@@ -266,6 +266,11 @@ const SeasonGrouping = {
             return this.getMovieBaseSlug(slug);
         }
 
+        // Special handling for Naruto (all versions group together as 'naruto')
+        if (slug.startsWith('naruto')) {
+            return 'naruto';
+        }
+
         // Special handling for One Punch Man (all seasons group together)
         if (slug.startsWith('one-punch-man')) {
             return 'one-punch-man';
@@ -319,6 +324,21 @@ const SeasonGrouping = {
             return 1; // Season 1
         }
 
+        // Special handling for Naruto (original / Shippuden / Boruto grouping)
+        if (slug.startsWith('naruto') || slug.startsWith('boruto')) {
+            const slugLower = slug.toLowerCase();
+            // Boruto = Season 3
+            if (slugLower.includes('boruto') || slugLower.includes('-3') || slugLower.includes('season-3')) {
+                return 3;
+            }
+            // Shippuden/Shippuuden = Season 2
+            if (slugLower.includes('shippuden') || slugLower.includes('shippuuden') || slugLower.includes('-2') || slugLower.includes('season-2')) {
+                return 2;
+            }
+            // Default to Season 1
+            return 1;
+        }
+
         // Special handling for Demon Slayer arcs
         if (slug.startsWith('kimetsu-no-yaiba')) {
             if (slug.includes('hashira-geiko-hen')) return 5;
@@ -341,6 +361,7 @@ const SeasonGrouping = {
 
         // Special handling for Initial D
         if (slug.startsWith('initial-d')) {
+            if (slug.includes('final-stage') || slug.includes('sixth-stage') || slug.includes('6th-stage')) return 6;
             if (slug.includes('fifth-stage') || slug.includes('5th-stage')) return 5;
             if (slug.includes('fourth-stage') || slug.includes('4th-stage')) return 4;
             if (slug.includes('third-stage') || slug.includes('3rd-stage')) return 3;
@@ -385,6 +406,34 @@ const SeasonGrouping = {
             return 'Season 1';
         }
 
+        // Special handling for Naruto display labels
+        if (slug.startsWith('naruto') || slug.startsWith('boruto')) {
+            const slugLower = slug.toLowerCase();
+            const titleLower = title ? title.toLowerCase() : '';
+            
+            // Check slug first - Boruto
+            if (slugLower.includes('boruto') || slugLower.endsWith('-3') || slugLower.includes('season-3')) {
+                return 'Naruto Boruto';
+            }
+            if (titleLower.includes('boruto')) {
+                return 'Naruto Boruto';
+            }
+            
+            // Check slug - Shippuden
+            if (slugLower.includes('shippuden') || slugLower.includes('shippuuden')) {
+                return 'Naruto Shippuden';
+            }
+            if (slugLower.endsWith('-2') || slugLower.includes('season-2')) {
+                return 'Naruto Shippuden';
+            }
+            if (titleLower.includes('shippuden') || titleLower.includes('shippuuden')) {
+                return 'Naruto Shippuden';
+            }
+            
+            // Default to Season 1 for base naruto
+            return 'Naruto';
+        }
+
         // Special handling for Jujutsu Kaisen
         if (slug.startsWith('jujutsu-kaisen')) {
             if (slug.includes('culling-game') || slug.includes('season-3') || slug.includes('dead-culling-game') || slug.includes('shimetsu-kaiyuu')) return 'Season 3';
@@ -415,11 +464,12 @@ const SeasonGrouping = {
 
         // Special handling for Initial D
         if (slug.startsWith('initial-d')) {
-            if (slug.includes('fifth-stage') || slug.includes('5th-stage')) return 'Fifth Stage';
-            if (slug.includes('fourth-stage') || slug.includes('4th-stage')) return 'Fourth Stage';
-            if (slug.includes('third-stage') || slug.includes('3rd-stage')) return 'Third Stage (Movie)';
-            if (slug.includes('second-stage') || slug.includes('2nd-stage')) return 'Second Stage';
-            return 'First Stage';
+                if (slug.includes('final-stage') || slug.includes('sixth-stage') || slug.includes('6th-stage')) return 'Final Stage';
+                if (slug.includes('fifth-stage') || slug.includes('5th-stage')) return 'Fifth Stage';
+                if (slug.includes('fourth-stage') || slug.includes('4th-stage')) return 'Fourth Stage';
+                if (slug.includes('third-stage') || slug.includes('3rd-stage')) return 'Third Stage (Movie)';
+                if (slug.includes('second-stage') || slug.includes('2nd-stage')) return 'Second Stage';
+                return 'First Stage';
         }
 
         // Special handling for Bleach TYBW - show as "Part X"

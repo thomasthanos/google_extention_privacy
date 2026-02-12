@@ -81,11 +81,9 @@ body {
   display: flex;
   flex-direction: column;
   height: var(--popup-max-height);
-  background: linear-gradient(
-    180deg,
-    var(--bg-secondary) 0%,
-    var(--bg-primary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-secondary) 0%,
+      var(--bg-primary) 100%);
 }
 
 /* ==================== AUTH SECTION ==================== */
@@ -97,11 +95,9 @@ body {
   height: 100%;
   padding: 40px 30px;
   text-align: center;
-  background: linear-gradient(
-    180deg,
-    var(--bg-secondary) 0%,
-    var(--bg-primary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-secondary) 0%,
+      var(--bg-primary) 100%);
 }
 
 .auth-content {
@@ -200,11 +196,9 @@ body {
   position: absolute;
   top: 42px;
   right: -50px;
-  background: linear-gradient(
-    180deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-secondary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-secondary) 100%);
   border: 1px solid var(--border-3d-light);
   border-radius: var(--border-radius-sm);
   padding: 8px;
@@ -280,11 +274,9 @@ body {
   position: absolute;
   top: 56px;
   right: 20px;
-  background: linear-gradient(
-    180deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-secondary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-secondary) 100%);
   border: 1px solid var(--border-3d-light);
   border-radius: var(--border-radius);
   min-width: 300px;
@@ -320,11 +312,9 @@ body {
   align-items: center;
   gap: 12px;
   padding: 16px;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 107, 107, 0.1),
-    rgba(255, 142, 83, 0.1)
-  );
+  background: linear-gradient(135deg,
+      rgba(255, 107, 107, 0.1),
+      rgba(255, 142, 83, 0.1));
   border-bottom: 1px solid var(--border-3d-dark);
 }
 
@@ -441,16 +431,20 @@ body {
 }
 
 @keyframes heartbeat {
+
   0%,
   100% {
     transform: scale(1);
   }
+
   25% {
     transform: scale(1.1);
   }
+
   50% {
     transform: scale(1);
   }
+
   75% {
     transform: scale(1.15);
   }
@@ -518,6 +512,7 @@ body {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -541,11 +536,9 @@ body {
 
 /* Header */
 .header {
-  background: linear-gradient(
-    180deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-secondary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-secondary) 100%);
   border-bottom: 1px solid var(--border-3d-dark);
   padding: 18px 20px;
   flex-shrink: 0;
@@ -574,10 +567,12 @@ body {
 }
 
 @keyframes pulse-glow {
+
   0%,
   100% {
     filter: drop-shadow(0 0 8px rgba(255, 107, 107, 0.5));
   }
+
   50% {
     filter: drop-shadow(0 0 15px rgba(255, 107, 107, 0.8));
   }
@@ -608,11 +603,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(
-    180deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-card) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-card) 100%);
   border: 1px solid var(--border-3d-light);
   border-bottom-color: var(--border-3d-dark);
   border-radius: var(--border-radius-sm);
@@ -628,11 +621,9 @@ body {
 }
 
 .btn-icon:hover {
-  background: linear-gradient(
-    180deg,
-    var(--bg-card-hover) 0%,
-    var(--bg-tertiary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-card-hover) 0%,
+      var(--bg-tertiary) 100%);
   color: var(--text-primary);
   transform: translateY(-2px);
   box-shadow:
@@ -646,11 +637,9 @@ body {
 }
 
 .btn-icon.btn-danger:hover {
-  background: linear-gradient(
-    180deg,
-    rgba(239, 68, 68, 0.2) 0%,
-    rgba(239, 68, 68, 0.1) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(239, 68, 68, 0.2) 0%,
+      rgba(239, 68, 68, 0.1) 100%);
   border-color: var(--danger);
   color: var(--danger);
   box-shadow:
@@ -683,11 +672,9 @@ body {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  background: linear-gradient(
-    180deg,
-    var(--bg-card) 0%,
-    var(--bg-tertiary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-card) 0%,
+      var(--bg-tertiary) 100%);
   border: 1px solid var(--border-3d-light);
   border-bottom-color: var(--border-3d-dark);
   border-radius: var(--border-radius-sm);
@@ -722,12 +709,10 @@ body {
 .stat-divider {
   width: 1px;
   height: 36px;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    var(--border-3d-light) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(180deg,
+      transparent 0%,
+      var(--border-3d-light) 50%,
+      transparent 100%);
 }
 
 /* Main Content */
@@ -751,11 +736,9 @@ body {
 }
 
 .main-content::-webkit-scrollbar-thumb {
-  background: linear-gradient(
-    180deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-card) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-card) 100%);
   border-radius: 3px;
   border: 1px solid var(--border-3d-light);
 }
@@ -852,11 +835,9 @@ body {
 .search-input {
   width: 100%;
   padding: 10px 12px 10px 38px;
-  background: linear-gradient(
-    180deg,
-    var(--bg-card) 0%,
-    var(--bg-tertiary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-card) 0%,
+      var(--bg-tertiary) 100%);
   border: 1px solid var(--border-3d-light);
   border-bottom-color: var(--border-3d-dark);
   border-radius: var(--border-radius-sm);
@@ -890,11 +871,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(
-    180deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-card) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-card) 100%);
   border: 1px solid var(--border-3d-light);
   border-bottom-color: var(--border-3d-dark);
   border-radius: var(--border-radius-sm);
@@ -911,11 +890,9 @@ body {
 
 .btn-sort:hover,
 .btn-sort.active {
-  background: linear-gradient(
-    180deg,
-    var(--bg-card-hover) 0%,
-    var(--bg-tertiary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-card-hover) 0%,
+      var(--bg-tertiary) 100%);
   color: var(--accent-primary);
   transform: translateY(-1px);
 }
@@ -938,11 +915,9 @@ body {
 }
 
 .sort-dropdown-content {
-  background: linear-gradient(
-    180deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-secondary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-secondary) 100%);
   border: 1px solid var(--border-3d-light);
   border-bottom-color: var(--border-3d-dark);
   border-radius: var(--border-radius-sm);
@@ -994,11 +969,9 @@ body {
 }
 
 .sort-option.active {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 107, 107, 0.2) 0%,
-    rgba(255, 107, 107, 0.1) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(255, 107, 107, 0.2) 0%,
+      rgba(255, 107, 107, 0.1) 100%);
   color: var(--accent-primary);
   font-weight: 600;
 }
@@ -1012,11 +985,9 @@ body {
 
 /* Anime Card - Premium 3D Style */
 .anime-card {
-  background: linear-gradient(
-    180deg,
-    var(--bg-card-hover) 0%,
-    var(--bg-card) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-card-hover) 0%,
+      var(--bg-card) 100%);
   border: 1px solid var(--border-3d-light);
   border-bottom-color: var(--border-3d-dark);
   border-radius: var(--border-radius);
@@ -1048,20 +1019,16 @@ body {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--border-3d-light) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      var(--border-3d-light) 50%,
+      transparent 100%);
 }
 
 .anime-card:hover {
-  background: linear-gradient(
-    180deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-card-hover) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-card-hover) 100%);
   border-color: var(--border-accent);
   transform: translateY(-2px);
   box-shadow: var(--shadow-card), var(--shadow-glow);
@@ -1122,11 +1089,9 @@ body {
   font-size: 10px;
   font-weight: 600;
   color: var(--success);
-  background: linear-gradient(
-    135deg,
-    rgba(74, 222, 128, 0.15) 0%,
-    rgba(74, 222, 128, 0.08) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(74, 222, 128, 0.15) 0%,
+      rgba(74, 222, 128, 0.08) 100%);
   border: 1px solid rgba(74, 222, 128, 0.3);
   padding: 2px 8px;
   border-radius: 10px;
@@ -1280,11 +1245,9 @@ body {
 
 .progress-bar {
   height: 6px;
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0.4) 0%,
-    rgba(0, 0, 0, 0.2) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(0, 0, 0, 0.4) 0%,
+      rgba(0, 0, 0, 0.2) 100%);
   border-radius: 4px;
   overflow: hidden;
   box-shadow:
@@ -1312,11 +1275,9 @@ body {
   left: 0;
   right: 0;
   height: 50%;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.25) 0%,
-    transparent 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(255, 255, 255, 0.25) 0%,
+      transparent 100%);
   border-radius: 4px 4px 0 0;
 }
 
@@ -1325,14 +1286,17 @@ body {
   height: 4px;
   border-radius: 2px;
 }
+
 .progress-bar.size-medium {
   height: 6px;
   border-radius: 3px;
 }
+
 .progress-bar.size-large {
   height: 8px;
   border-radius: 4px;
 }
+
 .progress-bar.size-huge {
   height: 12px;
   border-radius: 6px;
@@ -1402,11 +1366,9 @@ body {
   align-items: center;
   gap: 5px;
   padding: 5px 12px;
-  background: linear-gradient(
-    180deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-card) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-card) 100%);
   border: 1px solid var(--border-3d-light);
   border-bottom-color: var(--border-3d-dark);
   border-radius: 20px;
@@ -1423,31 +1385,25 @@ body {
 
 .badge-episodes {
   color: var(--accent-primary);
-  background: linear-gradient(
-    180deg,
-    rgba(255, 107, 107, 0.15) 0%,
-    rgba(255, 107, 107, 0.08) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(255, 107, 107, 0.15) 0%,
+      rgba(255, 107, 107, 0.08) 100%);
   border-color: rgba(255, 107, 107, 0.3);
 }
 
 .badge-time {
   color: var(--success);
-  background: linear-gradient(
-    180deg,
-    rgba(74, 222, 128, 0.15) 0%,
-    rgba(74, 222, 128, 0.08) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(74, 222, 128, 0.15) 0%,
+      rgba(74, 222, 128, 0.08) 100%);
   border-color: rgba(74, 222, 128, 0.3);
 }
 
 .badge-watching {
   color: var(--warning);
-  background: linear-gradient(
-    180deg,
-    rgba(251, 191, 36, 0.2) 0%,
-    rgba(251, 191, 36, 0.1) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(251, 191, 36, 0.2) 0%,
+      rgba(251, 191, 36, 0.1) 100%);
   border-color: rgba(251, 191, 36, 0.4);
   font-size: 10px;
   padding: 4px 10px;
@@ -1456,11 +1412,9 @@ body {
 /* In Progress Only Card */
 .anime-card.in-progress-only {
   border-color: rgba(251, 191, 36, 0.3);
-  background: linear-gradient(
-    180deg,
-    rgba(251, 191, 36, 0.08) 0%,
-    var(--bg-card) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(251, 191, 36, 0.08) 0%,
+      var(--bg-card) 100%);
 }
 
 .anime-card.in-progress-only:hover {
@@ -1498,7 +1452,8 @@ body {
 .anime-last-watched {
   font-size: 11px;
   color: var(--text-muted);
-  display: none; /* Hidden - using inline version now */
+  display: none;
+  /* Hidden - using inline version now */
 }
 
 /* Empty State */
@@ -1544,11 +1499,9 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 12px 20px;
-  background: linear-gradient(
-    180deg,
-    var(--bg-secondary) 0%,
-    var(--bg-tertiary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-secondary) 0%,
+      var(--bg-tertiary) 100%);
   border-top: 1px solid var(--border-3d-light);
   font-size: 11px;
   color: var(--text-muted);
@@ -1589,11 +1542,9 @@ body {
 }
 
 .donate-dropdown-content {
-  background: linear-gradient(
-    180deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-secondary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-secondary) 100%);
   border: 1px solid var(--border-3d-light);
   border-bottom-color: var(--border-3d-dark);
   border-radius: var(--border-radius-sm);
@@ -1693,11 +1644,9 @@ body {
 }
 
 .dialog {
-  background: linear-gradient(
-    180deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-secondary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-secondary) 100%);
   border: 1px solid var(--border-3d-light);
   border-bottom-color: var(--border-3d-dark);
   border-radius: var(--border-radius);
@@ -1715,6 +1664,7 @@ body {
     opacity: 0;
     transform: scale(0.9) translateY(-20px);
   }
+
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
@@ -1728,11 +1678,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(
-    180deg,
-    rgba(239, 68, 68, 0.2) 0%,
-    rgba(239, 68, 68, 0.1) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(239, 68, 68, 0.2) 0%,
+      rgba(239, 68, 68, 0.1) 100%);
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 50%;
   color: var(--danger);
@@ -1778,20 +1726,16 @@ body {
 }
 
 .btn-secondary {
-  background: linear-gradient(
-    180deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-card) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-card) 100%);
   color: var(--text-primary);
 }
 
 .btn-secondary:hover {
-  background: linear-gradient(
-    180deg,
-    var(--bg-card-hover) 0%,
-    var(--bg-tertiary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-card-hover) 0%,
+      var(--bg-tertiary) 100%);
   transform: translateY(-1px);
 }
 
@@ -1818,11 +1762,9 @@ body {
 .anime-in-progress {
   margin-bottom: 0;
   padding: 0;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 142, 83, 0.08) 0%,
-    rgba(255, 107, 107, 0.05) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(255, 142, 83, 0.08) 0%,
+      rgba(255, 107, 107, 0.05) 100%);
   border: 1px solid rgba(255, 142, 83, 0.2);
   border-radius: var(--border-radius-xs);
   box-shadow: 0 1px 4px rgba(255, 142, 83, 0.1);
@@ -1872,11 +1814,13 @@ body {
 }
 
 .in-progress-icon {
-  display: none; /* Hidden in compact design */
+  display: none;
+  /* Hidden in compact design */
 }
 
 .in-progress-preview {
-  display: none; /* Hidden in compact design */
+  display: none;
+  /* Hidden in compact design */
 }
 
 .collapse-icon {
@@ -1917,11 +1861,9 @@ body {
 
 .episode-tag {
   padding: 4px 10px;
-  background: linear-gradient(
-    180deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-card) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-card) 100%);
   border: 1px solid var(--border-3d-light);
   border-radius: var(--border-radius-xs);
   font-size: 11px;
@@ -1930,19 +1872,19 @@ body {
 }
 
 .episode-tag.in-progress {
-  padding: 6px 28px 6px 14px; /* More padding for pill look + delete button */
-  background: linear-gradient(
-    180deg,
-    rgba(251, 191, 36, 0.15) 0%,
-    rgba(251, 191, 36, 0.05) 100%
-  );
+  padding: 6px 28px 6px 14px;
+  /* More padding for pill look + delete button */
+  background: linear-gradient(180deg,
+      rgba(251, 191, 36, 0.15) 0%,
+      rgba(251, 191, 36, 0.05) 100%);
   border-color: rgba(251, 191, 36, 0.5);
   color: var(--warning);
   font-size: 12px;
   font-weight: 600;
   box-shadow: 0 0 10px rgba(251, 191, 36, 0.1);
   position: relative;
-  border-radius: 14px; /* Pill shape */
+  border-radius: 14px;
+  /* Pill shape */
   display: inline-flex;
   align-items: center;
 }
@@ -1980,11 +1922,9 @@ body {
 }
 
 .episode-tag.filler {
-  background: linear-gradient(
-    180deg,
-    rgba(168, 85, 247, 0.2) 0%,
-    rgba(168, 85, 247, 0.1) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(168, 85, 247, 0.2) 0%,
+      rgba(168, 85, 247, 0.1) 100%);
   border-color: rgba(168, 85, 247, 0.4);
   color: #a855f7;
   text-decoration: none;
@@ -1994,11 +1934,9 @@ body {
 /* Filler Badge */
 .badge-filler {
   color: #a855f7;
-  background: linear-gradient(
-    180deg,
-    rgba(168, 85, 247, 0.15) 0%,
-    rgba(168, 85, 247, 0.08) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(168, 85, 247, 0.15) 0%,
+      rgba(168, 85, 247, 0.08) 100%);
   border-color: rgba(168, 85, 247, 0.3);
   font-size: 10px;
 }
@@ -2010,11 +1948,9 @@ body {
   gap: 4px;
   margin-left: 8px;
   padding: 2px 6px;
-  background: linear-gradient(
-    180deg,
-    rgba(168, 85, 247, 0.15) 0%,
-    rgba(168, 85, 247, 0.08) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(168, 85, 247, 0.15) 0%,
+      rgba(168, 85, 247, 0.08) 100%);
   border: 1px solid rgba(168, 85, 247, 0.3);
   border-radius: 4px;
   font-size: 9px;
@@ -2052,11 +1988,9 @@ body {
 
 /* Watched Filler - normal style */
 .episode-tag.filler.watched-filler {
-  background: linear-gradient(
-    180deg,
-    rgba(168, 85, 247, 0.2) 0%,
-    rgba(168, 85, 247, 0.1) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(168, 85, 247, 0.2) 0%,
+      rgba(168, 85, 247, 0.1) 100%);
   border-color: rgba(168, 85, 247, 0.4);
   color: #a855f7;
   text-decoration: none;
@@ -2263,18 +2197,17 @@ body {
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
 }
 
 .loading {
-  background: linear-gradient(
-    90deg,
-    var(--bg-card) 25%,
-    var(--bg-tertiary) 50%,
-    var(--bg-card) 75%
-  );
+  background: linear-gradient(90deg,
+      var(--bg-card) 25%,
+      var(--bg-tertiary) 50%,
+      var(--bg-card) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
@@ -2298,6 +2231,7 @@ body {
     0 0 15px rgba(255, 107, 107, 0.3);
   flex-shrink: 0;
 }
+
 
 .btn-add-anime svg {
   width: 18px;
@@ -2329,11 +2263,9 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 107, 107, 0.15) 0%,
-    rgba(255, 142, 83, 0.1) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(255, 107, 107, 0.15) 0%,
+      rgba(255, 142, 83, 0.1) 100%);
   border-bottom: 1px solid var(--border-3d-dark);
 }
 
@@ -2402,11 +2334,9 @@ body {
 .form-group input[type="number"] {
   width: 100%;
   padding: 10px 12px;
-  background: linear-gradient(
-    180deg,
-    var(--bg-card) 0%,
-    var(--bg-tertiary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-card) 0%,
+      var(--bg-tertiary) 100%);
   border: 1px solid var(--border-3d-light);
   border-bottom-color: var(--border-3d-dark);
   border-radius: var(--border-radius-xs);
@@ -2476,11 +2406,9 @@ body {
 .checkbox-custom {
   width: 20px;
   height: 20px;
-  background: linear-gradient(
-    180deg,
-    var(--bg-card) 0%,
-    var(--bg-tertiary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-card) 0%,
+      var(--bg-tertiary) 100%);
   border: 2px solid var(--border-3d-light);
   border-radius: 4px;
   position: relative;
@@ -2492,13 +2420,13 @@ body {
   justify-content: center;
 }
 
-.checkbox-label input[type="checkbox"]:checked + .checkbox-custom {
+.checkbox-label input[type="checkbox"]:checked+.checkbox-custom {
   background: linear-gradient(135deg, var(--accent-primary) 0%, #ff8e53 100%);
   border-color: var(--accent-primary);
   box-shadow: 0 0 10px rgba(255, 107, 107, 0.4);
 }
 
-.checkbox-label input[type="checkbox"]:checked + .checkbox-custom::after {
+.checkbox-label input[type="checkbox"]:checked+.checkbox-custom::after {
   content: "✓";
   color: white;
   font-size: 14px;
@@ -2557,11 +2485,9 @@ body {
     opacity var(--transition-normal),
     margin var(--transition-normal),
     padding var(--transition-normal);
-  background: linear-gradient(
-    180deg,
-    rgba(99, 102, 241, 0.08) 0%,
-    rgba(99, 102, 241, 0.04) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(99, 102, 241, 0.08) 0%,
+      rgba(99, 102, 241, 0.04) 100%);
   border: 1px solid rgba(99, 102, 241, 0.25);
   border-radius: var(--border-radius-xs);
   margin-bottom: 0;
@@ -2639,11 +2565,9 @@ body {
   display: flex;
   flex-direction: column;
   padding: 8px 10px;
-  background: linear-gradient(
-    180deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-card) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-card) 100%);
   border: 1px solid var(--border-3d-light);
   border-radius: var(--border-radius-xs);
   font-size: 11px;
@@ -2651,11 +2575,9 @@ body {
 }
 
 .part-item:hover {
-  background: linear-gradient(
-    180deg,
-    var(--bg-card-hover) 0%,
-    var(--bg-tertiary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-card-hover) 0%,
+      var(--bg-tertiary) 100%);
   border-color: rgba(99, 102, 241, 0.4);
 }
 
@@ -2756,11 +2678,9 @@ body {
 
 .part-item.in-progress {
   border-color: rgba(251, 191, 36, 0.3);
-  background: linear-gradient(
-    180deg,
-    rgba(251, 191, 36, 0.08) 0%,
-    var(--bg-card) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(251, 191, 36, 0.08) 0%,
+      var(--bg-card) 100%);
 }
 
 /* Complete part */
@@ -2771,11 +2691,9 @@ body {
 
 .part-item.complete {
   border-color: rgba(74, 222, 128, 0.3);
-  background: linear-gradient(
-    180deg,
-    rgba(74, 222, 128, 0.08) 0%,
-    var(--bg-card) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(74, 222, 128, 0.08) 0%,
+      var(--bg-card) 100%);
 }
 
 .part-name {
@@ -2818,11 +2736,9 @@ body {
 
 /* ==================== SEASON GROUP BOX ==================== */
 .anime-season-group {
-  background: linear-gradient(
-    180deg,
-    var(--bg-card-hover) 0%,
-    var(--bg-card) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-card-hover) 0%,
+      var(--bg-card) 100%);
   border: 1px solid var(--border-3d-light);
   border-bottom-color: var(--border-3d-dark);
   border-radius: var(--border-radius);
@@ -2840,20 +2756,16 @@ body {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--border-3d-light) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      var(--border-3d-light) 50%,
+      transparent 100%);
 }
 
 .anime-season-group:hover {
-  background: linear-gradient(
-    180deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-card-hover) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-card-hover) 100%);
   border-color: var(--border-accent);
   transform: translateY(-2px);
   box-shadow: var(--shadow-card), var(--shadow-glow);
@@ -2895,17 +2807,24 @@ body {
 .season-count-badge {
   font-size: 10px;
   font-weight: 600;
-  color: var(--success);
-  background: linear-gradient(
-    135deg,
-    rgba(74, 222, 128, 0.15) 0%,
-    rgba(74, 222, 128, 0.08) 100%
-  );
-  border: 1px solid rgba(74, 222, 128, 0.3);
+  color: var(--warning);
+  background: linear-gradient(135deg,
+      rgba(251, 191, 36, 0.15) 0%,
+      rgba(251, 191, 36, 0.08) 100%);
+  border: 1px solid rgba(251, 191, 36, 0.3);
   padding: 2px 8px;
   border-radius: 10px;
   white-space: nowrap;
   flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.1);
+}
+
+.season-count-badge.complete {
+  color: var(--success);
+  background: linear-gradient(135deg,
+      rgba(74, 222, 128, 0.15) 0%,
+      rgba(74, 222, 128, 0.08) 100%);
+  border-color: rgba(74, 222, 128, 0.3);
   box-shadow: 0 0 8px rgba(74, 222, 128, 0.1);
 }
 
@@ -2971,22 +2890,18 @@ body {
   display: flex;
   flex-direction: column;
   padding: 8px 10px;
-  background: linear-gradient(
-    180deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-card) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-card) 100%);
   border: 1px solid var(--border-3d-light);
   border-radius: var(--border-radius-xs);
   transition: all var(--transition-fast);
 }
 
 .season-item:hover {
-  background: linear-gradient(
-    180deg,
-    var(--bg-card-hover) 0%,
-    var(--bg-tertiary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-card-hover) 0%,
+      var(--bg-tertiary) 100%);
   border-color: var(--border-accent);
 }
 
@@ -3065,21 +2980,17 @@ body {
 
 .season-item.in-progress .season-episode-badge {
   color: var(--warning);
-  background: linear-gradient(
-    135deg,
-    rgba(251, 191, 36, 0.15) 0%,
-    rgba(251, 191, 36, 0.08) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(251, 191, 36, 0.15) 0%,
+      rgba(251, 191, 36, 0.08) 100%);
   border: 1px solid rgba(251, 191, 36, 0.3);
 }
 
 .season-item.complete .season-episode-badge {
   color: var(--success);
-  background: linear-gradient(
-    135deg,
-    rgba(74, 222, 128, 0.15) 0%,
-    rgba(74, 222, 128, 0.08) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(74, 222, 128, 0.15) 0%,
+      rgba(74, 222, 128, 0.08) 100%);
   border: 1px solid rgba(74, 222, 128, 0.3);
 }
 
@@ -3198,11 +3109,9 @@ body {
 
 /* ==================== MOVIE GROUP BOX ==================== */
 .anime-movie-group {
-  background: linear-gradient(
-    180deg,
-    var(--bg-card-hover) 0%,
-    var(--bg-card) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-card-hover) 0%,
+      var(--bg-card) 100%);
   border: 1px solid var(--border-3d-light);
   border-bottom-color: var(--border-3d-dark);
   border-radius: var(--border-radius);
@@ -3220,20 +3129,16 @@ body {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(251, 191, 36, 0.3) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(251, 191, 36, 0.3) 50%,
+      transparent 100%);
 }
 
 .anime-movie-group:hover {
-  background: linear-gradient(
-    180deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-card-hover) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-card-hover) 100%);
   border-color: rgba(251, 191, 36, 0.5);
   transform: translateY(-2px);
   box-shadow:
@@ -3278,11 +3183,9 @@ body {
   font-size: 10px;
   font-weight: 600;
   color: var(--warning);
-  background: linear-gradient(
-    135deg,
-    rgba(251, 191, 36, 0.15) 0%,
-    rgba(251, 191, 36, 0.08) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(251, 191, 36, 0.15) 0%,
+      rgba(251, 191, 36, 0.08) 100%);
   border: 1px solid rgba(251, 191, 36, 0.3);
   padding: 2px 8px;
   border-radius: 10px;
@@ -3293,11 +3196,9 @@ body {
 
 .movie-count-badge.single {
   color: #f4a261;
-  background: linear-gradient(
-    135deg,
-    rgba(244, 162, 97, 0.15) 0%,
-    rgba(244, 162, 97, 0.08) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(244, 162, 97, 0.15) 0%,
+      rgba(244, 162, 97, 0.08) 100%);
   border: 1px solid rgba(244, 162, 97, 0.3);
   box-shadow: 0 0 8px rgba(244, 162, 97, 0.1);
 }
@@ -3388,22 +3289,18 @@ body {
   display: flex;
   flex-direction: column;
   padding: 8px 10px;
-  background: linear-gradient(
-    180deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-card) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-card) 100%);
   border: 1px solid var(--border-3d-light);
   border-radius: var(--border-radius-xs);
   transition: all var(--transition-fast);
 }
 
 .movie-item:hover {
-  background: linear-gradient(
-    180deg,
-    var(--bg-card-hover) 0%,
-    var(--bg-tertiary) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--bg-card-hover) 0%,
+      var(--bg-tertiary) 100%);
   border-color: rgba(251, 191, 36, 0.3);
 }
 
@@ -3507,11 +3404,9 @@ body {
 
 /* Single Movie Card */
 .single-movie-card {
-  background: linear-gradient(
-    135deg,
-    rgba(244, 162, 97, 0.08) 0%,
-    rgba(30, 30, 40, 0.95) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(244, 162, 97, 0.08) 0%,
+      rgba(30, 30, 40, 0.95) 100%);
   border: 1px solid rgba(244, 162, 97, 0.25);
   border-radius: 12px;
   margin-bottom: 10px;
@@ -3526,11 +3421,9 @@ body {
 
 .single-movie-card.watched {
   border-color: rgba(74, 222, 128, 0.3);
-  background: linear-gradient(
-    135deg,
-    rgba(74, 222, 128, 0.05) 0%,
-    rgba(30, 30, 40, 0.95) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(74, 222, 128, 0.05) 0%,
+      rgba(30, 30, 40, 0.95) 100%);
 }
 
 .single-movie-card .anime-card-main {
@@ -3618,22 +3511,18 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.1),
-    rgba(99, 102, 241, 0.05)
-  );
+  background: linear-gradient(135deg,
+      rgba(139, 92, 246, 0.1),
+      rgba(99, 102, 241, 0.05));
   border-bottom: 1px solid transparent;
   transition: all 0.3s ease;
 }
 
 .franchise-group.expanded .franchise-header {
   border-bottom-color: rgba(139, 92, 246, 0.2);
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.15),
-    rgba(99, 102, 241, 0.08)
-  );
+  background: linear-gradient(135deg,
+      rgba(139, 92, 246, 0.15),
+      rgba(99, 102, 241, 0.08));
 }
 
 .franchise-title {

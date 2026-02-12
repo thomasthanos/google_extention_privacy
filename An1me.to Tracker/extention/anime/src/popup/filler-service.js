@@ -559,7 +559,10 @@ const FillerService = {
             'shingeki-no-kyojin',  // Attack on Titan
             'kimetsu-no-yaiba',     // Demon Slayer
             'boku-no-hero-academia', // My Hero Academia
-            'jujutsu-kaisen'        // Jujutsu Kaisen
+            'jujutsu-kaisen',       // Jujutsu Kaisen
+            'naruto',               // Naruto (original + Shippuden + Boruto)
+            'boruto',               // Boruto (Naruto Next Generations)
+            'initial-d'             // Initial D (all stages)
         ];
         return multiSeasonPrefixes.some(prefix => slug.toLowerCase().startsWith(prefix));
     },
@@ -591,6 +594,32 @@ const FillerService = {
         'jujutsu-kaisen-season-2': 23,
         'jujutsu-kaisen-2nd-season': 23, // Correct slug for S2
         'jujutsu-kaisen-season-3': 12, // Fallback if user considers Hidden Inventory/Premature Death as S3
+        
+        // Naruto series
+        'naruto': 220,
+        'naruto-original': 220,
+        'naruto-complete': 220,
+        'naruto-episode': 220,  // Fallback if episodes included in slug
+        'naruto-shippuden': 500,
+        'naruto-shippuuden': 500,  // Alternative spelling (actual site spelling)
+        'naruto-shippuden-complete': 500,
+        'naruto-shippuuden-complete': 500,
+        'naruto-shippuden-episode': 500,
+        'naruto-shippuuden-episode': 500,
+        'boruto': 293,  // Boruto: Naruto Next Generations
+        'naruto-boruto': 293,
+        'boruto-naruto-next-generations': 293,
+        'boruto-episode': 293,
+
+        // Initial D stage-specific counts
+        'initial-d': 26,  // First stage default
+        'initial-d-first-stage': 26,
+        'initial-d-second-stage': 13,
+        'initial-d-third-stage': 1, // Movie (duration handled elsewhere)
+        'initial-d-fourth-stage': 24,
+        'initial-d-fifth-stage': 14,
+        'initial-d-sixth-stage': 4,
+        'initial-d-final-stage': 4,
     },
 
     /**
@@ -599,9 +628,64 @@ const FillerService = {
     getTotalEpisodes(slug, watchedCount, anime = null) {
         const normalizedSlug = slug.toLowerCase();
 
-        // Check manual overrides first
+        // Check manual overrides first - try exact match and base slug
         if (this.MANUAL_EPISODE_COUNTS[normalizedSlug]) {
             return this.MANUAL_EPISODE_COUNTS[normalizedSlug];
+        }
+
+        // For Naruto - check without hyphenated parts
+        if (normalizedSlug.startsWith('naruto')) {
+            // Try to match partial slugs like "naruto-episode-220"
+            const isShippuuden = normalizedSlug.includes('shippuuden') || normalizedSlug.includes('shippuden') || normalizedSlug.includes('-2');
+            if (isShippuuden) {
+                const count = this.MANUAL_EPISODE_COUNTS['naruto-shippuuden'] || this.MANUAL_EPISODE_COUNTS['naruto-shippuden'];
+                if (count) return count;
+                // Hardcode fallback
+                return 500;
+            } else {
+                const count = this.MANUAL_EPISODE_COUNTS['naruto'];
+                if (count) return count;
+                // Hardcode fallback
+                return 220;
+            }
+        }
+
+        // For Initial D - check stage indicators
+        if (normalizedSlug.startsWith('initial-d')) {
+            if (normalizedSlug.includes('sixth-stage') || normalizedSlug.includes('6th-stage') || normalizedSlug.includes('final-stage')) {
+                const count = this.MANUAL_EPISODE_COUNTS['initial-d-final-stage'];
+                if (count) return count;
+                return 4;
+            }
+            if (normalizedSlug.includes('fifth-stage') || normalizedSlug.includes('5th-stage')) {
+                const count = this.MANUAL_EPISODE_COUNTS['initial-d-fifth-stage'];
+                if (count) return count;
+                return 14;
+            }
+            if (normalizedSlug.includes('fourth-stage') || normalizedSlug.includes('4th-stage')) {
+                const count = this.MANUAL_EPISODE_COUNTS['initial-d-fourth-stage'];
+                if (count) return count;
+                return 24;
+            }
+            if (normalizedSlug.includes('third-stage') || normalizedSlug.includes('3rd-stage')) {
+                const count = this.MANUAL_EPISODE_COUNTS['initial-d-third-stage'];
+                if (count) return count;
+                return 1;
+            }
+            if (normalizedSlug.includes('second-stage') || normalizedSlug.includes('2nd-stage')) {
+                const count = this.MANUAL_EPISODE_COUNTS['initial-d-second-stage'];
+                if (count) return count;
+                return 13;
+            }
+            if (normalizedSlug.includes('first-stage') || normalizedSlug.includes('1st-stage')) {
+                const count = this.MANUAL_EPISODE_COUNTS['initial-d-first-stage'];
+                if (count) return count;
+                return 26;
+            }
+            // Fallback to first stage if no specific stage detected
+            const count = this.MANUAL_EPISODE_COUNTS['initial-d'];
+            if (count) return count;
+            return 26;
         }
 
         // For multi-season anime, DON'T use the global KNOWN_ANIME_TOTALS
@@ -668,12 +752,26 @@ const FillerService = {
         const isMultiSeason = this.isMultiSeasonAnime(slug);
 
         const normalizedSlug = slug.toLowerCase();
-        const hasKnownTotal = this.MANUAL_EPISODE_COUNTS[normalizedSlug] ||
-            (!isMultiSeason && (
-            this.KNOWN_ANIME_TOTALS[normalizedSlug] ||
-            (anime && anime.totalEpisodes) ||
-            (this.episodeTypesCache[slug] && this.episodeTypesCache[slug].totalEpisodes)
-        ));
+        
+        // Check for known totals - including Naruto and Initial D special cases
+        let hasKnownTotal = this.MANUAL_EPISODE_COUNTS[normalizedSlug];
+        
+        // For Naruto and Initial D, only mark as NOT guessed if user has watched all episodes
+        if (!hasKnownTotal && normalizedSlug.startsWith('naruto')) {
+            // Only show green (not guessed) if episodeCount >= totalEpisodes (completed the season)
+            hasKnownTotal = (episodeCount >= totalEpisodes);
+        }
+        
+        if (!hasKnownTotal && normalizedSlug.startsWith('initial-d')) {
+            // Only show green (not guessed) if episodeCount >= totalEpisodes (completed the stage)
+            hasKnownTotal = (episodeCount >= totalEpisodes);
+        }
+        
+        if (!hasKnownTotal && !isMultiSeason) {
+            hasKnownTotal = this.KNOWN_ANIME_TOTALS[normalizedSlug] ||
+                (anime && anime.totalEpisodes) ||
+                (this.episodeTypesCache[slug] && this.episodeTypesCache[slug].totalEpisodes);
+        }
 
         return {
             progress: Math.min(progress, 100),
