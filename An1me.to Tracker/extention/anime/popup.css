@@ -1,0 +1,3845 @@
+/**
+ * Anime Tracker - Popup Styles
+ * Premium Dark Theme with 3D Effects
+ */
+
+/* CSS Variables */
+:root {
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-tertiary: #1a1a25;
+  --bg-card: #14141f;
+  --bg-card-hover: #1c1c2a;
+
+  --accent-primary: #ff6b6b;
+  --accent-secondary: #ff8e8e;
+  --accent-gradient: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%);
+
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0b0;
+  --text-muted: #5a5a6e;
+
+  --success: #4ade80;
+  --success-glow: rgba(74, 222, 128, 0.3);
+  --warning: #fbbf24;
+  --danger: #ef4444;
+
+  --border-3d-light: rgba(255, 255, 255, 0.08);
+  --border-3d-dark: rgba(0, 0, 0, 0.4);
+  --border-accent: rgba(255, 107, 107, 0.3);
+
+  --border-radius: 14px;
+  --border-radius-sm: 10px;
+  --border-radius-xs: 6px;
+
+  --shadow-3d:
+    0 1px 0 0 var(--border-3d-light) inset,
+    0 -1px 0 0 var(--border-3d-dark) inset, 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-card:
+    0 1px 0 0 var(--border-3d-light) inset,
+    0 -1px 0 0 var(--border-3d-dark) inset, 0 8px 24px rgba(0, 0, 0, 0.3);
+  --shadow-glow: 0 0 20px rgba(255, 107, 107, 0.15);
+
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  --popup-width: 400px;
+  --popup-max-height: 560px;
+}
+
+/* Reset & Base */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body {
+  font-family:
+    "Klee One",
+    "Segoe UI",
+    -apple-system,
+    BlinkMacSystemFont,
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  width: var(--popup-width);
+  max-height: var(--popup-max-height);
+  overflow: hidden;
+}
+
+/* App Container */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: var(--popup-max-height);
+  background: linear-gradient(
+    180deg,
+    var(--bg-secondary) 0%,
+    var(--bg-primary) 100%
+  );
+}
+
+/* ==================== AUTH SECTION ==================== */
+.auth-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 40px 30px;
+  text-align: center;
+  background: linear-gradient(
+    180deg,
+    var(--bg-secondary) 0%,
+    var(--bg-primary) 100%
+  );
+}
+
+.auth-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.auth-logo {
+  width: 64px;
+  height: 64px;
+  color: var(--accent-primary);
+  filter: drop-shadow(0 0 20px rgba(255, 107, 107, 0.6));
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.auth-title {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 32px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.auth-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+  max-width: 280px;
+  line-height: 1.6;
+}
+
+.btn-google {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 28px;
+  margin-top: 10px;
+  background: #ffffff;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.btn-google:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.btn-google:active {
+  transform: translateY(0);
+}
+
+.google-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.auth-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  max-width: 260px;
+  margin-top: 20px;
+  line-height: 1.5;
+}
+
+/* ==================== USER MENU ==================== */
+.user-menu {
+  position: relative;
+  cursor: pointer;
+}
+
+.user-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-primary);
+  object-fit: cover;
+  transition: all var(--transition-fast);
+}
+
+.user-avatar:hover {
+  border-color: var(--accent-secondary);
+  box-shadow: 0 0 12px rgba(255, 107, 107, 0.4);
+}
+
+.user-dropdown {
+  position: absolute;
+  top: 42px;
+  right: -50px;
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-secondary) 100%
+  );
+  border: 1px solid var(--border-3d-light);
+  border-radius: var(--border-radius-sm);
+  padding: 8px;
+  min-width: 180px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all var(--transition-fast);
+  box-shadow:
+    var(--shadow-card),
+    0 10px 40px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.user-dropdown.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.user-email {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: var(--border-3d-dark);
+  margin: 6px 0;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: var(--border-radius-xs);
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+
+.dropdown-item svg {
+  width: 16px;
+  height: 16px;
+}
+
+.dropdown-item:hover {
+  background: rgba(255, 107, 107, 0.1);
+  color: var(--accent-primary);
+}
+
+/* ==================== SETTINGS DROPDOWN ==================== */
+.settings-dropdown {
+  position: absolute;
+  top: 56px;
+  right: 20px;
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-secondary) 100%
+  );
+  border: 1px solid var(--border-3d-light);
+  border-radius: var(--border-radius);
+  min-width: 300px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px) scale(0.95);
+  transition: all var(--transition-normal);
+  box-shadow:
+    var(--shadow-card),
+    0 10px 40px rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.settings-dropdown.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+
+.settings-dropdown-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-section {
+  padding: 12px;
+}
+
+/* Profile Section */
+.profile-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 107, 107, 0.1),
+    rgba(255, 142, 83, 0.1)
+  );
+  border-bottom: 1px solid var(--border-3d-dark);
+}
+
+.settings-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-primary);
+  object-fit: cover;
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+}
+
+.settings-user-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-user-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settings-user-email {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settings-divider {
+  height: 1px;
+  background: var(--border-3d-dark);
+  margin: 4px 0;
+}
+
+/* Settings Items */
+.settings-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+  position: relative;
+  overflow: hidden;
+}
+
+.settings-item::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--accent-gradient);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.settings-item:hover::before {
+  opacity: 0.08;
+}
+
+.settings-item:active {
+  transform: scale(0.98);
+}
+
+.settings-item-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--border-radius-xs);
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.settings-item-icon svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.settings-item:hover .settings-item-icon {
+  background: rgba(255, 107, 107, 0.15);
+  transform: scale(1.05);
+}
+
+.settings-item:hover .settings-item-icon svg {
+  color: var(--accent-primary);
+}
+
+/* Heart icon special animation */
+.settings-item-icon.heart svg {
+  color: #ff6b6b;
+}
+
+.settings-item:hover .settings-item-icon.heart {
+  animation: heartbeat 0.6s ease-in-out;
+}
+
+@keyframes heartbeat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.1);
+  }
+  50% {
+    transform: scale(1);
+  }
+  75% {
+    transform: scale(1.15);
+  }
+}
+
+.settings-item-text {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-item-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  transition: color var(--transition-fast);
+}
+
+.settings-item-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  transition: color var(--transition-fast);
+}
+
+.settings-item:hover .settings-item-title {
+  color: var(--accent-primary);
+}
+
+.settings-item:hover .settings-item-subtitle {
+  color: var(--text-secondary);
+}
+
+.settings-item-arrow {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+  transition: all var(--transition-fast);
+}
+
+.settings-item:hover .settings-item-arrow {
+  color: var(--accent-primary);
+  transform: translateX(3px);
+}
+
+/* Danger Item */
+.settings-item.danger:hover .settings-item-icon {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.settings-item.danger:hover .settings-item-icon svg,
+.settings-item.danger:hover .settings-item-title {
+  color: var(--danger);
+}
+
+/* Loading state for refresh */
+.settings-item.loading .settings-item-icon svg {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ==================== MAIN APP ==================== */
+.main-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Sync Status Variants */
+.sync-status.syncing {
+  color: var(--warning);
+}
+
+.sync-status.synced {
+  color: var(--success);
+}
+
+/* Header */
+.header {
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-secondary) 100%
+  );
+  border-bottom: 1px solid var(--border-3d-dark);
+  padding: 18px 20px;
+  flex-shrink: 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-icon {
+  width: 32px;
+  height: 32px;
+  color: var(--accent-primary);
+  filter: drop-shadow(0 0 10px rgba(255, 107, 107, 0.6));
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 8px rgba(255, 107, 107, 0.5));
+  }
+  50% {
+    filter: drop-shadow(0 0 15px rgba(255, 107, 107, 0.8));
+  }
+}
+
+.logo h1 {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 24px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 2px 10px rgba(255, 107, 107, 0.3);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 3D Icon Buttons */
+.btn-icon {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-card) 100%
+  );
+  border: 1px solid var(--border-3d-light);
+  border-bottom-color: var(--border-3d-dark);
+  border-radius: var(--border-radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-3d);
+}
+
+.btn-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-icon:hover {
+  background: linear-gradient(
+    180deg,
+    var(--bg-card-hover) 0%,
+    var(--bg-tertiary) 100%
+  );
+  color: var(--text-primary);
+  transform: translateY(-2px);
+  box-shadow:
+    var(--shadow-3d),
+    0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.btn-icon:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 0 0 var(--border-3d-dark) inset;
+}
+
+.btn-icon.btn-danger:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(239, 68, 68, 0.2) 0%,
+    rgba(239, 68, 68, 0.1) 100%
+  );
+  border-color: var(--danger);
+  color: var(--danger);
+  box-shadow:
+    var(--shadow-3d),
+    0 0 15px rgba(239, 68, 68, 0.2);
+}
+
+.btn-icon.btn-donate {
+  background: linear-gradient(180deg, #ff6b6b 0%, #ee5a5a 100%);
+  border-color: #ff8a8a;
+  border-bottom-color: #cc4a4a;
+  color: white;
+}
+
+.btn-icon.btn-donate:hover {
+  background: linear-gradient(180deg, #ff8a8a 0%, #ff6b6b 100%);
+  color: white;
+  box-shadow:
+    var(--shadow-3d),
+    0 0 15px rgba(255, 107, 107, 0.4);
+}
+
+.btn-icon.btn-donate svg {
+  fill: white;
+  stroke: white;
+}
+
+/* Stats Bar */
+.stats-bar {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background: linear-gradient(
+    180deg,
+    var(--bg-card) 0%,
+    var(--bg-tertiary) 100%
+  );
+  border: 1px solid var(--border-3d-light);
+  border-bottom-color: var(--border-3d-dark);
+  border-radius: var(--border-radius-sm);
+  padding: 14px 18px;
+  box-shadow: var(--shadow-3d);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stat-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+
+.stat-divider {
+  width: 1px;
+  height: 36px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--border-3d-light) 50%,
+    transparent 100%
+  );
+}
+
+/* Main Content */
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Custom Scrollbar */
+.main-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.main-content::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+  border-radius: 3px;
+}
+
+.main-content::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-card) 100%
+  );
+  border-radius: 3px;
+  border: 1px solid var(--border-3d-light);
+}
+
+.main-content::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
+}
+
+/* Category Tabs */
+.category-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 4px;
+  background: var(--bg-tertiary);
+  border-radius: 10px;
+  border: 1px solid var(--border-3d-dark);
+}
+
+.category-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.category-tab svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2;
+}
+
+.category-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.category-tab.active {
+  background: linear-gradient(180deg, var(--accent-primary) 0%, #e55555 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+}
+
+.category-tab.active svg {
+  stroke: white;
+}
+
+/* Category-specific colors */
+.category-tab[data-category="movies"].active {
+  background: linear-gradient(180deg, #f4a261 0%, #e68a3d 100%);
+  box-shadow: 0 2px 8px rgba(244, 162, 97, 0.3);
+}
+
+.category-tab[data-category="series"].active {
+  background: linear-gradient(180deg, #4ecdc4 0%, #3dbdb5 100%);
+  box-shadow: 0 2px 8px rgba(78, 205, 196, 0.3);
+}
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-bottom: 4px;
+}
+
+/* Search */
+.search-container {
+  position: relative;
+  flex: 1;
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 12px 10px 38px;
+  background: linear-gradient(
+    180deg,
+    var(--bg-card) 0%,
+    var(--bg-tertiary) 100%
+  );
+  border: 1px solid var(--border-3d-light);
+  border-bottom-color: var(--border-3d-dark);
+  border-radius: var(--border-radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-3d);
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow:
+    var(--shadow-3d),
+    0 0 0 3px rgba(255, 107, 107, 0.15),
+    var(--shadow-glow);
+}
+
+/* Sort */
+.sort-container {
+  position: relative;
+}
+
+.btn-sort {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-card) 100%
+  );
+  border: 1px solid var(--border-3d-light);
+  border-bottom-color: var(--border-3d-dark);
+  border-radius: var(--border-radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-3d);
+}
+
+.btn-sort svg {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-sort:hover,
+.btn-sort.active {
+  background: linear-gradient(
+    180deg,
+    var(--bg-card-hover) 0%,
+    var(--bg-tertiary) 100%
+  );
+  color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
+.sort-dropdown {
+  position: absolute;
+  top: 42px;
+  right: 0;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all var(--transition-fast);
+}
+
+.sort-dropdown.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.sort-dropdown-content {
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-secondary) 100%
+  );
+  border: 1px solid var(--border-3d-light);
+  border-bottom-color: var(--border-3d-dark);
+  border-radius: var(--border-radius-sm);
+  padding: 6px;
+  min-width: 160px;
+  box-shadow:
+    var(--shadow-card),
+    0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.sort-dropdown-content::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  right: 10px;
+  width: 12px;
+  height: 12px;
+  background: var(--bg-tertiary);
+  border-left: 1px solid var(--border-3d-light);
+  border-top: 1px solid var(--border-3d-light);
+  transform: rotate(45deg);
+}
+
+.sort-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: var(--border-radius-xs);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+
+.sort-option svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sort-option:hover {
+  background: rgba(255, 107, 107, 0.1);
+  color: var(--text-primary);
+}
+
+.sort-option.active {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 107, 107, 0.2) 0%,
+    rgba(255, 107, 107, 0.1) 100%
+  );
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+/* Anime List */
+.anime-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Anime Card - Premium 3D Style */
+.anime-card {
+  background: linear-gradient(
+    180deg,
+    var(--bg-card-hover) 0%,
+    var(--bg-card) 100%
+  );
+  border: 1px solid var(--border-3d-light);
+  border-bottom-color: var(--border-3d-dark);
+  border-radius: var(--border-radius);
+  padding: 10px 14px;
+  transition: all var(--transition-normal);
+  box-shadow: var(--shadow-card);
+  position: relative;
+  overflow: hidden;
+}
+
+.anime-card.expanded {
+  padding: 14px 16px;
+}
+
+/* Hide content when collapsed, show on expand */
+.anime-card-content {
+  display: none;
+  margin-top: 12px;
+}
+
+.anime-card.expanded .anime-card-content {
+  display: block;
+}
+
+.anime-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--border-3d-light) 50%,
+    transparent 100%
+  );
+}
+
+.anime-card:hover {
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-card-hover) 100%
+  );
+  border-color: var(--border-accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card), var(--shadow-glow);
+}
+
+.anime-card:hover .anime-expand-icon {
+  color: var(--accent-primary);
+}
+
+.anime-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0;
+  cursor: pointer;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.anime-card.expanded .anime-card-header {
+  margin-bottom: 12px;
+}
+
+.anime-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+  flex: 1;
+  margin-right: 10px;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.anime-title-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  position: relative;
+}
+
+.anime-title-text::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 30px;
+  background: linear-gradient(to right, transparent, var(--card-bg));
+  pointer-events: none;
+}
+
+.current-episode-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--success);
+  background: linear-gradient(
+    135deg,
+    rgba(74, 222, 128, 0.15) 0%,
+    rgba(74, 222, 128, 0.08) 100%
+  );
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.1);
+}
+
+.anime-expand-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  margin-right: 4px;
+  opacity: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.anime-expand-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.anime-card.expanded .anime-expand-icon {
+  transform: rotate(90deg);
+  color: var(--accent-primary);
+}
+
+.anime-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.anime-delete {
+  width: 26px;
+  height: 26px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--border-radius-xs);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.anime-card.expanded .anime-delete {
+  display: flex;
+}
+
+.anime-delete:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+}
+
+.anime-delete svg {
+  width: 14px;
+  height: 14px;
+}
+
+.anime-fetch-filler {
+  width: 26px;
+  height: 26px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--border-radius-xs);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.anime-card.expanded .anime-fetch-filler {
+  display: flex;
+}
+
+.anime-fetch-filler:hover {
+  background: rgba(251, 191, 36, 0.15);
+  color: var(--warning);
+  transform: scale(1.1);
+}
+
+.anime-fetch-filler:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.anime-edit-title {
+  width: 26px;
+  height: 26px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--border-radius-xs);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.anime-card.expanded .anime-edit-title {
+  display: flex;
+}
+
+.anime-edit-title:hover {
+  background: rgba(100, 180, 255, 0.15);
+  color: #64b4ff;
+  transform: scale(1.1);
+}
+
+/* Dynamic Progress Bar */
+.progress-container {
+  margin-bottom: 0;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    max-height var(--transition-normal),
+    opacity var(--transition-normal),
+    margin var(--transition-normal);
+}
+
+.anime-card.expanded .progress-container {
+  max-height: 100px;
+  opacity: 1;
+  margin-bottom: 12px;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.progress-bar {
+  height: 6px;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.4) 0%,
+    rgba(0, 0, 0, 0.2) 100%
+  );
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.4),
+    inset 0 -1px 2px rgba(255, 255, 255, 0.05),
+    0 1px 0 rgba(255, 255, 255, 0.05);
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 50%, #ff6b6b 100%);
+  border-radius: 4px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  box-shadow:
+    0 0 12px rgba(255, 107, 107, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.progress-fill::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.25) 0%,
+    transparent 100%
+  );
+  border-radius: 4px 4px 0 0;
+}
+
+/* Progress size classes */
+.progress-bar.size-small {
+  height: 4px;
+  border-radius: 2px;
+}
+.progress-bar.size-medium {
+  height: 6px;
+  border-radius: 3px;
+}
+.progress-bar.size-large {
+  height: 8px;
+  border-radius: 4px;
+}
+.progress-bar.size-huge {
+  height: 12px;
+  border-radius: 6px;
+  box-shadow:
+    inset 0 3px 6px rgba(0, 0, 0, 0.5),
+    inset 0 -2px 4px rgba(255, 255, 255, 0.05),
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.progress-bar.size-huge .progress-fill {
+  box-shadow:
+    0 0 16px rgba(255, 107, 107, 0.7),
+    0 0 30px rgba(255, 107, 107, 0.3),
+    inset 0 2px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Filler Progress Bar */
+.progress-container.filler-progress {
+  margin-bottom: 0;
+  margin-top: 8px;
+}
+
+.filler-progress .progress-info {
+  color: #a855f7;
+}
+
+.filler-progress .filler-label {
+  font-size: 10px;
+  opacity: 0.9;
+}
+
+.filler-progress .progress-bar.filler-bar {
+  height: 4px;
+  background: rgba(168, 85, 247, 0.15);
+}
+
+.filler-progress .progress-fill.filler-fill {
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  box-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+}
+
+/* Badges */
+.anime-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 0;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    max-height var(--transition-normal),
+    opacity var(--transition-normal),
+    margin var(--transition-normal);
+}
+
+.anime-card.expanded .anime-badges {
+  max-height: 100px;
+  opacity: 1;
+  margin-bottom: 10px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-card) 100%
+  );
+  border: 1px solid var(--border-3d-light);
+  border-bottom-color: var(--border-3d-dark);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.badge svg {
+  width: 12px;
+  height: 12px;
+}
+
+.badge-episodes {
+  color: var(--accent-primary);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 107, 107, 0.15) 0%,
+    rgba(255, 107, 107, 0.08) 100%
+  );
+  border-color: rgba(255, 107, 107, 0.3);
+}
+
+.badge-time {
+  color: var(--success);
+  background: linear-gradient(
+    180deg,
+    rgba(74, 222, 128, 0.15) 0%,
+    rgba(74, 222, 128, 0.08) 100%
+  );
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+.badge-watching {
+  color: var(--warning);
+  background: linear-gradient(
+    180deg,
+    rgba(251, 191, 36, 0.2) 0%,
+    rgba(251, 191, 36, 0.1) 100%
+  );
+  border-color: rgba(251, 191, 36, 0.4);
+  font-size: 10px;
+  padding: 4px 10px;
+}
+
+/* In Progress Only Card */
+.anime-card.in-progress-only {
+  border-color: rgba(251, 191, 36, 0.3);
+  background: linear-gradient(
+    180deg,
+    rgba(251, 191, 36, 0.08) 0%,
+    var(--bg-card) 100%
+  );
+}
+
+.anime-card.in-progress-only:hover {
+  border-color: rgba(251, 191, 36, 0.5);
+  box-shadow:
+    var(--shadow-card),
+    0 0 15px rgba(251, 191, 36, 0.15);
+}
+
+/* In-progress-only cards show content without needing expanded class */
+.anime-card.in-progress-only .progress-container {
+  max-height: 100px;
+  opacity: 1;
+  margin-bottom: 12px;
+}
+
+.anime-card.in-progress-only .anime-in-progress {
+  max-height: 200px;
+  opacity: 1;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+}
+
+.anime-card.in-progress-only .anime-in-progress.collapsed {
+  max-height: 32px;
+  padding: 8px 10px;
+}
+
+.anime-card.in-progress-only .anime-last-watched {
+  max-height: 30px;
+  opacity: 1;
+}
+
+/* Last Watched - Old style (kept for compatibility) */
+.anime-last-watched {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: none; /* Hidden - using inline version now */
+}
+
+/* Empty State */
+.empty-state {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 50px 30px;
+  flex: 1;
+}
+
+.empty-state.visible {
+  display: flex;
+}
+
+.empty-icon {
+  width: 72px;
+  height: 72px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  opacity: 0.4;
+}
+
+.empty-state h3 {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+.empty-state p {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 280px;
+  line-height: 1.6;
+}
+
+/* Footer */
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: linear-gradient(
+    180deg,
+    var(--bg-secondary) 0%,
+    var(--bg-tertiary) 100%
+  );
+  border-top: 1px solid var(--border-3d-light);
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--success);
+  font-weight: 500;
+}
+
+.sync-status svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Donate Dropdown */
+.donate-dropdown {
+  position: absolute;
+  top: 56px;
+  right: 20px;
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px) scale(0.95);
+  transition: all var(--transition-normal);
+  pointer-events: none;
+}
+
+.donate-dropdown.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.donate-dropdown-content {
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-secondary) 100%
+  );
+  border: 1px solid var(--border-3d-light);
+  border-bottom-color: var(--border-3d-dark);
+  border-radius: var(--border-radius-sm);
+  padding: 12px;
+  min-width: 160px;
+  box-shadow:
+    var(--shadow-card),
+    0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.donate-dropdown-content::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  right: 14px;
+  width: 12px;
+  height: 12px;
+  background: var(--bg-tertiary);
+  border-left: 1px solid var(--border-3d-light);
+  border-top: 1px solid var(--border-3d-light);
+  transform: rotate(45deg);
+}
+
+.donate-header {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-3d-dark);
+  font-weight: 600;
+}
+
+.donate-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-3d-light);
+  border-bottom-color: var(--border-3d-dark);
+  border-radius: var(--border-radius-xs);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-3d);
+  margin-bottom: 8px;
+}
+
+.donate-option:last-child {
+  margin-bottom: 0;
+}
+
+.donate-option svg {
+  width: 20px;
+  height: 20px;
+}
+
+.donate-option.paypal {
+  background: linear-gradient(180deg, #0070ba 0%, #003087 100%);
+  color: white;
+}
+
+.donate-option.paypal:hover {
+  background: linear-gradient(180deg, #008ed6 0%, #0070ba 100%);
+  transform: translateX(3px);
+}
+
+.donate-option.revolut {
+  background: linear-gradient(180deg, #191919 0%, #0a0a0a 100%);
+  color: white;
+}
+
+.donate-option.revolut:hover {
+  background: linear-gradient(180deg, #2a2a2a 0%, #191919 100%);
+  transform: translateX(3px);
+}
+
+/* Dialog Overlay */
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(8px);
+}
+
+.dialog-overlay.visible {
+  display: flex;
+}
+
+.dialog {
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-secondary) 100%
+  );
+  border: 1px solid var(--border-3d-light);
+  border-bottom-color: var(--border-3d-dark);
+  border-radius: var(--border-radius);
+  padding: 28px;
+  max-width: 320px;
+  text-align: center;
+  box-shadow:
+    var(--shadow-card),
+    0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: dialogSlideIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes dialogSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.dialog-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    180deg,
+    rgba(239, 68, 68, 0.2) 0%,
+    rgba(239, 68, 68, 0.1) 100%
+  );
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 50%;
+  color: var(--danger);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+}
+
+.dialog-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.dialog h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+.dialog p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* Buttons */
+.btn {
+  padding: 10px 24px;
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid var(--border-3d-light);
+  border-bottom-color: var(--border-3d-dark);
+  box-shadow: var(--shadow-3d);
+}
+
+.btn-secondary {
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-card) 100%
+  );
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  background: linear-gradient(
+    180deg,
+    var(--bg-card-hover) 0%,
+    var(--bg-tertiary) 100%
+  );
+  transform: translateY(-1px);
+}
+
+.btn-danger {
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+  border-color: #f87171;
+  border-bottom-color: #b91c1c;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: linear-gradient(180deg, #f87171 0%, #ef4444 100%);
+  transform: translateY(-1px);
+  box-shadow:
+    var(--shadow-3d),
+    0 0 20px rgba(239, 68, 68, 0.3);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+/* In Progress Section */
+.anime-in-progress {
+  margin-bottom: 0;
+  padding: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 142, 83, 0.08) 0%,
+    rgba(255, 107, 107, 0.05) 100%
+  );
+  border: 1px solid rgba(255, 142, 83, 0.2);
+  border-radius: var(--border-radius-xs);
+  box-shadow: 0 1px 4px rgba(255, 142, 83, 0.1);
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    max-height var(--transition-normal),
+    opacity var(--transition-normal),
+    margin var(--transition-normal),
+    padding var(--transition-normal);
+}
+
+.anime-card.expanded .anime-in-progress {
+  max-height: 200px;
+  opacity: 1;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+}
+
+.anime-card.expanded .anime-in-progress.collapsed {
+  max-height: 32px;
+  padding: 8px 10px;
+}
+
+.in-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--warning);
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-fast);
+  padding: 0;
+}
+
+.in-progress-header:hover {
+  color: #fcd34d;
+}
+
+.in-progress-title {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.in-progress-icon {
+  display: none; /* Hidden in compact design */
+}
+
+.in-progress-preview {
+  display: none; /* Hidden in compact design */
+}
+
+.collapse-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--warning);
+  transition: transform var(--transition-fast);
+  opacity: 0.7;
+}
+
+.anime-in-progress.collapsed .collapse-icon {
+  transform: rotate(-90deg);
+}
+
+.in-progress-content {
+  margin-top: 8px;
+  max-height: 150px;
+  overflow: hidden;
+  transition:
+    max-height var(--transition-normal),
+    margin var(--transition-normal),
+    opacity var(--transition-normal);
+}
+
+.anime-in-progress.collapsed .in-progress-content {
+  max-height: 0;
+  margin-top: 0;
+  opacity: 0;
+}
+
+/* Episodes Expanded View - Old styles removed, using collapsible version */
+
+.episode-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.episode-tag {
+  padding: 4px 10px;
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-card) 100%
+  );
+  border: 1px solid var(--border-3d-light);
+  border-radius: var(--border-radius-xs);
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.episode-tag.in-progress {
+  padding: 6px 28px 6px 14px; /* More padding for pill look + delete button */
+  background: linear-gradient(
+    180deg,
+    rgba(251, 191, 36, 0.15) 0%,
+    rgba(251, 191, 36, 0.05) 100%
+  );
+  border-color: rgba(251, 191, 36, 0.5);
+  color: var(--warning);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.1);
+  position: relative;
+  border-radius: 14px; /* Pill shape */
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Progress delete button */
+.progress-delete-btn {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(239, 68, 68, 0.8);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0;
+  transition: all var(--transition-fast);
+  padding: 0;
+}
+
+.episode-tag.in-progress:hover .progress-delete-btn {
+  opacity: 1;
+}
+
+.progress-delete-btn:hover {
+  background: var(--danger);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.episode-tag.filler {
+  background: linear-gradient(
+    180deg,
+    rgba(168, 85, 247, 0.2) 0%,
+    rgba(168, 85, 247, 0.1) 100%
+  );
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #a855f7;
+  text-decoration: none;
+  opacity: 1;
+}
+
+/* Filler Badge */
+.badge-filler {
+  color: #a855f7;
+  background: linear-gradient(
+    180deg,
+    rgba(168, 85, 247, 0.15) 0%,
+    rgba(168, 85, 247, 0.08) 100%
+  );
+  border-color: rgba(168, 85, 247, 0.3);
+  font-size: 10px;
+}
+
+/* Skipped Fillers Badge */
+.skipped-fillers-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 6px;
+  background: linear-gradient(
+    180deg,
+    rgba(168, 85, 247, 0.15) 0%,
+    rgba(168, 85, 247, 0.08) 100%
+  );
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 4px;
+  font-size: 9px;
+  color: #a855f7;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Unwatched Fillers Section */
+.unwatched-fillers-section {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(168, 85, 247, 0.3);
+}
+
+.unwatched-fillers-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #a855f7;
+  margin-bottom: 6px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.filler-count {
+  background: rgba(168, 85, 247, 0.2);
+  color: #a855f7;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+/* Watched Filler - normal style */
+.episode-tag.filler.watched-filler {
+  background: linear-gradient(
+    180deg,
+    rgba(168, 85, 247, 0.2) 0%,
+    rgba(168, 85, 247, 0.1) 100%
+  );
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #a855f7;
+  text-decoration: none;
+  opacity: 1;
+}
+
+/* Unwatched Filler - dimmed with dashed border */
+.episode-tag.filler.unwatched-filler {
+  background: transparent;
+  border: 1px dashed rgba(168, 85, 247, 0.4);
+  color: rgba(168, 85, 247, 0.6);
+  text-decoration: none;
+  opacity: 0.6;
+}
+
+/* Show more fillers button */
+.episode-tag.filler.show-more-fillers {
+  cursor: pointer;
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  color: #a855f7;
+  opacity: 0.9;
+  transition: all var(--transition-fast);
+}
+
+.episode-tag.filler.show-more-fillers:hover {
+  background: rgba(168, 85, 247, 0.25);
+  opacity: 1;
+}
+
+/* Hidden fillers container */
+.hidden-fillers {
+  display: none;
+}
+
+.hidden-fillers.expanded {
+  display: contents;
+}
+
+/* Show more button always at end */
+.show-more-fillers {
+  order: 999;
+}
+
+/* Hidden episodes container (for regular episodes) */
+.hidden-episodes {
+  display: none;
+}
+
+.hidden-episodes.expanded {
+  display: contents;
+}
+
+/* Show more episodes button */
+.show-more-episodes {
+  cursor: pointer;
+  order: 999;
+  transition: all var(--transition-fast);
+}
+
+.show-more-episodes:hover {
+  opacity: 1;
+}
+
+/* Anime Meta Row */
+.anime-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    max-height var(--transition-normal),
+    opacity var(--transition-normal),
+    margin var(--transition-normal);
+}
+
+.anime-card.expanded .anime-meta {
+  max-height: 50px;
+  opacity: 1;
+  margin-bottom: 8px;
+}
+
+.anime-last-watched-inline {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.anime-last-watched-inline svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0.7;
+}
+
+/* Collapsible Episodes Section */
+.anime-episodes {
+  max-height: 0;
+  overflow: hidden;
+  transition:
+    max-height var(--transition-normal),
+    opacity var(--transition-normal);
+  opacity: 0;
+}
+
+.anime-card.expanded .anime-episodes {
+  max-height: 300px;
+  opacity: 1;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-3d-dark);
+}
+
+.anime-episodes.collapsible {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: var(--border-radius-xs);
+  padding: 0;
+  margin-top: 0;
+  border-top: none;
+}
+
+.anime-card.expanded .anime-episodes.collapsible {
+  padding: 8px;
+  margin-top: 10px;
+}
+
+.anime-card.expanded .anime-episodes.collapsible.collapsed {
+  max-height: 40px;
+}
+
+.episodes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-fast);
+  padding: 2px 0;
+}
+
+.episodes-header:hover {
+  color: var(--accent-primary);
+}
+
+.episodes-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.episodes-header .collapse-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.anime-episodes.collapsed .collapse-icon {
+  transform: rotate(-90deg);
+}
+
+.episodes-content {
+  margin-top: 8px;
+  max-height: 150px;
+  overflow-y: auto;
+  transition:
+    max-height var(--transition-normal),
+    margin var(--transition-normal),
+    opacity var(--transition-normal);
+  padding-right: 4px;
+}
+
+/* Modern mini scrollbar for episodes */
+.episodes-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.episodes-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.episodes-content::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 4px;
+}
+
+.episodes-content::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+.anime-episodes.collapsed .episodes-content {
+  max-height: 0;
+  margin-top: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+/* Loading Animation */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.loading {
+  background: linear-gradient(
+    90deg,
+    var(--bg-card) 25%,
+    var(--bg-tertiary) 50%,
+    var(--bg-card) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* ==================== ADD ANIME BUTTON ==================== */
+.btn-add-anime {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--accent-primary) 0%, #ff8e53 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom-color: rgba(0, 0, 0, 0.3);
+  border-radius: var(--border-radius-sm);
+  color: white;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow:
+    var(--shadow-3d),
+    0 0 15px rgba(255, 107, 107, 0.3);
+  flex-shrink: 0;
+}
+
+.btn-add-anime svg {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-add-anime:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow:
+    var(--shadow-3d),
+    0 0 25px rgba(255, 107, 107, 0.5);
+}
+
+.btn-add-anime:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* ==================== ADD ANIME DIALOG ==================== */
+.add-anime-dialog {
+  max-width: 360px;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+  overflow: hidden;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 107, 107, 0.15) 0%,
+    rgba(255, 142, 83, 0.1) 100%
+  );
+  border-bottom: 1px solid var(--border-3d-dark);
+}
+
+.dialog-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dialog-close {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--border-radius-xs);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.dialog-close:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+}
+
+.dialog-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+.dialog-body {
+  padding: 20px;
+}
+
+.add-anime-dialog .dialog-actions {
+  padding: 16px 20px;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid var(--border-3d-dark);
+  margin: 0;
+}
+
+/* Form Elements */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.form-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"] {
+  width: 100%;
+  padding: 10px 12px;
+  background: linear-gradient(
+    180deg,
+    var(--bg-card) 0%,
+    var(--bg-tertiary) 100%
+  );
+  border: 1px solid var(--border-3d-light);
+  border-bottom-color: var(--border-3d-dark);
+  border-radius: var(--border-radius-xs);
+  color: var(--text-primary);
+  font-size: 13px;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-3d);
+}
+
+.form-group input[type="text"]::placeholder,
+.form-group input[type="number"]::placeholder {
+  color: var(--text-muted);
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="number"]:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow:
+    var(--shadow-3d),
+    0 0 0 3px rgba(255, 107, 107, 0.15);
+}
+
+.form-hint {
+  display: block;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.episodes-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.episodes-input-group input {
+  width: 100%;
+}
+
+.episodes-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Checkbox */
+.checkbox-group {
+  margin-top: 12px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.checkbox-label input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.checkbox-custom {
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(
+    180deg,
+    var(--bg-card) 0%,
+    var(--bg-tertiary) 100%
+  );
+  border: 2px solid var(--border-3d-light);
+  border-radius: 4px;
+  position: relative;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-3d);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox-label input[type="checkbox"]:checked + .checkbox-custom {
+  background: linear-gradient(135deg, var(--accent-primary) 0%, #ff8e53 100%);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 10px rgba(255, 107, 107, 0.4);
+}
+
+.checkbox-label input[type="checkbox"]:checked + .checkbox-custom::after {
+  content: "✓";
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.checkbox-label:hover .checkbox-custom {
+  border-color: var(--accent-primary);
+}
+
+/* Primary Button */
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-primary) 0%, #ff8e53 100%);
+  border-color: rgba(255, 255, 255, 0.2);
+  border-bottom-color: rgba(0, 0, 0, 0.3);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #ff8e8e 0%, var(--accent-primary) 100%);
+  transform: translateY(-1px);
+  box-shadow:
+    var(--shadow-3d),
+    0 0 20px rgba(255, 107, 107, 0.4);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Error state for inputs */
+.form-group input.error {
+  border-color: var(--danger);
+  box-shadow:
+    var(--shadow-3d),
+    0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+.form-error {
+  display: block;
+  font-size: 11px;
+  color: var(--danger);
+  margin-top: 4px;
+}
+
+/* ==================== ANIME PARTS BOX ==================== */
+.anime-parts {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    max-height var(--transition-normal),
+    opacity var(--transition-normal),
+    margin var(--transition-normal),
+    padding var(--transition-normal);
+  background: linear-gradient(
+    180deg,
+    rgba(99, 102, 241, 0.08) 0%,
+    rgba(99, 102, 241, 0.04) 100%
+  );
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: var(--border-radius-xs);
+  margin-bottom: 0;
+  padding: 0;
+}
+
+.anime-card.expanded .anime-parts {
+  max-height: 300px;
+  opacity: 1;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+}
+
+.anime-card.expanded .anime-parts.collapsed {
+  max-height: 38px;
+  padding: 10px 12px;
+}
+
+.parts-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-fast);
+}
+
+.parts-header:hover {
+  color: #818cf8;
+}
+
+.parts-icon {
+  font-size: 13px;
+}
+
+.parts-title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: #818cf8;
+}
+
+.anime-parts .collapse-icon {
+  width: 14px;
+  height: 14px;
+  color: #818cf8;
+  transition: transform var(--transition-fast);
+  opacity: 0.7;
+}
+
+.anime-parts.collapsed .collapse-icon {
+  transform: rotate(-90deg);
+}
+
+.parts-content {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow: hidden;
+  transition:
+    max-height var(--transition-normal),
+    margin var(--transition-normal),
+    opacity var(--transition-normal);
+}
+
+.anime-parts.collapsed .parts-content {
+  max-height: 0;
+  margin-top: 0;
+  opacity: 0;
+}
+
+.part-item {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-card) 100%
+  );
+  border: 1px solid var(--border-3d-light);
+  border-radius: var(--border-radius-xs);
+  font-size: 11px;
+  transition: all var(--transition-fast);
+}
+
+.part-item:hover {
+  background: linear-gradient(
+    180deg,
+    var(--bg-card-hover) 0%,
+    var(--bg-tertiary) 100%
+  );
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.part-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  min-height: 24px;
+}
+
+.part-expand-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+}
+
+.part-expand-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.part-item:hover .part-expand-icon {
+  color: #818cf8;
+}
+
+.part-item.expanded .part-expand-icon {
+  transform: rotate(90deg);
+  color: #818cf8;
+}
+
+/* Part item content - hidden by default */
+.part-item-content {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: all var(--transition-normal);
+  margin-top: 0;
+}
+
+.part-item.expanded .part-item-content {
+  max-height: 200px;
+  opacity: 1;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.part-progress-bar {
+  margin-bottom: 8px;
+}
+
+.part-episodes-list {
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.part-episodes-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.part-episodes-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.part-episodes-list::-webkit-scrollbar-thumb {
+  background: #818cf8;
+  border-radius: 4px;
+}
+
+.part-status-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Not started part */
+.part-item.not-started .part-status-icon {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* In progress part */
+.part-item.in-progress .part-status-icon {
+  color: var(--warning);
+  background: rgba(251, 191, 36, 0.15);
+}
+
+.part-item.in-progress {
+  border-color: rgba(251, 191, 36, 0.3);
+  background: linear-gradient(
+    180deg,
+    rgba(251, 191, 36, 0.08) 0%,
+    var(--bg-card) 100%
+  );
+}
+
+/* Complete part */
+.part-item.complete .part-status-icon {
+  color: var(--success);
+  background: rgba(74, 222, 128, 0.15);
+}
+
+.part-item.complete {
+  border-color: rgba(74, 222, 128, 0.3);
+  background: linear-gradient(
+    180deg,
+    rgba(74, 222, 128, 0.08) 0%,
+    var(--bg-card) 100%
+  );
+}
+
+.part-name {
+  flex: 1;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.part-episodes {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.part-progress {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.part-item.not-started .part-progress {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.part-item.in-progress .part-progress {
+  color: var(--warning);
+  background: rgba(251, 191, 36, 0.15);
+}
+
+.part-item.complete .part-progress {
+  color: var(--success);
+  background: rgba(74, 222, 128, 0.15);
+}
+
+/* ==================== SEASON GROUP BOX ==================== */
+.anime-season-group {
+  background: linear-gradient(
+    180deg,
+    var(--bg-card-hover) 0%,
+    var(--bg-card) 100%
+  );
+  border: 1px solid var(--border-3d-light);
+  border-bottom-color: var(--border-3d-dark);
+  border-radius: var(--border-radius);
+  padding: 10px 14px;
+  transition: all var(--transition-normal);
+  box-shadow: var(--shadow-card);
+  position: relative;
+  overflow: hidden;
+}
+
+.anime-season-group::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--border-3d-light) 50%,
+    transparent 100%
+  );
+}
+
+.anime-season-group:hover {
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-card-hover) 100%
+  );
+  border-color: var(--border-accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card), var(--shadow-glow);
+}
+
+.season-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.season-group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+}
+
+.season-group-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.season-group-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.season-count-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--success);
+  background: linear-gradient(
+    135deg,
+    rgba(74, 222, 128, 0.15) 0%,
+    rgba(74, 222, 128, 0.08) 100%
+  );
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.1);
+}
+
+.season-group-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.season-group-expand-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+}
+
+.season-group-expand-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.anime-season-group:hover .season-group-expand-icon {
+  color: var(--accent-primary);
+}
+
+.anime-season-group.expanded .season-group-expand-icon {
+  transform: rotate(90deg);
+  color: var(--accent-primary);
+}
+
+/* Season group stats - hidden in collapsed state */
+.season-group-stats {
+  display: none;
+}
+
+/* Season group content */
+.season-group-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  margin-top: 0;
+  padding-top: 0;
+  transition: all var(--transition-normal);
+}
+
+.anime-season-group.expanded .season-group-content {
+  max-height: 500px;
+  opacity: 1;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-3d-dark);
+}
+
+/* Individual season items - styled like mini anime cards */
+.season-item {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-card) 100%
+  );
+  border: 1px solid var(--border-3d-light);
+  border-radius: var(--border-radius-xs);
+  transition: all var(--transition-fast);
+}
+
+.season-item:hover {
+  background: linear-gradient(
+    180deg,
+    var(--bg-card-hover) 0%,
+    var(--bg-tertiary) 100%
+  );
+  border-color: var(--border-accent);
+}
+
+.season-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  min-height: 24px;
+}
+
+.season-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.season-status-icon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  font-weight: bold;
+}
+
+/* Season status styles */
+.season-item.not-started .season-status-icon {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.season-item.in-progress .season-status-icon {
+  color: var(--warning);
+  background: rgba(251, 191, 36, 0.15);
+}
+
+.season-item.complete .season-status-icon {
+  color: var(--success);
+  background: rgba(74, 222, 128, 0.15);
+}
+
+.season-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.season-item-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.season-episode-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.season-item.not-started .season-episode-badge {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-3d-light);
+}
+
+.season-item.in-progress .season-episode-badge {
+  color: var(--warning);
+  background: linear-gradient(
+    135deg,
+    rgba(251, 191, 36, 0.15) 0%,
+    rgba(251, 191, 36, 0.08) 100%
+  );
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.season-item.complete .season-episode-badge {
+  color: var(--success);
+  background: linear-gradient(
+    135deg,
+    rgba(74, 222, 128, 0.15) 0%,
+    rgba(74, 222, 128, 0.08) 100%
+  );
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+.season-item-actions {
+  display: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.season-item.expanded .season-item-actions {
+  display: flex;
+}
+
+.season-edit-btn,
+.season-delete-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--border-radius-xs);
+  font-size: 12px;
+  transition: all var(--transition-fast);
+}
+
+.season-edit-btn:hover {
+  background: rgba(100, 180, 255, 0.15);
+  color: #64b4ff;
+}
+
+.season-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+}
+
+.season-expand-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.season-expand-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.season-item:hover .season-expand-icon {
+  color: var(--accent-primary);
+}
+
+.season-item.expanded .season-expand-icon {
+  transform: rotate(90deg);
+  color: var(--accent-primary);
+}
+
+/* Season item content (episodes, progress) - hidden by default */
+.season-item-content {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: all var(--transition-normal);
+  margin-top: 0;
+}
+
+.season-item.expanded .season-item-content {
+  max-height: 300px;
+  opacity: 1;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-3d-dark);
+}
+
+/* Season progress bar */
+.season-progress-container {
+  margin-bottom: 10px;
+}
+
+.season-progress-container .progress-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.season-progress-container .progress-bar {
+  height: 4px;
+}
+
+/* Season episodes list */
+.season-episodes {
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.season-episodes::-webkit-scrollbar {
+  width: 4px;
+}
+
+.season-episodes::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.season-episodes::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 4px;
+}
+
+/* ==================== MOVIE GROUP BOX ==================== */
+.anime-movie-group {
+  background: linear-gradient(
+    180deg,
+    var(--bg-card-hover) 0%,
+    var(--bg-card) 100%
+  );
+  border: 1px solid var(--border-3d-light);
+  border-bottom-color: var(--border-3d-dark);
+  border-radius: var(--border-radius);
+  padding: 10px 14px;
+  transition: all var(--transition-normal);
+  box-shadow: var(--shadow-card);
+  position: relative;
+  overflow: hidden;
+}
+
+.anime-movie-group::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(251, 191, 36, 0.3) 50%,
+    transparent 100%
+  );
+}
+
+.anime-movie-group:hover {
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-card-hover) 100%
+  );
+  border-color: rgba(251, 191, 36, 0.5);
+  transform: translateY(-2px);
+  box-shadow:
+    var(--shadow-card),
+    0 0 20px rgba(251, 191, 36, 0.1);
+}
+
+.movie-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.movie-group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+}
+
+.movie-group-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.movie-group-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.movie-count-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--warning);
+  background: linear-gradient(
+    135deg,
+    rgba(251, 191, 36, 0.15) 0%,
+    rgba(251, 191, 36, 0.08) 100%
+  );
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.1);
+}
+
+.movie-count-badge.single {
+  color: #f4a261;
+  background: linear-gradient(
+    135deg,
+    rgba(244, 162, 97, 0.15) 0%,
+    rgba(244, 162, 97, 0.08) 100%
+  );
+  border: 1px solid rgba(244, 162, 97, 0.3);
+  box-shadow: 0 0 8px rgba(244, 162, 97, 0.1);
+}
+
+.anime-movie-group.single-movie .movie-group-content {
+  display: none;
+}
+
+.anime-movie-group.single-movie.expanded .movie-group-content {
+  display: block;
+}
+
+.movie-group-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.movie-group-expand-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+}
+
+.movie-group-expand-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.anime-movie-group:hover .movie-group-expand-icon {
+  color: var(--warning);
+}
+
+.anime-movie-group.expanded .movie-group-expand-icon {
+  transform: rotate(90deg);
+  color: var(--warning);
+}
+
+/* Movie group stats */
+.movie-group-stats {
+  display: none;
+}
+
+.anime-movie-group.expanded .movie-group-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+  padding-bottom: 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.movie-group-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Movie group content */
+.movie-group-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  margin-top: 0;
+  padding-top: 0;
+  transition: all var(--transition-normal);
+}
+
+.anime-movie-group.expanded .movie-group-content {
+  max-height: 500px;
+  opacity: 1;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-3d-dark);
+}
+
+/* Individual movie items */
+.movie-item {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-card) 100%
+  );
+  border: 1px solid var(--border-3d-light);
+  border-radius: var(--border-radius-xs);
+  transition: all var(--transition-fast);
+}
+
+.movie-item:hover {
+  background: linear-gradient(
+    180deg,
+    var(--bg-card-hover) 0%,
+    var(--bg-tertiary) 100%
+  );
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.movie-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.movie-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.movie-status-icon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  font-weight: bold;
+}
+
+.movie-item.not-started .movie-status-icon {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.movie-item.complete .movie-status-icon {
+  color: var(--success);
+  background: rgba(74, 222, 128, 0.15);
+}
+
+.movie-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.movie-item-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.movie-duration {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.movie-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.movie-item:hover .movie-item-actions {
+  opacity: 1;
+}
+
+.movie-edit-btn,
+.movie-delete-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--border-radius-xs);
+  font-size: 12px;
+  transition: all var(--transition-fast);
+}
+
+.movie-edit-btn:hover {
+  background: rgba(100, 180, 255, 0.15);
+  color: #64b4ff;
+}
+
+.movie-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+}
+
+/* Single Movie Card */
+.single-movie-card {
+  background: linear-gradient(
+    135deg,
+    rgba(244, 162, 97, 0.08) 0%,
+    rgba(30, 30, 40, 0.95) 100%
+  );
+  border: 1px solid rgba(244, 162, 97, 0.25);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.single-movie-card:hover {
+  border-color: rgba(244, 162, 97, 0.4);
+  box-shadow: 0 4px 16px rgba(244, 162, 97, 0.15);
+}
+
+.single-movie-card.watched {
+  border-color: rgba(74, 222, 128, 0.3);
+  background: linear-gradient(
+    135deg,
+    rgba(74, 222, 128, 0.05) 0%,
+    rgba(30, 30, 40, 0.95) 100%
+  );
+}
+
+.single-movie-card .anime-card-main {
+  padding: 14px 16px;
+}
+
+.single-movie-card .anime-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.single-movie-card .anime-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.single-movie-card .movie-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.single-movie-card .anime-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.single-movie-card .anime-card-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.single-movie-card:hover .anime-card-actions {
+  opacity: 1;
+}
+
+.single-movie-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.single-movie-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.single-movie-stat.watched {
+  color: var(--success);
+  font-weight: 500;
+}
+
+/* Franchise Groups */
+.franchise-group {
+  background: rgba(30, 30, 45, 0.95);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 16px;
+  margin-bottom: 16px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.franchise-group.expanded {
+  box-shadow: 0 8px 32px rgba(139, 92, 246, 0.2);
+}
+
+.franchise-header {
+  padding: 16px 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.1),
+    rgba(99, 102, 241, 0.05)
+  );
+  border-bottom: 1px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.franchise-group.expanded .franchise-header {
+  border-bottom-color: rgba(139, 92, 246, 0.2);
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.15),
+    rgba(99, 102, 241, 0.08)
+  );
+}
+
+.franchise-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #e0e0ff;
+}
+
+.franchise-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.franchise-name {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.franchise-badge {
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.franchise-stats {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.franchise-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.franchise-expand-icon {
+  width: 20px;
+  height: 20px;
+  transition: transform 0.3s ease;
+  color: #9ca3af;
+}
+
+.franchise-group.expanded .franchise-expand-icon {
+  transform: rotate(180deg);
+  color: #8b5cf6;
+}
+
+/* Franchise Entry */
+.franchise-entry {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.franchise-entry:first-child {
+  border-top: none;
+}
+
+.franchise-entry-header {
+  padding: 12px 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(40, 40, 60, 0.5);
+}
+
+.franchise-entry.expanded .franchise-entry-header {
+  background: rgba(40, 40, 60, 0.8);
+}
+
+.entry-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.entry-icon {
+  font-size: 16px;
+  width: 24px;
+  text-align: center;
+}
+
+.entry-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #d1d5db;
+}
+
+.franchise-entry.movie .entry-label {
+  color: #fbbf24;
+}
+
+.franchise-entry.special .entry-label {
+  color: #10b981;
+}
+
+.entry-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.entry-badge {
+  background: rgba(255, 255, 255, 0.08);
+  color: #9ca3af;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.entry-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.franchise-entry-header:hover .entry-actions {
+  opacity: 1;
+}
+
+.entry-edit-btn,
+.entry-delete-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.entry-edit-btn:hover {
+  color: #0ea5e9;
+  background: rgba(14, 165, 233, 0.1);
+}
+
+.entry-delete-btn:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.entry-expand-icon {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.3s ease;
+  color: #6b7280;
+}
+
+.franchise-entry.expanded .entry-expand-icon {
+  transform: rotate(180deg);
+  color: #8b5cf6;
+}
+
+/* Franchise Entry Content */
+.franchise-entry-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+  background: rgba(30, 30, 45, 0.8);
+}
+
+.franchise-entry.expanded .franchise-entry-content {
+  max-height: 500px;
+  padding: 16px 20px;
+}
+
+.entry-progress-container {
+  margin-bottom: 12px;
+}
+
+.entry-episodes {
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .franchise-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .franchise-stats {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .franchise-name {
+    max-width: 150px;
+  }
+}

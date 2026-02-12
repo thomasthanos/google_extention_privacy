@@ -1,0 +1,70 @@
+{
+  "manifest_version": 3,
+  "name": "An1me.to Tracker",
+  "version": "2.9.1",
+  "description": "Track your anime watching progress on an1me.to with cloud sync across all browsers",
+  "author": "ThomasThanos",
+  "permissions": [
+    "storage",
+    "scripting",
+    "identity"
+  ],
+  "host_permissions": [
+    "https://an1me.to/*",
+    "https://*.an1me.to/*",
+    "https://identitytoolkit.googleapis.com/*",
+    "https://securetoken.googleapis.com/*",
+    "https://firestore.googleapis.com/*",
+    "https://www.animefillerlist.com/*"
+  ],
+  "oauth2": {
+    "client_id": "851894443732-cg2pualkhrmfg47m2q1hnq57a31uskmn.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile"
+    ]
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "src/icons/icon16.png",
+      "32": "src/icons/icon32.png",
+      "48": "src/icons/icon48.png",
+      "128": "src/icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "src/icons/icon16.png",
+    "32": "src/icons/icon32.png",
+    "48": "src/icons/icon48.png",
+    "128": "src/icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://an1me.to/watch/*"
+      ],
+      "js": [
+        "src/content/config.js",
+        "src/content/logger.js",
+        "src/content/storage.js",
+        "src/content/anime-parser.js",
+        "src/content/notifications.js",
+        "src/content/progress-tracker.js",
+        "src/content/video-monitor.js",
+        "src/content/main.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["src/icons/icon128.png"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
