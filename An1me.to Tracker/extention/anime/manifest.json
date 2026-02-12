@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "An1me.to Tracker",
-  "version": "2.9.1",
+  "version": "2.9.4",
   "description": "Track your anime watching progress on an1me.to with cloud sync across all browsers",
   "author": "ThomasThanos",
   "permissions": [
@@ -63,8 +63,12 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["src/icons/icon128.png"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "src/icons/icon128.png"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }

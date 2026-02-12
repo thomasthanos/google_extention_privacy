@@ -6,10 +6,10 @@
 const FillerService = {
     // Known filler episodes - populated dynamically
     KNOWN_FILLERS: {},
-    
+
     // Known anime totals - populated dynamically
     KNOWN_ANIME_TOTALS: {},
-    
+
     // Episode types cache
     episodeTypesCache: {},
 
@@ -98,15 +98,15 @@ const FillerService = {
      */
     getNormalizedFillerSlug(slug) {
         const lowerSlug = slug.toLowerCase();
-        
+
         if (this.KNOWN_FILLERS[lowerSlug]) return lowerSlug;
-        
+
         const cleanSlug = lowerSlug
             .replace(/-?(episode|ep|tv|dub|sub|subbed|dubbed|season|s\d+)s?(-.*)?$/i, '')
             .replace(/-+$/, '');
-        
+
         if (this.KNOWN_FILLERS[cleanSlug]) return cleanSlug;
-        
+
         for (const key of Object.keys(this.KNOWN_FILLERS)) {
             if (lowerSlug === key || cleanSlug === key) {
                 return key;
@@ -115,7 +115,7 @@ const FillerService = {
                 return key;
             }
         }
-        
+
         return lowerSlug;
     },
 
@@ -241,7 +241,7 @@ const FillerService = {
      */
     updateFromEpisodeTypes(animeSlug, episodeTypes) {
         const { Logger } = window.AnimeTracker;
-        
+
         if (!episodeTypes) {
             Logger.error('updateFromEpisodeTypes: episodeTypes is null/undefined');
             return;
@@ -300,7 +300,7 @@ const FillerService = {
     async loadCachedEpisodeTypes(animeData) {
         const { Storage } = window.AnimeTracker;
         const { Logger } = window.AnimeTracker;
-        
+
         try {
             const keys = Object.keys(animeData);
             const storageKeys = keys.map(slug => `episodeTypes_${slug}`);
@@ -329,7 +329,7 @@ const FillerService = {
     async autoFetchMissing(animeData, onComplete) {
         const { CONFIG } = window.AnimeTracker;
         const { Logger } = window.AnimeTracker;
-        
+
         try {
             const animeSlugs = Object.keys(animeData);
             const slugsToFetch = [];
@@ -393,7 +393,7 @@ const FillerService = {
             }
 
             Logger.info(`Auto-fetch complete: ${successCount} success, ${failCount} failed`);
-            
+
             if (onComplete) onComplete();
         } catch (error) {
             Logger.error('Auto-fetch error:', error);
@@ -407,7 +407,7 @@ const FillerService = {
         const normalizedSlug = this.getNormalizedFillerSlug(slug);
         const fillers = this.KNOWN_FILLERS[normalizedSlug];
         if (!fillers) return false;
-        
+
         return fillers.some(([start, end]) => episodeNum >= start && episodeNum <= end);
     },
 
@@ -427,11 +427,11 @@ const FillerService = {
         const normalizedSlug = this.getNormalizedFillerSlug(slug);
         const fillers = this.KNOWN_FILLERS[normalizedSlug];
         if (!fillers || fillers.length === 0) return null;
-        
+
         const totalFillers = fillers.reduce((sum, [start, end]) => sum + (end - start + 1), 0);
         const watchedFillers = this.countFillerEpisodes(slug, episodes);
         const skippedFillers = totalFillers - watchedFillers;
-        
+
         return {
             total: totalFillers,
             watched: watchedFillers,
@@ -446,10 +446,10 @@ const FillerService = {
         const normalizedSlug = this.getNormalizedFillerSlug(slug);
         const fillers = this.KNOWN_FILLERS[normalizedSlug];
         if (!fillers || fillers.length === 0) return [];
-        
+
         const skippedFillers = [];
         const watchedEpisodeNumbers = new Set((episodes || []).map(ep => ep.number));
-        
+
         for (const [start, end] of fillers) {
             for (let ep = start; ep <= end; ep++) {
                 if (ep < currentEpisode && !watchedEpisodeNumbers.has(ep)) {
@@ -457,7 +457,7 @@ const FillerService = {
                 }
             }
         }
-        
+
         return skippedFillers.sort((a, b) => a - b);
     },
 
@@ -466,11 +466,11 @@ const FillerService = {
      */
     formatSkippedFillersCompact(fillerNumbers) {
         if (!fillerNumbers || fillerNumbers.length === 0) return '';
-        
+
         const ranges = [];
         let start = fillerNumbers[0];
         let end = fillerNumbers[0];
-        
+
         for (let i = 1; i <= fillerNumbers.length; i++) {
             if (i < fillerNumbers.length && fillerNumbers[i] === end + 1) {
                 end = fillerNumbers[i];
@@ -488,7 +488,7 @@ const FillerService = {
                 }
             }
         }
-        
+
         return ranges.join(', ');
     },
 
@@ -499,10 +499,10 @@ const FillerService = {
         const normalizedSlug = this.getNormalizedFillerSlug(slug);
         const fillers = this.KNOWN_FILLERS[normalizedSlug];
         if (!fillers || fillers.length === 0) return [];
-        
+
         const watchedEpisodeNumbers = new Set((episodes || []).map(ep => ep.number));
         const unwatchedFillers = [];
-        
+
         for (const [start, end] of fillers) {
             for (let ep = start; ep <= end && ep <= totalEpisodes; ep++) {
                 if (!watchedEpisodeNumbers.has(ep)) {
@@ -510,7 +510,7 @@ const FillerService = {
                 }
             }
         }
-        
+
         return unwatchedFillers.sort((a, b) => a - b);
     },
 
@@ -519,7 +519,7 @@ const FillerService = {
      */
     getCanonWatchTime(slug, anime) {
         if (!anime.episodes) return 0;
-        
+
         let canonTime = 0;
         for (const ep of anime.episodes) {
             if (!this.isFillerEpisode(slug, ep.number)) {
@@ -545,7 +545,7 @@ const FillerService = {
         const normalizedSlug = this.getNormalizedFillerSlug(slug);
         const fillers = this.KNOWN_FILLERS[normalizedSlug];
         if (!fillers || fillers.length === 0) return totalEpisodes;
-        
+
         const totalFillers = fillers.reduce((sum, [start, end]) => sum + (end - start + 1), 0);
         return totalEpisodes - totalFillers;
     },
@@ -590,11 +590,12 @@ const FillerService = {
         'kimetsu-no-yaiba-yuukaku-hen': 11,
         'kimetsu-no-yaiba-katanakaji-no-sato-hen': 11,
         'kimetsu-no-yaiba-hashira-geiko-hen': 8,
+        'kimetsu-no-yaiba-mugen-ressha-hen': 7,
         'higashi-no-eden': 11,
         'jujutsu-kaisen-season-2': 23,
         'jujutsu-kaisen-2nd-season': 23, // Correct slug for S2
         'jujutsu-kaisen-season-3': 12, // Fallback if user considers Hidden Inventory/Premature Death as S3
-        
+
         // Naruto series
         'naruto': 220,
         'naruto-original': 220,
@@ -730,15 +731,15 @@ const FillerService = {
      */
     calculateProgress(episodeCount, slug, anime = null) {
         const totalEpisodes = this.getTotalEpisodes(slug, episodeCount, anime);
-        
+
         // Check for complete canon viewing
         if (anime && anime.episodes) {
             const canonWatched = this.getCanonEpisodeCount(slug, anime.episodes);
             const totalCanon = this.getTotalCanonEpisodes(slug, totalEpisodes);
-            
+
             // If user has watched all canon episodes, force 100% progress even if fillers are skipped
             if (canonWatched >= totalCanon && totalCanon > 0) {
-                 return {
+                return {
                     progress: 100,
                     total: totalEpisodes,
                     isGuessed: false
@@ -752,21 +753,21 @@ const FillerService = {
         const isMultiSeason = this.isMultiSeasonAnime(slug);
 
         const normalizedSlug = slug.toLowerCase();
-        
+
         // Check for known totals - including Naruto and Initial D special cases
         let hasKnownTotal = this.MANUAL_EPISODE_COUNTS[normalizedSlug];
-        
+
         // For Naruto and Initial D, only mark as NOT guessed if user has watched all episodes
         if (!hasKnownTotal && normalizedSlug.startsWith('naruto')) {
             // Only show green (not guessed) if episodeCount >= totalEpisodes (completed the season)
             hasKnownTotal = (episodeCount >= totalEpisodes);
         }
-        
+
         if (!hasKnownTotal && normalizedSlug.startsWith('initial-d')) {
             // Only show green (not guessed) if episodeCount >= totalEpisodes (completed the stage)
             hasKnownTotal = (episodeCount >= totalEpisodes);
         }
-        
+
         if (!hasKnownTotal && !isMultiSeason) {
             hasKnownTotal = this.KNOWN_ANIME_TOTALS[normalizedSlug] ||
                 (anime && anime.totalEpisodes) ||

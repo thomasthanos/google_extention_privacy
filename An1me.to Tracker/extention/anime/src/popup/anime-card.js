@@ -429,7 +429,10 @@ const AnimeCardRenderer = {
             let seasonLabel;
             if (baseSlug === 'naruto' && seasons.length > 1) {
                 // If we have multiple Naruto entries, use index
-                seasonLabel = index === 0 ? 'Naruto' : 'Season 2 (Shippuden)';
+                if (index === 0) seasonLabel = 'Naruto';
+                else if (index === 1) seasonLabel = 'Shippuden';
+                else if (index === 2) seasonLabel = 'Boruto';
+                else seasonLabel = `Season ${index + 1}`;
             } else {
                 // Otherwise use the normal logic
                 seasonLabel = SeasonGrouping.getSeasonLabel(slug, anime.title);
