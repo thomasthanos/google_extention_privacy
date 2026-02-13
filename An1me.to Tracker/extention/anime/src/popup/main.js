@@ -3,7 +3,7 @@
  * Orchestrates all modules and handles UI interactions
  */
 
-(function() {
+(function () {
     'use strict';
 
     // Wait for all modules to load
@@ -264,7 +264,7 @@
 
             // Bind to header (captures title, icon, etc via bubbling)
             header.addEventListener('click', toggleCollapse);
-            
+
             // Explicitly bind to title just in case of bubbling issues
             const title = header.querySelector('.in-progress-title');
             if (title) title.addEventListener('click', toggleCollapse);
@@ -316,7 +316,7 @@
                     }
                     card.classList.toggle('expanded');
                 };
-                
+
                 header.addEventListener('click', toggleCard);
                 // Explicitly bind to title
                 const title = header.querySelector('.anime-title');
@@ -401,7 +401,7 @@
         // Season item headers (expand/collapse)
         elements.animeList.querySelectorAll('.season-item-header').forEach(header => {
             const toggleSeason = (e) => {
-                 // Don't toggle if clicking on buttons
+                // Don't toggle if clicking on buttons
                 if (e.target.closest('.season-edit-btn') || e.target.closest('.season-delete-btn')) {
                     return;
                 }
@@ -413,11 +413,11 @@
             };
 
             header.addEventListener('click', toggleSeason);
-            
+
             // Explicitly bind to label/title
             const label = header.querySelector('.season-label');
             if (label) label.addEventListener('click', toggleSeason);
-            
+
             const movieLabel = header.querySelector('.movie-label');
             if (movieLabel) movieLabel.addEventListener('click', toggleSeason);
         });
@@ -453,14 +453,15 @@
     /**
      * Update stats
      */
-    function updateStats() {
-        const { FillerService, UIHelpers, SeasonGrouping } = AT;
+    async function updateStats() {
+        const { FillerService, UIHelpers, SeasonGrouping, Storage } = AT;
 
         const animeEntries = Object.entries(animeData);
 
         // Count unique anime (season groups count as 1)
         const groups = SeasonGrouping.groupByBase(animeEntries);
-        elements.totalAnime.textContent = groups.size;
+        const totalAnimeCount = groups.size;
+        elements.totalAnime.textContent = totalAnimeCount;
 
         let totalCanonEpisodes = 0;
         let totalCanonTime = 0;
@@ -471,8 +472,23 @@
             totalCanonTime += FillerService.getCanonWatchTime(slug, anime);
         }
 
+        const totalTimeStr = UIHelpers.formatDurationShort(totalCanonTime);
+
         elements.totalEpisodes.textContent = totalCanonEpisodes;
-        elements.totalTime.textContent = UIHelpers.formatDurationShort(totalCanonTime);
+        elements.totalTime.textContent = totalTimeStr;
+
+        // Cache stats to storage to prevent UI jump on next load
+        try {
+            await Storage.set({
+                cachedStats: {
+                    totalAnime: totalAnimeCount,
+                    totalEpisodes: totalCanonEpisodes,
+                    totalTime: totalTimeStr
+                }
+            });
+        } catch (e) {
+            console.error('[Stats] Failed to cache stats:', e);
+        }
     }
 
     /**
@@ -482,15 +498,24 @@
         const { Storage, ProgressManager, FillerService, UIHelpers } = AT;
 
         try {
+            // Load cached stats first for immediate UI update
+            const cachedResult = await Storage.get(['cachedStats']);
+            if (cachedResult.cachedStats) {
+                const stats = cachedResult.cachedStats;
+                if (elements.totalAnime) elements.totalAnime.textContent = stats.totalAnime || 0;
+                if (elements.totalEpisodes) elements.totalEpisodes.textContent = stats.totalEpisodes || 0;
+                if (elements.totalTime) elements.totalTime.textContent = stats.totalTime || '0h';
+            }
+
             // Run multi-part anime migration first
             await Storage.migrateMultiPartAnime();
 
             const result = await Storage.get(['animeData', 'videoProgress']);
             animeData = result.animeData || {};
             videoProgress = result.videoProgress || {};
-            
+
             const cleanedData = ProgressManager.removeDuplicateEpisodes(animeData);
-            const { cleaned: cleanedProgress, removedCount: progressRemoved } = 
+            const { cleaned: cleanedProgress, removedCount: progressRemoved } =
                 ProgressManager.cleanTrackedProgress(cleanedData, videoProgress);
 
             const originalCount = UIHelpers.countEpisodes(animeData);
@@ -535,6 +560,15 @@
         const { Storage, FirebaseSync, FillerService } = AT;
 
         try {
+            // Load cached stats first for immediate UI update
+            const cachedResult = await Storage.get(['cachedStats']);
+            if (cachedResult.cachedStats) {
+                const stats = cachedResult.cachedStats;
+                if (elements.totalAnime) elements.totalAnime.textContent = stats.totalAnime || 0;
+                if (elements.totalEpisodes) elements.totalEpisodes.textContent = stats.totalEpisodes || 0;
+                if (elements.totalTime) elements.totalTime.textContent = stats.totalTime || '0h';
+            }
+
             // Load user preferences first
             const prefs = await chrome.storage.local.get(['userPreferences']);
             if (prefs.userPreferences) {
@@ -581,13 +615,13 @@
      */
     async function deleteProgress(slug, episodeNumber) {
         const { Storage, FirebaseSync } = AT;
-        
+
         const uniqueId = `${slug}__episode-${episodeNumber}`;
-        
+
         try {
             const result = await Storage.get(['videoProgress']);
             const currentVideoProgress = result.videoProgress || {};
-            
+
             if (currentVideoProgress[uniqueId]) {
                 // Soft delete: mark as deleted instead of removing
                 currentVideoProgress[uniqueId] = {
@@ -595,32 +629,32 @@
                     deleted: true,
                     deletedAt: new Date().toISOString()
                 };
-                
+
                 videoProgress = currentVideoProgress;
-                
+
                 const dataToSave = { videoProgress: currentVideoProgress };
                 const user = FirebaseSync.getUser();
                 if (user) {
                     dataToSave.userId = user.uid;
                 }
-                
+
                 // Save locally first
                 await Storage.set(dataToSave);
-                
+
                 // Then force cloud sync
                 if (user) {
                     // Force immediate save, passing proper data
                     console.log('[DeleteProgress] Syncing deletion to cloud...');
                     try {
-                        await FirebaseSync.saveToCloud({ 
-                            animeData: animeData, 
-                            videoProgress: currentVideoProgress 
+                        await FirebaseSync.saveToCloud({
+                            animeData: animeData,
+                            videoProgress: currentVideoProgress
                         }, true); // true = immediate
                     } catch (syncErr) {
                         console.error('[DeleteProgress] Cloud sync failed:', syncErr);
                     }
                 }
-                
+
                 renderAnimeList(elements.searchInput?.value || '');
                 console.log(`[DeleteProgress] Soft deleted progress for ${slug} Ep${episodeNumber}`);
             }
@@ -635,12 +669,12 @@
      */
     async function deleteAnime(slug) {
         const { Storage, FirebaseSync, UIHelpers } = AT;
-        
+
         // Remove from animeData if it exists
         if (animeData[slug]) {
             delete animeData[slug];
         } else {
-             console.log('[Delete] Anime not in local list, checking progress only:', slug);
+            console.log('[Delete] Anime not in local list, checking progress only:', slug);
         }
 
         try {
@@ -657,8 +691,8 @@
             }
 
             if (progressDeleted === 0 && !animeData[slug]) {
-                 console.warn('[Delete] No data found to delete for:', slug);
-                 return;
+                console.warn('[Delete] No data found to delete for:', slug);
+                return;
             }
 
             videoProgress = currentVideoProgress;
@@ -689,24 +723,24 @@
      */
     async function clearAllData() {
         const { Storage, FirebaseSync } = AT;
-        
+
         const dataToSave = {
             animeData: {},
             videoProgress: {}
         };
-        
+
         const user = FirebaseSync.getUser();
         if (user) {
             dataToSave.userId = user.uid;
         }
-        
+
         await Storage.set(dataToSave);
-        
+
         if (user) {
             // Fix: Use immediate save
             await FirebaseSync.saveToCloud({ animeData: {}, videoProgress: {} }, true);
         }
-        
+
         animeData = {};
         videoProgress = {};
         renderAnimeList();
@@ -1033,11 +1067,11 @@
      */
     async function signInWithGoogle() {
         const { FirebaseSync } = AT;
-        
+
         try {
             elements.googleSignIn.disabled = true;
             elements.googleSignIn.textContent = 'Signing in...';
-            
+
             await FirebaseSync.signInWithGoogle();
         } catch (error) {
             console.error('[Firebase] Sign in error:', error);
@@ -1061,17 +1095,17 @@
      */
     async function signOut() {
         const { Storage, FirebaseSync } = AT;
-        
+
         animeData = {};
         videoProgress = {};
-        
+
         await Storage.set({
             animeData: {},
             videoProgress: {}
         });
-        
+
         await FirebaseSync.signOut();
-        
+
         renderAnimeList();
         updateStats();
     }
@@ -1081,7 +1115,7 @@
      */
     function initEventListeners() {
         const { CONFIG, DONATE_LINKS, UIHelpers, FirebaseSync, Storage } = AT;
-        
+
         // Auth
         if (elements.googleSignIn) {
             elements.googleSignIn.addEventListener('click', signInWithGoogle);
@@ -1097,15 +1131,15 @@
                 elements.settingsDropdown.classList.toggle('visible');
             });
         }
-        
+
         document.addEventListener('click', (e) => {
-            if (elements.settingsDropdown && elements.settingsBtn && 
-                !elements.settingsDropdown.contains(e.target) && 
+            if (elements.settingsDropdown && elements.settingsBtn &&
+                !elements.settingsDropdown.contains(e.target) &&
                 !elements.settingsBtn.contains(e.target)) {
                 elements.settingsDropdown.classList.remove('visible');
             }
-            
-            if (elements.donateDropdown && 
+
+            if (elements.donateDropdown &&
                 !elements.donateDropdown.contains(e.target) &&
                 (!elements.settingsDonate || !elements.settingsDonate.contains(e.target))) {
                 elements.donateDropdown.classList.remove('visible');
@@ -1127,13 +1161,13 @@
             elements.settingsRefresh.addEventListener('click', async () => {
                 elements.settingsRefresh.classList.add('loading');
                 elements.settingsDropdown.classList.remove('visible');
-                
+
                 if (FirebaseSync.getUser()) {
                     await loadAndSyncData();
                 } else {
                     loadData();
                 }
-                
+
                 setTimeout(() => elements.settingsRefresh.classList.remove('loading'), 500);
             });
         }
@@ -1361,19 +1395,19 @@
         if (elements.animeList) {
             elements.animeList.addEventListener('click', async (e) => {
                 const target = e.target;
-                
+
                 // Delete progress button
                 if (target.classList.contains('progress-delete-btn') || target.closest('.progress-delete-btn')) {
                     const btn = target.classList.contains('progress-delete-btn') ? target : target.closest('.progress-delete-btn');
                     const slug = btn.dataset.slug;
                     const episodeNum = parseInt(btn.dataset.episode, 10);
-                    
+
                     if (slug && episodeNum) {
                         await deleteProgress(slug, episodeNum);
                     }
                     return;
                 }
-                
+
                 // Delete anime button
                 if (target.classList.contains('anime-delete') || target.closest('.anime-delete')) {
                     const btn = target.classList.contains('anime-delete') ? target : target.closest('.anime-delete');
@@ -1383,7 +1417,7 @@
                     }
                     return;
                 }
-                
+
                 // Edit title button
                 if (target.classList.contains('anime-edit-title') || target.closest('.anime-edit-title')) {
                     const btn = target.classList.contains('anime-edit-title') ? target : target.closest('.anime-edit-title');
@@ -1393,7 +1427,7 @@
                     }
                     return;
                 }
-                
+
                 // Fetch filler button
                 if (target.classList.contains('anime-fetch-filler') || target.closest('.anime-fetch-filler')) {
                     const btn = target.classList.contains('anime-fetch-filler') ? target : target.closest('.anime-fetch-filler');
@@ -1403,14 +1437,14 @@
                     }
                     return;
                 }
-                
+
                 // Expand/collapse card
                 const card = target.closest('.anime-card');
                 if (card && !target.closest('button') && !target.closest('.anime-card-actions')) {
                     card.classList.toggle('expanded');
                     return;
                 }
-                
+
                 // Collapse in-progress section
                 const inProgressHeader = target.closest('.in-progress-header');
                 if (inProgressHeader) {
@@ -1420,7 +1454,7 @@
                     }
                     return;
                 }
-                
+
                 // Collapse episodes section
                 const episodesHeader = target.closest('.episodes-header');
                 if (episodesHeader) {
@@ -1437,9 +1471,22 @@
     /**
      * Initialize
      */
-    function init() {
-        const { FirebaseSync } = AT;
-        
+    async function init() {
+        const { FirebaseSync, Storage } = AT;
+
+        // Load cached stats immediately (before anything else)
+        try {
+            const cachedResult = await Storage.get(['cachedStats']);
+            if (cachedResult.cachedStats) {
+                const stats = cachedResult.cachedStats;
+                if (elements.totalAnime) elements.totalAnime.textContent = stats.totalAnime || 0;
+                if (elements.totalEpisodes) elements.totalEpisodes.textContent = stats.totalEpisodes || 0;
+                if (elements.totalTime) elements.totalTime.textContent = stats.totalTime || '0h';
+            }
+        } catch (e) {
+            console.error('[Init] Failed to load cached stats:', e);
+        }
+
         // Display version dynamically from manifest
         try {
             const manifest = chrome.runtime.getManifest();
@@ -1449,9 +1496,9 @@
         } catch (e) {
             console.warn('[Version] Could not load manifest version:', e);
         }
-        
+
         initEventListeners();
-        
+
         // Initialize Firebase
         FirebaseSync.init({
             onUserSignedIn: (user) => {
@@ -1480,7 +1527,7 @@
     });
 
     // Debug functions
-    window.debugFillers = function(slug) {
+    window.debugFillers = function (slug) {
         const { FillerService } = AT;
         const normalized = FillerService.getNormalizedFillerSlug(slug);
         const fillers = FillerService.KNOWN_FILLERS[normalized];
@@ -1494,8 +1541,8 @@
         }
         return { slug, normalized, hasData: !!fillers };
     };
-    
-    window.showAllSlugs = function() {
+
+    window.showAllSlugs = function () {
         const { FillerService } = AT;
         console.log('[Debug] All anime slugs:');
         Object.keys(animeData).forEach(slug => {
@@ -1505,7 +1552,7 @@
         });
     };
 
-    window.testFetchFillers = async function(animeSlug) {
+    window.testFetchFillers = async function (animeSlug) {
         const { FillerService } = AT;
         console.log(`[Test] Fetching filler data for: ${animeSlug}`);
         try {
@@ -1521,18 +1568,18 @@
         }
     };
 
-    window.cleanupDuplicates = async function() {
+    window.cleanupDuplicates = async function () {
         const { Storage, ProgressManager, UIHelpers, FirebaseSync } = AT;
-        
+
         console.log('[Cleanup] Starting manual cleanup...');
-        
+
         const result = await Storage.get(['animeData', 'videoProgress', 'userId']);
         const originalCount = UIHelpers.countEpisodes(result.animeData || {});
-        
+
         const cleanedData = ProgressManager.removeDuplicateEpisodes(result.animeData || {});
-        const { cleaned: cleanedProgress, removedCount: progressRemoved } = 
+        const { cleaned: cleanedProgress, removedCount: progressRemoved } =
             ProgressManager.cleanTrackedProgress(cleanedData, result.videoProgress || {});
-        
+
         const cleanedCount = UIHelpers.countEpisodes(cleanedData);
         console.log('[Cleanup] Removed:', originalCount - cleanedCount, 'duplicates,', progressRemoved, 'progress entries');
 
@@ -1540,17 +1587,17 @@
             animeData: cleanedData,
             videoProgress: cleanedProgress
         });
-        
+
         if (FirebaseSync.getUser()) {
             FirebaseSync.pendingSave = { animeData: cleanedData, videoProgress: cleanedProgress };
             await FirebaseSync.performCloudSave();
         }
-        
+
         animeData = cleanedData;
         videoProgress = cleanedProgress;
         renderAnimeList(elements.searchInput?.value || '');
         updateStats();
-        
+
         return { removed: originalCount - cleanedCount, progressRemoved };
     };
 

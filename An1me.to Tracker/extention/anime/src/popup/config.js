@@ -43,6 +43,11 @@ const ANIME_NO_FILLER_DATA = [
     'ore-dake-level-up-na-ken',           // Solo Leveling
     'ore-dake-level-up-na-ken-season-2',  // Solo Leveling Season 2
     // Add more anime without filler data here as needed
+    'tokidoki-bosotto-russia-go-de-dereru-tonari-no-alya-san', // Alya Sometimes Hides Her Feelings
+    'kuzu-no-honkai', // Scum's Wish
+    'yosuga-no-sora',
+    'jujutsu-kaisen-shimetsu-kaiyuu-zenpen', // Culling Game Prequel/Special
+    'initial-d-fourth-stage', // Likely no specific filler list or handled by main
 ];
 
 // Slug mapping for anime that have different names on animefillerlist.com
@@ -87,7 +92,13 @@ const ANIME_FILLER_LIST_SLUG_MAPPING = {
 
     // One Punch Man seasons (all map to main series)
     'one-punch-man-season-2': 'one-punch-man',
-    'one-punch-man-season-3': 'one-punch-man'
+    'one-punch-man-season-3': 'one-punch-man',
+
+    // Initial D mappings
+    'initial-d-first-stage': 'initial-d',
+    'initial-d-second-stage': 'initial-d',
+    'initial-d-third-stage': 'initial-d',
+    // Fourth stage onward often doesn't have separate filler lists or is 404
 };
 
 // Episode offset mapping for multi-part anime
@@ -410,7 +421,7 @@ const SeasonGrouping = {
         if (slug.startsWith('naruto') || slug.startsWith('boruto')) {
             const slugLower = slug.toLowerCase();
             const titleLower = title ? title.toLowerCase() : '';
-            
+
             // Check slug first - Boruto
             if (slugLower.includes('boruto') || slugLower.endsWith('-3') || slugLower.includes('season-3')) {
                 return 'Naruto Boruto';
@@ -418,7 +429,7 @@ const SeasonGrouping = {
             if (titleLower.includes('boruto')) {
                 return 'Naruto Boruto';
             }
-            
+
             // Check slug - Shippuden
             if (slugLower.includes('shippuden') || slugLower.includes('shippuuden')) {
                 return 'Naruto Shippuden';
@@ -429,7 +440,7 @@ const SeasonGrouping = {
             if (titleLower.includes('shippuden') || titleLower.includes('shippuuden')) {
                 return 'Naruto Shippuden';
             }
-            
+
             // Default to Season 1 for base naruto
             return 'Naruto';
         }
@@ -464,12 +475,12 @@ const SeasonGrouping = {
 
         // Special handling for Initial D
         if (slug.startsWith('initial-d')) {
-                if (slug.includes('final-stage') || slug.includes('sixth-stage') || slug.includes('6th-stage')) return 'Final Stage';
-                if (slug.includes('fifth-stage') || slug.includes('5th-stage')) return 'Fifth Stage';
-                if (slug.includes('fourth-stage') || slug.includes('4th-stage')) return 'Fourth Stage';
-                if (slug.includes('third-stage') || slug.includes('3rd-stage')) return 'Third Stage (Movie)';
-                if (slug.includes('second-stage') || slug.includes('2nd-stage')) return 'Second Stage';
-                return 'First Stage';
+            if (slug.includes('final-stage') || slug.includes('sixth-stage') || slug.includes('6th-stage')) return 'Final Stage';
+            if (slug.includes('fifth-stage') || slug.includes('5th-stage')) return 'Fifth Stage';
+            if (slug.includes('fourth-stage') || slug.includes('4th-stage')) return 'Fourth Stage';
+            if (slug.includes('third-stage') || slug.includes('3rd-stage')) return 'Third Stage (Movie)';
+            if (slug.includes('second-stage') || slug.includes('2nd-stage')) return 'Second Stage';
+            return 'First Stage';
         }
 
         // Special handling for Bleach TYBW - show as "Part X"
