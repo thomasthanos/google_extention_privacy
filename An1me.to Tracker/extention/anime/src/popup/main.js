@@ -1027,39 +1027,16 @@
      * Fetch filler data for all anime
      */
     async function fetchAllFillers() {
-        const { FillerService } = AT;
+        const { FillerFetchUI } = AT;
 
-        const slugs = Object.keys(animeData);
-        if (slugs.length === 0) {
-            alert('No anime to fetch filler data for.');
-            return;
-        }
+        // Set callback to update UI after fetch completes
+        FillerFetchUI.onComplete = () => {
+            renderAnimeList(elements.searchInput?.value || '');
+            updateStats();
+        };
 
-        console.log('[FetchFillers] Fetching filler data for', slugs.length, 'anime...');
-
-        let successCount = 0;
-        let failCount = 0;
-
-        for (const slug of slugs) {
-            try {
-                const episodeTypes = await FillerService.fetchEpisodeTypes(slug);
-                if (episodeTypes) {
-                    FillerService.updateFromEpisodeTypes(slug, episodeTypes);
-                    successCount++;
-                } else {
-                    failCount++;
-                }
-            } catch (e) {
-                console.error(`[FetchFillers] Failed for ${slug}:`, e);
-                failCount++;
-            }
-        }
-
-        console.log(`[FetchFillers] Done: ${successCount} success, ${failCount} failed`);
-
-        // Update UI
-        renderAnimeList(elements.searchInput?.value || '');
-        updateStats();
+        // Open the custom UI modal
+        await FillerFetchUI.open();
     }
 
     /**
@@ -1472,7 +1449,10 @@
      * Initialize
      */
     async function init() {
-        const { FirebaseSync, Storage } = AT;
+        const { FirebaseSync, Storage, FillerFetchUI } = AT;
+
+        // Initialize Filler Fetch UI
+        FillerFetchUI.init();
 
         // Load cached stats immediately (before anything else)
         try {
@@ -1603,11 +1583,5 @@
 
     // Start
     init();
-    // Cleanup on unload to ensure pending saves are pushed
-    window.addEventListener('unload', () => {
-        if (window.AnimeTracker && window.AnimeTracker.FirebaseSync) {
-            window.AnimeTracker.FirebaseSync.cleanup();
-        }
-    });
 
 })();

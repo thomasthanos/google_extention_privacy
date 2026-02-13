@@ -1,237 +1,179 @@
 /**
- * Anime Tracker - Custom Console Logger
- * Beautiful, styled console logs for browser debugging
+ * Global Logger - Auto-beautify ΟΛΑ τα console logs
+ * Κάνει override console.log/warn/error για όμορφα styled outputs
  */
 
-const Logger = (function() {
+(function() {
     'use strict';
 
-    const CONFIG = {
-        enabled: true,
-        minLevel: 'DEBUG',
-        showTimestamp: true,
-        showBadge: true,
-        prefix: '🎬 Anime Tracker'
+    // Backup original console methods
+    const _log = console.log.bind(console);
+    const _warn = console.warn.bind(console);
+    const _error = console.error.bind(console);
+
+    // Colors
+    const COLORS = {
+        firebase: '255, 152, 0',    // Orange
+        sync: '167, 139, 250',      // Purple
+        storage: '16, 185, 129',    // Green
+        tracker: '255, 107, 107',   // Red
+        background: '96, 165, 250', // Blue
+        anime: '255, 107, 107',     // Red
+        success: '74, 222, 128',    // Light green
+        error: '239, 68, 68',       // Red
+        warning: '251, 191, 36',    // Yellow
+        info: '148, 163, 184',      // Gray
     };
 
-    const LEVELS = {
-        DEBUG: { priority: 0, color: '#6366f1', bg: '#eef2ff', icon: '🔍', method: 'log' },
-        INFO: { priority: 1, color: '#0ea5e9', bg: '#f0f9ff', icon: 'ℹ️', method: 'info' },
-        SUCCESS: { priority: 1, color: '#10b981', bg: '#ecfdf5', icon: '✅', method: 'log' },
-        WARN: { priority: 2, color: '#f59e0b', bg: '#fffbeb', icon: '⚠️', method: 'warn' },
-        ERROR: { priority: 3, color: '#ef4444', bg: '#fef2f2', icon: '❌', method: 'error' }
+    // Icons
+    const ICONS = {
+        firebase: '🔥',
+        sync: '☁️',
+        storage: '💾',
+        tracker: '🎬',
+        background: '⚙️',
+        anime: '🎬',
+        success: '✓',
+        error: '✗',
+        warning: '⚠',
+        info: 'ℹ',
+        save: '💿',
+        merge: '🔀',
+        refresh: '⟳',
+        link: '🔗',
+        user: '👤',
     };
 
-    const STYLES = {
-        badge: (color, bg) => `
-            background: ${bg};
-            color: ${color};
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-weight: 600;
-            font-size: 11px;
-            border: 1px solid ${color}33;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-        `.replace(/\s+/g, ' ').trim(),
+    /**
+     * Beautify log message
+     */
+    function beautify(...args) {
+        if (!args.length) return args;
+
+        const first = String(args[0] || '');
         
-        prefix: `
-            background: linear-gradient(135deg, #ff6b6b, #ff8e53);
-            color: white;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-weight: 700;
-            font-size: 11px;
-            margin-right: 4px;
-            box-shadow: 0 2px 4px rgba(255,107,107,0.3);
-            text-shadow: 0 1px 1px rgba(0,0,0,0.2);
-        `.replace(/\s+/g, ' ').trim(),
-        
-        timestamp: `
-            color: #6b7280;
-            font-size: 10px;
-            font-family: monospace;
-        `.replace(/\s+/g, ' ').trim(),
-        
-        message: (color) => `
-            color: ${color};
-            font-weight: 500;
-        `.replace(/\s+/g, ' ').trim()
-    };
+        // Match: [Prefix] Message
+        const match = first.match(/^\[([^\]]+)\]\s*(.*)$/);
+        if (!match) return args;
 
-    function shouldLog(level) {
-        if (!CONFIG.enabled) return false;
-        return (LEVELS[level]?.priority || 0) >= (LEVELS[CONFIG.minLevel]?.priority || 0);
-    }
+        const [, prefix, message] = match;
+        const lower = prefix.toLowerCase();
 
-    function getTimestamp() {
-        const now = new Date();
-        return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(now.getMilliseconds()).padStart(3, '0')}`;
-    }
+        // Determine color and icon
+        let color = COLORS.info;
+        let icon = ICONS.info;
 
-    function log(level, message, data = null) {
-        if (!shouldLog(level)) return;
-
-        const L = LEVELS[level];
-        const method = console[L.method] || console.log;
-        const parts = [];
-        const styles = [];
-
-        if (CONFIG.showBadge) {
-            parts.push(`%c${CONFIG.prefix}`);
-            styles.push(STYLES.prefix);
+        if (lower.includes('firebase')) {
+            color = COLORS.firebase;
+            icon = ICONS.firebase;
+        } else if (lower.includes('sync')) {
+            color = COLORS.sync;
+            icon = ICONS.sync;
+        } else if (lower.includes('storage')) {
+            color = COLORS.storage;
+            icon = ICONS.storage;
+        } else if (lower.includes('background')) {
+            color = COLORS.background;
+            icon = ICONS.background;
+        } else if (lower.includes('anime') || lower.includes('tracker')) {
+            color = COLORS.tracker;
+            icon = ICONS.tracker;
         }
 
-        parts.push(`%c${L.icon} ${level}`);
-        styles.push(STYLES.badge(L.color, L.bg));
+        // Message-specific icons and colors
+        const msgLower = message.toLowerCase();
+        if (msgLower.includes('✓') || msgLower.includes('success') || msgLower.includes('saved')) {
+            icon = ICONS.success;
+            color = COLORS.success;
+        } else if (msgLower.includes('merged')) {
+            icon = ICONS.merge;
+            color = COLORS.success;
+        } else if (msgLower.includes('redirect') || msgLower.includes('url')) {
+            icon = ICONS.link;
+        } else if (msgLower.includes('refresh')) {
+            icon = ICONS.refresh;
+        } else if (msgLower.includes('new episode')) {
+            icon = '➕';
+            color = COLORS.success;
+        } else if (msgLower.includes('signed in')) {
+            icon = ICONS.user;
+            color = COLORS.success;
+            
+            // Special handling for "signed in" messages with emails
+            const emailMatch = message.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+            if (emailMatch) {
+                const email = emailMatch[1];
+                const beforeEmail = message.substring(0, message.indexOf(email));
+                
+                // Create a beautiful email box with proper console styles
+                const prefixStyle = `color: rgb(${color}); font-weight: bold; font-size: 12px; padding: 2px 6px; background: rgba(${color}, 0.1); border-radius: 3px;`;
+                const msgStyle = `color: rgb(${COLORS.info}); font-size: 11px;`;
+                const emailStyle = `
+                    color: #a78bfa;
+                    background: linear-gradient(135deg, rgba(167, 139, 250, 0.2), rgba(139, 92, 246, 0.25));
+                    font-weight: 700;
+                    font-size: 11px;
+                    padding: 4px 12px;
+                    border: 2px solid rgba(167, 139, 250, 0.6);
+                    border-radius: 6px;
+                    margin: 0 4px;
+                `.replace(/\s+/g, ' ').trim();
 
-        if (CONFIG.showTimestamp) {
-            parts.push(`%c${getTimestamp()}`);
-            styles.push(STYLES.timestamp);
+                return [
+                    `%c${prefix} %c${icon} ${beforeEmail}%c ${email} `,
+                    prefixStyle,
+                    msgStyle,
+                    emailStyle,
+                    ...args.slice(1)
+                ];
+            }
+        } else if (msgLower.includes('initialized')) {
+            icon = '✓';
+            color = COLORS.success;
         }
 
-        parts.push(`%c${message}`);
-        styles.push(STYLES.message(L.color));
+        // Styled output
+        const prefixStyle = `color: rgb(${color}); font-weight: bold; font-size: 12px; padding: 2px 6px; background: rgba(${color}, 0.1); border-radius: 3px;`;
+        const msgStyle = `color: rgb(${COLORS.info}); font-size: 11px;`;
 
-        if (data !== null) {
-            method(parts.join(' '), ...styles, data);
+        return [
+            `%c${prefix} %c${icon} ${message}`,
+            prefixStyle,
+            msgStyle,
+            ...args.slice(1)
+        ];
+    }
+
+    // Override console.log
+    console.log = function(...args) {
+        const styled = beautify(...args);
+        _log(...styled);
+    };
+
+    // Override console.warn
+    console.warn = function(...args) {
+        const styled = beautify(...args);
+        if (styled[0] && styled[0].startsWith('%c')) {
+            _warn(...styled);
         } else {
-            method(parts.join(' '), ...styles);
+            _warn(...args);
         }
-    }
-
-    // Compact progress log - smaller, for frequent saves
-    function progress(uniqueId, pct, time) {
-        if (!shouldLog('DEBUG')) return;
-        const ts = getTimestamp();
-        console.log(
-            `%c${ts}%c 💾 %c${pct}%%c @ ${time}s %c${uniqueId}`,
-            'color: #6b7280; font-size: 10px; font-family: monospace;',
-            '',
-            'color: #10b981; font-weight: 600;',
-            'color: #6b7280;',
-            'color: #9ca3af; font-size: 10px;'
-        );
-    }
-
-    function table(data, title = 'Data') {
-        if (!CONFIG.enabled) return;
-        console.groupCollapsed(
-            `%c${CONFIG.prefix}%c 📊 ${title}`,
-            STYLES.prefix,
-            'color: #6366f1; font-weight: 600;'
-        );
-        console.table(data);
-        console.groupEnd();
-    }
-
-    function group(title, callback, collapsed = true) {
-        if (!CONFIG.enabled) return;
-        const method = collapsed ? console.groupCollapsed : console.group;
-        method(
-            `%c${CONFIG.prefix}%c 📁 ${title}`,
-            STYLES.prefix,
-            'color: #8b5cf6; font-weight: 600;'
-        );
-        try { callback(); } finally { console.groupEnd(); }
-    }
-
-    const timers = new Map();
-    function time(label) {
-        if (!CONFIG.enabled) return;
-        timers.set(label, performance.now());
-    }
-    function timeEnd(label) {
-        if (!CONFIG.enabled) return;
-        const start = timers.get(label);
-        if (start) {
-            timers.delete(label);
-            log('DEBUG', `⏱ ${label}: ${(performance.now() - start).toFixed(1)}ms`);
-        }
-    }
-
-    function episode(action, anime, epNum) {
-        if (!CONFIG.enabled) return;
-        const icons = { tracked: '📺', progress: '⏸️', resumed: '▶️', completed: '🎉' };
-        const colors = { tracked: '#10b981', progress: '#f59e0b', resumed: '#0ea5e9', completed: '#8b5cf6' };
-        console.log(
-            `%c${CONFIG.prefix}%c ${icons[action] || '📺'} ${action.toUpperCase()}%c ${anime} Ep${epNum}`,
-            STYLES.prefix,
-            `color: ${colors[action] || '#6366f1'}; font-weight: 600;`,
-            'color: #374151;'
-        );
-    }
-
-    function sync(status, details = '') {
-        if (!CONFIG.enabled) return;
-        const configs = {
-            started: { icon: '🔄', color: '#0ea5e9' },
-            success: { icon: '✅', color: '#10b981' },
-            error: { icon: '❌', color: '#ef4444' }
-        };
-        const cfg = configs[status] || configs.started;
-        console.log(
-            `%c${CONFIG.prefix}%c ${cfg.icon} Sync: ${status}%c ${details}`,
-            STYLES.prefix,
-            `color: ${cfg.color}; font-weight: 600;`,
-            'color: #6b7280;'
-        );
-    }
-
-    function storage(op, key, data) {
-        if (!CONFIG.enabled || !shouldLog('DEBUG')) return;
-        const icon = op === 'GET' ? '📖' : op === 'SET' ? '💾' : '🗑️';
-        const color = op === 'GET' ? '#0ea5e9' : op === 'SET' ? '#10b981' : '#ef4444';
-        console.groupCollapsed(
-            `%c${CONFIG.prefix}%c ${icon} ${op}%c ${key}`,
-            STYLES.prefix,
-            `color: ${color}; font-weight: 600;`,
-            'color: #6b7280;'
-        );
-        if (data !== undefined) console.log('Data:', data);
-        console.groupEnd();
-    }
-
-    function firebase(op, path, success = true) {
-        if (!CONFIG.enabled) return;
-        const icon = success ? '🔥' : '💥';
-        const color = success ? '#f59e0b' : '#ef4444';
-        console.log(
-            `%c${CONFIG.prefix}%c ${icon} FB ${op}%c ${path} %c${success ? '✓' : '✗'}`,
-            STYLES.prefix,
-            `color: ${color}; font-weight: 600;`,
-            'color: #6b7280;',
-            `color: ${success ? '#10b981' : '#ef4444'}; font-weight: 700;`
-        );
-    }
-
-    function configure(opts) { Object.assign(CONFIG, opts); }
-    function enable() { CONFIG.enabled = true; }
-    function disable() { CONFIG.enabled = false; }
-    function setLevel(level) { if (LEVELS[level]) CONFIG.minLevel = level; }
-
-    return {
-        debug: (msg, data) => log('DEBUG', msg, data),
-        info: (msg, data) => log('INFO', msg, data),
-        success: (msg, data) => log('SUCCESS', msg, data),
-        warn: (msg, data) => log('WARN', msg, data),
-        error: (msg, data) => log('ERROR', msg, data),
-        log: (msg, data) => log('INFO', msg, data),
-        progress,
-        table,
-        group,
-        time,
-        timeEnd,
-        episode,
-        sync,
-        storage,
-        firebase,
-        configure,
-        enable,
-        disable,
-        setLevel,
-        raw: console
     };
-})();
 
-if (typeof window !== 'undefined') window.Logger = Logger;
-if (typeof module !== 'undefined' && module.exports) module.exports = Logger;
+    // Override console.error  
+    console.error = function(...args) {
+        const styled = beautify(...args);
+        if (styled[0] && styled[0].startsWith('%c')) {
+            _error(...styled);
+        } else {
+            _error(...args);
+        }
+    };
+
+    // Beautiful startup
+    _log(
+        '%c🎬 Anime Tracker - Beautiful Logging Active',
+        'color: rgb(255, 107, 107); font-weight: bold; font-size: 13px; padding: 4px 8px; background: linear-gradient(135deg, rgba(255, 107, 107, 0.2), rgba(255, 142, 83, 0.2)); border-radius: 4px;'
+    );
+
+})();

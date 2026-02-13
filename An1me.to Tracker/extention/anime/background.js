@@ -180,7 +180,10 @@ async function syncToFirebase() {
         });
 
         if (response.ok) {
-            console.log('[Background] ✓ Auto-synced to Firebase');
+            // Beautiful styled log
+            const bgStyle = 'color: rgb(96, 165, 250); font-weight: bold; font-size: 12px; padding: 2px 6px; background: rgba(96, 165, 250, 0.1); border-radius: 3px;';
+            const msgStyle = 'color: rgb(148, 163, 184); font-size: 11px;';
+            console.log('%cBackground %c⚙️ Auto-synced to Firebase', bgStyle, msgStyle);
         } else {
             console.error('[Background] Sync failed:', response.status);
         }
@@ -323,7 +326,9 @@ chrome.runtime.onInstalled.addListener((details) => {
         });
     } else if (details.reason === 'update') {
         const version = chrome.runtime.getManifest().version;
-        console.log('[Anime Tracker] Extension updated to', version);
+        // Beautiful log με gradient
+        const style = 'color: rgb(255, 107, 107); font-weight: bold; font-size: 13px; padding: 4px 8px; background: linear-gradient(135deg, rgba(255, 107, 107, 0.2), rgba(255, 142, 83, 0.2)); border-radius: 4px;';
+        console.log(`%c🎬 Anime Tracker v${version}`, style);
         
         // Migration: Move data from sync to local if needed
         migrateFromSyncToLocal();
@@ -479,7 +484,10 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         const newCount = countEpisodes(newData);
 
         if (newCount > oldCount) {
-            console.log(`[Anime Tracker] New episode tracked! (${oldCount} → ${newCount})`);
+            // Beautiful styled log
+            const trackerStyle = 'color: rgb(255, 107, 107); font-weight: bold; font-size: 12px; padding: 2px 6px; background: rgba(255, 107, 107, 0.1); border-radius: 3px;';
+            const msgStyle = 'color: rgb(148, 163, 184); font-size: 11px;';
+            console.log(`%cAnime Tracker %c➕ New episode tracked! (${oldCount} → ${newCount})`, trackerStyle, msgStyle);
 
             // Debounce sync to avoid multiple rapid syncs
             if (syncDebounceTimeout) {
@@ -490,7 +498,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
                 syncDebounceTimeout = null;
                 syncToFirebase();
             }, 2000); // Wait 2 seconds before syncing
-        } else if (oldCount !== newCount) {
+        } else if (oldCount !== newCount && newCount > 0) {
             console.log(`[Anime Tracker] Anime data changed: ${oldCount} → ${newCount} episodes`);
         }
     }

@@ -34,7 +34,9 @@ const FirebaseLib = (function() {
      * Initialize and check for existing session
      */
     async function init() {
-        console.log('[Firebase] Redirect URL:', REDIRECT_URL);
+        // Show short version of redirect URL
+        const shortUrl = REDIRECT_URL.replace(/https:\/\/([a-z0-9]+)\.chromiumapp\.org.*/, 'chrome-extension://$1');
+        console.log('[Firebase] Extension redirect:', shortUrl);
         
         try {
             // Check for stored user
@@ -84,8 +86,8 @@ const FirebaseLib = (function() {
             authUrl.searchParams.set('scope', SCOPES);
             authUrl.searchParams.set('prompt', 'select_account');
 
-            console.log('[Firebase] Auth URL:', authUrl.toString());
-            console.log('[Firebase] Redirect URL:', REDIRECT_URL);
+            // Don't log full URLs - too verbose
+            console.log('[Firebase] Starting OAuth flow...');
 
             chrome.identity.launchWebAuthFlow(
                 {
@@ -104,7 +106,7 @@ const FirebaseLib = (function() {
                         return;
                     }
 
-                    console.log('[Firebase] Redirect received:', redirectUrl);
+                    console.log('[Firebase] OAuth redirect received');
 
                     try {
                         // Extract access token from URL fragment
