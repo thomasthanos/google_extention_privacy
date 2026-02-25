@@ -71,13 +71,18 @@ const UIHelpers = {
         const date = new Date(isoString);
         const now = new Date();
         const diffMs = now - date;
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
         const diffMinutes = Math.floor(diffMs / (1000 * 60));
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+        // Compare at midnight level to avoid flickering between N and N+1 days on refresh
+        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const dateMidnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const diffDays = Math.round((todayMidnight - dateMidnight) / (1000 * 60 * 60 * 24));
         
         if (diffMinutes < 1) return 'Just now';
         if (diffMinutes < 60) return `${diffMinutes} minutes ago`;
         if (diffHours < 24) return `${diffHours} hours ago`;
+        if (diffDays === 1) return 'Yesterday';
         if (diffDays < 7) return `${diffDays} days ago`;
         
         return date.toLocaleDateString('en-US', {

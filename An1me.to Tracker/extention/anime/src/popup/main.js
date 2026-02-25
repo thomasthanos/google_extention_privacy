@@ -464,15 +464,17 @@
         elements.totalAnime.textContent = totalAnimeCount;
 
         let totalCanonEpisodes = 0;
-        let totalCanonTime = 0;
+        let totalWatchTime = 0;
 
         for (const [slug, anime] of animeEntries) {
             const canonEps = FillerService.getCanonEpisodeCount(slug, anime.episodes);
             totalCanonEpisodes += canonEps;
-            totalCanonTime += FillerService.getCanonWatchTime(slug, anime);
+            // Use stored totalWatchTime (pre-calculated, stable) instead of getCanonWatchTime
+            // which fluctuates depending on whether filler data has loaded yet
+            totalWatchTime += anime.totalWatchTime || 0;
         }
 
-        const totalTimeStr = UIHelpers.formatDurationShort(totalCanonTime);
+        const totalTimeStr = UIHelpers.formatDurationShort(totalWatchTime);
 
         elements.totalEpisodes.textContent = totalCanonEpisodes;
         elements.totalTime.textContent = totalTimeStr;
