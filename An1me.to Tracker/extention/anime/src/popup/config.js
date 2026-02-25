@@ -124,7 +124,7 @@ const ANIME_PARTS_CONFIG = {
     'bleach-sennen-kessen-hen': [
         { name: 'Part 1', start: 1, end: 13 },
         { name: 'Part 2: Ketsubetsu-tan', start: 14, end: 26 },
-        { name: 'Part 3: Soukoku-tan', start: 27, end: 39 }
+        { name: 'Part 3: Soukoku-tan', start: 27, end: 40 }  // soukoku-tan ep14 + offset 26 = ep40
     ],
     'one-punch-man-season-2': [
         { name: 'Season 2', start: 1, end: 12 }
@@ -306,6 +306,11 @@ const SeasonGrouping = {
             return 'initial-d';
         }
 
+        // Special handling for Bleach (original + TYBW group together as 'bleach')
+        if (slug.startsWith('bleach')) {
+            return 'bleach';
+        }
+
         return slug
             // Remove season patterns with subtitle: -season-2-something-something
             .replace(/-season-?\d+(-[a-z-]+)?$/i, '')
@@ -401,11 +406,10 @@ const SeasonGrouping = {
             return romanMatch[1].toLowerCase() in romanMap ? romanMap[romanMatch[1].toLowerCase()] : 1;
         }
 
-        // Special handling for Bleach TYBW parts (use part number as season)
-        if (slug.includes('bleach-sennen-kessen-hen')) {
-            if (slug.includes('soukoku-tan')) return 3;
-            if (slug.includes('ketsubetsu-tan')) return 2;
-            return 1; // Base is Part 1
+        // Special handling for Bleach (original = S1, TYBW = S2)
+        if (slug.startsWith('bleach')) {
+            if (slug.includes('sennen-kessen-hen')) return 2;
+            return 1;
         }
 
         // No season indicator means season 1
@@ -487,11 +491,13 @@ const SeasonGrouping = {
             return 'First Stage';
         }
 
-        // Special handling for Bleach TYBW - show as "Part X"
+        // Special handling for Bleach TYBW
         if (slug.includes('bleach-sennen-kessen-hen')) {
-            if (slug.includes('soukoku-tan')) return 'Part 3';
-            if (slug.includes('ketsubetsu-tan')) return 'Part 2';
-            return 'Part 1';
+            // These sub-slugs appear before storage migration (shouldn't normally be shown separately)
+            if (slug.includes('soukoku-tan')) return 'TYBW Part 3';
+            if (slug.includes('ketsubetsu-tan')) return 'TYBW Part 2';
+            // After migration all 3 parts are merged into this slug
+            return 'Thousand-Year Blood War';
         }
 
         const seasonNum = this.getSeasonNumber(slug);

@@ -230,8 +230,9 @@ const AnimeCardRenderer = {
 
     /**
      * Create parts section for multi-part anime
+     * @param {boolean} startExpanded - if true, section starts expanded (for season group context)
      */
-    createPartsSection(slug, episodes = []) {
+    createPartsSection(slug, episodes = [], startExpanded = false) {
         const { ANIME_PARTS_CONFIG, CONFIG, FillerService, UIHelpers } = window.AnimeTracker;
 
         const partsConfig = ANIME_PARTS_CONFIG?.[slug];
@@ -304,8 +305,9 @@ const AnimeCardRenderer = {
             `;
         }).join('');
 
+        const collapsedClass = startExpanded ? '' : ' collapsed';
         return `
-            <div class="anime-parts collapsible collapsed">
+            <div class="anime-parts collapsible${collapsedClass}">
                 <div class="parts-header">
                     <span class="parts-icon">📦</span>
                     <span class="parts-title">Parts (${partsConfig.length})</span>
@@ -420,26 +422,48 @@ const AnimeCardRenderer = {
             }
         });
 
+        // Expand parts-based anime into individual season items
+        const expandedSeasons = [];
+        for (const season of seasons) {
+            const { ANIME_PARTS_CONFIG } = window.AnimeTracker;
+            const partsConfig = ANIME_PARTS_CONFIG?.[season.slug];
+            if (partsConfig && partsConfig.length > 0) {
+                // Split into one entry per part
+                partsConfig.forEach((part, partIndex) => {
+                    expandedSeasons.push({
+                        slug: season.slug,
+                        anime: season.anime,
+                        seasonNum: season.seasonNum,
+                        partConfig: part,
+                        partIndex
+                    });
+                });
+            } else {
+                expandedSeasons.push({ ...season, partConfig: null, partIndex: null });
+            }
+        }
+
         // Build season items HTML
-        const seasonData = seasons.map(({ slug, anime, seasonNum }, index) => {
+        const seasonData = expandedSeasons.map(({ slug, anime, seasonNum, partConfig, partIndex }, index) => {
             const { CONFIG } = window.AnimeTracker;
             const episodeCount = anime.episodes?.length || 0;
 
             // For Naruto group with multiple seasons, use index to determine which season
             let seasonLabel;
-            if (baseSlug === 'naruto' && seasons.length > 1) {
-                // If we have multiple Naruto entries, use index
+            if (partConfig) {
+                // Part-based: label is the part name
+                seasonLabel = partConfig.name;
+            } else if (baseSlug === 'naruto' && seasons.length > 1) {
                 if (index === 0) seasonLabel = 'Naruto';
                 else if (index === 1) seasonLabel = 'Shippuden';
                 else if (index === 2) seasonLabel = 'Boruto';
                 else seasonLabel = `Season ${index + 1}`;
             } else {
-                // Otherwise use the normal logic
                 seasonLabel = SeasonGrouping.getSeasonLabel(slug, anime.title);
             }
 
             // Check if this is a movie (e.g., Initial D Third Stage)
-            const isMovie = seasonLabel.includes('(Movie)') || slug.includes('third-stage');
+            const isMovie = !partConfig && (seasonLabel.includes('(Movie)') || slug.includes('third-stage'));
 
             let progressData, progressPercent, isComplete, hasProgress, statusClass, statusIcon;
             let episodeBadgeText, progressInfoHTML, episodesHTML;
@@ -464,9 +488,76 @@ const AnimeCardRenderer = {
                 `;
                 episodesHTML = ''; // No episodes list for movies
             } else {
-                // Handle as regular season
+                // Handle as regular season (or a specific part)
+                // If partConfig exists, filter episodes to this part's range only
+                const partEpisodes = partConfig
+                    ? (anime.episodes || []).filter(ep => ep.number >= partConfig.start && ep.number <= partConfig.end)
+                    : (anime.episodes || []);
+                const partEpisodeCount = partConfig ? (partConfig.end - partConfig.start + 1) : episodeCount;
+                const watchedInPart = partEpisodes.length;
+
+                if (partConfig) {
+                    // Part-specific progress
+                    const partProgress = (watchedInPart / partEpisodeCount) * 100;
+                    progressPercent = Math.round(partProgress);
+                    const currentEpInPart = watchedInPart > 0 ? Math.max(...partEpisodes.map(ep => ep.number)) : 0;
+                    isComplete = watchedInPart >= partEpisodeCount;
+                    hasProgress = watchedInPart > 0;
+                    statusClass = isComplete ? 'complete' : (hasProgress ? 'in-progress' : 'not-started');
+                    statusIcon = isComplete ? '✓' : (hasProgress ? '▶' : '○');
+                    episodeBadgeText = `Ep ${partConfig.start}-${partConfig.end}`;
+
+                    progressInfoHTML = `
+                        <div class="progress-info">
+                            <span>Ep ${partConfig.start}–${partConfig.end} · ${watchedInPart}/${partEpisodeCount}</span>
+                            <span>${progressPercent}%</span>
+                        </div>
+                        <div class="progress-bar size-small">
+                            <div class="progress-fill" style="width: ${partProgress}%"></div>
+                        </div>
+                    `;
+
+                    // Episode tags for this part
+                    const sortedPartEps = [...partEpisodes].sort((a, b) => b.number - a.number);
+                    const visiblePartEps = sortedPartEps.slice(0, CONFIG.VISIBLE_EPISODES_LIMIT);
+                    const hiddenPartEps = sortedPartEps.slice(CONFIG.VISIBLE_EPISODES_LIMIT);
+                    const partEpTags = visiblePartEps.map(ep => {
+                        const isFiller = FillerService.isFillerEpisode(slug, ep.number);
+                        return `<span class="episode-tag${isFiller ? ' filler watched-filler' : ''}">Ep ${ep.number}</span>`;
+                    }).join('');
+                    const partHiddenTags = hiddenPartEps.map(ep => {
+                        const isFiller = FillerService.isFillerEpisode(slug, ep.number);
+                        return `<span class="episode-tag${isFiller ? ' filler watched-filler' : ''}">Ep ${ep.number}</span>`;
+                    }).join('');
+                    const partMoreEps = hiddenPartEps.length > 0
+                        ? `<div class="hidden-episodes">${partHiddenTags}</div><span class="episode-tag show-more-episodes" data-more-text="+${hiddenPartEps.length} more" data-less-text="Show less">+${hiddenPartEps.length} more</span>`
+                        : '';
+
+                    episodesHTML = watchedInPart > 0 ? `
+                        <div class="season-episodes">
+                            <div class="episode-list">${partEpTags}${partMoreEps}</div>
+                        </div>` : '';
+
+                } else {
+                // --- Normal season (no partConfig) ---
                 progressData = FillerService.calculateProgress(episodeCount, slug, anime);
                 progressPercent = Math.round(progressData.progress);
+
+                // Get in-progress episodes from videoProgress
+                const trackedEpNums = new Set((anime.episodes || []).map(ep => ep.number));
+                const inProgressEps = [];
+                Object.entries(videoProgress).forEach(([uid, prog]) => {
+                    if (!uid.startsWith(slug + '__episode-')) return;
+                    const epNum = parseInt(uid.split('episode-')[1], 10);
+                    if (isNaN(epNum) || trackedEpNums.has(epNum)) return;
+                    if (prog.deleted) return;
+                    if (prog.percentage >= CONFIG.COMPLETED_PERCENTAGE) return;
+                    if (typeof prog.currentTime !== 'number' || isNaN(prog.currentTime)) return;
+                    const mins = Math.floor(prog.currentTime / 60);
+                    const secs = Math.floor(prog.currentTime % 60);
+                    inProgressEps.push({ number: epNum, timeStr: `${mins}:${secs.toString().padStart(2,'0')}`, percentage: prog.percentage });
+                });
+                inProgressEps.sort((a, b) => a.number - b.number);
 
                 // Get current episode for this season
                 let currentEp = 0;
@@ -475,6 +566,10 @@ const AnimeCardRenderer = {
                     if (validNumbers.length > 0) {
                         currentEp = Math.max(...validNumbers);
                     }
+                }
+                // Also consider in-progress episodes for current ep
+                if (inProgressEps.length > 0) {
+                    currentEp = Math.max(currentEp, Math.max(...inProgressEps.map(ep => ep.number)));
                 }
 
                 isComplete = progressPercent >= 100;
@@ -578,13 +673,35 @@ const AnimeCardRenderer = {
                     ${skippedFillersIndicator}
                 `;
 
+                // In-progress section
+                const inProgressTags = inProgressEps.map(ep =>
+                    `<span class="episode-tag in-progress" title="Saved: ${ep.percentage}%">
+                        Ep ${ep.number} (${ep.timeStr})
+                        <button class="progress-delete-btn" data-slug="${slug}" data-episode="${ep.number}" title="Delete progress">×</button>
+                    </span>`
+                ).join('');
+                const inProgressSection = inProgressTags ? `
+                    <div class="anime-in-progress collapsible">
+                        <div class="in-progress-header">
+                            <span class="in-progress-title">▶ In Progress (${inProgressEps.length})</span>
+                            <svg class="collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </div>
+                        <div class="in-progress-content">
+                            <div class="episode-list">${inProgressTags}</div>
+                        </div>
+                    </div>` : '';
+
                 episodesHTML = `
                     <div class="season-episodes">
+                        ${inProgressSection}
                         <div class="episode-list">${episodeTags}${moreEpisodes}</div>
                         ${unwatchedFillersSection}
                     </div>
                 `;
-            }
+                } // end normal season
+            } // end else (not movie)
 
             const html = `
                 <div class="season-item ${statusClass}" data-slug="${slug}">
@@ -615,14 +732,11 @@ const AnimeCardRenderer = {
         });
 
         const seasonItemsHTML = seasonData.map(d => d.html).join('');
-
         const lastWatchedText = latestWatched ? UIHelpers.formatDate(latestWatched.toISOString()) : 'Never';
-
-
-
-        // Check if all seasons are complete using the data object
         const allSeasonsComplete = seasonData.every(d => d.isComplete);
         const badgeClass = allSeasonsComplete ? 'complete' : '';
+        const itemCount = expandedSeasons.length;
+        const itemLabel = itemCount === seasons.length ? `${itemCount} seasons` : `${itemCount} parts`;
 
         return `
             <div class="anime-season-group" data-base-slug="${baseSlug}">
@@ -630,7 +744,7 @@ const AnimeCardRenderer = {
                     <h3 class="season-group-title">
                         <span class="season-group-icon">📺</span>
                         <span class="season-group-name">${UIHelpers.escapeHtml(baseTitle)}</span>
-                        <span class="season-count-badge ${badgeClass}">${seasons.length} seasons</span>
+                        <span class="season-count-badge ${badgeClass}">${itemLabel}</span>
                     </h3>
                     <div class="season-group-actions">
                         <div class="season-group-expand-icon">${UIHelpers.createIcon('chevron')}</div>
@@ -659,6 +773,8 @@ const AnimeCardRenderer = {
             .replace(/\s*\d+(st|nd|rd|th)\s*Season\s*$/i, '')
             // Remove "Part X" patterns
             .replace(/\s*-?\s*Part\s*\d+\s*$/i, '')
+            // Remove trailing "Episode" word (e.g. "Bleach Episode" -> "Bleach")
+            .replace(/\s*-?\s*Episode\s*$/i, '')
             // Remove trailing dashes or colons
             .replace(/\s*[-:]\s*$/, '')
             .trim();

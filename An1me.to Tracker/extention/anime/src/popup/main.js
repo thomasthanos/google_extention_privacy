@@ -538,12 +538,11 @@
             renderAnimeList();
             updateStats();
 
-            setTimeout(() => {
-                FillerService.autoFetchMissing(animeData, () => {
-                    renderAnimeList(elements.searchInput?.value || '');
-                    updateStats();
-                });
-            }, 1000);
+            // Run auto-fetch immediately (no delay) - re-renders when complete
+            FillerService.autoFetchMissing(animeData, () => {
+                renderAnimeList(elements.searchInput?.value || '');
+                updateStats();
+            });
         } catch (e) {
             console.error('[Storage] Load error:', e);
             animeData = {};
@@ -597,12 +596,11 @@
                 renderAnimeList(elements.searchInput?.value || '');
                 updateStats();
 
-                setTimeout(() => {
-                    FillerService.autoFetchMissing(animeData, () => {
-                        renderAnimeList(elements.searchInput?.value || '');
-                        updateStats();
-                    });
-                }, 1000);
+                // Run auto-fetch immediately - re-renders when complete
+                FillerService.autoFetchMissing(animeData, () => {
+                    renderAnimeList(elements.searchInput?.value || '');
+                    updateStats();
+                });
             }
         } catch (error) {
             console.error('[Sync] Error:', error);
