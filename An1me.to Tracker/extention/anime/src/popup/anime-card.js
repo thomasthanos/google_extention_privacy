@@ -494,6 +494,17 @@ const AnimeCardRenderer = {
                 // Episode badge text
                 episodeBadgeText = currentEp > 0 ? `Ep ${currentEp}` : `${episodeCount} eps`;
 
+                // Filler data for this season
+                const hasFillerData = FillerService.hasFillerData(slug);
+                const canonWatched = FillerService.getCanonEpisodeCount(slug, anime.episodes);
+                const totalCanon = FillerService.getTotalCanonEpisodes(slug, progressData.total);
+                const fillerInfo = FillerService.getFillerInfo(slug, anime.episodes);
+                const skippedFillers = FillerService.getSkippedFillers(slug, anime.episodes, currentEp);
+                const skippedFillersText = FillerService.formatSkippedFillersCompact(skippedFillers);
+                const skippedFillersIndicator = skippedFillers.length > 0
+                    ? `<div class="anime-meta"><span class="skipped-fillers-badge" title="Skipped filler episodes: ${skippedFillersText}">⏭️ ${skippedFillers.length} filler skipped</span></div>`
+                    : '';
+
                 // Build episode tags for this season
                 const sortedEpisodes = [...(anime.episodes || [])].sort((a, b) => b.number - a.number);
                 const visibleEpisodes = sortedEpisodes.slice(0, CONFIG.VISIBLE_EPISODES_LIMIT);
@@ -513,22 +524,64 @@ const AnimeCardRenderer = {
                     ? `<div class="hidden-episodes">${hiddenEpisodeTags}</div><span class="episode-tag show-more-episodes" data-more-text="+${hiddenEpisodes.length} more" data-less-text="Show less">+${hiddenEpisodes.length} more</span>`
                     : '';
 
-                // Progress bar info
+                // Unwatched fillers
+                const unwatchedFillers = FillerService.getUnwatchedFillers(slug, anime.episodes, currentEp);
+                const visibleUFilllers = unwatchedFillers.slice(0, CONFIG.VISIBLE_FILLERS_LIMIT);
+                const hiddenUFillers = unwatchedFillers.slice(CONFIG.VISIBLE_FILLERS_LIMIT);
+                const unwatchedFillerTags = visibleUFilllers.map(epNum =>
+                    `<span class="episode-tag filler unwatched-filler" title="Filler Episode (Not watched)">Ep ${epNum}</span>`
+                ).join('');
+                const hiddenFillerTags = hiddenUFillers.map(epNum =>
+                    `<span class="episode-tag filler unwatched-filler" title="Filler Episode (Not watched)">Ep ${epNum}</span>`
+                ).join('');
+                const showMoreFillers = hiddenUFillers.length > 0
+                    ? `<div class="hidden-fillers">${hiddenFillerTags}</div><span class="episode-tag filler show-more-fillers" data-more-text="+${hiddenUFillers.length} more" data-less-text="Show less">+${hiddenUFillers.length} more</span>`
+                    : '';
+                const unwatchedFillersSection = unwatchedFillers.length > 0
+                    ? `<div class="unwatched-fillers-section"><span class="unwatched-fillers-label">Unwatched Fillers <span class="filler-count">${unwatchedFillers.length}</span></span><div class="episode-list">${unwatchedFillerTags}${showMoreFillers}</div></div>`
+                    : '';
+
+                // Filler progress bar
+                const watchedFillerCount = fillerInfo?.watched || 0;
+                const totalFillerCount = fillerInfo?.total || 0;
+                const fillerProgressPercent = totalFillerCount > 0 ? Math.round((watchedFillerCount / totalFillerCount) * 100) : 0;
+                const fillerProgressBar = (hasFillerData && watchedFillerCount > 0) ? `
+                    <div class="progress-container filler-progress">
+                        <div class="progress-info">
+                            <span class="filler-label">🎭 Filler ${watchedFillerCount}/${totalFillerCount}</span>
+                            <span>${fillerProgressPercent}%</span>
+                        </div>
+                        <div class="progress-bar filler-bar size-small">
+                            <div class="progress-fill filler-fill" style="width: ${fillerProgressPercent}%"></div>
+                        </div>
+                    </div>` : '';
+
+                // Progress bar info - use canon counts when filler data is available
                 const totalDisplay = progressData.isGuessed ? `~${progressData.total}` : progressData.total;
+                const totalCanonDisplay = progressData.isGuessed ? `~${totalCanon}` : totalCanon;
+                const canonProgressPercent = hasFillerData ? Math.round((canonWatched / totalCanon) * 100) : progressPercent;
+                const canonProgressWidth = hasFillerData ? (canonWatched / totalCanon) * 100 : progressData.progress;
+
+                const progressInfoText = hasFillerData
+                    ? `<span title="Canon: ${canonWatched}/${totalCanonDisplay} | Total: ${episodeCount}/${totalDisplay}${progressData.isGuessed ? ' (estimated)' : ''}">📍 Ep ${currentEp > 0 ? currentEp : episodeCount} · ${canonWatched}/${totalCanonDisplay} · ${totalFillerCount} filler</span>`
+                    : `<span>Ep ${currentEp > 0 ? currentEp : episodeCount} · ${episodeCount}/${totalDisplay}</span>`;
 
                 progressInfoHTML = `
                     <div class="progress-info">
-                        <span>${episodeCount}/${totalDisplay}</span>
-                        <span>${progressPercent}%</span>
+                        ${progressInfoText}
+                        <span>${canonProgressPercent}%</span>
                     </div>
                     <div class="progress-bar size-small">
-                        <div class="progress-fill" style="width: ${progressData.progress}%"></div>
+                        <div class="progress-fill" style="width: ${canonProgressWidth}%"></div>
                     </div>
+                    ${fillerProgressBar}
+                    ${skippedFillersIndicator}
                 `;
 
                 episodesHTML = `
                     <div class="season-episodes">
                         <div class="episode-list">${episodeTags}${moreEpisodes}</div>
+                        ${unwatchedFillersSection}
                     </div>
                 `;
             }

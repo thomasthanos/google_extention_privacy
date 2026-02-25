@@ -294,11 +294,11 @@ async function fetchEpisodeTypesFromAnimeFillerList(animeSlug) {
             }
         }
 
-        // Calculate total episodes (highest manga canon episode number)
-        // This includes both pure canon and mixed canon/filler episodes
-        const allCanonEpisodes = [...episodeTypes.canon, ...episodeTypes.mixed];
-        if (allCanonEpisodes.length > 0) {
-            episodeTypes.totalEpisodes = Math.max(...allCanonEpisodes);
+        // Calculate total episodes (highest episode number across ALL types)
+        // Must include fillers too - otherwise anime ending with fillers get wrong total
+        const allEpisodes = [...episodeTypes.canon, ...episodeTypes.mixed, ...episodeTypes.filler, ...episodeTypes.anime_canon];
+        if (allEpisodes.length > 0) {
+            episodeTypes.totalEpisodes = Math.max(...allEpisodes);
         }
 
         console.log(`[Anime Tracker] ✓ Fetched episode types for ${animeSlug}:`, episodeTypes);

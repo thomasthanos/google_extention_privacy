@@ -466,7 +466,13 @@
         }, 5000);
 
         // Cleanup interval after 30 minutes
-        setTimeout(() => clearInterval(periodicCheck), 30 * 60 * 1000);
+        const periodicCheckTimeout = setTimeout(() => clearInterval(periodicCheck), 30 * 60 * 1000);
+
+        // Register for cleanup on navigation - prevents interval leak across episodes
+        VideoMonitor.addCleanup(() => {
+            clearInterval(periodicCheck);
+            clearTimeout(periodicCheckTimeout);
+        });
     }
 
     // Start when DOM is ready

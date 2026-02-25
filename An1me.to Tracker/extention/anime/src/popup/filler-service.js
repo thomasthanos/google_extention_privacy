@@ -150,7 +150,6 @@ const FillerService = {
             'darling-in-the-franxx',
             'dandadan',
             'vinland-saga',
-            'death-note',
             'higashi-no-eden'  // Not on AnimeFillerList
         ];
         return nicherAnime.some(name => slug.includes(name));
@@ -327,7 +326,7 @@ const FillerService = {
      * Auto-fetch missing episode types with rate limiting
      */
     async autoFetchMissing(animeData, onComplete) {
-        const { CONFIG } = window.AnimeTracker;
+        const { CONFIG, ANIME_NO_FILLER_DATA, SeasonGrouping } = window.AnimeTracker;
         const { Logger } = window.AnimeTracker;
 
         try {
@@ -338,6 +337,11 @@ const FillerService = {
                 if (this.episodeTypesCache[slug]) continue;
                 const normalizedSlug = slug.toLowerCase();
                 if (this.KNOWN_ANIME_TOTALS[normalizedSlug]) continue;
+                // Skip anime known to have no filler data - avoids repeated failed requests
+                const baseSlug = SeasonGrouping.getBaseSlug(slug);
+                if (ANIME_NO_FILLER_DATA && (ANIME_NO_FILLER_DATA.includes(slug) || ANIME_NO_FILLER_DATA.includes(baseSlug))) continue;
+                if (this.isLikelyMovie(slug)) continue;
+                if (this.isUnlikelyToHaveFillerData(slug)) continue;
                 slugsToFetch.push(slug);
             }
 

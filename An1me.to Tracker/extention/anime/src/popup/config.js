@@ -74,6 +74,10 @@ const ANIME_FILLER_LIST_SLUG_MAPPING = {
     // JJK movie
     'jujutsu-kaisen-0': 'jujutsu-kaisen-0-movie',
 
+    // Naruto Shippuden - double 'u' spelling used on an1me.to
+    'naruto-shippuuden': 'naruto-shippuden',
+    'naruto-shippuuden-complete': 'naruto-shippuden',
+
     // Special suffixes
     'tokyo-ghoul-re': 'tokyo-ghoul-re-0',
     'blue-lock-episode-nagi': 'blue-lock-0',
