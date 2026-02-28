@@ -1,0 +1,35 @@
+{
+  "appName": {
+    "message": "Auto Liker para Tinder y Boo",
+    "description": "El nombre de la extensión"
+  },
+  "appDescription": {
+    "message": "Auto Like con botón neón, contador, anillo de progreso y pausa inteligente para Tinder y Boo 🔥",
+    "description": "Descripción de la extensión"
+  },
+  "totalLikes": {
+    "message": "Total de Likes",
+    "description": "Etiqueta para el contador de likes totales"
+  },
+  "status": {
+    "message": "Estado",
+    "description": "Etiqueta para el indicador de estado"
+  },
+  "startAutoLike": {
+    "message": "Iniciar Auto Like",
+    "description": "Texto del botón para iniciar el auto like"
+  },
+  "stopAutoLike": {
+    "message": "Detener Auto Like",
+    "description": "Texto del botón para detener el auto like"
+  },
+  "byAuthor": {
+    "message": "por $AUTHOR$",
+    "description": "Crédito al autor",
+    "placeholders": {
+      "author": {
+        "content": "ThomasT"
+      }
+    }
+  }
+}

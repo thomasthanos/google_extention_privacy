@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "an1me.to Speed Control",
+  "version": "3.2",
+  "description": "Control video playback speed with F7 (hold) and F8 (toggle).",
+  "icons": {
+    "16": "src/icon16.png",
+    "32": "src/icon32.png",
+    "192": "src/icon192.png",
+    "512": "src/icon512.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://an1me.to/*"],
+      "js": ["content.js"],
+      "all_frames": true
+    }
+  ],
+  "host_permissions": [
+    "https://an1me.to/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "src/icon16.png",
+      "32": "src/icon32.png",
+      "192": "src/icon192.png",
+      "512": "src/icon512.png"
+    }
+  },
+  "permissions": ["storage"],
+  "background": {
+    "service_worker": "background.js"
+  }
+}

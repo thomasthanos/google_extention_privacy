@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Auto Liker</title>
+    <link rel="stylesheet" href="popup.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="popup-container">
+        <div class="header">
+            <div class="app-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 21.35L10.55 20.03C5.4 15.36 2 12.28 2 8.5C2 5.42 4.42 3 7.5 3C9.24 3 10.91 3.81 12 5.09C13.09 3.81 14.76 3 16.5 3C19.58 3 22 5.42 22 8.5C22 12.28 18.6 15.36 13.45 20.03L12 21.35Z" fill="url(#pinkGradient)"/>
+                    <defs>
+                        <linearGradient id="pinkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#ff6bff" />
+                            <stop offset="100%" stop-color="#ff3dff" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+            <h1>Auto Liker</h1>
+        </div>
+        
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-value" id="likeCount">0</div>
+                <div class="stat-label">Total Likes</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-value" id="statusIndicator">
+                    <span id="statusDot" class="dot off"></span>
+                </div>
+                <div class="stat-label">Status</div>
+            </div>
+        </div>
+        
+        <div class="progress-container">
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill"></div>
+            </div>
+            <div id="progressText" class="progress-text">0%</div>
+        </div>
+        
+        <button id="toggleButton" class="btn-primary">
+            <span id="buttonText">Start Auto Like</span>
+        </button>
+        
+<div class="donate-buttons">
+    <a href="https://www.paypal.me/ThomasThanos" target="_blank" class="donate-btn paypal">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="22" height="22">
+            <path fill="#3070b7" d="M43.804,32.5H64.5c3.966,0,7.251,0.614,9.773,1.828l0.535-0.293c0.125-1.2,0.192-2.46,0.192-3.785 C75,21.828,69,15,55,15H31.604c-1.477,0-2.734,1.075-2.964,2.534l-9.616,61.155C18.834,79.903,19.772,81,21,81h12.917l-0.893,5.69 c-0.079,0.502,0.043,0.978,0.291,1.37l8.441-53.811C41.917,33.236,42.777,32.5,43.804,32.5z"/>
+            <path fill="#40a6dd" d="M74.808,34.035l-0.535,0.293C71.751,33.114,68.466,32.5,64.5,32.5H43.804 c-1.026,0-1.887,0.736-2.047,1.75l-8.441,53.811C33.667,88.617,34.28,89,35,89h1.433h10.63c1.477,0,2.734-1.075,2.964-2.534 l2.505-15.932C52.762,69.075,54.019,68,55.496,68h3.53C67.286,68,81,62.857,81,45.071C81,40.424,79.325,36.353,74.808,34.035z"/>
+            <path fill="#375ca9" d="M43.804,32.5c-1.026,0-1.887,0.736-2.047,1.75l-3.442,21.944c0.587-0.439,1.314-0.694,2.101-0.694 h8.949c3.771,0,22.604-1.024,24.909-21.172C71.751,33.114,68.466,32.5,64.5,32.5H43.804z"/>
+        </svg>
+        PayPal
+    </a>
+    <a href="https://revolut.me/thomas2873" target="_blank" class="donate-btn revolut">
+        <svg width="22" height="22" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" fill="none">
+            <path stroke="#0055ff" stroke-linejoin="round" stroke-width="12"
+                d="M99 22c-13.415 0-29.564 1.953-38.077 3.13-3.521.486-6.226 3.294-6.667 6.82L39.138 152.897c-1.154 9.233 5.793 17.672 15.093 17.36 7.908-.265 14.743-1.197 20.936-3.119 5.049-1.567 8.26-6.27 8.974-11.508L89 120l14.191 39.42c2.285 6.348 8.318 10.693 15.053 10.29 10.248-.611 18.11-2.294 27.788-5.98 4.703-1.791 6.264-7.558 3.671-11.871C139.848 135.468 136.165 121.216 131 104c0 0 22-14 22-38 0-36-30-44-54-44Z"></path>
+            <path fill="#0055ff"
+                d="m85.929 87.19 4.363-32c.406-2.974 2.95-5.235 5.94-4.984C112.14 51.539 117.362 59.302 116 72c-1.142 10.655-7.352 19.734-24.13 21.635-3.613.409-6.433-2.843-5.941-6.446Z"></path>
+        </svg>
+        Revolut
+    </a>
+</div>
+
+
+        
+        <div class="footer">
+            <div class="version">v4.4</div>
+            <div class="author">by ThomasT</div>
+        </div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

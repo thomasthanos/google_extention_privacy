@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>an1me.to Speed Control</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <div class="header">
+      <img src="src/icon16.png" alt="icon" class="icon">
+      <span>Speed Control</span>
+    </div>
+
+    <div class="section">
+      <div class="info">
+        <div class="info-title">Select boost speed</div>
+        <div class="info-keys">
+          <span class="key">F7</span> Hold
+          <span class="key">F8</span> Toggle
+        </div>
+      </div>
+      <div class="speed-row">
+        <button class="speed-btn" data-value="1.5">1.5x</button>
+        <button class="speed-btn" data-value="2">2x</button>
+        <button class="speed-btn" data-value="3">3x</button>
+        <button class="speed-btn" data-value="4">4x</button>
+        <button class="speed-btn" data-value="8">8x</button>
+      </div>
+      <div class="hint" id="hint">Click on video first, then use F7/F8</div>
+    </div>
+
+    <div class="footer">
+      <div class="by">by <a href="https://github.com/thomasthanos" target="_blank" rel="noopener" class="author-link">@ThomasT</a></div>
+      <div class="donate-row">
+        <button id="donate-paypal" class="donate-btn">PayPal</button>
+        <button id="donate-revolut" class="donate-btn">Revolut</button>
+      </div>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

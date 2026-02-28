@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(move \"D:\\Projects\\google extention\\anime.to\\icon16.png\" \"D:\\Projects\\google extention\\anime.to\\src\"\" && move \"D:Projectsgoogle extentionanime.toicon32.png\" \"D:Projectsgoogle extentionanime.tosrc\"\")",
+      "Bash(move \"D:\\Projects\\google extention\\anime.to\\icon192.png\" \"D:\\Projects\\google extention\\anime.to\\src\"\" && move \"D:Projectsgoogle extentionanime.toicon512.png\" \"D:Projectsgoogle extentionanime.tosrc\"\")",
+      "Bash(move \"D:\\Projects\\google extention\\anime.to\\screenshots\\*\" \"D:\\Projects\\google extention\\anime.to\\src\\screenshots\"\")"
+    ]
+  }
+}
