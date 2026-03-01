@@ -3,6 +3,45 @@
  * Handles Firebase authentication and cloud synchronization
  */
 
+/**
+ * Merge two deletedAnime maps, keeping the newest deletedAt for each slug.
+ */
+function mergeDeletedAnime(local, cloud) {
+    const merged = { ...cloud };
+    for (const [slug, info] of Object.entries(local)) {
+        if (!merged[slug] || new Date(info.deletedAt) > new Date(merged[slug].deletedAt)) {
+            merged[slug] = info;
+        }
+    }
+    // Clean up entries older than 60 days (no longer needed)
+    const cutoff = Date.now() - 60 * 24 * 60 * 60 * 1000;
+    for (const [slug, info] of Object.entries(merged)) {
+        if (new Date(info.deletedAt).getTime() < cutoff) {
+            delete merged[slug];
+        }
+    }
+    return merged;
+}
+
+/**
+ * Remove from animeData any slug that was deleted AFTER its last watched episode.
+ * This stops deleted anime from being resurrected during merge.
+ */
+function applyDeletedAnime(animeData, deletedAnime) {
+    for (const [slug, info] of Object.entries(deletedAnime)) {
+        if (!animeData[slug]) continue;
+        const deletedAt = new Date(info.deletedAt).getTime();
+        const lastWatched = animeData[slug].lastWatched
+            ? new Date(animeData[slug].lastWatched).getTime()
+            : 0;
+        // If deleted more recently than last watched → honour the deletion
+        if (deletedAt >= lastWatched) {
+            console.log(`[Sync] Honouring deletion of ${slug} (deleted ${info.deletedAt})`);
+            delete animeData[slug];
+        }
+    }
+}
+
 const FirebaseSync = {
     // State
     currentUser: null,
@@ -136,6 +175,7 @@ const FirebaseSync = {
                 await FirebaseLib.setDocument('users', this.currentUser.uid, {
                     animeData: dataToSave.animeData || {},
                     videoProgress: dataToSave.videoProgress || {},
+                    deletedAnime: dataToSave.deletedAnime || {},
                     lastUpdated: new Date().toISOString(),
                     email: this.currentUser.email
                 });
@@ -226,12 +266,18 @@ const FirebaseSync = {
                 }
             }
             
-            const localData = await Storage.get(['animeData', 'videoProgress', 'userId']);
+            const localData = await Storage.get(['animeData', 'videoProgress', 'userId', 'deletedAnime']);
             let finalData;
 
             if (cloudData) {
                 const shouldMerge = localData.userId === this.currentUser.uid;
-                
+
+                // Merge deletedAnime logs from both sides (union, keep newest deletedAt)
+                const mergedDeletedAnime = mergeDeletedAnime(
+                    localData.deletedAnime || {},
+                    cloudData.deletedAnime || {}
+                );
+
                 if (shouldMerge && localData.animeData && Object.keys(localData.animeData).length > 0) {
                     finalData = ProgressManager.mergeData(localData, cloudData);
                     console.log('[Sync] Merged episodes:', UIHelpers.countEpisodes(finalData.animeData));
@@ -246,7 +292,11 @@ const FirebaseSync = {
                     finalData.animeData = ProgressManager.removeDuplicateEpisodes(finalData.animeData);
                 }
 
-                const { cleaned: cleanedProgress, removedCount: progressRemoved } = 
+                // Apply deletedAnime: remove any anime that was deleted after its last watch
+                applyDeletedAnime(finalData.animeData, mergedDeletedAnime);
+                finalData.deletedAnime = mergedDeletedAnime;
+
+                const { cleaned: cleanedProgress } = 
                     ProgressManager.cleanTrackedProgress(finalData.animeData, finalData.videoProgress);
                 finalData.videoProgress = cleanedProgress;
                 
@@ -255,6 +305,7 @@ const FirebaseSync = {
                 await Storage.set({
                     animeData: finalData.animeData,
                     videoProgress: finalData.videoProgress,
+                    deletedAnime: mergedDeletedAnime,
                     userId: this.currentUser.uid
                 });
 

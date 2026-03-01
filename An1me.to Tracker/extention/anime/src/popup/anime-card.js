@@ -109,8 +109,8 @@ const AnimeCardRenderer = {
             ? `<div class="hidden-episodes">${hiddenEpisodeTags}</div><span class="episode-tag show-more-episodes" data-more-text="+${hiddenEpisodes.length} more" data-less-text="Show less">+${hiddenEpisodes.length} more</span>`
             : '';
 
-        // Unwatched fillers
-        const unwatchedFillers = FillerService.getUnwatchedFillers(slug, anime.episodes, currentEpisode);
+        // Unwatched fillers — only up to current episode, descending order (most recent first)
+        const unwatchedFillers = FillerService.getUnwatchedFillers(slug, anime.episodes, currentEpisode).slice().reverse();
         const visibleFillers = unwatchedFillers.slice(0, CONFIG.VISIBLE_FILLERS_LIMIT);
         const hiddenFillers = unwatchedFillers.slice(CONFIG.VISIBLE_FILLERS_LIMIT);
 
@@ -619,8 +619,8 @@ const AnimeCardRenderer = {
                     ? `<div class="hidden-episodes">${hiddenEpisodeTags}</div><span class="episode-tag show-more-episodes" data-more-text="+${hiddenEpisodes.length} more" data-less-text="Show less">+${hiddenEpisodes.length} more</span>`
                     : '';
 
-                // Unwatched fillers
-                const unwatchedFillers = FillerService.getUnwatchedFillers(slug, anime.episodes, currentEp);
+                // Unwatched fillers — only up to current episode, descending (newest → oldest)
+                const unwatchedFillers = FillerService.getUnwatchedFillers(slug, anime.episodes, currentEp).slice().reverse();
                 const visibleUFilllers = unwatchedFillers.slice(0, CONFIG.VISIBLE_FILLERS_LIMIT);
                 const hiddenUFillers = unwatchedFillers.slice(CONFIG.VISIBLE_FILLERS_LIMIT);
                 const unwatchedFillerTags = visibleUFilllers.map(epNum =>

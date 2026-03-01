@@ -133,7 +133,81 @@ function jsonToFirestoreValue(value) {
 }
 
 /**
+ * Fetch current cloud data from Firebase (for merge before write)
+ */
+async function fetchCloudData(user, token) {
+    try {
+        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${user.uid}`;
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) return null;
+        const doc = await response.json();
+        if (!doc.fields) return null;
+
+        // Convert Firestore fields back to plain JS
+        function firestoreValueToJson(val) {
+            if (val.nullValue !== undefined) return null;
+            if (val.stringValue !== undefined) return val.stringValue;
+            if (val.integerValue !== undefined) return parseInt(val.integerValue, 10);
+            if (val.doubleValue !== undefined) return val.doubleValue;
+            if (val.booleanValue !== undefined) return val.booleanValue;
+            if (val.arrayValue) return (val.arrayValue.values || []).map(firestoreValueToJson);
+            if (val.mapValue) {
+                const obj = {};
+                for (const [k, v] of Object.entries(val.mapValue.fields || {})) {
+                    obj[k] = firestoreValueToJson(v);
+                }
+                return obj;
+            }
+            return null;
+        }
+
+        const result = {};
+        for (const [k, v] of Object.entries(doc.fields)) {
+            result[k] = firestoreValueToJson(v);
+        }
+        return result;
+    } catch (e) {
+        console.warn('[Background] Could not fetch cloud data for merge:', e);
+        return null;
+    }
+}
+
+/**
+ * Merge local animeData with cloud animeData (union of episodes per anime)
+ */
+function mergeAnimeData(localData, cloudData) {
+    const merged = { ...(cloudData || {}), ...(localData || {}) };
+
+    for (const slug of Object.keys(merged)) {
+        const cloudAnime = cloudData?.[slug];
+        const localAnime = localData?.[slug];
+
+        if (!cloudAnime || !localAnime) continue; // Only one side — already correct
+
+        const episodeMap = new Map();
+        const cloudEps = Array.isArray(cloudAnime.episodes) ? cloudAnime.episodes : [];
+        const localEps = Array.isArray(localAnime.episodes) ? localAnime.episodes : [];
+
+        // Cloud first (prefer cloud meta for episodes that exist on both)
+        for (const ep of [...cloudEps, ...localEps]) {
+            if (ep && typeof ep === 'object' && typeof ep.number === 'number' && !isNaN(ep.number)) {
+                if (!episodeMap.has(ep.number)) episodeMap.set(ep.number, ep);
+            }
+        }
+
+        merged[slug] = { ...localAnime }; // local wins for metadata (title, etc.)
+        merged[slug].episodes = Array.from(episodeMap.values()).sort((a, b) => a.number - b.number);
+        merged[slug].totalWatchTime = merged[slug].episodes.reduce((s, ep) => s + (ep.duration || 0), 0);
+    }
+
+    return merged;
+}
+
+/**
  * Sync data to Firebase (called automatically when episodes are tracked)
+ * Always merges with existing cloud data first to avoid overwriting other browsers.
  */
 async function syncToFirebase() {
     if (syncInProgress) {
@@ -157,9 +231,26 @@ async function syncToFirebase() {
     syncInProgress = true;
 
     try {
-        const result = await chrome.storage.local.get(['animeData', 'videoProgress']);
-        const animeData = result.animeData || {};
-        const videoProgress = result.videoProgress || {};
+        const result = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime']);
+        const localAnimeData = result.animeData || {};
+        const localVideoProgress = result.videoProgress || {};
+        const localDeletedAnime = result.deletedAnime || {};
+
+        // Fetch current cloud data and merge episodes before overwriting
+        const cloudDoc = await fetchCloudData(user, token);
+        const cloudAnimeData = cloudDoc?.animeData || null;
+
+        const mergedAnimeData = cloudAnimeData
+            ? mergeAnimeData(localAnimeData, cloudAnimeData)
+            : localAnimeData;
+
+        // If merge added episodes the local browser didn't have, save them locally too
+        const localCount = Object.values(localAnimeData).reduce((s, a) => s + (a.episodes?.length || 0), 0);
+        const mergedCount = Object.values(mergedAnimeData).reduce((s, a) => s + (a.episodes?.length || 0), 0);
+        if (mergedCount > localCount) {
+            console.log(`[Background] Merge added ${mergedCount - localCount} episodes from cloud → saving locally`);
+            await chrome.storage.local.set({ animeData: mergedAnimeData });
+        }
 
         const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${user.uid}`;
 
@@ -171,8 +262,9 @@ async function syncToFirebase() {
             },
             body: JSON.stringify({
                 fields: jsonToFirestoreFields({
-                    animeData: animeData,
-                    videoProgress: videoProgress,
+                    animeData: mergedAnimeData,
+                    videoProgress: localVideoProgress,
+                    deletedAnime: localDeletedAnime,
                     lastUpdated: new Date().toISOString(),
                     email: user.email
                 })
@@ -180,10 +272,9 @@ async function syncToFirebase() {
         });
 
         if (response.ok) {
-            // Beautiful styled log
             const bgStyle = 'color: rgb(96, 165, 250); font-weight: bold; font-size: 12px; padding: 2px 6px; background: rgba(96, 165, 250, 0.1); border-radius: 3px;';
             const msgStyle = 'color: rgb(148, 163, 184); font-size: 11px;';
-            console.log('%cBackground %c⚙️ Auto-synced to Firebase', bgStyle, msgStyle);
+            console.log(`%cBackground %c⚙️ Auto-synced to Firebase (${mergedCount} eps)`, bgStyle, msgStyle);
         } else {
             console.error('[Background] Sync failed:', response.status);
         }

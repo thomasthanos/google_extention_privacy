@@ -2382,6 +2382,59 @@ body {
   color: var(--text-muted);
 }
 
+/* Episodes Live Preview */
+.episodes-preview {
+  display: none;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: var(--border-radius-xs);
+  font-size: 12px;
+  line-height: 1.5;
+  transition: all var(--transition-fast);
+}
+
+.episodes-preview.preview-visible {
+  display: block;
+  background: linear-gradient(180deg,
+      rgba(74, 222, 128, 0.08) 0%,
+      rgba(74, 222, 128, 0.04) 100%);
+  border: 1px solid rgba(74, 222, 128, 0.25);
+  animation: fadeInPreview 0.2s ease;
+}
+
+.episodes-preview.preview-error-state {
+  background: linear-gradient(180deg,
+      rgba(239, 68, 68, 0.08) 0%,
+      rgba(239, 68, 68, 0.04) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.preview-ok {
+  color: var(--success);
+  font-weight: 500;
+}
+
+.preview-ok strong {
+  color: #86efac;
+  font-weight: 700;
+}
+
+.preview-error {
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.preview-fillers {
+  color: #a855f7;
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+@keyframes fadeInPreview {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* Checkbox */
 .checkbox-group {
   margin-top: 12px;

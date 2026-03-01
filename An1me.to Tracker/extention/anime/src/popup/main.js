@@ -668,17 +668,20 @@
      * Delete anime
      */
     async function deleteAnime(slug) {
-        const { Storage, FirebaseSync, UIHelpers } = AT;
+        const { Storage, FirebaseSync } = AT;
+
+        // Track whether anime existed BEFORE deleting from memory
+        const wasInAnimeData = !!animeData[slug];
 
         // Remove from animeData if it exists
-        if (animeData[slug]) {
+        if (wasInAnimeData) {
             delete animeData[slug];
         } else {
             console.log('[Delete] Anime not in local list, checking progress only:', slug);
         }
 
         try {
-            const result = await Storage.get(['videoProgress']);
+            const result = await Storage.get(['videoProgress', 'deletedAnime']);
             const currentVideoProgress = result.videoProgress || {};
 
             let progressDeleted = 0;
@@ -690,14 +693,19 @@
                 }
             }
 
-            if (progressDeleted === 0 && !animeData[slug]) {
+            // Use wasInAnimeData (captured before deletion) so this check is correct
+            if (progressDeleted === 0 && !wasInAnimeData) {
                 console.warn('[Delete] No data found to delete for:', slug);
                 return;
             }
 
             videoProgress = currentVideoProgress;
 
-            const dataToSave = { animeData, videoProgress: currentVideoProgress };
+            // Record deletion with timestamp so other devices respect it during merge
+            const deletedAnime = result.deletedAnime || {};
+            deletedAnime[slug] = { deletedAt: new Date().toISOString() };
+
+            const dataToSave = { animeData, videoProgress: currentVideoProgress, deletedAnime };
             const user = FirebaseSync.getUser();
             if (user) {
                 dataToSave.userId = user.uid;
@@ -706,8 +714,7 @@
             await Storage.set(dataToSave);
 
             if (user) {
-                // Fix: Use immediate save to ensure deletion is committed before popup closes
-                await FirebaseSync.saveToCloud({ animeData, videoProgress: currentVideoProgress }, true);
+                await FirebaseSync.saveToCloud({ animeData, videoProgress: currentVideoProgress, deletedAnime }, true);
             }
 
             renderAnimeList(elements.searchInput?.value || '');
@@ -758,10 +765,10 @@
         // Reset form
         elements.animeSlugInput.value = '';
         elements.animeTitleInput.value = '';
-        elements.episodesWatchedInput.value = '1';
-        elements.markAllWatchedCheckbox.checked = true;
+        elements.episodesWatchedInput.value = '';
         elements.animeSlugInput.classList.remove('error');
         elements.episodesWatchedInput.classList.remove('error');
+        updateEpisodesPreview('');
 
         elements.addAnimeDialog.classList.add('visible');
         elements.animeSlugInput.focus();
@@ -772,6 +779,117 @@
      */
     function hideAddAnimeDialog() {
         elements.addAnimeDialog.classList.remove('visible');
+    }
+
+    /**
+     * Build compact range string from sorted episode numbers
+     */
+    function buildRangeString(episodeNumbers) {
+        if (!episodeNumbers || episodeNumbers.length === 0) return '';
+        const ranges = [];
+        let start = episodeNumbers[0], end = episodeNumbers[0];
+        for (let i = 1; i < episodeNumbers.length; i++) {
+            if (episodeNumbers[i] === end + 1) {
+                end = episodeNumbers[i];
+            } else {
+                ranges.push(start === end ? `${start}` : `${start}–${end}`);
+                start = end = episodeNumbers[i];
+            }
+        }
+        ranges.push(start === end ? `${start}` : `${start}–${end}`);
+        return ranges.join(', ');
+    }
+
+    /**
+     * Split episodes into canon and filler arrays for a given slug.
+     */
+    function splitCanonAndFillers(slug, episodeNumbers) {
+        const { FillerService } = window.AnimeTracker;
+        if (!slug || !FillerService || !FillerService.hasFillerData(slug)) {
+            return { canon: episodeNumbers, fillers: [] };
+        }
+        const canon = [];
+        const fillers = [];
+        for (const n of episodeNumbers) {
+            if (FillerService.isFillerEpisode(slug, n)) {
+                fillers.push(n);
+            } else {
+                canon.push(n);
+            }
+        }
+        return { canon, fillers };
+    }
+
+    /**
+     * Update the live episodes preview below the input
+     */
+    function updateEpisodesPreview(input) {
+        const preview = document.getElementById('episodesPreview');
+        if (!preview) return;
+
+        if (!input || !input.trim()) {
+            preview.innerHTML = '';
+            preview.className = 'episodes-preview';
+            return;
+        }
+
+        const allEpisodes = parseEpisodeRanges(input);
+
+        if (allEpisodes.length === 0) {
+            preview.innerHTML = '<span class="preview-error">⚠ Δεν βρέθηκαν έγκυρα επεισόδια</span>';
+            preview.className = 'episodes-preview preview-visible preview-error-state';
+            return;
+        }
+
+        // Get slug to filter known fillers
+        const slugRaw = elements.animeSlugInput ? elements.animeSlugInput.value : '';
+        const slug = extractSlugFromInput(slugRaw);
+        const { canon, fillers } = splitCanonAndFillers(slug, allEpisodes);
+
+        const rangeStr = buildRangeString(canon);
+        const total = canon.length;
+
+        let html = `<span class="preview-ok">✓ ${total} επεισόδια: <strong>${rangeStr}</strong></span>`;
+        if (fillers.length > 0) {
+            const fillerStr = buildRangeString(fillers);
+            html += `<br><span class="preview-fillers">⏭ ${fillers.length} fillers αφαιρέθηκαν αυτόματα: ${fillerStr}</span>`;
+        }
+
+        preview.innerHTML = html;
+        preview.className = 'episodes-preview preview-visible';
+    }
+
+    /**
+     * Parse episode ranges from user input
+     * Supports: "1", "30", "1-30", "1-30, 50-60", "1-30, 50-60, 70"
+     * Returns a sorted array of unique episode numbers
+     */
+    function parseEpisodeRanges(input) {
+        if (!input || !input.trim()) return [];
+
+        const episodeNumbers = new Set();
+        // Split by comma or semicolon
+        const parts = input.split(/[,;]+/).map(p => p.trim()).filter(Boolean);
+
+        for (const part of parts) {
+            const rangeMatch = part.match(/^(\d+)\s*[-–]\s*(\d+)$/);
+            const singleMatch = part.match(/^(\d+)$/);
+
+            if (rangeMatch) {
+                const start = parseInt(rangeMatch[1], 10);
+                const end = parseInt(rangeMatch[2], 10);
+                if (start > 0 && end >= start) {
+                    for (let i = start; i <= end; i++) {
+                        episodeNumbers.add(i);
+                    }
+                }
+            } else if (singleMatch) {
+                const num = parseInt(singleMatch[1], 10);
+                if (num > 0) episodeNumbers.add(num);
+            }
+        }
+
+        return Array.from(episodeNumbers).sort((a, b) => a - b);
     }
 
     /**
@@ -828,8 +946,7 @@
         const slugInput = elements.animeSlugInput.value;
         const slug = extractSlugFromInput(slugInput);
         const title = elements.animeTitleInput.value.trim() || generateTitleFromSlug(slug);
-        const episodeCount = parseInt(elements.episodesWatchedInput.value, 10);
-        const markAll = elements.markAllWatchedCheckbox.checked;
+        const episodesRawInput = elements.episodesWatchedInput.value.trim();
 
         // Validate slug
         if (!slug) {
@@ -839,8 +956,22 @@
         }
         elements.animeSlugInput.classList.remove('error');
 
-        // Validate episode count
-        if (isNaN(episodeCount) || episodeCount < 1) {
+        // Validate episodes input
+        if (!episodesRawInput) {
+            elements.episodesWatchedInput.classList.add('error');
+            elements.episodesWatchedInput.focus();
+            return;
+        }
+
+        // Parse episode ranges (e.g. "1-56, 72-90, 113-122" or just "73")
+        const allParsedEpisodes = parseEpisodeRanges(episodesRawInput);
+        // Auto-exclude known fillers for this slug
+        const { canon: episodeNumbers, fillers: excludedFillers } = splitCanonAndFillers(slug, allParsedEpisodes);
+        if (excludedFillers.length > 0) {
+            console.log(`[AddAnime] Auto-excluded ${excludedFillers.length} filler episodes for ${slug}:`, excludedFillers);
+        }
+
+        if (episodeNumbers.length === 0) {
             elements.episodesWatchedInput.classList.add('error');
             elements.episodesWatchedInput.focus();
             return;
@@ -859,25 +990,12 @@
             const isMovie = SeasonGrouping.isMovie(slug);
             const defaultDuration = isMovie ? 6000 : 1440;
 
-            // Create episodes array
-            const episodes = [];
-            if (markAll) {
-                // Mark episodes 1 to N
-                for (let i = 1; i <= episodeCount; i++) {
-                    episodes.push({
-                        number: i,
-                        duration: defaultDuration,
-                        watchedAt: now
-                    });
-                }
-            } else {
-                // Just mark the specified episode
-                episodes.push({
-                    number: episodeCount,
-                    duration: defaultDuration,
-                    watchedAt: now
-                });
-            }
+            // Build episodes array from parsed numbers
+            const episodes = episodeNumbers.map(num => ({
+                number: num,
+                duration: defaultDuration,
+                watchedAt: now
+            }));
 
             // Check if anime already exists and merge episodes
             if (animeData[slug]) {
@@ -1214,11 +1332,20 @@
         }
         // Handle Enter key in add anime form
         if (elements.animeSlugInput) {
+            // Re-run preview when slug changes (filler data might now be available)
+            elements.animeSlugInput.addEventListener('input', () => {
+                if (elements.episodesWatchedInput && elements.episodesWatchedInput.value) {
+                    updateEpisodesPreview(elements.episodesWatchedInput.value);
+                }
+            });
             elements.animeSlugInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') elements.episodesWatchedInput.focus();
             });
         }
         if (elements.episodesWatchedInput) {
+            elements.episodesWatchedInput.addEventListener('input', (e) => {
+                updateEpisodesPreview(e.target.value);
+            });
             elements.episodesWatchedInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') addAnimeWithEpisodes();
             });

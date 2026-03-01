@@ -4,8 +4,26 @@
  */
 
 const FillerService = {
-    // Known filler episodes - populated dynamically
-    KNOWN_FILLERS: {},
+    // Known filler episodes - pre-seeded with verified data, also populated dynamically
+    KNOWN_FILLERS: {
+        // Naruto Shippuden - verified filler list
+        'naruto-shippuuden': [
+            [57,71],[91,112],[144,151],[170,171],[176,196],
+            [223,242],[257,260],[271,271],[279,281],[284,295],
+            [303,320],[347,361],[376,377],[388,390],[394,413],
+            [416,417],[422,423],[427,450],[464,468],[480,483]
+        ],
+        'naruto-shippuden': [
+            [57,71],[91,112],[144,151],[170,171],[176,196],
+            [223,242],[257,260],[271,271],[279,281],[284,295],
+            [303,320],[347,361],[376,377],[388,390],[394,413],
+            [416,417],[422,423],[427,450],[464,468],[480,483]
+        ],
+        // Naruto (original) - verified filler list
+        'naruto': [
+            [26,26],[97,106],[136,140],[143,219]
+        ],
+    },
 
     // Known anime totals - populated dynamically
     KNOWN_ANIME_TOTALS: {},
@@ -288,8 +306,12 @@ const FillerService = {
             Logger.success(`Updated KNOWN_FILLERS for ${animeSlug}`, fillerRanges);
         }
 
+        // Hardcoded/verified filler lists take priority — don't overwrite them
+        const PROTECTED_SLUGS = ['naruto-shippuuden', 'naruto-shippuden', 'naruto'];
         slugVariations.forEach(slug => {
-            this.KNOWN_FILLERS[slug] = fillerRanges;
+            if (!PROTECTED_SLUGS.includes(slug.toLowerCase())) {
+                this.KNOWN_FILLERS[slug] = fillerRanges;
+            }
         });
     },
 

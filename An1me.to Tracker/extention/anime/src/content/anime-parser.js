@@ -46,6 +46,23 @@ const AnimeParser = {
         
         Logger.debug(`Slug: ${animeSlug} | Ep: ${episodeSlug || 'none'}`);
 
+        // ── Double episode detection (e.g. naruto-shippuuden-episode-119-120) ──
+        // Must run BEFORE normal patterns so Pattern 4 doesn't mangle the slug.
+        let episodeFound = false;
+        let isDoubleEpisode = false;
+        let secondEpisodeNumber = null;
+
+        const doubleEpMatch = animeSlug.match(/^(.+?)[-_]ep(?:isode)?[-_]?(\d+)[-_](\d+)$/i);
+        if (doubleEpMatch) {
+            animeSlug = doubleEpMatch[1];               // e.g. 'naruto-shippuuden'
+            episodeNumber = parseInt(doubleEpMatch[2]); // first ep  (119)
+            secondEpisodeNumber = parseInt(doubleEpMatch[3]); // second ep (120)
+            episodeSlug = `episode-${episodeNumber}`;
+            isDoubleEpisode = true;
+            episodeFound = true;
+            Logger.debug(`Double episode: ${animeSlug} Ep${episodeNumber}-${secondEpisodeNumber}`);
+        }
+
         // Episode detection patterns
         const episodePatterns = [
             /^(.+?)[-_]ep(?:isode)?[-_]?(\d+)$/i,
@@ -54,9 +71,8 @@ const AnimeParser = {
             /^(.+?)[-_](\d+)$/
         ];
 
-        let episodeFound = false;
-        
         for (const pattern of episodePatterns) {
+            if (episodeFound) break;
             const match = animeSlug.match(pattern);
             if (match) {
                 animeSlug = match[1];
@@ -126,7 +142,9 @@ const AnimeParser = {
             episodeSlug: `episode-${episodeNumber}`,
             episodeNumber,
             uniqueId,
-            url: window.location.href
+            url: window.location.href,
+            isDoubleEpisode,
+            secondEpisodeNumber
         };
     },
 

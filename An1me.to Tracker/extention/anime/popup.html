@@ -340,16 +340,10 @@
                 <div class="form-group">
                     <label for="episodesWatched">Episodes Watched</label>
                     <div class="episodes-input-group">
-                        <input type="number" id="episodesWatched" min="1" value="1" placeholder="12">
-                        <span class="episodes-hint">Enter the number of episodes you've watched</span>
+                        <input type="text" id="episodesWatched" placeholder="π.χ. 1-56, 72-90, 113-122">
+                        <span class="episodes-hint">Γράψε επεισόδιο (5), εύρος (1-56) ή συνδυασμό (1-56, 72-90, 113)</span>
                     </div>
-                </div>
-                <div class="form-group checkbox-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="markAllWatched" checked>
-                        <span class="checkbox-custom"></span>
-                        <span>Σημείωσε όλα τα επεισόδια (1 έως Ν) ως watched</span>
-                    </label>
+                    <div class="episodes-preview" id="episodesPreview"></div>
                 </div>
             </div>
             <div class="dialog-actions">

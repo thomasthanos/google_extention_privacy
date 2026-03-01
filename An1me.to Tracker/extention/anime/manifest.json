@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "An1me.to Tracker",
-  "version": "3.0.3",
+  "version": "3.0.5",
   "description": "Track your anime watching progress on an1me.to with cloud sync across all browsers",
   "author": "ThomasThanos",
   "permissions": [

@@ -70,13 +70,29 @@
                         validDuration = 1800;
                     }
 
+                    const watchedAt = new Date().toISOString().split('.')[0] + 'Z';
                     animeData[animeInfo.animeSlug].episodes.push({
                         number: animeInfo.episodeNumber,
-                        watchedAt: new Date().toISOString().split('.')[0] + 'Z',
+                        watchedAt,
                         duration: validDuration
                     });
                     animeData[animeInfo.animeSlug].totalWatchTime =
                         (animeData[animeInfo.animeSlug].totalWatchTime || 0) + validDuration;
+
+                    // ── Double episode: also save the second episode ──
+                    if (animeInfo.isDoubleEpisode && animeInfo.secondEpisodeNumber) {
+                        const alreadyHasSecond = animeData[animeInfo.animeSlug].episodes
+                            .some(ep => ep.number === animeInfo.secondEpisodeNumber);
+                        if (!alreadyHasSecond) {
+                            animeData[animeInfo.animeSlug].episodes.push({
+                                number: animeInfo.secondEpisodeNumber,
+                                watchedAt,
+                                duration: validDuration
+                            });
+                            animeData[animeInfo.animeSlug].totalWatchTime += validDuration;
+                        }
+                    }
+
                     animeData[animeInfo.animeSlug].lastWatched = new Date().toISOString();
                     animeData[animeInfo.animeSlug].episodes.sort((a, b) => a.number - b.number);
                     
@@ -356,15 +372,31 @@
                                 validDuration = 1800;
                             }
 
+                            const watchedAt = now.toISOString().split('.')[0] + 'Z';
                             const episodeData = {
                                 number: animeInfo.episodeNumber,
-                                watchedAt: now.toISOString().split('.')[0] + 'Z',
+                                watchedAt,
                                 duration: validDuration
                             };
 
                             animeData[animeInfo.animeSlug].episodes.push(episodeData);
                             animeData[animeInfo.animeSlug].totalWatchTime =
                                 (animeData[animeInfo.animeSlug].totalWatchTime || 0) + validDuration;
+
+                            // ── Double episode: also save the second episode ──
+                            if (animeInfo.isDoubleEpisode && animeInfo.secondEpisodeNumber) {
+                                const alreadyHasSecond = animeData[animeInfo.animeSlug].episodes
+                                    .some(ep => ep.number === animeInfo.secondEpisodeNumber);
+                                if (!alreadyHasSecond) {
+                                    animeData[animeInfo.animeSlug].episodes.push({
+                                        number: animeInfo.secondEpisodeNumber,
+                                        watchedAt,
+                                        duration: validDuration
+                                    });
+                                    animeData[animeInfo.animeSlug].totalWatchTime += validDuration;
+                                }
+                            }
+
                             animeData[animeInfo.animeSlug].lastWatched = new Date().toISOString();
                             animeData[animeInfo.animeSlug].episodes.sort((a, b) => a.number - b.number);
 

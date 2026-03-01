@@ -406,11 +406,27 @@ const ProgressTracker = {
             animeData[info.animeSlug].episodes.push(episodeData);
             animeData[info.animeSlug].totalWatchTime = (animeData[info.animeSlug].totalWatchTime || 0) + validDuration;
             animeData[info.animeSlug].lastWatched = new Date().toISOString();
+
+            // ── Double episode: also save the second episode (e.g. ep 120 alongside ep 119) ──
+            if (info.isDoubleEpisode && info.secondEpisodeNumber) {
+                const alreadyHasSecond = animeData[info.animeSlug].episodes
+                    .some(ep => ep.number === info.secondEpisodeNumber);
+                if (!alreadyHasSecond) {
+                    animeData[info.animeSlug].episodes.push({
+                        number: info.secondEpisodeNumber,
+                        watchedAt: now.toISOString().split('.')[0] + 'Z',
+                        duration: validDuration
+                    });
+                    animeData[info.animeSlug].totalWatchTime += validDuration;
+                    Logger.info(`Double episode: also tracked Ep${info.secondEpisodeNumber}`);
+                }
+            }
+
             animeData[info.animeSlug].episodes.sort((a, b) => a.number - b.number);
 
             await Storage.set({ animeData });
 
-            Logger.success(`✓ Tracked: ${info.animeTitle} Ep${info.episodeNumber}`);
+            Logger.success(`✓ Tracked: ${info.animeTitle} Ep${info.episodeNumber}${info.isDoubleEpisode ? '-' + info.secondEpisodeNumber : ''}`);
             Notifications.showCompletion(info);
             return true;
         } catch (e) {
