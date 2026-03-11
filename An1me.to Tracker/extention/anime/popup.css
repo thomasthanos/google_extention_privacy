@@ -150,20 +150,163 @@ body {
 }
 .auth-subtitle { font-size: 13px; color: var(--t2); line-height: 1.6; }
 
-.auth-tabs {
-  display: flex; gap: 4px;
-  background: rgba(255,255,255,0.05);
-  border-radius: var(--r12); padding: 4px; width: 100%;
-}
-.auth-tab {
-  flex: 1; padding: 8px 0; border: none;
-  background: transparent; color: var(--t3);
-  font-size: 13px; font-weight: 500; font-family: inherit;
-  border-radius: var(--r8); cursor: pointer; transition: all var(--tn);
-}
-.auth-tab.active { background: rgba(255,255,255,0.1); color: var(--t1); }
-
 .auth-panel { width: 100%; }
+
+/* Japanese Header */
+.japanese-header {
+  text-align: center;
+  margin-bottom: 8px;
+}
+.torii-gate {
+  font-size: 52px;
+  margin-bottom: 6px;
+  filter: drop-shadow(0 0 14px rgba(255, 82, 82, 0.6));
+  line-height: 1;
+}
+.auth-anime-title {
+  display: block;
+  margin-bottom: 4px;
+  text-align: center;
+}
+.jp-text {
+  display: block;
+  font-size: 26px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #ff5252, #ff8c42);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 2px;
+}
+.en-text {
+  display: block;
+  font-size: 13px;
+  color: var(--t2);
+  letter-spacing: 1px;
+}
+.jp-subtitle {
+  font-size: 11px;
+  color: var(--t3);
+  margin-top: 6px;
+  font-style: italic;
+}
+
+/* Google Primary Button */
+.btn-google-primary {
+  width: 100%;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #ff5252, #ff8c42);
+  border: 2px solid rgba(255, 215, 0, 0.3);
+  border-radius: var(--r16);
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 30px rgba(255, 82, 82, 0.3);
+  margin-bottom: 4px;
+}
+.btn-google-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 40px rgba(255, 82, 82, 0.5);
+  border-color: rgba(255, 215, 0, 0.5);
+}
+.btn-google-primary:active { transform: translateY(0); }
+.btn-google-primary .btn-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: white;
+  font-weight: 600;
+  font-size: 16px;
+}
+.btn-google-primary .google-icon { width: 20px; height: 20px; }
+
+.sparkle {
+  animation: sparkle 1.5s infinite;
+  opacity: 0.8;
+}
+@keyframes sparkle {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+/* Collapsible Section */
+.auth-collapsible {
+  width: 100%;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 8px;
+}
+.auth-collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  color: var(--t2);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+.auth-collapsible-header:hover { color: var(--red); }
+.auth-collapsible-header .arrow { transition: transform 0.3s; }
+.auth-collapsible.expanded .arrow { transform: rotate(180deg); }
+.auth-collapsible-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.auth-collapsible.expanded .auth-collapsible-content {
+  max-height: 280px;
+  margin-bottom: 8px;
+}
+
+/* Token Button */
+.btn-token {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 4px solid #c4b5fd;
+  border-radius: var(--r12);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-token:hover {
+  transform: translateX(2px);
+  background: linear-gradient(135deg, #9f7aea, #7c3aed);
+  border-left-width: 6px;
+}
+.btn-token .btn-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: white;
+}
+.token-icon { font-size: 18px; }
+.token-text { flex: 1; text-align: left; font-weight: 600; }
+.token-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  text-transform: uppercase;
+}
+
+/* Help Link */
+.help-link {
+  display: inline-block;
+  color: var(--t3);
+  font-size: 11px;
+  text-decoration: none;
+  padding: 8px;
+  margin-top: 4px;
+  transition: color 0.2s;
+}
+.help-link:hover { color: var(--red); }
 .auth-form { display: flex; flex-direction: column; gap: 10px; width: 100%; }
 .auth-input {
   width: 100%; padding: 11px 14px;
@@ -174,7 +317,22 @@ body {
   outline: none; transition: border-color var(--tn);
 }
 .auth-input:focus { border-color: rgba(255,82,82,0.5); }
-.auth-textarea { min-height: 80px; resize: vertical; font-size: 12px; font-family: monospace; }
+.auth-textarea {
+  min-height: 90px;
+  resize: none;
+  font-size: 12px;
+  font-family: monospace;
+  background: rgba(155, 106, 255, 0.06);
+  border-color: rgba(155, 106, 255, 0.25);
+  border-radius: var(--r12);
+  color: var(--t1);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.auth-textarea:focus {
+  border-color: rgba(155, 106, 255, 0.55);
+  box-shadow: 0 0 0 3px rgba(155, 106, 255, 0.12);
+}
+.auth-textarea::placeholder { color: var(--t3); }
 
 .btn-google {
   display: flex; align-items: center; gap: 12px;
@@ -194,7 +352,8 @@ body {
 .btn-email-signin:hover   { opacity: 0.88; }
 .btn-email-signin:disabled{ opacity: 0.45; cursor: not-allowed; }
 
-.auth-note { font-size: 11px; color: var(--t3); line-height: 1.6; }
+.auth-note { font-size: 11px; color: var(--t2); line-height: 1.6; }
+.auth-note.collapsible-note { color: var(--t2); font-size: 12px; }
 .auth-note a { color: var(--red); text-decoration: none; }
 .auth-error { color: var(--red); font-size: 12px; text-align: center; margin: 0; }
 
@@ -965,4 +1124,47 @@ body {
 @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
 .loading { background: linear-gradient(90deg,var(--bg-card) 25%,var(--bg-2) 50%,var(--bg-card) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
 
+
+/* ─── Mobile Optimization (Orion/Safari) ───────────────────── */
+@media screen and (max-width: 600px) and (min-height: 700px) {
+  body {
+    width: 100vw;
+    height: 100vh;
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  .app {
+    width: 100vw;
+    height: 100vh;
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  /* Auth Section - Full screen centered */
+  .auth-section {
+    padding: 20px;
+    justify-content: center;
+  }
+
+  .auth-content {
+    width: 100%;
+    max-width: 340px;
+    margin: 0 auto;
+  }
+
+  /* Main App - Full screen with proper scrolling */
+  .main-app {
+    width: 100vw;
+    height: 100vh;
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  .main-content {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
 

@@ -441,7 +441,7 @@ async function startRealtimeListener() {
     // This ensures we never miss changes that arrived while we were offline.
     const gapSinceLastMessage = Date.now() - lastStreamMessageAt;
     if (gapSinceLastMessage > 45000) {
-        console.log(`[BG-RT] Catching up after ${Math.round(gapSinceLastMessage / 1000)}s gap...`);
+        console.debug(`[BG-RT] Catching up after ${Math.round(gapSinceLastMessage / 1000)}s gap...`);
         try {
             const cloudDoc = await fetchCloudData(user, token);
             if (cloudDoc) await applyCloudUpdate(cloudDoc);
@@ -453,7 +453,7 @@ async function startRealtimeListener() {
     rtListenAbort = new AbortController();
     const docPath = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${user.uid}`;
 
-    console.log('[BG-RT] Opening real-time stream...');
+    console.debug('[BG-RT] Opening real-time stream...');
     try {
         const res = await fetch(`${LISTEN_URL}?key=${FIREBASE_API_KEY}`, {
             method:  'POST',
@@ -467,7 +467,7 @@ async function startRealtimeListener() {
         rtReconnectDelay = 5000;
         // Reset stream-alive timer so the new connection isn't immediately flagged as stale
         markStreamAlive();
-        console.log('[BG-RT] ✓ Real-time stream connected');
+        console.debug('[BG-RT] ✓ Real-time stream connected');
 
         const reader  = res.body.getReader();
         const decoder = new TextDecoder();
@@ -754,8 +754,8 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     // Restart SSE stream if dead
     const streamDead = !rtListenAbort || rtListenAbort.signal.aborted;
     if (streamDead) {
-        console.log('[BG] keepAlive: stream dead, restarting...');
-        startRealtimeListener();
+    console.debug('[BG] keepAlive: stream dead, restarting...');
+    startRealtimeListener();
     }
 
     checkStreamHealth();
@@ -771,7 +771,7 @@ function markStreamAlive() {
 function checkStreamHealth() {
     const elapsed = Date.now() - lastStreamMessageAt;
     if (elapsed > 90000) {
-        console.log(`[BG] Stream silent for ${Math.round(elapsed / 1000)}s, reconnecting`);
+        console.debug(`[BG] Stream silent for ${Math.round(elapsed / 1000)}s, reconnecting`);
         lastStreamMessageAt = Date.now();
         if (rtListenAbort) rtListenAbort.abort();
         startRealtimeListener();
