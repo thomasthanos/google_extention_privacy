@@ -42,12 +42,13 @@ const DONATE_LINKS = {
 const ANIME_NO_FILLER_DATA = [
     'ore-dake-level-up-na-ken',           // Solo Leveling
     'ore-dake-level-up-na-ken-season-2',  // Solo Leveling Season 2
-    // Add more anime without filler data here as needed
     'tokidoki-bosotto-russia-go-de-dereru-tonari-no-alya-san', // Alya Sometimes Hides Her Feelings
-    'kuzu-no-honkai', // Scum's Wish
+    'kuzu-no-honkai',      // Scum's Wish
     'yosuga-no-sora',
     'jujutsu-kaisen-shimetsu-kaiyuu-zenpen', // Culling Game Prequel/Special
     'initial-d-fourth-stage', // Likely no specific filler list or handled by main
+    'higashi-no-eden',     // Not on AnimeFillerList (moved from isUnlikelyToHaveFillerData)
+    'darling-in-the-franxx', // Not on AnimeFillerList (moved from isUnlikelyToHaveFillerData)
 ];
 
 // Slug mapping for anime that have different names on animefillerlist.com
@@ -126,13 +127,7 @@ const ANIME_PARTS_CONFIG = {
         { name: 'Part 2: Ketsubetsu-tan', start: 14, end: 26 },
         { name: 'Part 3: Soukoku-tan', start: 27, end: 40 }  // soukoku-tan ep14 + offset 26 = ep40
     ],
-    'one-punch-man-season-2': [
-        { name: 'Season 2', start: 1, end: 12 }
-    ],
-    'one-punch-man-season-3': [
-        { name: 'Season 3', start: 1, end: 30 }
-    ],
-    // Add more multi-part anime as needed
+    // Add multi-part anime here (entries with only 1 part are pointless — skip them)
     // Example:
     // 'attack-on-titan-final': [
     //     { name: 'Part 1', start: 1, end: 16 },

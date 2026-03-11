@@ -48,11 +48,10 @@ const ProgressTracker = {
      */
     cleanLastSavedProgress() {
         const { CONFIG } = window.AnimeTrackerContent;
-        
         if (this.lastSavedProgress.size > CONFIG.MAX_SAVED_PROGRESS_ENTRIES) {
-            const keysToRemove = Array.from(this.lastSavedProgress.keys())
-                .slice(0, this.lastSavedProgress.size - CONFIG.MAX_SAVED_PROGRESS_ENTRIES);
-            keysToRemove.forEach(key => this.lastSavedProgress.delete(key));
+            Array.from(this.lastSavedProgress.keys())
+                .slice(0, this.lastSavedProgress.size - CONFIG.MAX_SAVED_PROGRESS_ENTRIES)
+                .forEach(key => this.lastSavedProgress.delete(key));
         }
     },
 
@@ -75,7 +74,8 @@ const ProgressTracker = {
         const filtered = entries.filter(([id, progress]) => {
             if (id === currentUniqueId) return true;
             
-            if (progress.percentage >= 80 || (progress.duration && (progress.duration - progress.currentTime) <= CONFIG.REMAINING_TIME_THRESHOLD)) {
+            // Use CONFIG.COMPLETED_PERCENTAGE (85) consistently — not a hardcoded 80
+            if (progress.percentage >= CONFIG.COMPLETED_PERCENTAGE || (progress.duration && (progress.duration - progress.currentTime) <= CONFIG.REMAINING_TIME_THRESHOLD)) {
                 Logger.debug('Removing completed progress:', id);
                 return false;
             }
@@ -265,9 +265,7 @@ const ProgressTracker = {
         this.cleanLastSavedProgress();
 
         const pct = Math.floor((currentTime / duration) * 100);
-        const requiredPct = 85; // Dynamic threshold
-        const progressMsg = `${pct}% (need ${requiredPct}%)`;
-        Logger.debug(`Progress saved: ${progressMsg} @ ${Math.floor(currentTime)}s / ${Math.floor(duration)}s`);
+        Logger.debug(`Progress saved: ${pct}% (need 85%) @ ${Math.floor(currentTime)}s / ${Math.floor(duration)}s`);
         Logger.progress(uniqueId, pct, Math.floor(currentTime));
 
         this.performSaveProgress(uniqueId, currentTime, duration).catch(e => {
@@ -436,7 +434,7 @@ const ProgressTracker = {
     },
 
     /**
-     * Reset state
+     * Reset state (called on SPA navigation to a new episode)
      */
     reset() {
         if (this.seekSaveTimeout) {
@@ -445,6 +443,10 @@ const ProgressTracker = {
         }
         this.pendingSeekSave = null;
         this.saveQueue = [];
+        this.isProcessingQueue = false;
+        this.saveInProgress = false;
+        this.lastSavedProgress.clear();
+        this.lastSaveTime = 0;
     }
 };
 

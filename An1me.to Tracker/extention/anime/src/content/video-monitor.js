@@ -44,11 +44,6 @@ const VideoMonitor = {
         }
         
         if (this.videoElement) {
-            try {
-                // Event listeners will be removed by cleanup functions
-            } catch (e) {
-                // Video element might be gone
-            }
             this.videoElement = null;
         }
         

@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
   "name": "An1me.to Tracker",
-  "version": "3.0.5",
+  "version": "3.0.6",
   "description": "Track your anime watching progress on an1me.to with cloud sync across all browsers",
   "author": "ThomasThanos",
   "permissions": [
     "storage",
     "scripting",
-    "identity"
+    "identity",
+    "alarms"
   ],
   "host_permissions": [
     "https://an1me.to/*",
@@ -17,13 +18,6 @@
     "https://firestore.googleapis.com/*",
     "https://www.animefillerlist.com/*"
   ],
-  "oauth2": {
-    "client_id": "851894443732-cg2pualkhrmfg47m2q1hnq57a31uskmn.apps.googleusercontent.com",
-    "scopes": [
-      "https://www.googleapis.com/auth/userinfo.email",
-      "https://www.googleapis.com/auth/userinfo.profile"
-    ]
-  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -52,7 +46,9 @@
         "src/content/notifications.js",
         "src/content/progress-tracker.js",
         "src/content/video-monitor.js",
-        "src/content/main.js"
+        "src/content/main.js",
+        "src/content/merge-utils.js",
+        "src/content/cloud-sync.js"
       ],
       "run_at": "document_idle",
       "all_frames": false

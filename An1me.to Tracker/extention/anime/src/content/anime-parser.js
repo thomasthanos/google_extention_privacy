@@ -120,6 +120,11 @@ const AnimeParser = {
         if (offset > 0) {
             Logger.debug(`Applying offset +${offset} to ${originalSlug}`);
             episodeNumber += offset;
+            // Also offset the second episode so double-episode saves are consistent
+            // e.g. bleach-TYBW-part-2-episode-1-2 → episodes 14 and 15, not 14 and 2
+            if (secondEpisodeNumber !== null) {
+                secondEpisodeNumber += offset;
+            }
         }
 
         // Normalize slug to merge multi-part anime into one entry

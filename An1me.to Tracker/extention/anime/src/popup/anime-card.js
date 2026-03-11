@@ -13,7 +13,6 @@ const AnimeCardRenderer = {
         const { CONFIG } = window.AnimeTracker;
 
         const episodeCount = anime.episodes?.length || 0;
-        const totalTime = UIHelpers.formatDuration(anime.totalWatchTime || 0);
         const lastWatched = UIHelpers.formatDate(anime.lastWatched);
         const progressData = FillerService.calculateProgress(episodeCount, slug, anime);
         const sizeClass = UIHelpers.getProgressSizeClass(episodeCount, progressData.total);
@@ -22,7 +21,6 @@ const AnimeCardRenderer = {
         const canonWatched = FillerService.getCanonEpisodeCount(slug, anime.episodes);
         const totalCanon = FillerService.getTotalCanonEpisodes(slug, progressData.total);
         const hasFillerData = FillerService.hasFillerData(slug);
-        const canonProgress = hasFillerData ? (canonWatched / totalCanon) * 100 : null;
 
         // Get highest completed episode
         let highestCompletedEp = 0;
@@ -128,9 +126,6 @@ const AnimeCardRenderer = {
 
         // Filler info
         const fillerInfo = FillerService.getFillerInfo(slug, anime.episodes);
-
-        const latestProgress = episodesWithProgress[0];
-        const latestProgressPreview = latestProgress ? `Ep ${latestProgress.number} (${latestProgress.timeStr})` : '';
 
         // Progress section - COMPACT DESIGN
         const progressSection = progressTags ? `
@@ -346,17 +341,16 @@ const AnimeCardRenderer = {
                 return `<span class="episode-tag in-progress" title="Saved: ${ep.percentage}%">Ep ${ep.number} (${epMin}:${epSec.toString().padStart(2, '0')})</span>`;
             }).join('');
 
-        const latestProgressPreview = `Ep ${latestEp.number} (${timeStr})`;
-
         return `
             <div class="anime-card in-progress-only" data-slug="${anime.slug}">
                 <div class="anime-card-header">
-                    <h3 class="anime-title">${UIHelpers.escapeHtml(anime.title)}</h3>
+                    <h3 class="anime-title">
+                        <span class="anime-title-text">${UIHelpers.escapeHtml(anime.title)}</span>
                         <span class="badge badge-watching">Watching</span>
-                        <div class="anime-card-actions">
-                            <button class="anime-delete" data-slug="${anime.slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
-                            <div class="anime-expand-icon">${UIHelpers.createIcon('chevron')}</div>
-                        </div>
+                    </h3>
+                    <div class="anime-card-actions">
+                        <button class="anime-delete" data-slug="${anime.slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
+                        <div class="anime-expand-icon">${UIHelpers.createIcon('chevron')}</div>
                     </div>
                 </div>
                 <div class="progress-container">
@@ -374,7 +368,6 @@ const AnimeCardRenderer = {
                             <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                         </svg>
                         <span class="in-progress-title">In Progress (${activeEpisodes.length})</span>
-                        <span class="in-progress-preview">${latestProgressPreview}</span>
                         <svg class="collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="6 9 12 15 18 9"/>
                         </svg>
@@ -621,9 +614,9 @@ const AnimeCardRenderer = {
 
                 // Unwatched fillers — only up to current episode, descending (newest → oldest)
                 const unwatchedFillers = FillerService.getUnwatchedFillers(slug, anime.episodes, currentEp).slice().reverse();
-                const visibleUFilllers = unwatchedFillers.slice(0, CONFIG.VISIBLE_FILLERS_LIMIT);
+                const visibleUFillers = unwatchedFillers.slice(0, CONFIG.VISIBLE_FILLERS_LIMIT);
                 const hiddenUFillers = unwatchedFillers.slice(CONFIG.VISIBLE_FILLERS_LIMIT);
-                const unwatchedFillerTags = visibleUFilllers.map(epNum =>
+                const unwatchedFillerTags = visibleUFillers.map(epNum =>
                     `<span class="episode-tag filler unwatched-filler" title="Filler Episode (Not watched)">Ep ${epNum}</span>`
                 ).join('');
                 const hiddenFillerTags = hiddenUFillers.map(epNum =>
@@ -870,76 +863,6 @@ const AnimeCardRenderer = {
                 </div>
                 <div class="movie-group-content">
                     ${movieItemsHTML}
-                </div>
-            </div>
-        `;
-    },
-
-    /**
-     * Create "in progress only" anime card
-     */
-    createInProgressOnlyCard(anime) {
-        const { UIHelpers } = window.AnimeTracker;
-        const { CONFIG } = window.AnimeTracker;
-
-        const activeEpisodes = anime.episodes.filter(ep => ep.percentage < CONFIG.COMPLETED_PERCENTAGE);
-
-        if (activeEpisodes.length === 0) return '';
-
-        const latestEp = activeEpisodes.sort((a, b) => b.number - a.number)[0];
-        const minutes = Math.floor(latestEp.currentTime / 60);
-        const seconds = Math.floor(latestEp.currentTime % 60);
-        const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-
-        const progressTags = activeEpisodes
-            .sort((a, b) => b.number - a.number)
-            .map(ep => {
-                const epMin = Math.floor(ep.currentTime / 60);
-                const epSec = Math.floor(ep.currentTime % 60);
-                return `<span class="episode-tag in-progress" title="Saved: ${ep.percentage}%">
-                    Ep ${ep.number} (${epMin}:${epSec.toString().padStart(2, '0')})
-                    <button class="progress-delete-btn" data-slug="${anime.slug}" data-episode="${ep.number}" title="Delete progress">×</button>
-                </span>`;
-            }).join('');
-
-        const latestProgressPreview = `Ep ${latestEp.number} (${timeStr})`;
-
-        return `
-            <div class="anime-card in-progress-only" data-slug="${anime.slug}">
-                <div class="anime-card-header">
-                    <h3 class="anime-title">
-                        <span class="anime-title-text">${UIHelpers.escapeHtml(anime.title)}</span>
-                        <span class="badge badge-watching">Watching</span>
-                    </h3>
-                    <div class="anime-card-actions">
-                        <button class="anime-delete" data-slug="${anime.slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
-                        <div class="anime-expand-icon">${UIHelpers.createIcon('chevron')}</div>
-                    </div>
-                </div>
-                <div class="anime-card-content">
-                    <div class="progress-container">
-                        <div class="progress-info">
-                            <span>Ep ${latestEp.number} at ${timeStr}</span>
-                            <span>${latestEp.percentage}%</span>
-                        </div>
-                        <div class="progress-bar size-small">
-                            <div class="progress-fill" style="width: ${latestEp.percentage}%"></div>
-                        </div>
-                    </div>
-                    <div class="anime-in-progress collapsible collapsed">
-                        <div class="in-progress-header">
-                            <span class="in-progress-title">In Progress (${activeEpisodes.length})</span>
-                            <svg class="collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="6 9 12 15 18 9"/>
-                            </svg>
-                        </div>
-                        <div class="in-progress-content">
-                            <div class="episode-list">${progressTags}</div>
-                        </div>
-                    </div>
-                    <div class="anime-meta">
-                        <span class="anime-last-watched-inline">${UIHelpers.createIcon('calendar')} ${UIHelpers.formatDate(anime.lastProgress)}</span>
-                    </div>
                 </div>
             </div>
         `;

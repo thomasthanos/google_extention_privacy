@@ -59,7 +59,7 @@
         animeSlugInput: document.getElementById('animeSlug'),
         animeTitleInput: document.getElementById('animeTitle'),
         episodesWatchedInput: document.getElementById('episodesWatched'),
-        markAllWatchedCheckbox: document.getElementById('markAllWatched'),
+        // markAllWatched checkbox removed — element not present in HTML
         // Edit Title Dialog
         editTitleDialog: document.getElementById('editTitleDialog'),
         editTitleInput: document.getElementById('editTitleInput'),
@@ -72,6 +72,14 @@
 
     // State for edit title
     let editingSlug = null;
+
+    // Timestamp of last save initiated by this popup (used to distinguish
+    // our own writes from background-SW cloud updates in the storage listener)
+    let lastInternalSaveAt = 0;
+
+    function markInternalSave() {
+        lastInternalSaveAt = Date.now();
+    }
 
     /**
      * Show auth screen
@@ -306,6 +314,9 @@
         });
 
         // Card headers
+        // NOTE: stopPropagation prevents the delegated animeList listener from
+        // also toggling the card, which would cause a double-toggle (open then
+        // immediately close) when clicking the header or title.
         elements.animeList.querySelectorAll('.anime-card').forEach(card => {
             const header = card.querySelector('.anime-card-header');
             if (header) {
@@ -314,13 +325,13 @@
                     if (e.target.closest('.anime-delete') || e.target.closest('.anime-edit-title') || e.target.closest('.anime-fetch-filler')) {
                         return;
                     }
+                    e.stopPropagation(); // prevent delegated listener from toggling again
                     card.classList.toggle('expanded');
                 };
 
+                // Bind only to the header — the title is a child so it bubbles up here.
+                // Binding to both header AND title would fire toggleCard twice per title click.
                 header.addEventListener('click', toggleCard);
-                // Explicitly bind to title
-                const title = header.querySelector('.anime-title');
-                if (title) title.addEventListener('click', toggleCard);
             }
         });
 
@@ -361,40 +372,6 @@
                     const isExpanded = hiddenEpisodes.classList.toggle('expanded');
                     btn.textContent = isExpanded ? btn.dataset.lessText : btn.dataset.moreText;
                 }
-            });
-        });
-
-        // Delete buttons
-        elements.animeList.querySelectorAll('.anime-delete').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                deleteAnime(btn.dataset.slug);
-            });
-        });
-
-        // Edit title buttons
-        elements.animeList.querySelectorAll('.anime-edit-title').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const slug = btn.dataset.slug;
-                editAnimeTitle(slug);
-            });
-        });
-
-        // Season item edit buttons
-        elements.animeList.querySelectorAll('.season-edit-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const slug = btn.dataset.slug;
-                editAnimeTitle(slug);
-            });
-        });
-
-        // Season item delete buttons
-        elements.animeList.querySelectorAll('.season-delete-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                deleteAnime(btn.dataset.slug);
             });
         });
 
@@ -639,6 +616,7 @@
                 }
 
                 // Save locally first
+                markInternalSave();
                 await Storage.set(dataToSave);
 
                 // Then force cloud sync
@@ -711,6 +689,7 @@
                 dataToSave.userId = user.uid;
             }
 
+            markInternalSave();
             await Storage.set(dataToSave);
 
             if (user) {
@@ -741,6 +720,7 @@
             dataToSave.userId = user.uid;
         }
 
+        markInternalSave();
         await Storage.set(dataToSave);
 
         if (user) {
@@ -1033,6 +1013,7 @@
                 dataToSave.userId = user.uid;
             }
 
+            markInternalSave();
             await Storage.set(dataToSave);
 
             // Update UI immediately
@@ -1113,6 +1094,7 @@
                 dataToSave.userId = user.uid;
             }
 
+            markInternalSave();
             await Storage.set(dataToSave);
 
             // Update UI
@@ -1139,6 +1121,34 @@
      */
     function editAnimeTitle(slug) {
         showEditTitleDialog(slug);
+    }
+
+    /**
+     * Fetch filler data for a single anime (called from card button)
+     */
+    async function fetchFillerForAnime(slug, btn) {
+        const { FillerService } = AT;
+
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = '...';
+        }
+
+        try {
+            const episodeTypes = await FillerService.fetchEpisodeTypes(slug);
+            if (episodeTypes) {
+                FillerService.updateFromEpisodeTypes(slug, episodeTypes);
+                renderAnimeList(elements.searchInput?.value || '');
+                updateStats();
+            }
+        } catch (error) {
+            console.error('[FetchFiller] Error:', error);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = '🎭';
+            }
+        }
     }
 
     /**
@@ -1214,6 +1224,143 @@
         // Auth
         if (elements.googleSignIn) {
             elements.googleSignIn.addEventListener('click', signInWithGoogle);
+        }
+
+        // Auth tabs switching
+        const authTabs = document.getElementById('authTabs');
+        if (authTabs) {
+            authTabs.querySelectorAll('.auth-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    authTabs.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    document.querySelectorAll('.auth-panel').forEach(p => p.style.display = 'none');
+                    const panel = document.getElementById('authPanel' + tab.dataset.tab.charAt(0).toUpperCase() + tab.dataset.tab.slice(1));
+                    if (panel) panel.style.display = 'block';
+                });
+            });
+        }
+
+        // Email/Password sign in
+        const emailSignInBtn = document.getElementById('emailSignIn');
+        if (emailSignInBtn) {
+            emailSignInBtn.addEventListener('click', async () => {
+                const email = document.getElementById('authEmail')?.value?.trim();
+                const password = document.getElementById('authPassword')?.value;
+                const errorEl = document.getElementById('emailAuthError');
+
+                if (!email || !password) {
+                    if (errorEl) { errorEl.textContent = 'Please enter email and password.'; errorEl.style.display = 'block'; }
+                    return;
+                }
+
+                emailSignInBtn.disabled = true;
+                emailSignInBtn.textContent = 'Signing in...';
+                if (errorEl) errorEl.style.display = 'none';
+
+                try {
+                    await FirebaseLib.signInWithEmailPassword(email, password);
+                } catch (err) {
+                    const msg = err.message.includes('INVALID_PASSWORD') || err.message.includes('EMAIL_NOT_FOUND')
+                        ? 'Invalid email or password.'
+                        : err.message.includes('TOO_MANY_ATTEMPTS') ? 'Too many attempts. Try again later.'
+                        : err.message;
+                    if (errorEl) { errorEl.textContent = msg; errorEl.style.display = 'block'; }
+                } finally {
+                    emailSignInBtn.disabled = false;
+                    emailSignInBtn.textContent = 'Sign In';
+                }
+            });
+
+            // Also trigger on Enter
+            document.getElementById('authPassword')?.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') emailSignInBtn.click();
+            });
+        }
+
+        // Force sign out (clears corrupt session)
+        const forceSignOutLink = document.getElementById('forceSignOut');
+        if (forceSignOutLink) {
+            forceSignOutLink.addEventListener('click', async (e) => {
+                e.preventDefault();
+                await chrome.storage.local.remove(['firebase_user', 'firebase_tokens', 'userId']);
+                // Reload popup
+                window.location.reload();
+            });
+        }
+
+        // Token import sign in
+        const tokenSignInBtn = document.getElementById('tokenSignIn');
+        if (tokenSignInBtn) {
+            tokenSignInBtn.addEventListener('click', async () => {
+                const tokenInput = document.getElementById('authTokenInput')?.value?.trim();
+                const errorEl = document.getElementById('tokenAuthError');
+
+                if (!tokenInput) {
+                    if (errorEl) { errorEl.textContent = 'Please paste your exported token.'; errorEl.style.display = 'block'; }
+                    return;
+                }
+
+                tokenSignInBtn.disabled = true;
+                tokenSignInBtn.textContent = 'Importing...';
+                if (errorEl) errorEl.style.display = 'none';
+
+                try {
+                    const tokenData = JSON.parse(tokenInput);
+                    await FirebaseLib.signInWithExportedToken(tokenData);
+                } catch (err) {
+                    const msg = err.message.includes('JSON') ? 'Invalid token format. Please copy it again from Chrome.' : err.message;
+                    if (errorEl) { errorEl.textContent = msg; errorEl.style.display = 'block'; }
+                } finally {
+                    tokenSignInBtn.disabled = false;
+                    tokenSignInBtn.textContent = 'Import & Sign In';
+                }
+            });
+        }
+
+        // Export Token button (in settings, shown when logged in)
+        const exportTokenBtn = document.getElementById('settingsExportToken');
+        if (exportTokenBtn) {
+            exportTokenBtn.addEventListener('click', async () => {
+                elements.settingsDropdown?.classList.remove('visible');
+                try {
+                    const tokenData = await FirebaseLib.exportSessionToken();
+                    const tokenStr = JSON.stringify(tokenData);
+
+                    // Show overlay with token
+                    const overlay = document.createElement('div');
+                    overlay.className = 'export-token-overlay';
+                    overlay.innerHTML = `
+                        <div class="export-token-box">
+                            <h3>🔑 Export Token</h3>
+                            <p>Copy this token and paste it in the <strong>Import</strong> tab on Orion/Safari. Valid for ~1 hour.</p>
+                            <textarea class="export-token-text" readonly>${tokenStr}</textarea>
+                            <div class="export-token-actions">
+                                <button class="btn-copy-token">Copy Token</button>
+                                <button class="btn-close-token">Close</button>
+                            </div>
+                        </div>
+                    `;
+
+                    overlay.querySelector('.btn-copy-token').addEventListener('click', async () => {
+                        try {
+                            await navigator.clipboard.writeText(tokenStr);
+                            overlay.querySelector('.btn-copy-token').textContent = '✓ Copied!';
+                        } catch {
+                            // Fallback: select all
+                            overlay.querySelector('.export-token-text').select();
+                        }
+                    });
+
+                    overlay.querySelector('.btn-close-token').addEventListener('click', () => overlay.remove());
+                    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+                    document.body.appendChild(overlay);
+                    // Auto-select text
+                    setTimeout(() => overlay.querySelector('.export-token-text')?.select(), 50);
+                } catch (err) {
+                    alert('Export failed: ' + err.message);
+                }
+            });
         }
 
         // Settings Menu
@@ -1435,48 +1582,57 @@
         }
 
         // Storage changes
+        // Automatically reacts to updates written by the background SW
+        // (e.g. real-time cloud sync from another device) — no manual refresh needed.
         let storageUpdateTimeout = null;
-        let isInternalUpdate = false;
-        let updateResetTimeout = null;
 
         chrome.storage.local.onChanged.addListener((changes, namespace) => {
-            if (isInternalUpdate) return;
+            if (namespace !== 'local') return;
+
+            // Changes within 1.5s of our own save are ours — skip re-upload.
+            // Anything older is from the background SW (another device's cloud update).
+            const isOwnWrite = (Date.now() - lastInternalSaveAt) < 1500;
+            const { UIHelpers } = AT;
 
             let needsUpdate = false;
             let needsCloudSync = false;
+            let isExternalUpdate = false;
 
             if (changes.animeData) {
-                animeData = changes.animeData.newValue || {};
-                needsUpdate = true;
-
                 const oldCount = UIHelpers.countEpisodes(changes.animeData.oldValue || {});
                 const newCount = UIHelpers.countEpisodes(changes.animeData.newValue || {});
+                animeData = changes.animeData.newValue || {};
+                needsUpdate = true;
                 if (newCount > oldCount) {
-                    needsCloudSync = true;
+                    if (!isOwnWrite) isExternalUpdate = true;
+                    else needsCloudSync = true;
                 }
             }
             if (changes.videoProgress) {
                 videoProgress = changes.videoProgress.newValue || {};
                 needsUpdate = true;
+                if (!isOwnWrite) isExternalUpdate = true;
             }
 
             if (needsUpdate) {
-                if (storageUpdateTimeout) {
-                    clearTimeout(storageUpdateTimeout);
-                }
+                if (storageUpdateTimeout) clearTimeout(storageUpdateTimeout);
 
                 storageUpdateTimeout = setTimeout(async () => {
                     renderAnimeList(elements.searchInput?.value || '');
                     updateStats();
 
+                    // Flash sync indicator when update arrived from another device
+                    if (isExternalUpdate && elements.syncStatus && elements.syncText) {
+                        elements.syncStatus.classList.add('synced');
+                        elements.syncText.textContent = 'Synced ✓';
+                        setTimeout(() => {
+                            elements.syncText.textContent = 'Cloud Synced';
+                        }, 2500);
+                    }
+
+                    // Only push back to cloud if the popup itself triggered new data
                     if (FirebaseSync.getUser() && needsCloudSync) {
-                        isInternalUpdate = true;
-
-                        if (updateResetTimeout) {
-                            clearTimeout(updateResetTimeout);
-                            updateResetTimeout = null;
-                        }
-
+                        markInternalSave();
                         try {
                             const result = await Storage.get(['animeData', 'videoProgress']);
                             await FirebaseSync.saveToCloud({
@@ -1485,10 +1641,6 @@
                             });
                         } catch (error) {
                             console.error('[Storage] Cloud save error:', error);
-                        } finally {
-                            updateResetTimeout = setTimeout(() => {
-                                isInternalUpdate = false;
-                            }, 1000);
                         }
                     }
                 }, CONFIG.STORAGE_UPDATE_DEBOUNCE_MS);
@@ -1529,6 +1681,22 @@
                     if (slug) {
                         editAnimeTitle(slug);
                     }
+                    return;
+                }
+
+                // Season item edit button
+                if (target.classList.contains('season-edit-btn') || target.closest('.season-edit-btn')) {
+                    const btn = target.classList.contains('season-edit-btn') ? target : target.closest('.season-edit-btn');
+                    const slug = btn.dataset.slug;
+                    if (slug) editAnimeTitle(slug);
+                    return;
+                }
+
+                // Season item delete button
+                if (target.classList.contains('season-delete-btn') || target.closest('.season-delete-btn')) {
+                    const btn = target.classList.contains('season-delete-btn') ? target : target.closest('.season-delete-btn');
+                    const slug = btn.dataset.slug;
+                    if (slug) deleteAnime(slug);
                     return;
                 }
 
@@ -1573,6 +1741,25 @@
     }
 
     /**
+     * Ask the background SW if it has a live stream. If not (SW was asleep),
+     * the caller should trigger a direct cloud pull to avoid showing stale data.
+     */
+    function checkBackgroundAlive(timeoutMs = 400) {
+        return new Promise((resolve) => {
+            const timer = setTimeout(() => resolve(false), timeoutMs);
+            try {
+                chrome.runtime.sendMessage({ type: 'GET_VERSION' }, (resp) => {
+                    clearTimeout(timer);
+                    resolve(!chrome.runtime.lastError && !!resp);
+                });
+            } catch (_) {
+                clearTimeout(timer);
+                resolve(false);
+            }
+        });
+    }
+
+    /**
      * Initialize
      */
     async function init() {
@@ -1608,8 +1795,17 @@
 
         // Initialize Firebase
         FirebaseSync.init({
-            onUserSignedIn: (user) => {
+            onUserSignedIn: async (user) => {
                 showMainApp(user);
+                // If the background SW was asleep (no live stream), ping it to
+                // wake up and reconnect, then load data directly from the cloud.
+                // This prevents the popup from showing stale data when it's
+                // opened after a period of inactivity.
+                const bgAlive = await checkBackgroundAlive();
+                if (!bgAlive) {
+                    console.log('[Popup] SW was asleep, sending wake-up sync signal');
+                    try { chrome.runtime.sendMessage({ type: 'SYNC_TO_FIREBASE' }); } catch (_) {}
+                }
                 loadAndSyncData();
             },
             onUserSignedOut: () => {

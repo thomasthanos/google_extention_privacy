@@ -3,25 +3,7 @@
  * Handles Firebase authentication and cloud synchronization
  */
 
-/**
- * Merge two deletedAnime maps, keeping the newest deletedAt for each slug.
- */
-function mergeDeletedAnime(local, cloud) {
-    const merged = { ...cloud };
-    for (const [slug, info] of Object.entries(local)) {
-        if (!merged[slug] || new Date(info.deletedAt) > new Date(merged[slug].deletedAt)) {
-            merged[slug] = info;
-        }
-    }
-    // Clean up entries older than 60 days (no longer needed)
-    const cutoff = Date.now() - 60 * 24 * 60 * 60 * 1000;
-    for (const [slug, info] of Object.entries(merged)) {
-        if (new Date(info.deletedAt).getTime() < cutoff) {
-            delete merged[slug];
-        }
-    }
-    return merged;
-}
+// mergeDeletedAnime → AnimeTracker.MergeUtils.mergeDeletedAnime (see src/popup/merge-utils.js)
 
 /**
  * Remove from animeData any slug that was deleted AFTER its last watched episode.
@@ -230,7 +212,7 @@ const FirebaseSync = {
     /**
      * Load and sync data with cloud
      */
-    async loadAndSyncData(elements, callbacks) {
+    async loadAndSyncData(elements) {
         const { Storage } = window.AnimeTracker;
         const { ProgressManager } = window.AnimeTracker;
         const { FillerService } = window.AnimeTracker;
@@ -246,6 +228,36 @@ const FirebaseSync = {
         }
 
         try {
+            // On Orion/mobile (no background service worker), push local videoProgress
+            // to cloud BEFORE fetching, so we don't lose progress saved by content scripts
+            const localSnapshot = await Storage.get(['videoProgress', 'userId']);
+            if (localSnapshot.userId === this.currentUser.uid && localSnapshot.videoProgress && Object.keys(localSnapshot.videoProgress).length > 0) {
+                try {
+                    // Read current cloud doc and merge, don't overwrite
+                    const currentCloud = await FirebaseLib.getDocument('users', this.currentUser.uid);
+                    if (currentCloud) {
+                        const cloudVP = currentCloud.videoProgress || {};
+                        const localVP = localSnapshot.videoProgress;
+                        // Full merge delegated to shared MergeUtils (soft-delete + currentTime aware)
+                        const merged = AnimeTracker.MergeUtils.mergeVideoProgress(localVP, cloudVP);
+                        // Only update if there are actual changes
+                        const hasChanges = Object.entries(merged).some(([id, val]) => {
+                            return !cloudVP[id] || val.currentTime !== cloudVP[id].currentTime;
+                        });
+                        if (hasChanges) {
+                            await FirebaseLib.setDocument('users', this.currentUser.uid, {
+                                ...currentCloud,
+                                videoProgress: merged,
+                                lastUpdated: new Date().toISOString()
+                            });
+                            console.log('[Sync] Pre-upload: pushed local videoProgress to cloud');
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[Sync] Pre-upload failed (non-critical):', e.message);
+                }
+            }
+
             // Get cloud data with retry
             let cloudData = null;
             let retryCount = 0;
@@ -273,7 +285,7 @@ const FirebaseSync = {
                 const shouldMerge = localData.userId === this.currentUser.uid;
 
                 // Merge deletedAnime logs from both sides (union, keep newest deletedAt)
-                const mergedDeletedAnime = mergeDeletedAnime(
+                const mergedDeletedAnime = AnimeTracker.MergeUtils.mergeDeletedAnime(
                     localData.deletedAnime || {},
                     cloudData.deletedAnime || {}
                 );
@@ -284,13 +296,15 @@ const FirebaseSync = {
                 } else {
                     finalData = {
                         animeData: cloudData.animeData || {},
-                        videoProgress: {
-                            ...(cloudData.videoProgress || {}),
-                            ...(localData.videoProgress || {})
-                        }
+                        videoProgress: cloudData.videoProgress || {}
                     };
                     finalData.animeData = ProgressManager.removeDuplicateEpisodes(finalData.animeData);
                 }
+
+                // videoProgress is already correctly merged by ProgressManager.mergeData:
+                // it uses currentTime as the primary conflict resolver (higher wins),
+                // with savedAt as tiebreaker, and honours soft-delete flags.
+                // No additional override needed here.
 
                 // Apply deletedAnime: remove any anime that was deleted after its last watch
                 applyDeletedAnime(finalData.animeData, mergedDeletedAnime);

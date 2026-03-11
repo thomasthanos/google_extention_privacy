@@ -162,89 +162,35 @@ const ProgressManager = {
     },
 
     /**
-     * Merge local and cloud data
+     * Merge local and cloud data.
+     * - animeData: episodes are union-merged (same episode number kept once).
+     * - videoProgress: per-entry conflict resolution:
+     *     both active    → higher currentTime wins; savedAt as tiebreaker
+     *     local deleted  → kept if deletedAt > cloud savedAt
+     *     cloud deleted  → kept unless local savedAt > cloud deletedAt
+     *     both deleted   → cloud version kept (equivalent)
      */
     mergeData(localData, cloudData) {
-        const merged = {
-            animeData: { ...(cloudData.animeData || {}), ...(localData.animeData || {}) },
-            videoProgress: { ...(cloudData.videoProgress || {}), ...(localData.videoProgress || {}) }
+        const { mergeAnimeData, mergeVideoProgress, mergeDeletedAnime, applyDeletedAnime } = AnimeTracker.MergeUtils;
+
+        // Merge deletedAnime first — we need it to filter the anime union below.
+        const mergedDeleted = mergeDeletedAnime(
+            localData.deletedAnime  || {},
+            cloudData.deletedAnime  || {}
+        );
+
+        const mergedAnime = mergeAnimeData(localData.animeData || {}, cloudData.animeData || {});
+
+        // Remove any anime that were deleted on another device (deletedAt >= lastWatched).
+        applyDeletedAnime(mergedAnime, mergedDeleted);
+
+        const mergedProgress = mergeVideoProgress(localData.videoProgress || {}, cloudData.videoProgress || {});
+
+        return {
+            animeData:     this.removeDuplicateEpisodes(mergedAnime),
+            videoProgress: mergedProgress,
+            deletedAnime:  mergedDeleted
         };
-
-        for (const slug of Object.keys(merged.animeData)) {
-            const cloudAnime = cloudData.animeData?.[slug];
-            const localAnime = localData.animeData?.[slug];
-
-            if (cloudAnime || localAnime) {
-                const episodeMap = new Map();
-
-                const cloudEpisodes = Array.isArray(cloudAnime?.episodes) ? cloudAnime.episodes : [];
-                const localEpisodes = Array.isArray(localAnime?.episodes) ? localAnime.episodes : [];
-
-                [...cloudEpisodes, ...localEpisodes].forEach(ep => {
-                    if (ep && typeof ep === 'object' && typeof ep.number === 'number') {
-                        if (!episodeMap.has(ep.number)) {
-                            episodeMap.set(ep.number, ep);
-                        }
-                    }
-                });
-
-                if (episodeMap.size > 0) {
-                    merged.animeData[slug].episodes = Array.from(episodeMap.values()).sort((a, b) => a.number - b.number);
-                    merged.animeData[slug].totalWatchTime = merged.animeData[slug].episodes.reduce((sum, ep) => sum + (ep.duration || 0), 0);
-                }
-            }
-        }
-
-        merged.animeData = this.removeDuplicateEpisodes(merged.animeData);
-        
-        // Merge videoProgress with soft delete support
-        const mergedProgress = { ...(cloudData.videoProgress || {}) };
-        const localProgress = localData.videoProgress || {};
-
-        for (const [id, localP] of Object.entries(localProgress)) {
-            const cloudP = mergedProgress[id];
-            
-            if (!cloudP) {
-                // Only in local
-                mergedProgress[id] = localP;
-            } else {
-                // Conflict resolution
-                const localDeleted = !!localP.deleted;
-                const cloudDeleted = !!cloudP.deleted;
-                
-                if (localDeleted && !cloudDeleted) {
-                    // Local deleted, cloud active.
-                    // If local delete is newer than cloud save, keep deleted.
-                    const deleteTime = localP.deletedAt ? new Date(localP.deletedAt).getTime() : 0;
-                    const saveTime = cloudP.savedAt ? new Date(cloudP.savedAt).getTime() : 0;
-                    
-                    if (deleteTime > saveTime) {
-                        mergedProgress[id] = localP;
-                    }
-                    // Else cloud is newer (resurrected), keep cloud (default)
-                } else if (!localDeleted && cloudDeleted) {
-                    // Cloud deleted, local active.
-                    // If cloud delete is newer, keep deleted (default has cloud).
-                    const deleteTime = cloudP.deletedAt ? new Date(cloudP.deletedAt).getTime() : 0;
-                    const saveTime = localP.savedAt ? new Date(localP.savedAt).getTime() : 0;
-                    
-                    if (saveTime > deleteTime) {
-                        mergedProgress[id] = localP; // Local is newer
-                    }
-                } else if (!localDeleted && !cloudDeleted) {
-                     // Both active, take newest
-                    const localTime = localP.savedAt ? new Date(localP.savedAt).getTime() : 0;
-                    const cloudTime = cloudP.savedAt ? new Date(cloudP.savedAt).getTime() : 0;
-                    if (localTime > cloudTime) {
-                         mergedProgress[id] = localP;
-                    }
-                }
-                // If both deleted, cloud version (default) is fine
-            }
-        }
-        merged.videoProgress = mergedProgress;
-
-        return merged;
     },
 
     /**

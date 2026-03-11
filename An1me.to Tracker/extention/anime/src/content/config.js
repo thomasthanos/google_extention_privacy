@@ -3,16 +3,7 @@
  */
 
 const ContentConfig = {
-    // Note: WATCH_THRESHOLD is now DEPRECATED - using dynamic 85% threshold in shouldMarkComplete()
-    // Kept here for backwards compatibility only
-    WATCH_THRESHOLD: 0.80,           // DEPRECATED - now using dynamic calculation
-    
-    // Note: REMAINING_TIME_THRESHOLD set to 120 seconds for anime outro/ending skip
     REMAINING_TIME_THRESHOLD: 120,   // 120 seconds (2 min) - typical anime outro (90s ending + 30s preview)
-    
-    // Note: MIN_WATCHED_TIME is DEPRECATED - using dynamic percentage instead
-    MIN_WATCHED_TIME: 1080,          // DEPRECATED - now using dynamic 85% of actual duration
-    
     DEBOUNCE_DELAY: 300,             // Faster debounce for quicker detection
     VIDEO_CHECK_INTERVAL: 1500,      // Check more frequently
     MAX_RETRIES: 60,

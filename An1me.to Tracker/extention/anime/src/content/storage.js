@@ -111,31 +111,6 @@ const ContentStorage = {
         });
     },
 
-    /**
-     * Check storage quota
-     */
-    async checkQuota() {
-        return new Promise((resolve) => {
-            try {
-                chrome.storage.local.getBytesInUse(null, (bytesInUse) => {
-                    if (chrome.runtime.lastError) {
-                        resolve({ ok: true });
-                        return;
-                    }
-                    const maxBytes = 10485760; // 10MB
-                    const usedPercent = Math.round((bytesInUse / maxBytes) * 100);
-                    resolve({
-                        ok: bytesInUse < maxBytes * 0.9,
-                        bytesInUse,
-                        maxBytes,
-                        usedPercent
-                    });
-                });
-            } catch (e) {
-                resolve({ ok: true });
-            }
-        });
-    }
 };
 
 // Export

@@ -165,10 +165,9 @@ const FillerService = {
             'yofukashi-no-uta',
             'mashle',
             'call-of-the-night',
-            'darling-in-the-franxx',
             'dandadan',
-            'vinland-saga',
-            'higashi-no-eden'  // Not on AnimeFillerList
+            'vinland-saga'
+            // Note: 'higashi-no-eden' and 'darling-in-the-franxx' removed — already in ANIME_NO_FILLER_DATA config
         ];
         return nicherAnime.some(name => slug.includes(name));
     },
@@ -541,21 +540,6 @@ const FillerService = {
     },
 
     /**
-     * Calculate canon-only watch time
-     */
-    getCanonWatchTime(slug, anime) {
-        if (!anime.episodes) return 0;
-
-        let canonTime = 0;
-        for (const ep of anime.episodes) {
-            if (!this.isFillerEpisode(slug, ep.number)) {
-                canonTime += (ep.duration || 0);
-            }
-        }
-        return canonTime;
-    },
-
-    /**
      * Get canon episode count
      */
     getCanonEpisodeCount(slug, episodes) {
@@ -598,7 +582,7 @@ const FillerService = {
         'one-punch-man': 12,
         'one-punch-man-2': 12,
         'one-punch-man-season-2': 12,
-        'one-punch-man-season-3': 12, // Season 3 currently has only 1 episode announced
+        'one-punch-man-season-3': 12,
         'wanpanman': 12, // Japanese romanization
         'wanpanman-2': 12,
         'wanpanman-season-2': 12,

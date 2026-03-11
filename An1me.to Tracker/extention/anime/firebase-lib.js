@@ -17,8 +17,15 @@ const FirebaseLib = (function() {
     const isLocalDev = !('update_url' in chrome.runtime.getManifest());
     const OAUTH_CLIENT_ID = isLocalDev ? OAUTH_CLIENT_ID_LOCAL : OAUTH_CLIENT_ID_RELEASE;
 
-    const REDIRECT_URL = chrome.identity.getRedirectURL();
+    // Lazy REDIRECT_URL — chrome.identity may not exist on non-Chrome browsers (e.g. Orion/Safari)
     const SCOPES = ['email', 'profile'].join(' ');
+    function getRedirectUrl() {
+        try {
+            return chrome.identity?.getRedirectURL?.() || '';
+        } catch (e) {
+            return '';
+        }
+    }
 
     // Storage keys
     const STORAGE_KEYS = {
@@ -34,29 +41,39 @@ const FirebaseLib = (function() {
      * Initialize and check for existing session
      */
     async function init() {
-        // Show short version of redirect URL
-        const shortUrl = REDIRECT_URL.replace(/https:\/\/([a-z0-9]+)\.chromiumapp\.org.*/, 'chrome-extension://$1');
-        console.log('[Firebase] Extension redirect:', shortUrl);
+        // Show short version of redirect URL (only on Chrome where identity API exists)
+        try {
+            const ru = getRedirectUrl();
+            if (ru) {
+                const shortUrl = ru.replace(/https:\/\/([a-z0-9]+)\.chromiumapp\.org.*/, 'chrome-extension://$1');
+                console.log('[Firebase] Extension redirect:', shortUrl);
+            }
+        } catch (e) { /* non-Chrome browser */ }
         
         try {
             // Check for stored user
             const stored = await chrome.storage.local.get([STORAGE_KEYS.USER, STORAGE_KEYS.TOKENS]);
             if (stored[STORAGE_KEYS.USER] && stored[STORAGE_KEYS.TOKENS]) {
-                // Check if token needs refresh (with 5 min buffer)
                 const tokens = stored[STORAGE_KEYS.TOKENS];
-                if (tokens.expiresAt < Date.now() + 300000) {
+
+                // FIX: If no refreshToken exists, the session is corrupt — clear it
+                if (!tokens.refreshToken) {
+                    console.warn('[Firebase] Corrupt session (no refreshToken), clearing...');
+                    await signOut();
+                    return null;
+                }
+
+                // Check if token needs refresh (with 5 min buffer)
+                // Guard against corrupt tokens missing expiresAt
+                if (!tokens.expiresAt || tokens.expiresAt < Date.now() + 300000) {
                     try {
                         await refreshToken(tokens.refreshToken);
                         console.log('[Firebase] Token refreshed successfully');
                     } catch (e) {
-                        console.warn('[Firebase] Token refresh failed:', e.message);
-                        // Try to continue with existing token if not completely expired
-                        if (tokens.expiresAt < Date.now()) {
-                            console.log('[Firebase] Token expired, signing out');
-                            // FIX BUG #46: Don't set currentUser if we're signing out
-                            await signOut();
-                            return null;
-                        }
+                        console.warn('[Firebase] Token refresh failed, signing out:', e.message);
+                        // FIX: Always sign out if refresh fails — prevents stuck "logged in" state
+                        await signOut();
+                        return null;
                     }
                 }
 
@@ -80,13 +97,18 @@ const FirebaseLib = (function() {
         return new Promise((resolve, reject) => {
             // Build OAuth URL
             const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+            const REDIRECT_URL = getRedirectUrl();
+            if (!REDIRECT_URL || !chrome.identity?.launchWebAuthFlow) {
+                reject(new Error('Google sign-in is not supported on this browser. Please use Email/Password login instead.'));
+                return;
+            }
+
             authUrl.searchParams.set('client_id', OAUTH_CLIENT_ID);
             authUrl.searchParams.set('redirect_uri', REDIRECT_URL);
             authUrl.searchParams.set('response_type', 'token');
             authUrl.searchParams.set('scope', SCOPES);
             authUrl.searchParams.set('prompt', 'select_account');
 
-            // Don't log full URLs - too verbose
             console.log('[Firebase] Starting OAuth flow...');
 
             chrome.identity.launchWebAuthFlow(
@@ -127,7 +149,7 @@ const FirebaseLib = (function() {
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                     postBody: `access_token=${accessToken}&providerId=google.com`,
-                                    requestUri: REDIRECT_URL,
+                                    requestUri: getRedirectUrl(),
                                     returnIdpCredential: true,
                                     returnSecureToken: true
                                 })
@@ -477,10 +499,103 @@ const FirebaseLib = (function() {
         return { nullValue: null };
     }
 
+    /**
+     * Sign in with Email/Password (works on ALL browsers including Orion/Safari)
+     */
+    async function signInWithEmailPassword(email, password) {
+        const response = await fetch(
+            `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password, returnSecureToken: true })
+            }
+        );
+
+        const data = await response.json();
+        if (data.error) throw new Error(data.error.message);
+
+        currentUser = {
+            uid: data.localId,
+            email: data.email,
+            displayName: data.displayName || data.email.split('@')[0],
+            photoURL: null
+        };
+
+        const tokens = {
+            idToken: data.idToken,
+            refreshToken: data.refreshToken,
+            expiresAt: Date.now() + (parseInt(data.expiresIn) * 1000)
+        };
+
+        await chrome.storage.local.set({
+            [STORAGE_KEYS.USER]: currentUser,
+            [STORAGE_KEYS.TOKENS]: tokens
+        });
+
+        notifyAuthStateListeners(currentUser);
+        return currentUser;
+    }
+
+    /**
+     * Sign in via exported token (for cross-browser transfer from Chrome)
+     */
+    async function signInWithExportedToken(tokenData) {
+        if (!tokenData || !tokenData.user || !tokenData.tokens) {
+            throw new Error('Invalid token data');
+        }
+        // Verify token is still valid by refreshing it
+        const response = await fetch(
+            `https://securetoken.googleapis.com/v1/token?key=${API_KEY}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    grant_type: 'refresh_token',
+                    refresh_token: tokenData.tokens.refreshToken
+                })
+            }
+        );
+        const data = await response.json();
+        if (data.error) throw new Error('Token expired or invalid. Please export a fresh token from Chrome.');
+
+        currentUser = tokenData.user;
+        const tokens = {
+            idToken: data.id_token,
+            refreshToken: data.refresh_token,
+            expiresAt: Date.now() + (parseInt(data.expires_in) * 1000)
+        };
+
+        await chrome.storage.local.set({
+            [STORAGE_KEYS.USER]: currentUser,
+            [STORAGE_KEYS.TOKENS]: tokens
+        });
+
+        notifyAuthStateListeners(currentUser);
+        return currentUser;
+    }
+
+    /**
+     * Export current session tokens (call from Chrome to get token for Orion)
+     */
+    async function exportSessionToken() {
+        const stored = await chrome.storage.local.get([STORAGE_KEYS.USER, STORAGE_KEYS.TOKENS]);
+        if (!stored[STORAGE_KEYS.USER] || !stored[STORAGE_KEYS.TOKENS]) {
+            throw new Error('Not signed in');
+        }
+        return {
+            user: stored[STORAGE_KEYS.USER],
+            tokens: { refreshToken: stored[STORAGE_KEYS.TOKENS].refreshToken }
+        };
+    }
+
     // Public API
     return {
         init,
         signInWithGoogle,
+        signInWithEmailPassword,
+        signInWithExportedToken,
+        exportSessionToken,
         signOut,
         getCurrentUser,
         onAuthStateChanged,

@@ -18,7 +18,79 @@
     let animeInfo = null;
     let isTracked = false;
     let isTrackingInProgress = false;
+    let isTrackingImmediate = false; // guard against concurrent trackImmediately() calls
     let currentEpisodeId = null;
+
+    /**
+     * Shared helper: write a completed episode into animeData synchronously.
+     * Used by both trackImmediately() and handleBeforeUnload() to avoid duplicated logic.
+     *
+     * @param {object} info      - animeInfo object
+     * @param {number} duration  - video duration in seconds
+     * @param {object} animeData - mutable animeData from storage
+     * @param {string} logPrefix - label for log messages ('Immediate' | 'beforeunload')
+     * @returns {boolean} true if the episode was newly written, false if already existed
+     */
+    function writeSyncEpisode(info, duration, animeData, logPrefix) {
+        const { Logger, Notifications } = AT;
+
+        if (!animeData[info.animeSlug]) {
+            animeData[info.animeSlug] = {
+                title: info.animeTitle,
+                slug: info.animeSlug,
+                episodes: [],
+                totalWatchTime: 0,
+                lastWatched: null,
+                totalEpisodes: null
+            };
+        }
+
+        if (!Array.isArray(animeData[info.animeSlug].episodes)) {
+            animeData[info.animeSlug].episodes = [];
+        }
+
+        const exists = animeData[info.animeSlug].episodes
+            .some(ep => ep.number === info.episodeNumber);
+
+        if (exists) {
+            Logger.debug(`${logPrefix}: episode already tracked`);
+            return false;
+        }
+
+        // Validate duration (typical anime: 20-30 min = 1200-1800s, max 2h = 7200s)
+        let validDuration = Math.round(duration);
+        if (validDuration > 7200) {
+            Logger.warn(`${logPrefix}: invalid duration ${validDuration}s, capping to 1800s`);
+            validDuration = 1800;
+        }
+
+        const watchedAt = new Date().toISOString().split('.')[0] + 'Z';
+        animeData[info.animeSlug].episodes.push({
+            number: info.episodeNumber,
+            watchedAt,
+            duration: validDuration
+        });
+        animeData[info.animeSlug].totalWatchTime =
+            (animeData[info.animeSlug].totalWatchTime || 0) + validDuration;
+
+        // Double episode: also save the second episode (e.g. ep 119 + 120)
+        if (info.isDoubleEpisode && info.secondEpisodeNumber) {
+            const alreadyHasSecond = animeData[info.animeSlug].episodes
+                .some(ep => ep.number === info.secondEpisodeNumber);
+            if (!alreadyHasSecond) {
+                animeData[info.animeSlug].episodes.push({
+                    number: info.secondEpisodeNumber,
+                    watchedAt,
+                    duration: validDuration
+                });
+                animeData[info.animeSlug].totalWatchTime += validDuration;
+            }
+        }
+
+        animeData[info.animeSlug].lastWatched = new Date().toISOString();
+        animeData[info.animeSlug].episodes.sort((a, b) => a.number - b.number);
+        return true;
+    }
 
     /**
      * Immediately track episode (no debounce, synchronous)
@@ -27,81 +99,37 @@
     function trackImmediately() {
         const { Logger, ProgressTracker, VideoMonitor, Notifications } = AT;
         const videoElement = VideoMonitor.getVideoElement();
-        
-        if (!animeInfo || isTracked || !videoElement) return;
-        
-        const duration = videoElement.duration;
+
+        // Guard: already tracked, no info, no video, or another call already in flight
+        if (!animeInfo || isTracked || !videoElement || isTrackingImmediate) return;
+
+        const duration    = videoElement.duration;
         const currentTime = videoElement.currentTime;
-        
+
         if (!duration || !ProgressTracker.shouldMarkComplete(currentTime, duration)) return;
-        
+
+        // Lock immediately before the async storage read to prevent race conditions
+        isTrackingImmediate = true;
         isTracked = true;
-        
-        // Synchronous save using chrome.storage.local directly
+
         try {
             chrome.storage.local.get(['animeData'], (result) => {
-                if (chrome.runtime.lastError) return;
-                
+                if (chrome.runtime.lastError) {
+                    isTrackingImmediate = false;
+                    return;
+                }
+
                 const animeData = result.animeData || {};
-                
-                if (!animeData[animeInfo.animeSlug]) {
-                    animeData[animeInfo.animeSlug] = {
-                        title: animeInfo.animeTitle,
-                        slug: animeInfo.animeSlug,
-                        episodes: [],
-                        totalWatchTime: 0,
-                        lastWatched: null,
-                        totalEpisodes: null
-                    };
-                }
-                
-                if (!Array.isArray(animeData[animeInfo.animeSlug].episodes)) {
-                    animeData[animeInfo.animeSlug].episodes = [];
-                }
-                
-                const exists = animeData[animeInfo.animeSlug].episodes
-                    .some(ep => ep.number === animeInfo.episodeNumber);
-                
-                if (!exists) {
-                    // Validate duration (typical anime: 20-30 min = 1200-1800s, max 2h = 7200s)
-                    let validDuration = Math.round(duration);
-                    if (validDuration > 7200) {
-                        Logger.warn(`Invalid duration ${validDuration}s, capping to 1800s`);
-                        validDuration = 1800;
-                    }
+                const written   = writeSyncEpisode(animeInfo, duration, animeData, 'Immediate');
 
-                    const watchedAt = new Date().toISOString().split('.')[0] + 'Z';
-                    animeData[animeInfo.animeSlug].episodes.push({
-                        number: animeInfo.episodeNumber,
-                        watchedAt,
-                        duration: validDuration
-                    });
-                    animeData[animeInfo.animeSlug].totalWatchTime =
-                        (animeData[animeInfo.animeSlug].totalWatchTime || 0) + validDuration;
-
-                    // ── Double episode: also save the second episode ──
-                    if (animeInfo.isDoubleEpisode && animeInfo.secondEpisodeNumber) {
-                        const alreadyHasSecond = animeData[animeInfo.animeSlug].episodes
-                            .some(ep => ep.number === animeInfo.secondEpisodeNumber);
-                        if (!alreadyHasSecond) {
-                            animeData[animeInfo.animeSlug].episodes.push({
-                                number: animeInfo.secondEpisodeNumber,
-                                watchedAt,
-                                duration: validDuration
-                            });
-                            animeData[animeInfo.animeSlug].totalWatchTime += validDuration;
-                        }
-                    }
-
-                    animeData[animeInfo.animeSlug].lastWatched = new Date().toISOString();
-                    animeData[animeInfo.animeSlug].episodes.sort((a, b) => a.number - b.number);
-                    
+                if (written) {
                     chrome.storage.local.set({ animeData }, () => {
+                        isTrackingImmediate = false;
                         if (!chrome.runtime.lastError) {
                             Logger.success('✓ Immediate track successful');
                             Notifications.showCompletion(animeInfo);
-                            
-                            // Clear progress
+
+                            // Clear in-progress record
                             chrome.storage.local.get(['videoProgress'], (progressResult) => {
                                 if (!chrome.runtime.lastError) {
                                     const videoProgress = progressResult.videoProgress || {};
@@ -111,9 +139,12 @@
                             });
                         }
                     });
+                } else {
+                    isTrackingImmediate = false;
                 }
             });
         } catch (e) {
+            isTrackingImmediate = false;
             Logger.error('Immediate track failed:', e);
         }
     }
@@ -325,9 +356,9 @@
      * Handle before unload
      */
     const handleBeforeUnload = () => {
-        const { CONFIG, Logger, ProgressTracker, VideoMonitor, Notifications } = AT;
+        const { Logger, ProgressTracker, VideoMonitor, Notifications } = AT;
         const videoElement = VideoMonitor.getVideoElement();
-        
+
         if (animeInfo && !isTracked && videoElement && videoElement.currentTime > 0) {
             const duration = videoElement.duration;
             const currentTime = videoElement.currentTime;
@@ -335,7 +366,6 @@
             if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
                 isTracked = true;
 
-                // Use synchronous storage API for immediate save
                 try {
                     chrome.storage.local.get(['animeData'], (result) => {
                         if (chrome.runtime.lastError) {
@@ -344,62 +374,9 @@
                         }
 
                         const animeData = result.animeData || {};
+                        const written = writeSyncEpisode(animeInfo, duration, animeData, 'beforeunload');
 
-                        if (!animeData[animeInfo.animeSlug]) {
-                            animeData[animeInfo.animeSlug] = {
-                                title: animeInfo.animeTitle,
-                                slug: animeInfo.animeSlug,
-                                episodes: [],
-                                totalWatchTime: 0,
-                                lastWatched: null,
-                                totalEpisodes: null
-                            };
-                        }
-
-                        if (!Array.isArray(animeData[animeInfo.animeSlug].episodes)) {
-                            animeData[animeInfo.animeSlug].episodes = [];
-                        }
-
-                        const existingIndex = animeData[animeInfo.animeSlug].episodes
-                            .findIndex(ep => ep.number === animeInfo.episodeNumber);
-
-                        if (existingIndex === -1) {
-                            const now = new Date();
-                            // Validate duration (typical anime: 20-30 min = 1200-1800s, max 2h = 7200s)
-                            let validDuration = Math.round(duration);
-                            if (validDuration > 7200) {
-                                Logger.warn(`Invalid duration ${validDuration}s, capping to 1800s`);
-                                validDuration = 1800;
-                            }
-
-                            const watchedAt = now.toISOString().split('.')[0] + 'Z';
-                            const episodeData = {
-                                number: animeInfo.episodeNumber,
-                                watchedAt,
-                                duration: validDuration
-                            };
-
-                            animeData[animeInfo.animeSlug].episodes.push(episodeData);
-                            animeData[animeInfo.animeSlug].totalWatchTime =
-                                (animeData[animeInfo.animeSlug].totalWatchTime || 0) + validDuration;
-
-                            // ── Double episode: also save the second episode ──
-                            if (animeInfo.isDoubleEpisode && animeInfo.secondEpisodeNumber) {
-                                const alreadyHasSecond = animeData[animeInfo.animeSlug].episodes
-                                    .some(ep => ep.number === animeInfo.secondEpisodeNumber);
-                                if (!alreadyHasSecond) {
-                                    animeData[animeInfo.animeSlug].episodes.push({
-                                        number: animeInfo.secondEpisodeNumber,
-                                        watchedAt,
-                                        duration: validDuration
-                                    });
-                                    animeData[animeInfo.animeSlug].totalWatchTime += validDuration;
-                                }
-                            }
-
-                            animeData[animeInfo.animeSlug].lastWatched = new Date().toISOString();
-                            animeData[animeInfo.animeSlug].episodes.sort((a, b) => a.number - b.number);
-
+                        if (written) {
                             chrome.storage.local.set({ animeData }, () => {
                                 if (!chrome.runtime.lastError) {
                                     Logger.success('✓ Tracked on beforeunload (synchronous)');
@@ -454,6 +431,7 @@
         // Reset state
         isTracked = false;
         isTrackingInProgress = false;
+        isTrackingImmediate = false;
         currentEpisodeId = null;
         earlyTrackDone = false;
 
@@ -528,13 +506,13 @@
             navigationObserver.disconnect();
         }
 
-        // Listen for clicks on navigation elements (next episode, etc.)
+        // Single merged click listener: handles an1me.to nav, generic nav patterns, and any outbound link
         document.addEventListener('click', (e) => {
             const target = e.target.closest('[data-open-nav-episode], .episode-navigation, .next-episode, .prev-episode, .episode-list-item, a, button');
             if (!target) return;
-            
+
             // Check if it's a navigation element specific to an1me.to
-            const isAn1meNav = 
+            const isAn1meNav =
                 target.hasAttribute('data-open-nav-episode') ||
                 target.classList.contains('episode-navigation') ||
                 target.classList.contains('next-episode') ||
@@ -542,19 +520,26 @@
                 target.classList.contains('episode-list-item') ||
                 target.closest('[data-open-nav-episode]') ||
                 target.closest('.episode-navigation');
-            
+
             if (isAn1meNav) {
                 Logger.debug('An1me.to navigation detected, tracking immediately');
                 trackImmediately();
                 return;
             }
-            
-            // Fallback: Check generic navigation patterns
+
+            // Check for any outbound link click
+            const link = e.target.closest('a[href]');
+            if (link && link.href && link.href !== location.href) {
+                trackImmediately();
+                return;
+            }
+
+            // Fallback: generic navigation patterns
             const href = target.getAttribute('href') || '';
             const text = (target.textContent || '').toLowerCase();
             const className = (target.className || '').toLowerCase();
-            
-            const isNavigation = 
+
+            const isNavigation =
                 href.includes('/watch/') ||
                 href.includes('episode') ||
                 text.includes('next') ||
@@ -563,17 +548,9 @@
                 className.includes('next') ||
                 className.includes('prev') ||
                 className.includes('episode');
-            
+
             if (isNavigation) {
                 Logger.debug('Navigation click detected, tracking immediately');
-                trackImmediately();
-            }
-        }, { capture: true, passive: true });
-
-        // Also track on any link click that might navigate away
-        document.addEventListener('click', (e) => {
-            const link = e.target.closest('a[href]');
-            if (link && link.href && link.href !== location.href) {
                 trackImmediately();
             }
         }, { capture: true, passive: true });
