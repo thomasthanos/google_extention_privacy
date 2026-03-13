@@ -1412,6 +1412,12 @@
                 if (elements.donateDropdown) {
                     elements.donateDropdown.classList.remove('visible');
                 }
+                if (elements.sortDropdown) {
+                    elements.sortDropdown.classList.remove('visible');
+                }
+                if (elements.sortBtn) {
+                    elements.sortBtn.classList.remove('active');
+                }
                 elements.settingsDropdown.classList.toggle('visible');
             });
         }
