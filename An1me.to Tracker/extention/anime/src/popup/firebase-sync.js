@@ -158,6 +158,7 @@ const FirebaseSync = {
                     animeData: dataToSave.animeData || {},
                     videoProgress: dataToSave.videoProgress || {},
                     deletedAnime: dataToSave.deletedAnime || {},
+                    groupCoverImages: dataToSave.groupCoverImages || {},
                     lastUpdated: new Date().toISOString(),
                     email: this.currentUser.email
                 });
@@ -278,7 +279,7 @@ const FirebaseSync = {
                 }
             }
             
-            const localData = await Storage.get(['animeData', 'videoProgress', 'userId', 'deletedAnime']);
+            const localData = await Storage.get(['animeData', 'videoProgress', 'userId', 'deletedAnime', 'groupCoverImages']);
             let finalData;
 
             if (cloudData) {
@@ -301,6 +302,11 @@ const FirebaseSync = {
                     finalData.animeData = ProgressManager.removeDuplicateEpisodes(finalData.animeData);
                 }
 
+                // Merge groupCoverImages: prefer local keys over cloud keys to preserve posters
+                const localGroupCovers = localData.groupCoverImages || {};
+                const cloudGroupCovers = cloudData.groupCoverImages || {};
+                const mergedGroupCovers = { ...cloudGroupCovers, ...localGroupCovers };
+
                 // videoProgress is already correctly merged by ProgressManager.mergeData:
                 // it uses currentTime as the primary conflict resolver (higher wins),
                 // with savedAt as tiebreaker, and honours soft-delete flags.
@@ -316,10 +322,13 @@ const FirebaseSync = {
                 
                 finalData.videoProgress = ProgressManager.cleanOrphanedProgress(finalData.animeData, finalData.videoProgress);
 
+                // Attach merged group covers to finalData before saving
+                finalData.groupCoverImages = mergedGroupCovers;
                 await Storage.set({
                     animeData: finalData.animeData,
                     videoProgress: finalData.videoProgress,
                     deletedAnime: mergedDeletedAnime,
+                    groupCoverImages: mergedGroupCovers,
                     userId: this.currentUser.uid
                 });
 
@@ -335,12 +344,14 @@ const FirebaseSync = {
                 if (localData.userId === this.currentUser.uid && localData.animeData && Object.keys(localData.animeData).length > 0) {
                     finalData = {
                         animeData: ProgressManager.removeDuplicateEpisodes(localData.animeData || {}),
-                        videoProgress: localData.videoProgress || {}
+                        videoProgress: localData.videoProgress || {},
+                        groupCoverImages: localData.groupCoverImages || {}
                     };
 
                     await Storage.set({
                         animeData: finalData.animeData,
                         videoProgress: finalData.videoProgress,
+                        groupCoverImages: finalData.groupCoverImages,
                         userId: this.currentUser.uid
                     });
 
@@ -351,10 +362,11 @@ const FirebaseSync = {
                     this.pendingSave = finalData;
                     await this.performCloudSave(elements);
                 } else {
-                    finalData = { animeData: {}, videoProgress: {} };
+                    finalData = { animeData: {}, videoProgress: {}, groupCoverImages: {} };
                     await Storage.set({
                         animeData: {},
                         videoProgress: {},
+                        groupCoverImages: {},
                         userId: this.currentUser.uid
                     });
                 }

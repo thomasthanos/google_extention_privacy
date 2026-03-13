@@ -205,7 +205,9 @@
 
         fullPushInProgress = true;
         try {
-            const local = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime']);
+            // Fetch local animeData, videoProgress, deletedAnime and groupCoverImages.
+            // We need group covers so they are synced to the cloud when the SW is unavailable.
+            const local = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
 
             // Fetch cloud to safely merge animeData (keep episodes from both sides)
             const url       = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
@@ -231,15 +233,22 @@
                 ? mergeVideoProgress(local.videoProgress || {}, cloudData.videoProgress)
                 : (local.videoProgress || {});
 
+            // Merge group cover images: prefer local posters over cloud posters.
+            const localGroupCovers = local.groupCoverImages || {};
+            const cloudGroupCovers = cloudData?.groupCoverImages || {};
+            const mergedGroupCovers = { ...cloudGroupCovers, ...localGroupCovers };
+
             // Write back locally if cloud had more / different data
             const localEps  = Object.values(local.animeData || {}).reduce((s, a) => s + (a.episodes?.length || 0), 0);
             const mergedEps = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
             const deletedDiff = Object.keys(mergedDeleted).length !== Object.keys(local.deletedAnime || {}).length;
-            if (mergedEps > localEps || deletedDiff) {
+            const groupDiff   = Object.keys(mergedGroupCovers).length !== Object.keys(local.groupCoverImages || {}).length;
+            if (mergedEps > localEps || deletedDiff || groupDiff) {
                 await chrome.storage.local.set({
-                    animeData:    mergedAnime,
-                    videoProgress: mergedProgress,
-                    deletedAnime:  mergedDeleted
+                    animeData:        mergedAnime,
+                    videoProgress:    mergedProgress,
+                    deletedAnime:     mergedDeleted,
+                    groupCoverImages: mergedGroupCovers
                 });
             }
 
@@ -248,11 +257,12 @@
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body:    JSON.stringify({
                     fields: toFSFields({
-                        animeData:     mergedAnime,
-                        videoProgress: mergedProgress,
-                        deletedAnime:  mergedDeleted,
-                        lastUpdated:   new Date().toISOString(),
-                        email:         user.email
+                        animeData:        mergedAnime,
+                        videoProgress:    mergedProgress,
+                        deletedAnime:     mergedDeleted,
+                        groupCoverImages: mergedGroupCovers,
+                        lastUpdated:      new Date().toISOString(),
+                        email:            user.email
                     })
                 })
             });
@@ -271,15 +281,35 @@
 
     async function wakeBackgroundSW(messageType = 'SYNC_PROGRESS_ONLY') {
         return new Promise((resolve) => {
-            const timeout = setTimeout(() => resolve(false), 1500);
-            chrome.runtime.sendMessage({ type: messageType }, (response) => {
-                clearTimeout(timeout);
-                if (chrome.runtime.lastError || !response) {
+            // If the extension context is invalid, immediately resolve false. Use the
+            // Storage helper to avoid accessing chrome.runtime when invalid.
+            try {
+                const Storage = (window.AnimeTrackerContent && window.AnimeTrackerContent.Storage) || null;
+                if (!Storage || !Storage.isContextValid()) {
                     resolve(false);
-                } else {
-                    resolve(true);
+                    return;
                 }
-            });
+            } catch (_) {
+                resolve(false);
+                return;
+            }
+
+            const timeout = setTimeout(() => resolve(false), 1500);
+            try {
+                chrome.runtime.sendMessage({ type: messageType }, (response) => {
+                    clearTimeout(timeout);
+                    // If there's an error or no response, treat the SW as unavailable.
+                    if (chrome.runtime.lastError || !response) {
+                        resolve(false);
+                    } else {
+                        resolve(true);
+                    }
+                });
+            } catch (_) {
+                // Calling sendMessage can throw if the extension context is invalid.
+                clearTimeout(timeout);
+                resolve(false);
+            }
         });
     }
 
@@ -316,7 +346,9 @@
     async function applyCloudUpdate(cloudDoc) {
         if (!cloudDoc) return;
         try {
-            const local = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime']);
+            // Fetch animeData, videoProgress, deletedAnime and groupCoverImages from storage.
+            // We need groupCoverImages here so we can merge posters across devices.
+            const local = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
 
             // Merge deletedAnime so cross-device deletions propagate in Orion too.
             const mergedDeleted = cloudDoc.deletedAnime
@@ -330,6 +362,13 @@
 
             const mergedProgress = mergeVideoProgress(local.videoProgress || {}, cloudDoc.videoProgress || {});
 
+            // Merge group cover images: prefer local posters over cloud posters. If a key
+            // exists locally, keep it; otherwise fall back to cloud. This prevents a
+            // remote update from overwriting the user's chosen group poster.
+            const localGroupCovers = local.groupCoverImages || {};
+            const cloudGroupCovers = cloudDoc.groupCoverImages || {};
+            const mergedGroupCovers = { ...cloudGroupCovers, ...localGroupCovers };
+
             const localEps  = Object.values(local.animeData || {}).reduce((s, a) => s + (a.episodes?.length || 0), 0);
             const mergedEps = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
 
@@ -341,11 +380,16 @@
 
             const deletedChanged = Object.keys(mergedDeleted).length !== Object.keys(local.deletedAnime || {}).length;
 
-            if (mergedEps !== localEps || progressChanged || deletedChanged) {
+            // Determine if any group covers changed by comparing keys. If there are new keys
+            // from cloud, mergedGroupCovers will have more entries than local.
+            const groupChanged = Object.keys(mergedGroupCovers).length !== Object.keys(local.groupCoverImages || {}).length;
+
+            if (mergedEps !== localEps || progressChanged || deletedChanged || groupChanged) {
                 await chrome.storage.local.set({
-                    animeData:    mergedAnime,
-                    videoProgress: mergedProgress,
-                    deletedAnime:  mergedDeleted
+                    animeData:       mergedAnime,
+                    videoProgress:   mergedProgress,
+                    deletedAnime:    mergedDeleted,
+                    groupCoverImages: mergedGroupCovers
                 });
                 console.log(`[CS-Sync] ← Cloud update applied (eps: ${localEps}→${mergedEps})`);
             }
@@ -464,15 +508,32 @@
             }
 
             if (changes.animeData) {
-                const oldCount = Object.values(changes.animeData.oldValue || {})
+                const oldAnime = changes.animeData.oldValue || {};
+                const newAnime = changes.animeData.newValue || {};
+                const oldCount = Object.values(oldAnime)
                     .reduce((s, a) => s + (a.episodes?.length || 0), 0);
-                const newCount = Object.values(changes.animeData.newValue || {})
+                const newCount = Object.values(newAnime)
                     .reduce((s, a) => s + (a.episodes?.length || 0), 0);
-                if (newCount > oldCount) {
+
+                // Detect cover changes when episode count hasn't changed
+                let coverChanged = false;
+                if (newCount === oldCount) {
+                    for (const slug of Object.keys(newAnime)) {
+                        const oldCover = oldAnime[slug]?.coverImage || null;
+                        const newCover = newAnime[slug]?.coverImage || null;
+                        if (oldCover !== newCover) {
+                            coverChanged = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (newCount > oldCount || coverChanged) {
                     if (isOrionMode) {
+                        // In no-SW mode, schedule a full push to upload updated animeData
                         scheduleFullPush(1500);
                     } else {
-                        // Wake SW for a full sync when a new episode is tracked
+                        // Wake SW for a full sync when anime metadata changes (new episode or cover)
                         setTimeout(async () => {
                             const swAlive = await wakeBackgroundSW('SYNC_TO_FIREBASE');
                             if (!swAlive) pushFullDirect();

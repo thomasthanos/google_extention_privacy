@@ -286,6 +286,11 @@ const SeasonGrouping = {
             return 'one-punch-man';
         }
 
+        // Special handling for One Piece (all arcs/parts group together)
+        if (slug.startsWith('one-piece')) {
+            return 'one-piece';
+        }
+
         // Special handling for Demon Slayer arcs (all "-hen" suffixes should group together)
         if (slug.startsWith('kimetsu-no-yaiba')) {
             return 'kimetsu-no-yaiba';
@@ -324,6 +329,12 @@ const SeasonGrouping = {
 
     // Extract season number from slug
     getSeasonNumber(slug) {
+        // Special handling for One Piece
+        if (slug.startsWith('one-piece')) {
+            if (slug.includes('new-world')) return 2;
+            return 1;
+        }
+
         // Special handling for One Punch Man
         if (slug.startsWith('one-punch-man')) {
             if (slug.includes('season-3') || slug.endsWith('-3')) return 3;
@@ -413,6 +424,12 @@ const SeasonGrouping = {
 
     // Get display name for a season
     getSeasonLabel(slug, title) {
+        // Special handling for One Piece arcs
+        if (slug.startsWith('one-piece')) {
+            if (slug.includes('new-world')) return 'New World';
+            return 'East Blue & Grandline';
+        }
+
         // Special handling for One Punch Man
         if (slug.startsWith('one-punch-man')) {
             if (slug.includes('season-3') || slug.endsWith('-3')) return 'Season 3';

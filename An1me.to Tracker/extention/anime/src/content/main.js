@@ -35,14 +35,26 @@
         const { Logger, Notifications } = AT;
 
         if (!animeData[info.animeSlug]) {
+            // When encountering a new anime slug for the first time, initialise the
+            // record with the provided metadata. Include the coverImage if it exists
+            // in the parsed info. Without this, only episodes and watch time are
+            // stored, which would cause the popup to miss the cover image.
             animeData[info.animeSlug] = {
                 title: info.animeTitle,
                 slug: info.animeSlug,
                 episodes: [],
                 totalWatchTime: 0,
                 lastWatched: null,
-                totalEpisodes: null
+                totalEpisodes: null,
+                coverImage: info.coverImage || null
             };
+        }
+
+        // If a cover image was parsed and the stored anime record does not yet
+        // have one, persist it. We deliberately do not overwrite an existing
+        // coverImage to avoid replacing a user-edited or previously saved image.
+        if (!animeData[info.animeSlug].coverImage && info.coverImage) {
+            animeData[info.animeSlug].coverImage = info.coverImage;
         }
 
         if (!Array.isArray(animeData[info.animeSlug].episodes)) {
@@ -415,6 +427,32 @@
         handleBeforeUnload
     };
 
+    // ─── Utility: Compute base slug for grouping ──────────────────────────
+    // Groups anime by removing season/part indicators and special cases. This
+    // replicates the logic used in the popup's SeasonGrouping.getBaseSlug() but
+    // simplified for use in the content script. It returns a consistent base
+    // slug used to map multiple seasons (e.g. "naruto-shippuuden" → "naruto").
+    function getBaseSlug(slug) {
+        if (!slug || typeof slug !== 'string') return slug || '';
+        const lower = slug.toLowerCase();
+        // Special cases – group all related seasons under a single slug
+        if (lower.startsWith('naruto')) return 'naruto';
+        if (lower.startsWith('one-punch-man')) return 'one-punch-man';
+        if (lower.startsWith('kimetsu-no-yaiba')) return 'kimetsu-no-yaiba';
+        if (lower.startsWith('shingeki-no-kyojin')) return 'shingeki-no-kyojin';
+        if (lower.startsWith('initial-d')) return 'initial-d';
+        if (lower.startsWith('bleach')) return 'bleach';
+        // Generic: strip season/part indicators, years, roman numerals, and arc suffixes
+        return lower
+            .replace(/-season-?\d+(-[a-z-]+)?$/i, '')
+            .replace(/-s\d+$/i, '')
+            .replace(/-\d+(st|nd|rd|th)-season$/i, '')
+            .replace(/-(part|cour)-?\d+(-[a-z-]+)?$/i, '')
+            .replace(/-20\d{2}$/i, '')
+            .replace(/-(ii|iii|iv|v|vi)$/i, '')
+            .replace(/-[a-z]+-hen$/i, '');
+    }
+
     /**
      * Initialize tracker
      */
@@ -439,6 +477,63 @@
         if (!animeInfo) {
             Logger.debug('No anime info found');
             return;
+        }
+
+        // ── Persist cover image on first page load (even if episode not completed) ──
+        // If the current anime exists in storage but lacks a cover image, and the
+        // parser was able to extract one, update the stored record. This ensures
+        // that posters appear for partially watched anime (those with in-progress
+        // episodes) without requiring the episode to be marked as completed.
+        if (animeInfo.coverImage) {
+            try {
+                // Fetch animeData and groupCoverImages together. If the current
+                // anime exists, update its cover image. If it doesn't exist, create
+                // a minimal entry so that posters appear even for in-progress anime.
+                // Also compute the baseSlug and persist a group cover image if not
+                // already stored for this group. This ensures group cards show a
+                // consistent poster across all seasons, and avoids overwriting once
+                // a group cover has been set.
+                chrome.storage.local.get(['animeData', 'groupCoverImages'], (result) => {
+                    if (chrome.runtime.lastError) return;
+                    const animeData = result.animeData || {};
+                    const groupCoverImages = result.groupCoverImages || {};
+                    const slug = animeInfo.animeSlug;
+                    // Update or create anime entry with cover image
+                    if (animeData[slug]) {
+                        if (!animeData[slug].coverImage) {
+                            animeData[slug].coverImage = animeInfo.coverImage;
+                        }
+                    } else {
+                        animeData[slug] = {
+                            title: animeInfo.animeTitle,
+                            slug: slug,
+                            episodes: [],
+                            totalWatchTime: 0,
+                            lastWatched: null,
+                            totalEpisodes: null,
+                            coverImage: animeInfo.coverImage
+                        };
+                    }
+
+                    // Determine the group base slug for this anime and set group cover
+                    // only if it hasn't been set previously. This uses the utility
+                    // defined above. We don't overwrite an existing group cover to
+                    // respect the user's request to keep the first assigned cover.
+                    try {
+                        const baseSlug = getBaseSlug(slug);
+                        if (animeInfo.coverImage && !groupCoverImages[baseSlug]) {
+                            groupCoverImages[baseSlug] = animeInfo.coverImage;
+                        }
+                    } catch (_) {
+                        // Ignore baseSlug errors; group cover won't be set
+                    }
+
+                    chrome.storage.local.set({ animeData, groupCoverImages });
+                });
+            } catch (e) {
+                // Silent catch: storage errors should not block init
+                Logger.warn('Cover image update failed:', e);
+            }
         }
 
         Logger.info(`Detected: ${animeInfo.animeTitle} Ep${animeInfo.episodeNumber}`);

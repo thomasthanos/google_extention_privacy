@@ -179,18 +179,61 @@ const AnimeCardRenderer = {
         // Parts section for multi-part anime
         const partsSection = this.createPartsSection(slug, anime.episodes);
 
+        // ── Cover image & placeholder ──
+        // If a cover image exists on the anime object, show it. Otherwise, display a
+        // placeholder with the first letter of the title. Use inline styles here to
+        // avoid modifying external CSS; these dimensions and styles match the
+        // provided design (44x58 px, 8px radius, accent border/gradient).
+        const firstLetter = (anime.title || '').trim().charAt(0) || '';
+        const coverHtml = anime.coverImage
+            ? `<img src="${anime.coverImage}" alt="${UIHelpers.escapeHtml(anime.title)}" style="border-radius:8px;width:44px;height:58px;object-fit:cover;">
+              `
+            : `<div style="width:44px;height:58px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff;">
+                    ${UIHelpers.escapeHtml(firstLetter.toUpperCase())}
+               </div>`;
+
+        // ── Meta row computation ──
+        // Display summary information (episodes watched/total, status, last watched) when the card is expanded.
+        const totalWatchedEpisodes = anime.episodes?.length || 0;
+        const totalEpisodesPossible = progressData.total || 0;
+        const episodeProgressText = totalEpisodesPossible > 0 ? `${totalWatchedEpisodes}/${totalEpisodesPossible}` : '';
+        let statusTextCard = '';
+        if (totalWatchedEpisodes === 0) {
+            statusTextCard = 'Not started';
+        } else if (totalEpisodesPossible > 0 && totalWatchedEpisodes < totalEpisodesPossible) {
+            statusTextCard = 'Watching';
+        } else {
+            statusTextCard = 'Completed';
+        }
+        const timeAgoText = anime.lastWatched ? UIHelpers.formatDate(anime.lastWatched) : 'Never';
+        const isCardComplete = totalEpisodesPossible > 0 && totalWatchedEpisodes >= totalEpisodesPossible;
+        const progressBadge = !isCardComplete && episodeProgressText
+            ? `<span class="meta-badge meta-badge-progress">Ep ${episodeProgressText}</span>`
+            : '';
+        const statusBadgeClass = isCardComplete ? 'meta-badge-complete' : (totalWatchedEpisodes > 0 ? 'meta-badge-watching' : 'meta-badge-notstarted');
+        const statusBadgeIcon = isCardComplete ? '✓' : '⊙';
+        const statusBadge = `<span class="meta-badge ${statusBadgeClass}">${statusBadgeIcon} ${statusTextCard}</span>`;
+        const metaRowHtml = `<div class="anime-meta-row">${progressBadge}${statusBadge}<span class="meta-time">${timeAgoText}</span></div>`;
+
         return `
             <div class="anime-card" data-slug="${slug}">
                 <div class="anime-card-header">
-                    <h3 class="anime-title"><span class="anime-title-text">${UIHelpers.escapeHtml(anime.title)}</span><span class="current-episode-badge">Ep ${episodeCount}</span></h3>
-                    <div class="anime-card-actions">
-                        <button class="anime-edit-title" data-slug="${slug}" title="Edit title">✏️</button>
-                        <button class="anime-delete" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
-                        <div class="anime-expand-icon">${UIHelpers.createIcon('chevron')}</div>
+                    <div class="anime-cover-container" style="flex-shrink:0;">${coverHtml}</div>
+                    <div class="anime-header-main" style="flex:1; display:flex; flex-direction:column; overflow:hidden; margin-left:8px;">
+                        <div class="anime-title-row" style="display:flex; align-items:center; overflow:hidden;">
+                            <span class="anime-title-text" style="font-size:14px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${UIHelpers.escapeHtml(anime.title)}</span>
+                        </div>
+                        ${metaRowHtml}
                     </div>
+                    <div class="anime-card-actions">
+                        <button class="anime-edit-title" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
+                        <button class="anime-delete" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
+                    </div>
+                    <div class="anime-expand-icon">${UIHelpers.createIcon('chevron')}</div>
                 </div>
                 <div class="anime-card-content">
-                    <div class="progress-container">
+                    <!-- Main progress: visible when expanded, above filler bar -->
+                    <div class="progress-container header-progress">
                         <div class="progress-info">
                             ${progressInfoText}
                             <span>${canonProgressPercent}%</span>
@@ -392,6 +435,27 @@ const AnimeCardRenderer = {
         // Get the base title from the first season (usually Season 1)
         const firstSeason = seasons[0];
         const baseTitle = this.extractBaseTitle(firstSeason.anime.title);
+
+        // ── Determine a cover image or placeholder for the season group ──
+        // Use the coverImage of the first season's anime if available. Otherwise,
+        // display a placeholder with the first letter of the base title. This
+        // mirrors the behaviour of individual anime cards, providing a visual
+        // identity for grouped entries.
+        // Try to fetch a pre-assigned group poster. The content script stores
+        // posters for each baseSlug in `groupCoverImages` to ensure a
+        // consistent cover across all seasons. If none exists, fall back to
+        // the first season's cover image. Only if both are missing do we
+        // display a placeholder.
+        const groupImages = (window.AnimeTracker && window.AnimeTracker.groupCoverImages) || {};
+        const coverImageGroup = groupImages[baseSlug] ||
+            ((firstSeason?.anime && firstSeason.anime.coverImage) ? firstSeason.anime.coverImage : null);
+        const firstLetterGroup = (baseTitle || '').trim().charAt(0) || '';
+        const coverHtmlGroup = coverImageGroup
+            ? `<img src="${coverImageGroup}" alt="${UIHelpers.escapeHtml(baseTitle)}" style="border-radius:8px;width:44px;height:58px;object-fit:cover;">
+              `
+            : `<div style="width:44px;height:58px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff;">
+                    ${UIHelpers.escapeHtml(firstLetterGroup.toUpperCase())}
+               </div>`;
 
         // Calculate total stats across all seasons
         let totalEpisodes = 0;
@@ -703,11 +767,11 @@ const AnimeCardRenderer = {
                             <span class="season-status-icon">${statusIcon}</span>
                             <span class="season-label">${seasonLabel}</span>
                         </div>
-                        <div class="season-item-right">
+                    <div class="season-item-right">
                             <span class="season-episode-badge">${episodeBadgeText}</span>
                             <div class="season-item-actions">
-                                <button class="season-edit-btn" data-slug="${slug}" title="Edit title">✏️</button>
-                                <button class="season-delete-btn" data-slug="${slug}" title="Delete">🗑️</button>
+                                <button class="season-edit-btn" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
+                                <button class="season-delete-btn" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
                             </div>
                             <div class="season-expand-icon">${UIHelpers.createIcon('chevron')}</div>
                         </div>
@@ -731,22 +795,43 @@ const AnimeCardRenderer = {
         const itemCount = expandedSeasons.length;
         const itemLabel = itemCount === seasons.length ? `${itemCount} seasons` : `${itemCount} parts`;
 
+        // Compute meta information for season group. Show number of seasons watched vs total,
+        // overall status, and last watched relative time.
+        const totalSeasons = seasons.length;
+        const anyStarted = seasons.some(({ anime }) =>
+            (anime.episodes?.length || 0) > 0 || (anime.totalWatchTime || 0) > 0
+        );
+        let statusGroup;
+        if (!anyStarted) {
+            statusGroup = 'Not started';
+        } else if (allSeasonsComplete) {
+            statusGroup = 'Completed';
+        } else {
+            statusGroup = 'Watching';
+        }
+        const groupProgressBadge = !allSeasonsComplete
+            ? `<span class="meta-badge meta-badge-progress">${itemLabel}</span>`
+            : '';
+        const groupStatusClass = allSeasonsComplete ? 'meta-badge-complete' : (anyStarted ? 'meta-badge-watching' : 'meta-badge-notstarted');
+        const groupStatusIcon = allSeasonsComplete ? '✓' : '⊙';
+        const groupStatusBadge = `<span class="meta-badge ${groupStatusClass}">${groupStatusIcon} ${statusGroup}</span>`;
+        const metaRowHtmlGroup = `<div class="season-group-meta-row">${groupProgressBadge}${groupStatusBadge}<span class="meta-time">${lastWatchedText}</span></div>`;
+
         return `
             <div class="anime-season-group" data-base-slug="${baseSlug}">
                 <div class="season-group-header">
-                    <h3 class="season-group-title">
-                        <span class="season-group-icon">📺</span>
-                        <span class="season-group-name">${UIHelpers.escapeHtml(baseTitle)}</span>
-                        <span class="season-count-badge ${badgeClass}">${itemLabel}</span>
-                    </h3>
+                    <div class="season-group-logo" style="flex-shrink:0;">
+                        ${coverHtmlGroup}
+                    </div>
+                    <div class="season-header-main" style="flex:1; display:flex; flex-direction:column; overflow:hidden; margin-left:8px;">
+                        <div class="season-title-row" style="display:flex; align-items:center; overflow:hidden;">
+                            <span class="season-group-name" style="font-size:14px;font-weight:600;color:var(--t1);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${UIHelpers.escapeHtml(baseTitle)}</span>
+                        </div>
+                        ${metaRowHtmlGroup}
+                    </div>
                     <div class="season-group-actions">
                         <div class="season-group-expand-icon">${UIHelpers.createIcon('chevron')}</div>
                     </div>
-                </div>
-                <div class="season-group-stats">
-                    <span class="season-group-stat">📊 ${totalEpisodes} episodes</span>
-                    <span class="season-group-stat">⏱️ ${UIHelpers.formatDuration(totalWatchTime)}</span>
-                    <span class="season-group-stat">📅 ${lastWatchedText}</span>
                 </div>
                 <div class="season-group-content">
                     ${seasonItemsHTML}
@@ -832,8 +917,8 @@ const AnimeCardRenderer = {
                         <div class="movie-item-right">
                             <span class="movie-duration">${formattedTime}</span>
                             <div class="movie-item-actions">
-                                <button class="movie-edit-btn" data-slug="${slug}" title="Edit title">✏️</button>
-                                <button class="movie-delete-btn" data-slug="${slug}" title="Delete">🗑️</button>
+                                <button class="movie-edit-btn" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
+                                <button class="movie-delete-btn" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
                             </div>
                         </div>
                     </div>
@@ -844,22 +929,43 @@ const AnimeCardRenderer = {
         const lastWatchedText = latestWatched ? UIHelpers.formatDate(latestWatched.toISOString()) : 'Never';
         const watchedCount = movies.filter(m => m.anime.episodes?.length > 0 || (m.anime.totalWatchTime || 0) > 0).length;
 
+        // Determine cover image for movie group
+        const groupImages = (window.AnimeTracker && window.AnimeTracker.groupCoverImages) || {};
+        const coverImageGroup = groupImages[baseSlug] || ((firstMovie?.anime && firstMovie.anime.coverImage) ? firstMovie.anime.coverImage : null);
+        const firstLetterGroup = (baseTitle || '').trim().charAt(0) || '';
+        const coverHtmlGroup = coverImageGroup
+            ? `<img src="${coverImageGroup}" alt="${UIHelpers.escapeHtml(baseTitle)}" style="border-radius:8px;width:44px;height:58px;object-fit:cover;">`
+            : `<div style="width:44px;height:58px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff;">
+                    ${UIHelpers.escapeHtml(firstLetterGroup.toUpperCase())}
+               </div>`;
+
+        // Compute meta information: number of movies watched vs total, status, and last watched
+        const totalMovies = movies.length;
+        const statusGroup = (watchedCount === 0) ? 'Not started' : (watchedCount < totalMovies ? 'Watching' : 'Completed');
+        const allMoviesWatched = watchedCount >= totalMovies;
+        const movieProgressBadge = !allMoviesWatched
+            ? `<span class="meta-badge meta-badge-progress">${movies.length} movies</span>`
+            : '';
+        const movieStatusClass = allMoviesWatched ? 'meta-badge-complete' : (watchedCount > 0 ? 'meta-badge-watching' : 'meta-badge-notstarted');
+        const movieStatusIcon = allMoviesWatched ? '✓' : '⊙';
+        const movieStatusBadge = `<span class="meta-badge ${movieStatusClass}">${movieStatusIcon} ${statusGroup}</span>`;
+        const metaRowHtml = `<div class="movie-group-meta-row">${movieProgressBadge}${movieStatusBadge}<span class="meta-time">${lastWatchedText}</span></div>`;
+
         return `
             <div class="anime-movie-group" data-base-slug="${baseSlug}">
                 <div class="movie-group-header">
-                    <h3 class="movie-group-title">
-                        <span class="movie-group-icon">🎬</span>
-                        <span class="movie-group-name">${UIHelpers.escapeHtml(baseTitle)} Movies</span>
-                        <span class="movie-count-badge">${movies.length} movies</span>
-                    </h3>
+                    <div class="movie-group-logo" style="flex-shrink:0;">
+                        ${coverHtmlGroup}
+                    </div>
+                    <div class="movie-header-main" style="flex:1; display:flex; flex-direction:column; overflow:hidden; margin-left:8px;">
+                        <div class="movie-title-row" style="display:flex; align-items:center; overflow:hidden;">
+                            <span class="movie-group-name" style="font-size:14px;font-weight:600;color:var(--t1);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${UIHelpers.escapeHtml(baseTitle)} Movies</span>
+                        </div>
+                        ${metaRowHtml}
+                    </div>
                     <div class="movie-group-actions">
                         <div class="movie-group-expand-icon">${UIHelpers.createIcon('chevron')}</div>
                     </div>
-                </div>
-                <div class="movie-group-stats">
-                    <span class="movie-group-stat">✅ ${watchedCount}/${movies.length} watched</span>
-                    <span class="movie-group-stat">⏱️ ${UIHelpers.formatDuration(totalWatchTime)}</span>
-                    <span class="movie-group-stat">📅 ${lastWatchedText}</span>
                 </div>
                 <div class="movie-group-content">
                     ${movieItemsHTML}
@@ -880,22 +986,36 @@ const AnimeCardRenderer = {
         const lastWatched = anime.lastWatched ? UIHelpers.formatDate(anime.lastWatched) : 'Never';
         const isWatched = anime.episodes?.length > 0 || watchTime > 0;
 
+        // Determine a cover image for single movie
+        const coverImg = anime.coverImage || null;
+        const firstLetter = (title || '').trim().charAt(0) || '';
+        const coverHtml = coverImg
+            ? `<img src="${coverImg}" alt="${UIHelpers.escapeHtml(title)}" style="border-radius:8px;width:44px;height:58px;object-fit:cover;">`
+            : `<div style="width:44px;height:58px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff;">
+                    ${UIHelpers.escapeHtml(firstLetter.toUpperCase())}
+               </div>`;
+
+        // Meta row for single movie: new badge design
+        const singleStatusClass = isWatched ? 'meta-badge-complete' : 'meta-badge-notstarted';
+        const singleStatusIcon = isWatched ? '✓' : '⊙';
+        const singleStatusText = isWatched ? 'Watched' : 'Not watched';
+        const metaRowHtml = `<div class="single-movie-meta-row"><span class="meta-badge" style="color:#f4a261;background:rgba(244,162,97,0.12);border:1px solid rgba(244,162,97,0.35);">Movie</span><span class="meta-badge ${singleStatusClass}">${singleStatusIcon} ${singleStatusText}</span><span class="meta-time">${lastWatched}</span></div>`;
+
         return `
             <div class="anime-movie-group single-movie" data-base-slug="${slug}">
                 <div class="movie-group-header">
-                    <h3 class="movie-group-title">
-                        <span class="movie-group-icon">🎬</span>
-                        <span class="movie-group-name">${UIHelpers.escapeHtml(title)}</span>
-                        <span class="movie-count-badge single">Movie</span>
-                    </h3>
+                    <div class="movie-group-logo" style="flex-shrink:0;">
+                        ${coverHtml}
+                    </div>
+                    <div class="movie-header-main" style="flex:1; display:flex; flex-direction:column; overflow:hidden; margin-left:8px;">
+                        <div class="movie-title-row" style="display:flex; align-items:center; overflow:hidden;">
+                            <span class="movie-group-name" style="font-size:14px;font-weight:600;color:var(--t1);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${UIHelpers.escapeHtml(title)}</span>
+                        </div>
+                        ${metaRowHtml}
+                    </div>
                     <div class="movie-group-actions">
                         <div class="movie-group-expand-icon">${UIHelpers.createIcon('chevron')}</div>
                     </div>
-                </div>
-                <div class="movie-group-stats">
-                    <span class="movie-group-stat">${isWatched ? '✅ Watched' : '⭕ Not watched'}</span>
-                    <span class="movie-group-stat">⏱️ ${formattedTime}</span>
-                    <span class="movie-group-stat">📅 ${lastWatched}</span>
                 </div>
                 <div class="movie-group-content">
                     <div class="movie-item ${isWatched ? 'complete' : 'not-started'}" data-slug="${slug}">
@@ -907,8 +1027,8 @@ const AnimeCardRenderer = {
                             <div class="movie-item-right">
                                 <span class="movie-duration">${formattedTime}</span>
                                 <div class="movie-item-actions">
-                                    <button class="movie-edit-btn" data-slug="${slug}" title="Edit title">✏️</button>
-                                    <button class="movie-delete-btn" data-slug="${slug}" title="Delete">🗑️</button>
+                                    <button class="movie-edit-btn" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
+                                    <button class="movie-delete-btn" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
                                 </div>
                             </div>
                         </div>

@@ -201,9 +201,15 @@ function mergeAnimeData(localData, cloudData) {
                 if (epTs > existingTs) map.set(ep.number, ep);
             }
         }
-        merged[slug] = { ...l };
-        merged[slug].episodes       = Array.from(map.values()).sort((a, b) => a.number - b.number);
-        merged[slug].totalWatchTime = merged[slug].episodes.reduce((s, ep) => s + (ep.duration || 0), 0);
+        // Start with local metadata (local wins by default)
+        const mergedMeta = { ...l };
+        // If local is missing a coverImage but cloud has one, copy it over
+        if (!mergedMeta.coverImage && c.coverImage) {
+            mergedMeta.coverImage = c.coverImage;
+        }
+        mergedMeta.episodes       = Array.from(map.values()).sort((a, b) => a.number - b.number);
+        mergedMeta.totalWatchTime = mergedMeta.episodes.reduce((s, ep) => s + (ep.duration || 0), 0);
+        merged[slug] = mergedMeta;
     }
     return merged;
 }
@@ -241,51 +247,105 @@ async function fetchCloudData(user, token) {
 // wins), then writes the merged map back.  This prevents overwriting progress
 // that another device has written for a different episode.
 
+// background.js - Αντικαταστήστε ολόκληρη τη συνάρτηση syncProgressOnly
+
 async function syncProgressOnly() {
-    const user  = await getFirebaseUser();
+    // Αν υπάρχει ήδη sync σε εξέλιξη, το κάνουμε pending
+    if (syncInProgress) { pendingSync = true; return; }
+
+    const user = await getFirebaseUser();
     const token = await getFirebaseToken();
     if (!user || !token) return;
 
+    syncInProgress = true;
     try {
-        const result  = await chrome.storage.local.get(['videoProgress']);
-        const localVP = result.videoProgress || {};
+        // Φέρνουμε ΟΛΑ τα δεδομένα, συμπεριλαμβανομένων των cover images
+        const result = await chrome.storage.local.get([
+            'animeData', 
+            'videoProgress', 
+            'deletedAnime', 
+            'groupCoverImages'
+        ]);
+        
+        const localAnime    = result.animeData    || {};
+        const localProgress = result.videoProgress || {};
+        const localDeleted  = result.deletedAnime  || {};
+        const localGroup    = result.groupCoverImages || {};
 
-        // Fetch cloud so we can merge — prevents wiping another device's progress
-        const cloudDoc  = await fetchCloudData(user, token);
-        const mergedVP  = cloudDoc?.videoProgress
-            ? mergeVideoProgress(localVP, cloudDoc.videoProgress)
-            : localVP;
+        // Φέρνουμε τα cloud data για συγχώνευση
+        const cloudDoc = await fetchCloudData(user, token);
 
-        // Write back locally if cloud had additional entries from another device
-        const localCount  = Object.keys(localVP).length;
-        const mergedCount = Object.keys(mergedVP).length;
-        if (mergedCount > localCount) {
-            pauseSync(); // don't re-trigger animeData full sync from this write
-            await chrome.storage.local.set({ videoProgress: mergedVP });
-            console.log(`[BG] ✓ Pulled ${mergedCount - localCount} new progress entries from cloud`);
+        // Συγχώνευση deletedAnime
+        const mergedDeleted = cloudDoc?.deletedAnime
+            ? mergeDeletedAnime(localDeleted, cloudDoc.deletedAnime)
+            : localDeleted;
+
+        // Συγχώνευση animeData (με τη νέα λογική που έχετε ήδη)
+        let mergedAnime = cloudDoc?.animeData
+            ? mergeAnimeData(localAnime, cloudDoc.animeData)
+            : { ...localAnime };
+
+        // Εφαρμογή διαγραφών
+        applyDeletedAnime(mergedAnime, mergedDeleted);
+
+        // Συγχώνευση videoProgress
+        const mergedProgress = cloudDoc?.videoProgress
+            ? mergeVideoProgress(localProgress, cloudDoc.videoProgress)
+            : localProgress;
+
+        // Συγχώνευση group cover images
+        const cloudGroup = cloudDoc?.groupCoverImages || {};
+        const mergedGroup = { ...cloudGroup, ...localGroup };
+
+        // Τοπική αποθήκευση αν χρειάζεται
+        const localEps   = Object.values(localAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
+        const mergedEps  = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
+        const localPCnt  = Object.keys(localProgress).length;
+        const mergedPCnt = Object.keys(mergedProgress).length;
+        const deletedChanged = !shallowEqualDeletedAnime(localDeleted, mergedDeleted);
+        const groupChanged   = Object.keys(mergedGroup).length !== Object.keys(localGroup).length;
+
+        if (mergedEps > localEps || mergedPCnt > localPCnt || deletedChanged || groupChanged) {
+            pauseSync();
+            await chrome.storage.local.set({
+                animeData:        mergedAnime,
+                videoProgress:    mergedProgress,
+                deletedAnime:     mergedDeleted,
+                groupCoverImages: mergedGroup
+            });
         }
 
-        const url        = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
-        const updateMask = 'updateMask.fieldPaths=videoProgress&updateMask.fieldPaths=lastUpdated';
-        const response   = await fetch(`${url}?${updateMask}`, {
+        // Τώρα ανεβάζουμε ΟΛΑ τα δεδομένα στο cloud
+        const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
+        const fieldMask = [
+            'animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'lastUpdated', 'email'
+        ].map(f => `updateMask.fieldPaths=${f}`).join('&');
+
+        const response = await fetch(`${url}?${fieldMask}`, {
             method:  'PATCH',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body:    JSON.stringify({
                 fields: jsonToFirestoreFields({
-                    videoProgress: mergedVP,
-                    lastUpdated:   new Date().toISOString()
+                    animeData:        mergedAnime,
+                    videoProgress:    mergedProgress,
+                    deletedAnime:     mergedDeleted,
+                    groupCoverImages: mergedGroup,
+                    lastUpdated:      new Date().toISOString(),
+                    email:            user.email
                 })
             })
         });
 
         if (response.ok) {
-            console.log('[BG] ✓ videoProgress synced (merged)');
+            console.log('[BG] ✓ Full sync completed (from progress-only path)');
         } else {
-            console.warn('[BG] videoProgress sync failed:', response.status);
-            await syncToFirebase(); // fall back to full sync
+            console.warn('[BG] Sync failed:', response.status);
         }
-    } catch (e) {
-        console.warn('[BG] syncProgressOnly error:', e.message);
+    } catch (error) {
+        console.error('[BG] Sync error:', error);
+    } finally {
+        syncInProgress = false;
+        if (pendingSync) { pendingSync = false; setTimeout(syncToFirebase, 1000); }
     }
 }
 
@@ -301,12 +361,14 @@ async function syncToFirebase() {
 
     syncInProgress = true;
     try {
-        const result = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime']);
+        // Also load groupCoverImages so we can sync poster data across devices
+        const result = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
         const localAnime    = result.animeData    || {};
         const localProgress = result.videoProgress || {};
         const localDeleted  = result.deletedAnime  || {};
+        const localGroup    = result.groupCoverImages || {};
 
-        // Fetch cloud to merge animeData, videoProgress AND deletedAnime.
+        // Fetch cloud to merge animeData, videoProgress, deletedAnime and group cover images.
         const cloudDoc = await fetchCloudData(user, token);
 
         // Merge deletedAnime first so we can apply it to animeData below.
@@ -327,25 +389,31 @@ async function syncToFirebase() {
             ? mergeVideoProgress(localProgress, cloudDoc.videoProgress)
             : localProgress;
 
+        // Merge group cover images: prefer local posters over cloud posters.
+        const cloudGroup = cloudDoc?.groupCoverImages || {};
+        const mergedGroup = { ...cloudGroup, ...localGroup };
+
         const localEps   = Object.values(localAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
         const mergedEps  = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
         const localPCnt  = Object.keys(localProgress).length;
         const mergedPCnt = Object.keys(mergedProgress).length;
         const deletedChanged = !shallowEqualDeletedAnime(localDeleted, mergedDeleted);
+        const groupChanged   = Object.keys(mergedGroup).length !== Object.keys(localGroup).length;
 
         // Write back locally if cloud had more/different data (e.g. from another device)
-        if (mergedEps > localEps || mergedPCnt > localPCnt || deletedChanged) {
+        if (mergedEps > localEps || mergedPCnt > localPCnt || deletedChanged || groupChanged) {
             pauseSync(); // prevent this write from immediately re-triggering a full sync
             await chrome.storage.local.set({
-                animeData:    mergedAnime,
-                videoProgress: mergedProgress,
-                deletedAnime:  mergedDeleted
+                animeData:       mergedAnime,
+                videoProgress:   mergedProgress,
+                deletedAnime:    mergedDeleted,
+                groupCoverImages: mergedGroup
             });
         }
 
         const url       = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         const fieldMask = [
-            'animeData', 'videoProgress', 'deletedAnime', 'lastUpdated', 'email'
+            'animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'lastUpdated', 'email'
         ].map(f => `updateMask.fieldPaths=${f}`).join('&');
 
         const response = await fetch(`${url}?${fieldMask}`, {
@@ -353,11 +421,12 @@ async function syncToFirebase() {
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body:    JSON.stringify({
                 fields: jsonToFirestoreFields({
-                    animeData:     mergedAnime,
-                    videoProgress: mergedProgress,
-                    deletedAnime:  mergedDeleted,
-                    lastUpdated:   new Date().toISOString(),
-                    email:         user.email
+                    animeData:       mergedAnime,
+                    videoProgress:   mergedProgress,
+                    deletedAnime:    mergedDeleted,
+                    groupCoverImages: mergedGroup,
+                    lastUpdated:     new Date().toISOString(),
+                    email:           user.email
                 })
             })
         });
@@ -384,7 +453,8 @@ async function syncToFirebase() {
 async function applyCloudUpdate(cloudDoc) {
     if (!cloudDoc) return;
     try {
-        const local = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime']);
+        // Also load groupCoverImages so posters can be synced across devices
+        const local = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
 
         // Merge deletedAnime from cloud so cross-device deletions propagate here too.
         const mergedDeleted = cloudDoc.deletedAnime
@@ -399,6 +469,12 @@ async function applyCloudUpdate(cloudDoc) {
         // For videoProgress: keep local if it's higher — cloud update might be from another tab
         const mergedProgress = mergeVideoProgress(local.videoProgress || {}, cloudDoc.videoProgress || {});
 
+        // Merge group cover images: prefer local posters over cloud posters. If a key
+        // exists locally, keep it; otherwise fall back to cloud.
+        const localGroup = local.groupCoverImages || {};
+        const cloudGroup = cloudDoc.groupCoverImages || {};
+        const mergedGroup = { ...cloudGroup, ...localGroup };
+
         const localEps  = Object.values(local.animeData || {}).reduce((s, a) => s + (a.episodes?.length || 0), 0);
         const mergedEps = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
 
@@ -409,13 +485,15 @@ async function applyCloudUpdate(cloudDoc) {
         }
 
         const deletedChanged = !shallowEqualDeletedAnime(local.deletedAnime || {}, mergedDeleted);
+        const groupChanged   = Object.keys(mergedGroup).length !== Object.keys(local.groupCoverImages || {}).length;
 
-        if (mergedEps !== localEps || progressChanged || deletedChanged) {
+        if (mergedEps !== localEps || progressChanged || deletedChanged || groupChanged) {
             pauseSync(); // prevent this write from immediately re-triggering a full sync
             await chrome.storage.local.set({
-                animeData:    mergedAnime,
-                videoProgress: mergedProgress,
-                deletedAnime:  mergedDeleted
+                animeData:        mergedAnime,
+                videoProgress:    mergedProgress,
+                deletedAnime:     mergedDeleted,
+                groupCoverImages: mergedGroup
             });
             console.log(`[BG-RT] ← Cloud update applied (eps: ${localEps}→${mergedEps})`);
         }
@@ -545,18 +623,55 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
     // ── animeData: full sync, respect syncPaused ───────────────────────────
     if (changes.animeData && !isSyncPaused()) {
-        const oldCount = Object.values(changes.animeData.oldValue || {})
+        const oldAnime = changes.animeData.oldValue || {};
+        const newAnime = changes.animeData.newValue || {};
+
+        // Calculate episode counts to detect new episodes
+        const oldCount = Object.values(oldAnime)
             .reduce((s, a) => s + (a.episodes?.length || 0), 0);
-        const newCount = Object.values(changes.animeData.newValue || {})
+        const newCount = Object.values(newAnime)
             .reduce((s, a) => s + (a.episodes?.length || 0), 0);
-        if (newCount > oldCount) {
-            console.log(
-                `%cAnime Tracker %c➕ New episode! (${oldCount}→${newCount})`,
-                'color:rgb(255,107,107);font-weight:bold;font-size:12px',
-                'color:rgb(148,163,184);font-size:11px'
-            );
-            // Reuse syncDebounceTimeout so storage listener and message handler
-            // share the same timer — prevents two simultaneous full syncs.
+
+        // Detect cover changes: if any slug has a different coverImage value
+        let coverChanged = false;
+        if (!coverChanged && (newCount === oldCount)) {
+            for (const slug of Object.keys(newAnime)) {
+                const oldCover = oldAnime[slug]?.coverImage || null;
+                const newCover = newAnime[slug]?.coverImage || null;
+                // Treat undefined vs null as equal; only trigger when value changes from falsy to non-null or vice versa or differs
+                if (oldCover !== newCover) {
+                    coverChanged = true;
+                    break;
+                }
+            }
+        }
+
+        if (newCount > oldCount || coverChanged) {
+            if (newCount > oldCount) {
+                console.log(
+                    `%cAnime Tracker %c➕ New episode! (${oldCount}→${newCount})`,
+                    'color:rgb(255,107,107);font-weight:bold;font-size:12px',
+                    'color:rgb(148,163,184);font-size:11px'
+                );
+            } else {
+                console.log('[BG] Anime metadata changed (cover updated), scheduling sync');
+            }
+            // Reuse syncDebounceTimeout so storage listener and message handler share the same timer
+            if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
+            syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 2000);
+        }
+    }
+
+    // ── groupCoverImages: full sync when new posters are added ──────────────
+    // When group posters are updated locally (e.g. a content script saved a
+    // new group poster), schedule a full sync so the change propagates to
+    // Firestore and other devices. Ignore changes during sync pauses to
+    // prevent re-triggering syncs for remote updates.
+    if (changes.groupCoverImages && !isSyncPaused()) {
+        const oldLen = Object.keys(changes.groupCoverImages.oldValue || {}).length;
+        const newLen = Object.keys(changes.groupCoverImages.newValue || {}).length;
+        if (newLen !== oldLen) {
+            console.log('[BG] Group cover images changed, scheduling sync');
             if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
             syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 2000);
         }

@@ -95,9 +95,15 @@
                 }
             }
 
-            merged[slug] = { ...l };
-            merged[slug].episodes       = Array.from(map.values()).sort((a, b) => a.number - b.number);
-            merged[slug].totalWatchTime = merged[slug].episodes.reduce((s, ep) => s + (ep.duration || 0), 0);
+            // Start with local metadata
+            const mergedMeta = { ...l };
+            // If local missing coverImage but cloud has, use cloud's cover
+            if (!mergedMeta.coverImage && c.coverImage) {
+                mergedMeta.coverImage = c.coverImage;
+            }
+            mergedMeta.episodes       = Array.from(map.values()).sort((a, b) => a.number - b.number);
+            mergedMeta.totalWatchTime = mergedMeta.episodes.reduce((s, ep) => s + (ep.duration || 0), 0);
+            merged[slug] = mergedMeta;
         }
 
         return merged;

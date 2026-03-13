@@ -118,8 +118,14 @@ const FirebaseLib = (function() {
                 },
                 async (redirectUrl) => {
                     if (chrome.runtime.lastError) {
-                        console.error('[Firebase] Auth error:', chrome.runtime.lastError);
-                        reject(new Error(chrome.runtime.lastError.message));
+                        const errMsg = chrome.runtime.lastError.message || '';
+                        const isCancelled = errMsg.includes('did not approve') ||
+                            errMsg.includes('cancelled') || errMsg.includes('closed') ||
+                            errMsg.includes('user_cancelled');
+                        if (!isCancelled) {
+                            console.error('[Firebase] Auth error:', chrome.runtime.lastError);
+                        }
+                        reject(new Error(errMsg));
                         return;
                     }
 

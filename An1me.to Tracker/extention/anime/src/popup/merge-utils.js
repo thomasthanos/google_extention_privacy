@@ -78,7 +78,8 @@
         for (const slug of Object.keys(merged)) {
             const c = cloudData?.[slug];
             const l = localData?.[slug];
-            if (!c || !l) continue; // only in one source — already in merged
+            // Only need to merge when present in both local and cloud
+            if (!c || !l) continue;
 
             // Union-merge episodes by number; keep the more recently watched copy
             const map = new Map();
@@ -97,9 +98,16 @@
                 }
             }
 
-            merged[slug] = { ...l }; // local metadata wins
-            merged[slug].episodes       = Array.from(map.values()).sort((a, b) => a.number - b.number);
-            merged[slug].totalWatchTime = merged[slug].episodes.reduce((s, ep) => s + (ep.duration || 0), 0);
+            // Start with local metadata (local wins)
+            const mergedMeta = { ...l };
+            // If local is missing a coverImage but cloud has one, copy it
+            if (!mergedMeta.coverImage && c.coverImage) {
+                mergedMeta.coverImage = c.coverImage;
+            }
+            // Assign merged episodes and totalWatchTime
+            mergedMeta.episodes       = Array.from(map.values()).sort((a, b) => a.number - b.number);
+            mergedMeta.totalWatchTime = mergedMeta.episodes.reduce((s, ep) => s + (ep.duration || 0), 0);
+            merged[slug] = mergedMeta;
         }
 
         return merged;

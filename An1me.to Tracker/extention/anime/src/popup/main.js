@@ -489,9 +489,20 @@
             // Run multi-part anime migration first
             await Storage.migrateMultiPartAnime();
 
-            const result = await Storage.get(['animeData', 'videoProgress']);
+            // Load animeData, videoProgress and groupCoverImages in one call. The
+            // extension stores group cover images in chrome.storage.local under
+            // the `groupCoverImages` key (see content script). We assign
+            // window.AnimeTracker.groupCoverImages here so that the card
+            // renderer can use the correct poster for season groups. This call
+            // defaults to an empty object when the key is missing, preventing
+            // undefined errors.
+            const result = await Storage.get(['animeData', 'videoProgress', 'groupCoverImages']);
             animeData = result.animeData || {};
             videoProgress = result.videoProgress || {};
+            // Expose group cover images globally. If the key doesn't exist,
+            // default to an empty object. This is read by AnimeCardRenderer
+            // when rendering season groups.
+            window.AnimeTracker.groupCoverImages = result.groupCoverImages || {};
 
             const cleanedData = ProgressManager.removeDuplicateEpisodes(animeData);
             const { cleaned: cleanedProgress, removedCount: progressRemoved } =
@@ -571,6 +582,8 @@
             if (data) {
                 animeData = data.animeData;
                 videoProgress = data.videoProgress;
+                // Update global group cover images from synced data
+                window.AnimeTracker.groupCoverImages = data.groupCoverImages || {};
 
                 renderAnimeList(elements.searchInput?.value || '');
                 updateStats();
@@ -619,19 +632,22 @@
                 markInternalSave();
                 await Storage.set(dataToSave);
 
-                // Then force cloud sync
-                if (user) {
-                    // Force immediate save, passing proper data
-                    console.log('[DeleteProgress] Syncing deletion to cloud...');
-                    try {
-                        await FirebaseSync.saveToCloud({
-                            animeData: animeData,
-                            videoProgress: currentVideoProgress
-                        }, true); // true = immediate
-                    } catch (syncErr) {
-                        console.error('[DeleteProgress] Cloud sync failed:', syncErr);
-                    }
+            // Then force cloud sync (include group covers)
+            if (user) {
+                // Force immediate save, passing proper data
+                console.log('[DeleteProgress] Syncing deletion to cloud...');
+                try {
+                    // Fetch groupCoverImages so we can sync posters
+                    const gcResult = await Storage.get(['groupCoverImages']);
+                    await FirebaseSync.saveToCloud({
+                        animeData: animeData,
+                        videoProgress: currentVideoProgress,
+                        groupCoverImages: gcResult.groupCoverImages || {}
+                    }, true); // true = immediate
+                } catch (syncErr) {
+                    console.error('[DeleteProgress] Cloud sync failed:', syncErr);
                 }
+            }
 
                 renderAnimeList(elements.searchInput?.value || '');
                 console.log(`[DeleteProgress] Soft deleted progress for ${slug} Ep${episodeNumber}`);
@@ -659,7 +675,8 @@
         }
 
         try {
-            const result = await Storage.get(['videoProgress', 'deletedAnime']);
+            // Retrieve video progress, deleted anime logs and group covers
+            const result = await Storage.get(['videoProgress', 'deletedAnime', 'groupCoverImages']);
             const currentVideoProgress = result.videoProgress || {};
 
             let progressDeleted = 0;
@@ -693,7 +710,14 @@
             await Storage.set(dataToSave);
 
             if (user) {
-                await FirebaseSync.saveToCloud({ animeData, videoProgress: currentVideoProgress, deletedAnime }, true);
+                // Fetch group covers to sync posters
+                const gcResult = await Storage.get(['groupCoverImages']);
+                await FirebaseSync.saveToCloud({
+                    animeData,
+                    videoProgress: currentVideoProgress,
+                    deletedAnime,
+                    groupCoverImages: gcResult.groupCoverImages || {}
+                }, true);
             }
 
             renderAnimeList(elements.searchInput?.value || '');
@@ -712,7 +736,8 @@
 
         const dataToSave = {
             animeData: {},
-            videoProgress: {}
+            videoProgress: {},
+            groupCoverImages: {}
         };
 
         const user = FirebaseSync.getUser();
@@ -725,7 +750,7 @@
 
         if (user) {
             // Fix: Use immediate save
-            await FirebaseSync.saveToCloud({ animeData: {}, videoProgress: {} }, true);
+            await FirebaseSync.saveToCloud({ animeData: {}, videoProgress: {}, groupCoverImages: {} }, true);
         }
 
         animeData = {};
@@ -1027,7 +1052,15 @@
 
             // Save to cloud in background (don't wait)
             if (user) {
-                FirebaseSync.saveToCloud({ animeData, videoProgress }).catch(err => {
+                (async () => {
+                    // Include group covers
+                    const gcRes = await Storage.get(['groupCoverImages']);
+                    await FirebaseSync.saveToCloud({
+                        animeData,
+                        videoProgress,
+                        groupCoverImages: gcRes.groupCoverImages || {}
+                    });
+                })().catch(err => {
                     console.error('[AddAnime] Cloud save error:', err);
                 });
             }
@@ -1104,7 +1137,15 @@
 
             // Save to cloud in background
             if (user) {
-                FirebaseSync.saveToCloud({ animeData, videoProgress }).catch(err => {
+                (async () => {
+                    // Include group covers
+                    const gcRes = await Storage.get(['groupCoverImages']);
+                    await FirebaseSync.saveToCloud({
+                        animeData,
+                        videoProgress,
+                        groupCoverImages: gcRes.groupCoverImages || {}
+                    });
+                })().catch(err => {
                     console.error('[EditTitle] Cloud save error:', err);
                 });
             }
@@ -1170,32 +1211,62 @@
     /**
      * Sign in with Google
      */
+    const GOOGLE_BTN_DEFAULT_HTML = `
+        <span class="btn-content">
+            <svg class="google-icon" viewBox="0 0 24 24">
+                <path fill="#fff" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#fff" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#fff" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#fff" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            <span>Sign in with Google</span>
+        </span>`;
+
     async function signInWithGoogle() {
         const { FirebaseSync } = AT;
 
         try {
             elements.googleSignIn.disabled = true;
-            elements.googleSignIn.textContent = 'Signing in...';
+            elements.googleSignIn.innerHTML = `
+                <span class="btn-content">
+                    <svg class="google-icon" style="animation:spin 0.9s linear infinite" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+                        <circle cx="12" cy="12" r="10" stroke-opacity="0.3"/>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
+                    </svg>
+                    <span>Signing in...</span>
+                </span>`;
 
             await FirebaseSync.signInWithGoogle();
         } catch (error) {
-            console.error('[Firebase] Sign in error:', error);
-            alert('Sign in failed: ' + error.message);
+            const msg = (error.message || '').toLowerCase();
+            const isCancelled = msg.includes('did not approve') || msg.includes('cancelled') ||
+                msg.includes('closed') || msg.includes('popup_closed') ||
+                error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request';
+            if (!isCancelled) {
+                console.error('[Firebase] Sign in error:', error);
+                showAuthToast('Sign in failed. Please try again.', 'error');
+            }
         } finally {
             elements.googleSignIn.disabled = false;
-            elements.googleSignIn.innerHTML = `
-            <span class="btn-content">
-            <svg class="google-icon" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                </svg>
-                    <span>Sign in with Google</span>
-                <span class="sparkle">⚡</span>
-            </span>
-        `;
+            elements.googleSignIn.innerHTML = GOOGLE_BTN_DEFAULT_HTML;
         }
+    }
+
+    function showAuthToast(message, type = 'error') {
+        const existing = document.getElementById('authToast');
+        if (existing) existing.remove();
+        const toast = document.createElement('div');
+        toast.id = 'authToast';
+        toast.textContent = message;
+        toast.style.cssText = `
+            position:absolute; bottom:20px; left:50%; transform:translateX(-50%);
+            background:${type === 'error' ? 'rgba(240,69,69,0.9)' : 'rgba(54,212,116,0.9)'};
+            color:#fff; padding:8px 18px; border-radius:50px; font-size:12px;
+            font-weight:600; z-index:10; white-space:nowrap;
+            box-shadow:0 4px 16px rgba(0,0,0,0.4);
+            animation:fadeIn 0.2s ease;`;
+        document.getElementById('authSection')?.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
     }
 
     /**
@@ -1233,14 +1304,19 @@
         const collapsible = document.getElementById('advancedCollapsible');
         const collapsibleHeader = collapsible?.querySelector('.auth-collapsible-header');
         if (collapsibleHeader) {
+            const authContent = document.querySelector('.auth-content');
+            const toggleTokenMode = (expanded) => {
+                collapsible.classList.toggle('expanded', expanded);
+                authContent?.classList.toggle('token-mode', expanded);
+            };
             collapsibleHeader.addEventListener('click', () => {
-                collapsible.classList.toggle('expanded');
-                const isExpanded = collapsible.classList.contains('expanded');
+                const isExpanded = !collapsible.classList.contains('expanded');
+                toggleTokenMode(isExpanded);
                 try { localStorage.setItem('authAdvancedExpanded', isExpanded); } catch (_) {}
             });
             try {
                 const wasExpanded = localStorage.getItem('authAdvancedExpanded') === 'true';
-                if (wasExpanded) collapsible.classList.add('expanded');
+                if (wasExpanded) toggleTokenMode(true);
             } catch (_) {}
         }
 
@@ -1565,19 +1641,38 @@
             let isExternalUpdate = false;
 
             if (changes.animeData) {
-                const oldCount = UIHelpers.countEpisodes(changes.animeData.oldValue || {});
-                const newCount = UIHelpers.countEpisodes(changes.animeData.newValue || {});
+                // Always update local animeData and re-render when animeData changes.
                 animeData = changes.animeData.newValue || {};
                 needsUpdate = true;
-                if (newCount > oldCount) {
-                    if (!isOwnWrite) isExternalUpdate = true;
-                    else needsCloudSync = true;
+                // If this write didn't originate from within the popup (e.g. from background SW)
+                // mark it as an external update so the UI can flash the sync indicator. Otherwise,
+                // mark for cloud sync so the change propagates to other devices.
+                if (!isOwnWrite) {
+                    isExternalUpdate = true;
+                } else {
+                    needsCloudSync = true;
                 }
             }
             if (changes.videoProgress) {
                 videoProgress = changes.videoProgress.newValue || {};
                 needsUpdate = true;
                 if (!isOwnWrite) isExternalUpdate = true;
+            }
+
+            // Detect changes in group cover images. When posters are updated
+            // (e.g. another device added a new group cover), update the global
+            // cache and re-render. Treat this similar to animeData updates:
+            // external updates trigger a sync indicator, and local updates
+            // (not from the popup) should be synced to the cloud.
+            if (changes.groupCoverImages) {
+                window.AnimeTracker.groupCoverImages = changes.groupCoverImages.newValue || {};
+                needsUpdate = true;
+                if (!isOwnWrite) {
+                    isExternalUpdate = true;
+                } else {
+                    // If the popup itself triggered a write (unlikely), mark for cloud sync.
+                    needsCloudSync = true;
+                }
             }
 
             if (needsUpdate) {
@@ -1600,10 +1695,12 @@
                     if (FirebaseSync.getUser() && needsCloudSync) {
                         markInternalSave();
                         try {
-                            const result = await Storage.get(['animeData', 'videoProgress']);
+                            // Include groupCoverImages in sync data to persist posters across devices
+                            const result = await Storage.get(['animeData', 'videoProgress', 'groupCoverImages']);
                             await FirebaseSync.saveToCloud({
                                 animeData: result.animeData || {},
-                                videoProgress: result.videoProgress || {}
+                                videoProgress: result.videoProgress || {},
+                                groupCoverImages: result.groupCoverImages || {}
                             });
                         } catch (error) {
                             console.error('[Storage] Cloud save error:', error);
@@ -1842,7 +1939,8 @@
 
         console.log('[Cleanup] Starting manual cleanup...');
 
-        const result = await Storage.get(['animeData', 'videoProgress', 'userId']);
+        // Also retrieve groupCoverImages so we preserve them during cleanup
+        const result = await Storage.get(['animeData', 'videoProgress', 'userId', 'groupCoverImages']);
         const originalCount = UIHelpers.countEpisodes(result.animeData || {});
 
         const cleanedData = ProgressManager.removeDuplicateEpisodes(result.animeData || {});
@@ -1854,11 +1952,13 @@
 
         await Storage.set({
             animeData: cleanedData,
-            videoProgress: cleanedProgress
+            videoProgress: cleanedProgress,
+            groupCoverImages: result.groupCoverImages || {}
         });
 
         if (FirebaseSync.getUser()) {
-            FirebaseSync.pendingSave = { animeData: cleanedData, videoProgress: cleanedProgress };
+            // Also include group covers in the pending save
+            FirebaseSync.pendingSave = { animeData: cleanedData, videoProgress: cleanedProgress, groupCoverImages: result.groupCoverImages || {} };
             await FirebaseSync.performCloudSave();
         }
 

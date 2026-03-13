@@ -141,6 +141,13 @@ const AnimeParser = {
 
         Logger.info(`${animeTitle} Ep${episodeNumber}`, { id: uniqueId });
 
+        // ── Extract cover image from the page ──
+        // The an1me.to site places the featured image inside a .anime-featured div. If no image
+        // exists (e.g. on non-anime pages), fall back to null. This property will be saved
+        // alongside other anime information when first stored. See README for details.
+        const coverImageElement = document.querySelector('.anime-featured img');
+        const coverImage = coverImageElement ? coverImageElement.src || null : null;
+
         return {
             animeSlug,
             animeTitle: this.escapeHtml(animeTitle),
@@ -149,7 +156,8 @@ const AnimeParser = {
             uniqueId,
             url: window.location.href,
             isDoubleEpisode,
-            secondEpisodeNumber
+            secondEpisodeNumber,
+            coverImage
         };
     },
 

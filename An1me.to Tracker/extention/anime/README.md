@@ -1,237 +1,235 @@
-# Anime Tracker 🎬
+# 🎌 An1me.to Tracker
 
-Chrome Extension for tracking anime watching progress on an1me.to
+> A Chrome extension that automatically tracks your anime watching progress on [an1me.to](https://an1me.to), with real-time cloud sync across all your devices.
 
-## Features
+**Version:** 3.0.8 · **Author:** ThomasThanos · **Manifest:** V3
 
-- **Dynamic Episode Completion**: Marks episode as complete when 85% watched (based on actual video duration) OR less than 120 seconds remaining (handles anime outro skip)
-- **Next Episode Detection**: Auto-tracks when you navigate to the next episode
-- **Video Progress Saving**: Auto-save playback progress with smart throttling
-- **Resume Playback**: Beautiful animated prompt to resume from where you left off
-- **Cloud Sync**: Sync data across devices with Google Account
-- **Filler Detection**: Shows unwatched filler episodes for Bleach, Naruto, One Piece, etc.
-- **Modern Dark UI**: Glassmorphism design with Klee One & Bebas Neue fonts
-- **Episode Badge**: Shows current episode number next to anime title
-- **3D Progress Bars**: Beautiful gradient progress bars with glow effects
-- **Custom Logger**: Styled console logs for debugging
+---
 
-## Installation
+## ✨ Features
 
-### 1. Generate Icons
+- **Auto-tracking** — Detects what you're watching and saves your episode progress automatically
+- **Cloud sync** — Real-time sync across devices via Firebase Firestore (SSE stream)
+- **Filler detection** — Fetches canon/filler data from AnimeFillerList.com and highlights filler episodes
+- **Season grouping** — Smart grouping of multi-season anime (Naruto, AoT, Demon Slayer, etc.) into collapsible cards
+- **Movie grouping** — Standalone movies grouped by franchise with poster art
+- **Resume prompts** — Asks if you want to resume from where you left off
+- **Multi-part anime** — Handles split cours (e.g. Bleach TYBW) with correct episode offsets
+- **Google sign-in** — One-click auth with your Google account
+- **Manual token auth** — Alternative login via Firebase token for advanced users
+- **Donate button** — PayPal & Revolut links built in
 
-Open terminal in the project folder and run:
+---
 
-```bash
-node generate-icons.js
-```
-
-Or open `generate-icons.html` in a browser and download icons manually.
-
-### 2. Load in Chrome
-
-1. Go to `chrome://extensions/`
-2. Enable **Developer mode** (top right)
-3. Click **Load unpacked**
-4. Select the `D:\Projects\anime` folder
-
-## Usage
-
-1. Go to [an1me.to](https://an1me.to/)
-2. Start watching an episode
-3. Your progress is saved automatically
-4. If you return to an episode you left midway, a prompt will appear to resume
-5. Episode is marked complete when:
-   - You watch **85% of the actual video duration** (dynamic threshold), OR
-   - Less than 120 seconds (2 min) remaining - handles anime outro/ending skip, OR
-   - You navigate to the next episode after reaching 85%
-   
-   **Examples:**
-   - 23:17 episode → Complete @ 19:48 (85%) or 21:17 (skip outro)
-   - 30:00 episode → Complete @ 25:30 (85%) or 28:00 (skip outro)
-   - 15:00 episode → Complete @ 12:45 (85%) or 13:00 (skip outro)
-6. Click the extension icon to see your stats and episode progress
-
-## Custom Logger (Debugging)
-
-The extension includes a custom Logger for beautiful console output:
-
-```javascript
-// In browser console:
-Logger.info('Message', data);
-Logger.success('Completed!');
-Logger.warn('Warning message');
-Logger.error('Error message', error);
-Logger.debug('Debug info', object);
-
-// Domain-specific logging
-Logger.episode('tracked', 'Bleach', 15);
-Logger.firebase('save', '/users/123', true);
-Logger.sync('success', 'Synced 5 anime');
-Logger.storage('SET', 'animeData', data);
-
-// Utilities
-Logger.table(data);
-Logger.time('operation');
-Logger.timeEnd('operation');
-Logger.setLevel('WARN'); // DEBUG, INFO, WARN, ERROR
-```
-
-Output format:
-```
-[17:12:20.512] [Anime Tracker INFO] Unique ID: bleach__episode-126
-```
-
-## File Structure
+## 📁 Project Structure
 
 ```
 anime/
-├── manifest.json           # Extension configuration
-├── background.js           # Service worker
-├── content.js              # Video tracking logic
-├── popup.html              # Popup UI structure
-├── popup.css               # Popup styling
-├── popup.js                # Popup logic
-├── logger.js               # Custom console logger
-├── firebase-config.js      # Firebase configuration
-├── firebase-lib.js         # Firebase REST API library
-├── add-episodes-script.js  # Utility script for manual episode adding
-├── greek-utils.js          # Language utilities
-└── icons/
-    ├── icon16.png
-    ├── icon32.png
-    ├── icon48.png
-    └── icon128.png
+├── manifest.json              # Chrome Extension Manifest V3
+├── background.js              # Service Worker (sync engine + real-time listener)
+├── popup.html                 # Extension popup HTML shell
+├── popup.css                  # All popup styles (glassmorphic dark UI)
+├── firebase-config.js         # Firebase project config
+├── firebase-lib.js            # Firebase SDK (bundled)
+├── logger.js                  # Shared logger (background context)
+└── src/
+    ├── content/               # Scripts injected into an1me.to watch pages
+    │   ├── config.js          # Content-side config (thresholds, slug maps)
+    │   ├── logger.js          # Styled console logger
+    │   ├── storage.js         # chrome.storage wrapper
+    │   ├── anime-parser.js    # URL/DOM parsing for anime info
+    │   ├── notifications.js   # Resume prompt & completion UI
+    │   ├── progress-tracker.js# Episode save logic & queue
+    │   ├── video-monitor.js   # Video element detection & events
+    │   ├── main.js            # Content script entry point
+    │   ├── merge-utils.js     # Data merge helpers (content-side)
+    │   └── cloud-sync.js      # Cloud sync trigger (content-side)
+    └── popup/                 # Scripts loaded by popup.html
+        ├── config.js          # Popup config, slug maps, season grouping logic
+        ├── storage.js         # chrome.storage wrapper (popup-side)
+        ├── ui-helpers.js      # Icons, formatters, HTML escape, logger
+        ├── filler-service.js  # AnimeFillerList.com API + cache
+        ├── progress-manager.js# Progress cleanup, deduplication, merging
+        ├── firebase-sync.js   # Firebase auth + cloud sync
+        ├── anime-card.js      # Anime card HTML renderer
+        ├── filler-fetch-ui.js # Filler fetch button UI logic
+        ├── filler-console-logger.js # Debug filler data to console
+        ├── merge-utils.js     # Data merge helpers (popup-side)
+        └── main.js            # Popup entry point & event handlers
 ```
 
-## Data Storage
+---
 
-Data is stored in `chrome.storage.local` with the following structure:
+## 🏗️ Architecture
 
-```javascript
+### Content Scripts (`src/content/`)
+
+Run on every `https://an1me.to/watch/*` page. Their job is to detect the video player, monitor playback, and save progress to `chrome.storage.local`.
+
+```
+Page loads
+    └─► main.js initializes
+            └─► video-monitor.js finds the <video> element (including iframes)
+                    └─► progress-tracker.js listens for timeupdate/ended events
+                            ├─► Saves in-progress state every 2s to videoProgress{}
+                            └─► On completion (≥85%) → saves episode to animeData{}
+                                    └─► cloud-sync.js notifies background.js to push
+```
+
+**Key config values (content):**
+| Constant | Value | Purpose |
+|---|---|---|
+| `COMPLETED_PERCENTAGE` | 85% | When an episode counts as "watched" |
+| `REMAINING_TIME_THRESHOLD` | 120s | Mark complete if ≤2 min remain |
+| `PROGRESS_SAVE_INTERVAL` | 2000ms | How often to save in-progress state |
+| `VIDEO_CHECK_INTERVAL` | 1500ms | How often to scan for video element |
+
+---
+
+### Background Service Worker (`background.js`)
+
+Runs persistently. Handles all Firebase communication and bidirectional sync.
+
+```
+chrome.storage.onChanged
+    ├─► videoProgress changed → syncProgressOnly() [debounced 3s]
+    └─► animeData changed     → syncToFirebase()   [debounced 2s]
+
+Real-time SSE stream (Firestore Listen API)
+    └─► applyCloudUpdate() merges remote changes locally
+
+chrome.alarms ("keepAlive" every 20s)
+    └─► Checks stream health, reconnects if dead (90s timeout)
+```
+
+**Sync strategy:**
+- **Local wins** for episode data (higher episode count takes precedence)
+- **Higher currentTime wins** for video progress (most-watched device wins)
+- **Timestamp wins** for deletions (most recent delete is respected)
+- Deletions are stored for 60 days before being purged
+- A `syncPausedUntil` guard prevents re-uploading data that just came from the cloud
+
+---
+
+### Popup (`src/popup/`)
+
+The extension popup (400×590px). Rendered from `popup.html`, styled by `popup.css`.
+
+**UI Components:**
+- **Auth screen** — Google sign-in or manual token input, glassmorphic card with neon city background
+- **Stats bar** — Total anime, episodes, watch time
+- **Category tabs** — All / Watching / Completed / Movies
+- **Search + sort** — Instant search with debounce, multiple sort modes
+- **Anime cards** — Expandable cards with:
+  - Cover poster with 3D border effect
+  - Status badge (Watching / Completed)
+  - Canon progress bar + filler progress bar
+  - Episode tags (watched, unwatched fillers, in-progress)
+  - Edit title / Delete actions
+- **Season groups** — Multi-season anime collapsed under one card
+- **Movie groups** — Franchise movies grouped together
+
+---
+
+## 🔌 Permissions
+
+| Permission | Why |
+|---|---|
+| `storage` | Save anime data and video progress locally |
+| `scripting` | Inject content scripts into watch pages |
+| `identity` | Google OAuth sign-in |
+| `alarms` | Keep the service worker alive every 20s |
+| `https://an1me.to/*` | Access watch pages |
+| `https://firestore.googleapis.com/*` | Cloud sync |
+| `https://www.animefillerlist.com/*` | Fetch filler episode data |
+
+---
+
+## ☁️ Firebase / Cloud
+
+- **Project:** `anime-tracker-64d86`
+- **Auth:** Firebase Identity Toolkit (Google sign-in)
+- **Database:** Firestore (REST API + Listen SSE stream)
+- **Data structure per user document:**
+
+```json
 {
-  animeData: {
-    "anime-slug": {
-      title: "Anime Title",
-      slug: "anime-slug",
-      episodes: [                  // All completed episodes (optimized storage)
-        {
-          number: 1,             // Episode number (slug/uniqueId computed on-the-fly)
-          watchedAt: "2024-01-01T12:00:00Z",  // ISO timestamp without milliseconds
-          duration: 1440         // Duration in seconds (~24 min)
-        }
-      ],
-      totalWatchTime: 1440,      // Sum of all episode durations
-      lastWatched: "2024-01-01T12:00:00Z"
-    }
-  },
-  videoProgress: {
-    "anime-slug__episode-6": {   // Episodes in progress (<80% completion)
-      currentTime: 900,          // 15 minutes in seconds
-      duration: 1440,            // Total duration
-      savedAt: "2024-01-01T12:00:00Z",
-      percentage: 62             // Completion percentage
-    }
-  }
+  "animeData": { "<slug>": { "title": "", "episodes": [], "coverImage": "", "lastWatched": "" } },
+  "videoProgress": { "<slug>__episode-<n>": { "currentTime": 0, "percentage": 0, "duration": 0 } },
+  "deletedAnime": { "<slug>": { "deletedAt": "<ISO date>" } },
+  "groupCoverImages": { "<baseSlug>": "<dataUrl>" },
+  "lastUpdated": "<ISO date>",
+  "email": ""
 }
 ```
 
-**Note**: Progress is saved only for incomplete episodes (under 80% and more than 4 min remaining). Only the 20 most recent in-progress episodes are kept for 7 days.
+---
 
-## Troubleshooting
+## 🧠 Smart Slug System
 
-### Video not being tracked
-- Make sure you've watched 80% of the video OR have less than 4 minutes remaining
-- Refresh the page and try again
-- Check if the video is in a cross-origin iframe
+The extension handles anime that appear under multiple slugs on an1me.to:
 
-### Data not syncing
-- Make sure you're signed in with Google account
-- Check sync status in the popup footer
+- **Slug normalization** — Multi-part anime (e.g. Bleach TYBW parts 1/2/3) are merged into a single base slug for unified tracking
+- **Episode offsets** — Part 2 of a split cour gets its episode numbers offset to continue from Part 1
+- **Filler slug mapping** — Maps an1me.to slugs to AnimeFillerList.com slugs (e.g. `naruto-shippuuden` → `naruto-shippuden`)
+- **Season grouping** — Extracts base slug and season number from any slug variation, groups automatically
 
-## Changelog
+**Hardcoded franchise support:** Naruto, Bleach, Attack on Titan, Demon Slayer, Jujutsu Kaisen, One Piece, One Punch Man, Initial D, Dragon Ball, and more.
 
-### v2.9.0 (Latest) - Dynamic Progress Tracking
-- **Dynamic Threshold**: Episode completion now uses 85% of actual video duration (not static 80%)
-- **Accurate Tracking**: 23:17 episode → complete @ 19:48 (85%), 30:00 episode → complete @ 25:30 (85%)
-- **Outro Skip Handling**: Remaining time threshold set to 120 seconds (2 min) to handle anime outro/ending skip
-- **Better UX**: Improved logging shows required percentage and actual duration in MM:SS format
-- **Firebase Sync**: Verified working correctly with retry logic and proper data merging
-- **Documentation**: Added comprehensive docs (DYNAMIC_PROGRESS_UPDATE.md, QUICK_REFERENCE.md, TESTING_SCENARIOS.md, FINAL_UPDATES.md)
-- **Backwards Compatible**: No data migration needed, old episodes remain tracked
+---
 
-### v2.4.0
-- **Smart Completion**: Episode marked complete at 80% watched OR <4 min remaining OR next episode navigation
-- **UI Overhaul**: Glassmorphism design with blur effects and smooth animations
-- **Google Fonts**: Klee One for body text, Bebas Neue for title
-- **Episode Badge**: Shows current episode number (Ep X) next to anime title in popup
-- **3D Progress Bars**: Gradient backgrounds with inset shadows and glow effects
-- **Resume Prompt Redesign**: Compact design with SVG icons, scale 1.5x, fade animations
-- **Episode Complete Notification**: Larger notification with icon wrapper and glow effect
-- **Filler Improvements**: Show 6 unwatched fillers + expandable "show more" button
-- **No Text Selection**: Disabled text selection across popup and notifications
-- **Mini Scrollbar**: Custom webkit scrollbar for episode lists
-- **Local Dev OAuth**: Separate OAuth client ID for local development
-- **Settings Menu**: Changed to vertical dots icon
+## 🎨 UI / Design
 
-### v2.3.0
-- **Bug Fix**: Fixed storage inconsistency (sync vs local) - all now use local storage
-- **Bug Fix**: Fixed memory leak in `lastSavedProgress` (using Map instead of Object)
-- **Bug Fix**: Fixed `cleanOrphanedProgress` never being called
-- **Bug Fix**: Fixed race condition in `isInternalUpdate` flag
-- **Bug Fix**: Fixed filename `greek-utils.js'` typo (extra quote)
-- **New Feature**: Custom styled Logger for beautiful console debugging
-- **Improvement**: Debounced search input (150ms)
-- **Improvement**: Better Firebase token refresh error handling
-- **Improvement**: Storage migration from sync to local in background.js
-- **Improvement**: Enhanced add-episodes-script with listAnime() and getStats()
+- **Theme:** Deep midnight dark (`#070b13` base)
+- **Accent:** Electric blue → cyan gradient (`hsl(215,100%,55%)` → `hsl(190,100%,55%)`)
+- **Typography:** Inter (body) + Bebas Neue (headings)
+- **Cards:** Glassmorphic with 3D border system (light top edge, dark bottom edge, inset highlight)
+- **Buttons:** Filled pill with gradient + depth shadow
+- **Popup size:** 420 × 590px
 
-### v2.2.1
-- **Storage Migration**: Moved from sync to local storage (fixes quota exceeded error)
-- **No More Quota Errors**: Local storage has 10MB limit instead of 8KB per item
-- **Auto Migration**: Automatic data transfer from sync to local storage
-- **Cloud Sync**: Firebase sync remains for cross-browser sync
+---
 
-### v2.1.6
-- **Filler Detection**: Recognition of filler episodes for Bleach, Naruto, One Piece, etc.
-- **Filler Badge**: Shows how many fillers you've watched (e.g. "🎭 2/164 Filler")
-- **Filler Episodes**: Filler episodes shown in purple with strikethrough
-- **Collapsible Episodes**: Episode list is now collapsible
-- **UI Cleanup**: Better organization of meta info
+## 🛠️ Development
 
-### v2.1.5
-- **UI Improvement**: Collapsible "In Progress" section with click to expand/collapse
-- **UI Cleanup**: Removed duplicate badges - shown only in header
-- **Bug Fix**: Episodes with >= 85% progress no longer show as "In Progress"
-- **Bug Fix**: Automatic cleanup for completed progress entries
+No build step required. Pure vanilla JavaScript + Chrome Extension APIs.
 
-### v2.1.4
-- **Bug Fix**: Tracked episodes no longer appear as "In Progress"
-- **Improvement**: Auto cleanup of progress entries for completed episodes
-- **Improvement**: Reduced storage space by removing unnecessary progress data
+**To load in Chrome:**
+1. Go to `chrome://extensions`
+2. Enable **Developer mode**
+3. Click **Load unpacked**
+4. Select the `anime/` folder
 
-### v2.1.3
-- **Bug Fix**: Preserve local videoProgress during cloud sync
-- **Improvement**: Error handling for "Extension context invalidated" errors
-- **Improvement**: Graceful handling when extension reloads while video is playing
+**To reload after changes:**
+- Click the 🔄 refresh icon on `chrome://extensions`
+- Or press **R** in the extensions page
 
-### v2.1.2
-- **New Feature**: Show anime you're watching but haven't completed an episode ("Watching" badge)
-- **Bug Fix**: Video progress preserved for anime without completed episodes
-- **Bug Fix**: Improved cleanOrphanedProgress logic
+**Debugging:**
+- Content script logs: DevTools console on any `an1me.to/watch/` page
+- Background logs: Click **"Service Worker"** link on the extensions page → DevTools
+- Popup logs: Right-click the extension icon → **Inspect popup**
 
-### v2.1.1
-- **Bug Fix**: Fixed infinite sync loop in storage listener
-- **Bug Fix**: Fixed memory leak in content.js
-- **Bug Fix**: Proper cleanup of event listeners on video elements
-- **Improvement**: Better Firebase token refresh error handling
-- **Improvement**: saveToCloud returns Promise for better async handling
+---
 
-### v2.1.0
-- Cloud sync with Firebase
-- Google Sign-In
-- Settings dropdown
-- Donate options
+## 📦 Data Storage
 
-## License
+All data lives in `chrome.storage.local` (no quota limits unlike `sync`):
 
-MIT
+| Key | Type | Description |
+|---|---|---|
+| `animeData` | Object | All tracked anime with episode history |
+| `videoProgress` | Object | In-progress video positions |
+| `deletedAnime` | Object | Tombstone records for cross-device deletion |
+| `groupCoverImages` | Object | Season group poster images (base64) |
+| `firebase_user` | Object | Logged-in user info |
+| `firebase_tokens` | Object | Auth tokens (auto-refreshed) |
+| `episodeTypesCache` | Object | Cached filler data from AnimeFillerList (24h TTL) |
+
+---
+
+## 📝 Notes
+
+- The extension uses **Manifest V3** with a service worker (not a persistent background page)
+- The SSE keep-alive alarm fires every ~20s to prevent the service worker from going to sleep
+- Token auto-refresh happens when less than 2 minutes remain before expiry
+- Filler data is fetched lazily (on demand) and cached for 24 hours
+- The `syncPausedUntil` mechanism prevents sync loops when applying remote changes locally
