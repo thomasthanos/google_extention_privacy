@@ -81,6 +81,43 @@
         lastInternalSaveAt = Date.now();
     }
 
+    function normalizeCategory(value) {
+        const allowed = new Set(['all', 'series', 'movies']);
+        return allowed.has(value) ? value : 'all';
+    }
+
+    function getCalendarDayDiff(isoString) {
+        if (!isoString) return 0;
+        const target = new Date(isoString);
+        if (isNaN(target.getTime())) return 0;
+
+        const now = new Date();
+        const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const targetMidnight = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+        return Math.round((nowMidnight - targetMidnight) / (1000 * 60 * 60 * 24));
+    }
+
+    function isAnimeCompleted(slug, anime) {
+        const { FillerService, SeasonGrouping } = AT;
+        if (!anime) return false;
+
+        const watchedCount = anime.episodes?.length || 0;
+        if (watchedCount === 0) return false;
+
+        // Movies are complete as soon as they are tracked once.
+        if (SeasonGrouping.isMovie(slug)) return true;
+
+        const progressData = FillerService.calculateProgress(watchedCount, slug, anime);
+        return progressData.progress >= 100;
+    }
+
+    function isAgedCompleted(slug, anime) {
+        const { CONFIG } = AT;
+        if (!isAnimeCompleted(slug, anime)) return false;
+        const daysSinceLastWatch = getCalendarDayDiff(anime?.lastWatched);
+        return daysSinceLastWatch >= CONFIG.COMPLETED_LIST_MIN_DAYS;
+    }
+
     /**
      * Show auth screen
      */
@@ -122,7 +159,7 @@
      * Render anime list
      */
     function renderAnimeList(filter = '') {
-        const { AnimeCardRenderer, ProgressManager } = AT;
+        const { AnimeCardRenderer, ProgressManager, SeasonGrouping } = AT;
 
         // Save expanded state
         const expandedCards = new Set();
@@ -131,10 +168,8 @@
             if (slug) expandedCards.add(slug);
         });
 
-        const { SeasonGrouping } = AT;
-
         // Filter by category
-        const categoryFilter = (slug) => {
+        const categoryFilter = (slug, anime) => {
             if (currentCategory === 'all') return true;
             const isMovie = SeasonGrouping.isMovie(slug);
             if (currentCategory === 'movies') return isMovie;
@@ -145,7 +180,7 @@
         const entries = Object.entries(animeData)
             .filter(([slug, anime]) => {
                 const matchesSearch = !filter || anime.title.toLowerCase().includes(filter.toLowerCase());
-                const matchesCategory = categoryFilter(slug);
+                const matchesCategory = categoryFilter(slug, anime);
                 return matchesSearch && matchesCategory;
             });
 
@@ -157,7 +192,8 @@
         const inProgressOnly = ProgressManager.getInProgressOnlyAnime(animeData, visibleProgress)
             .filter(anime => {
                 const matchesSearch = !filter || anime.title.toLowerCase().includes(filter.toLowerCase());
-                const matchesCategory = categoryFilter(anime.slug || '');
+                const trackedAnime = anime.slug ? animeData[anime.slug] : null;
+                const matchesCategory = categoryFilter(anime.slug || '', trackedAnime);
                 return matchesSearch && matchesCategory;
             })
             .sort((a, b) => new Date(b.lastProgress || 0) - new Date(a.lastProgress || 0));
@@ -194,52 +230,68 @@
             }
         });
 
-        // Group anime by seasons
-        const groups = SeasonGrouping.groupByBase(sortedEntries);
+        const orderMap = new Map(sortedEntries.map(([slug], index) => [slug, index]));
 
-        // Build HTML: season groups for multi-season, regular cards for single
-        let trackedHtml = '';
-        const processedSlugs = new Set();
+        const renderGroupedEntries = (entriesToRender) => {
+            if (!entriesToRender.length) return '';
 
-        // First pass: handle groups in order based on first entry's sort position
-        const groupsArray = Array.from(groups.entries());
+            const groups = SeasonGrouping.groupByBase(entriesToRender);
+            const groupsArray = Array.from(groups.entries());
+            let html = '';
 
-        // Sort groups by their first season's position in sortedEntries
-        groupsArray.sort((a, b) => {
-            const aFirstSlug = a[1][0].slug;
-            const bFirstSlug = b[1][0].slug;
-            const aIndex = sortedEntries.findIndex(([s]) => s === aFirstSlug);
-            const bIndex = sortedEntries.findIndex(([s]) => s === bFirstSlug);
-            return aIndex - bIndex;
-        });
+            groupsArray.sort((a, b) => {
+                const aFirstSlug = a[1][0].slug;
+                const bFirstSlug = b[1][0].slug;
+                const aIndex = orderMap.get(aFirstSlug) ?? Number.MAX_SAFE_INTEGER;
+                const bIndex = orderMap.get(bFirstSlug) ?? Number.MAX_SAFE_INTEGER;
+                return aIndex - bIndex;
+            });
 
-        for (const [baseSlug, entries] of groupsArray) {
-            if (SeasonGrouping.isMovieGroup(entries)) {
-                // Render as movie group
-                if (entries.length > 1) {
-                    trackedHtml += AnimeCardRenderer.createMovieGroup(baseSlug, entries, visibleProgress);
-                    entries.forEach(m => processedSlugs.add(m.slug));
+            for (const [baseSlug, groupedEntries] of groupsArray) {
+                if (SeasonGrouping.isMovieGroup(groupedEntries)) {
+                    if (groupedEntries.length > 1) {
+                        html += AnimeCardRenderer.createMovieGroup(baseSlug, groupedEntries, visibleProgress);
+                    } else {
+                        const { slug, anime } = groupedEntries[0];
+                        html += AnimeCardRenderer.createSingleMovieCard(slug, anime, visibleProgress);
+                    }
+                } else if (SeasonGrouping.hasMultipleSeasons(groupedEntries)) {
+                    html += AnimeCardRenderer.createSeasonGroup(baseSlug, groupedEntries, visibleProgress);
                 } else {
-                    // Single movie - render as single movie card
-                    const { slug, anime } = entries[0];
-                    trackedHtml += AnimeCardRenderer.createSingleMovieCard(slug, anime, visibleProgress);
-                    processedSlugs.add(slug);
+                    const { slug, anime } = groupedEntries[0];
+                    html += AnimeCardRenderer.createAnimeCard(slug, anime, visibleProgress);
                 }
-            } else if (SeasonGrouping.hasMultipleSeasons(entries)) {
-                // Render as season group
-                trackedHtml += AnimeCardRenderer.createSeasonGroup(baseSlug, entries, visibleProgress);
-                entries.forEach(s => processedSlugs.add(s.slug));
-            } else {
-                // Render as regular card
-                const { slug, anime } = entries[0];
-                trackedHtml += AnimeCardRenderer.createAnimeCard(slug, anime, visibleProgress);
-                processedSlugs.add(slug);
             }
-        }
 
+            return html;
+        };
+
+        const normalEntries = sortedEntries.filter(([slug, anime]) => !isAgedCompleted(slug, anime));
+        const completedEntries = sortedEntries.filter(([slug, anime]) => isAgedCompleted(slug, anime));
+
+        const trackedHtml = renderGroupedEntries(normalEntries);
+        const completedCardsHtml = renderGroupedEntries(completedEntries);
         const inProgressHtml = inProgressOnly.map(anime => AnimeCardRenderer.createInProgressOnlyCard(anime)).join('');
+        const completedGroupHtml = completedEntries.length > 0
+            ? `
+                <div class="completed-list-section">
+                    <div class="completed-list-label" id="completedListToggle">
+                        <div class="completed-list-label-left">
+                            <span class="completed-list-label-title">COMPLETED LIST</span>
+                            <span class="completed-list-label-sub">${AT.CONFIG.COMPLETED_LIST_MIN_DAYS}+ days since last watch</span>
+                        </div>
+                        <svg class="completed-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="completed-list-cards" style="display:none;">
+                        ${completedCardsHtml}
+                    </div>
+                </div>
+            `
+            : '';
 
-        elements.animeList.innerHTML = inProgressHtml + trackedHtml;
+        elements.animeList.innerHTML = inProgressHtml + trackedHtml + completedGroupHtml;
 
         // Restore expanded state
         elements.animeList.querySelectorAll('.anime-card').forEach(card => {
@@ -409,6 +461,22 @@
             }
         });
 
+        // Completed list toggle
+        const completedToggle = elements.animeList.querySelector('#completedListToggle');
+        if (completedToggle) {
+            completedToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const cards = completedToggle.nextElementSibling;
+                const chevron = completedToggle.querySelector('.completed-chevron');
+                const isHidden = cards.style.display === 'none';
+                cards.style.display = isHidden ? 'flex' : 'none';
+                chevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
+            });
+            // Set initial chevron state (collapsed)
+            const chevron = completedToggle.querySelector('.completed-chevron');
+            chevron.style.transform = 'rotate(-90deg)';
+        }
+
         // Movie item edit buttons
         elements.animeList.querySelectorAll('.movie-edit-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -431,7 +499,7 @@
      * Update stats
      */
     async function updateStats() {
-        const { FillerService, UIHelpers, SeasonGrouping, Storage } = AT;
+        const { UIHelpers, SeasonGrouping, Storage } = AT;
 
         const animeEntries = Object.entries(animeData);
 
@@ -440,12 +508,16 @@
         const totalAnimeCount = groups.size;
         elements.totalAnime.textContent = totalAnimeCount;
 
-        let totalCanonEpisodes = 0;
+        let totalWatchedEpisodes = 0;
         let totalWatchTime = 0;
 
         for (const [slug, anime] of animeEntries) {
-            const canonEps = FillerService.getCanonEpisodeCount(slug, anime.episodes);
-            totalCanonEpisodes += canonEps;
+            const uniqueEpisodeNumbers = new Set(
+                (anime.episodes || [])
+                    .map(ep => Number(ep?.number))
+                    .filter(n => Number.isFinite(n) && n > 0)
+            );
+            totalWatchedEpisodes += uniqueEpisodeNumbers.size;
             // Use stored totalWatchTime (pre-calculated, stable) instead of getCanonWatchTime
             // which fluctuates depending on whether filler data has loaded yet
             totalWatchTime += anime.totalWatchTime || 0;
@@ -453,7 +525,7 @@
 
         const totalTimeStr = UIHelpers.formatDurationShort(totalWatchTime);
 
-        elements.totalEpisodes.textContent = totalCanonEpisodes;
+        elements.totalEpisodes.textContent = totalWatchedEpisodes;
         elements.totalTime.textContent = totalTimeStr;
 
         // Cache stats to storage to prevent UI jump on next load
@@ -461,7 +533,7 @@
             await Storage.set({
                 cachedStats: {
                     totalAnime: totalAnimeCount,
-                    totalEpisodes: totalCanonEpisodes,
+                    totalEpisodes: totalWatchedEpisodes,
                     totalTime: totalTimeStr
                 }
             });
@@ -496,31 +568,45 @@
             // renderer can use the correct poster for season groups. This call
             // defaults to an empty object when the key is missing, preventing
             // undefined errors.
-            const result = await Storage.get(['animeData', 'videoProgress', 'groupCoverImages']);
-            animeData = result.animeData || {};
-            videoProgress = result.videoProgress || {};
+            const result = await Storage.get(['animeData', 'videoProgress', 'groupCoverImages', 'deletedAnime']);
+            const normalized = ProgressManager.normalizeCanonicalSlugs(
+                result.animeData || {},
+                result.videoProgress || {},
+                result.deletedAnime || {}
+            );
+            animeData = normalized.animeData || {};
+            videoProgress = normalized.videoProgress || {};
             // Expose group cover images globally. If the key doesn't exist,
             // default to an empty object. This is read by AnimeCardRenderer
             // when rendering season groups.
             window.AnimeTracker.groupCoverImages = result.groupCoverImages || {};
 
             const cleanedData = ProgressManager.removeDuplicateEpisodes(animeData);
+            const { repairedData, repairedCount } = ProgressManager.repairLikelyMissedEpisodes(cleanedData);
             const { cleaned: cleanedProgress, removedCount: progressRemoved } =
-                ProgressManager.cleanTrackedProgress(cleanedData, videoProgress);
+                ProgressManager.cleanTrackedProgress(repairedData, videoProgress);
 
-            const originalCount = UIHelpers.countEpisodes(animeData);
-            const cleanedCount = UIHelpers.countEpisodes(cleanedData);
-            const needsSave = (originalCount !== cleanedCount) || (progressRemoved > 0);
+            const originalCount = UIHelpers.countEpisodes(result.animeData || {});
+            const cleanedCount = UIHelpers.countEpisodes(repairedData);
+            const needsSave =
+                (originalCount !== cleanedCount) ||
+                (progressRemoved > 0) ||
+                (repairedCount > 0) ||
+                normalized.changed;
 
             if (needsSave) {
-                animeData = cleanedData;
+                animeData = repairedData;
                 videoProgress = cleanedProgress;
-                await Storage.set({
-                    animeData: cleanedData,
+                const payload = {
+                    animeData: repairedData,
                     videoProgress: cleanedProgress
-                });
+                };
+                if (normalized.changed) {
+                    payload.deletedAnime = normalized.deletedAnime || {};
+                }
+                await Storage.set(payload);
             } else {
-                animeData = cleanedData;
+                animeData = repairedData;
             }
 
             await FillerService.loadCachedEpisodeTypes(animeData);
@@ -546,7 +632,7 @@
      * Load and sync with cloud
      */
     async function loadAndSyncData() {
-        const { Storage, FirebaseSync, FillerService } = AT;
+        const { Storage, FirebaseSync, FillerService, ProgressManager } = AT;
 
         try {
             // Load cached stats first for immediate UI update
@@ -562,7 +648,7 @@
             const prefs = await chrome.storage.local.get(['userPreferences']);
             if (prefs.userPreferences) {
                 currentSort = prefs.userPreferences.sort || 'date';
-                currentCategory = prefs.userPreferences.category || 'all';
+                currentCategory = normalizeCategory(prefs.userPreferences.category || 'all');
 
                 // Update UI to reflect saved preferences
                 document.querySelectorAll('.sort-option').forEach(o => {
@@ -580,10 +666,31 @@
 
             const data = await FirebaseSync.loadAndSyncData(elements);
             if (data) {
-                animeData = data.animeData;
-                videoProgress = data.videoProgress;
+                const normalized = ProgressManager.normalizeCanonicalSlugs(
+                    data.animeData || {},
+                    data.videoProgress || {},
+                    data.deletedAnime || {}
+                );
+                const deduped = ProgressManager.removeDuplicateEpisodes(normalized.animeData || {});
+                const { repairedData, repairedCount } = ProgressManager.repairLikelyMissedEpisodes(deduped);
+                const { cleaned: cleanedProgress, removedCount: progressRemoved } =
+                    ProgressManager.cleanTrackedProgress(repairedData, normalized.videoProgress || {});
+
+                animeData = repairedData;
+                videoProgress = cleanedProgress;
                 // Update global group cover images from synced data
                 window.AnimeTracker.groupCoverImages = data.groupCoverImages || {};
+
+                if (repairedCount > 0 || progressRemoved > 0 || normalized.changed) {
+                    const payload = {
+                        animeData: repairedData,
+                        videoProgress: cleanedProgress
+                    };
+                    if (normalized.changed) {
+                        payload.deletedAnime = normalized.deletedAnime || {};
+                    }
+                    await Storage.set(payload);
+                }
 
                 renderAnimeList(elements.searchInput?.value || '');
                 updateStats();
@@ -904,31 +1011,35 @@
         if (!input) return null;
 
         input = input.trim();
+        const normalizeSlug = (slug) => slug
+            .toLowerCase()
+            .replace(/-episode-\d+$/i, '')
+            .replace(/-(?:episodes?|ep)$/i, '')
+            .replace(/-+$/g, '');
 
         // Check if it's a watch URL with episode (e.g., /watch/black-clover-episode-170/)
         const watchEpisodePattern = /\/watch\/([a-zA-Z0-9-]+)-episode-\d+/i;
         const watchMatch = input.match(watchEpisodePattern);
         if (watchMatch) {
-            return watchMatch[1].toLowerCase();
+            return normalizeSlug(watchMatch[1]);
         }
 
         // Check if it's an anime URL (e.g., /anime/black-clover)
         const animePattern = /\/anime\/([a-zA-Z0-9-]+)/i;
         const animeMatch = input.match(animePattern);
         if (animeMatch) {
-            return animeMatch[1].toLowerCase();
+            return normalizeSlug(animeMatch[1]);
         }
 
         // Check if it's a watch URL without episode
         const watchPattern = /\/watch\/([a-zA-Z0-9-]+)/i;
         const watchOnlyMatch = input.match(watchPattern);
         if (watchOnlyMatch) {
-            // Remove -episode-N suffix if present
-            return watchOnlyMatch[1].toLowerCase().replace(/-episode-\d+$/, '');
+            return normalizeSlug(watchOnlyMatch[1]);
         }
 
         // Otherwise treat as slug directly - convert to lowercase and replace spaces with dashes
-        return input.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        return normalizeSlug(input.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''));
     }
 
     /**
@@ -1618,6 +1729,7 @@
             elements.categoryTabs.querySelectorAll('.category-tab').forEach(tab => {
                 tab.addEventListener('click', async () => {
                     currentCategory = tab.dataset.category;
+                    currentCategory = normalizeCategory(currentCategory);
                     elements.categoryTabs.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
                     tab.classList.add('active');
                     if (elements.searchInput) {

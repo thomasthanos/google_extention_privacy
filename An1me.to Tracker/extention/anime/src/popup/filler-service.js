@@ -6,6 +6,17 @@
 const FillerService = {
     // Known filler episodes - pre-seeded with verified data, also populated dynamically
     KNOWN_FILLERS: {
+        // Bleach (2004) - verified filler ranges
+        'bleach': [
+            [33,33],[50,50],[64,108],[128,137],[147,149],[168,189],
+            [204,205],[213,214],[228,266],[287,287],[298,299],[303,305],
+            [311,341],[355,355]
+        ],
+        // Bleach TYBW entries are separate and should not inherit main-series fillers
+        'bleach-sennen-kessen-hen': [],
+        'bleach-sennen-kessen-hen-ketsubetsu-tan': [],
+        'bleach-sennen-kessen-hen-soukoku-tan': [],
+
         // Naruto Shippuden - verified filler list
         'naruto-shippuuden': [
             [57,71],[91,112],[144,151],[170,171],[176,196],
@@ -306,7 +317,7 @@ const FillerService = {
         }
 
         // Hardcoded/verified filler lists take priority — don't overwrite them
-        const PROTECTED_SLUGS = ['naruto-shippuuden', 'naruto-shippuden', 'naruto'];
+        const PROTECTED_SLUGS = ['bleach', 'naruto-shippuuden', 'naruto-shippuden', 'naruto'];
         slugVariations.forEach(slug => {
             if (!PROTECTED_SLUGS.includes(slug.toLowerCase())) {
                 this.KNOWN_FILLERS[slug] = fillerRanges;
@@ -577,6 +588,15 @@ const FillerService = {
         return multiSeasonPrefixes.some(prefix => slug.toLowerCase().startsWith(prefix));
     },
 
+    /**
+     * Detect multi-season context from title when slug is ambiguous.
+     */
+    isMultiSeasonTitle(title) {
+        const t = String(title || '').toLowerCase();
+        if (!t) return false;
+        return /jujutsu\s*kaisen|attack\s*on\s*titan|shingeki|demon\s*slayer|kimetsu|my\s*hero|boku\s*no\s*hero|one\s*punch\s*man|naruto|boruto|initial\s*d/.test(t);
+    },
+
     // Manual episode count overrides
     MANUAL_EPISODE_COUNTS: {
         'one-punch-man': 12,
@@ -589,6 +609,10 @@ const FillerService = {
         'wanpanman-season-3': 1,
         'death-note': 37,
         'cyberpunk-edgerunners': 10,
+        'bleach': 366,
+        'bleach-sennen-kessen-hen': 40,
+        'bleach-sennen-kessen-hen-ketsubetsu-tan': 26,
+        'bleach-sennen-kessen-hen-soukoku-tan': 40,
         'shingeki-no-kyojin': 25,
         'shingeki-no-kyojin-season-2': 12,
         'shingeki-no-kyojin-season-3': 12,
@@ -633,13 +657,30 @@ const FillerService = {
         'initial-d-final-stage': 4,
     },
 
+    getStandardFallbackTotal(watchedCount) {
+        if (watchedCount <= 12) return 12;
+        if (watchedCount <= 13) return 13;
+        if (watchedCount <= 24) return 24;
+        if (watchedCount <= 26) return 26;
+        if (watchedCount <= 39) return 39;
+        if (watchedCount <= 50) return 50;
+        if (watchedCount <= 52) return 52;
+        if (watchedCount <= 100) return 100;
+        if (watchedCount <= 150) return 150;
+        if (watchedCount <= 200) return 200;
+        return Math.ceil(watchedCount / 25) * 25 + 25;
+    },
+
     /**
      * Get total episodes for anime with improved fallback
      */
     getTotalEpisodes(slug, watchedCount, anime = null) {
         const normalizedSlug = slug.toLowerCase();
+        const hasMultiSeasonContext =
+            this.isMultiSeasonAnime(slug) ||
+            this.isMultiSeasonTitle(anime?.title);
 
-        // Check manual overrides first - try exact match and base slug
+        // Exact manual override always wins.
         if (this.MANUAL_EPISODE_COUNTS[normalizedSlug]) {
             return this.MANUAL_EPISODE_COUNTS[normalizedSlug];
         }
@@ -699,20 +740,26 @@ const FillerService = {
             return 26;
         }
 
+        // Prefer explicit totals captured from the source page when available.
+        if (anime && Number.isFinite(anime.totalEpisodes)) {
+            const explicitTotal = Number(anime.totalEpisodes);
+            if (explicitTotal >= watchedCount && explicitTotal > 0 && explicitTotal < 10000) {
+                // For multi-season shows, page-derived totals are often "currently released"
+                // counts (or noisy values). Keep at least a cour-sized estimate.
+                if (hasMultiSeasonContext) {
+                    return Math.max(explicitTotal, this.getStandardFallbackTotal(watchedCount));
+                }
+                return explicitTotal;
+            }
+        }
+
         // For multi-season anime, DON'T use the global KNOWN_ANIME_TOTALS
         // because it contains the total for ALL seasons combined
         // Instead, use standard cour lengths for individual seasons
-        if (!this.isMultiSeasonAnime(slug)) {
+        if (!hasMultiSeasonContext) {
             const knownTotal = this.KNOWN_ANIME_TOTALS[normalizedSlug];
             if (knownTotal && knownTotal >= watchedCount) {
                 return knownTotal;
-            }
-
-            if (anime && anime.totalEpisodes &&
-                typeof anime.totalEpisodes === 'number' &&
-                anime.totalEpisodes >= watchedCount &&
-                anime.totalEpisodes < 10000) {
-                return anime.totalEpisodes;
             }
 
             const cachedTypes = this.episodeTypesCache[slug];
@@ -722,18 +769,7 @@ const FillerService = {
         }
 
         // Standard cour lengths fallback (used for all multi-season anime and unknown anime)
-        if (watchedCount <= 12) return 12;
-        if (watchedCount <= 13) return 13;
-        if (watchedCount <= 24) return 24;
-        if (watchedCount <= 26) return 26;
-        if (watchedCount <= 39) return 39;
-        if (watchedCount <= 50) return 50;
-        if (watchedCount <= 52) return 52;
-        if (watchedCount <= 100) return 100;
-        if (watchedCount <= 150) return 150;
-        if (watchedCount <= 200) return 200;
-
-        return Math.ceil(watchedCount / 25) * 25 + 25;
+        return this.getStandardFallbackTotal(watchedCount);
     },
 
     /**
@@ -741,6 +777,24 @@ const FillerService = {
      */
     calculateProgress(episodeCount, slug, anime = null) {
         const totalEpisodes = this.getTotalEpisodes(slug, episodeCount, anime);
+
+        // Bleach-specific override:
+        // if the user has reached the last episode number, mark it complete
+        // even when some fillers/episodes are missing from tracked history.
+        if (anime && Array.isArray(anime.episodes) && slug.toLowerCase().startsWith('bleach')) {
+            const maxEpisodeWatched = anime.episodes.reduce((max, ep) => {
+                const n = Number(ep?.number) || 0;
+                return n > max ? n : max;
+            }, 0);
+
+            if (totalEpisodes > 0 && maxEpisodeWatched >= totalEpisodes) {
+                return {
+                    progress: 100,
+                    total: totalEpisodes,
+                    isGuessed: false
+                };
+            }
+        }
 
         // Check for complete canon viewing
         if (anime && anime.episodes) {
@@ -760,7 +814,9 @@ const FillerService = {
         const progress = (episodeCount / totalEpisodes) * 100;
 
         // For multi-season anime, we always use guessed totals per season
-        const isMultiSeason = this.isMultiSeasonAnime(slug);
+        const isMultiSeason =
+            this.isMultiSeasonAnime(slug) ||
+            this.isMultiSeasonTitle(anime?.title);
 
         const normalizedSlug = slug.toLowerCase();
 

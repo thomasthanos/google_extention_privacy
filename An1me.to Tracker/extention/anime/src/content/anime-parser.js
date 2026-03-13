@@ -41,6 +41,11 @@ const AnimeParser = {
         }
 
         let animeSlug = pathMatch[1];
+        // Some an1me URLs include a trailing "-episode" in the slug segment.
+        // Normalize it early so episodes don't split across two different anime keys.
+        animeSlug = animeSlug
+            .replace(/[-_](?:episodes?|ep)$/i, '')
+            .replace(/[-_]+$/g, '');
         let episodeSlug = pathMatch[2] || null;
         let episodeNumber = 1;
         
@@ -113,6 +118,7 @@ const AnimeParser = {
 
         // Store original slug for offset lookup
         const originalSlug = animeSlug;
+        let totalEpisodes = this.detectTotalEpisodes(originalSlug);
 
         // Apply episode offset for multi-part anime
         const offsetMapping = window.AnimeTrackerContent?.EPISODE_OFFSET_MAPPING || {};
@@ -125,6 +131,9 @@ const AnimeParser = {
             if (secondEpisodeNumber !== null) {
                 secondEpisodeNumber += offset;
             }
+            if (Number.isFinite(totalEpisodes) && totalEpisodes > 0) {
+                totalEpisodes += offset;
+            }
         }
 
         // Normalize slug to merge multi-part anime into one entry
@@ -136,6 +145,13 @@ const AnimeParser = {
 
         // Extract anime title
         let animeTitle = this.extractTitle(animeSlug);
+
+        // Normalize ambiguous slugs using title hints (e.g. Jujutsu Kaisen parts/arcs).
+        const canonicalSlug = this.normalizeSlugByTitle(animeSlug, animeTitle);
+        if (canonicalSlug !== animeSlug) {
+            Logger.debug(`Title-based normalize ${animeSlug} -> ${canonicalSlug}`);
+            animeSlug = canonicalSlug;
+        }
 
         const uniqueId = `${animeSlug}__episode-${episodeNumber}`;
 
@@ -157,7 +173,8 @@ const AnimeParser = {
             url: window.location.href,
             isDoubleEpisode,
             secondEpisodeNumber,
-            coverImage
+            coverImage,
+            totalEpisodes
         };
     },
 
@@ -195,6 +212,87 @@ const AnimeParser = {
         }
         
         return null;
+    },
+
+    /**
+     * Detect total episode count from page links/data attributes.
+     * Returns highest episode number found, or null.
+     */
+    detectTotalEpisodes(animeSlug) {
+        const episodeNumbers = new Set();
+        const escapedSlug = (animeSlug || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const hasSlug = Boolean(escapedSlug);
+        const hrefPattern = hasSlug
+            ? new RegExp(`/watch/${escapedSlug}-episode-(\\d+)`, 'i')
+            : /\/watch\/[^/]+-episode-(\d+)/i;
+
+        const selectors = [
+            `a[href*="/watch/${animeSlug}-episode-"]`,
+            `a[href*="${animeSlug}-episode-"]`,
+            '.episode-list a[href*="-episode-"]',
+            '.episodes a[href*="-episode-"]',
+            '[data-open-nav-episode]',
+            'a[href*="-episode-"]'
+        ];
+
+        const parseEpisodeNumber = (value) => {
+            if (!value) return null;
+            const text = String(value);
+            const match = text.match(/(?:episode|ep)\s*[-_#:]?\s*(\d{1,4})/i) || text.match(/\b(\d{1,4})\b/);
+            if (!match) return null;
+            const num = parseInt(match[1], 10);
+            return Number.isFinite(num) && num > 0 ? num : null;
+        };
+
+        for (const selector of selectors) {
+            const nodes = document.querySelectorAll(selector);
+            for (const node of nodes) {
+                const href = node.getAttribute('href') || '';
+                const hrefMatch = href.match(hrefPattern);
+                if (hrefMatch) {
+                    const hrefNum = parseInt(hrefMatch[1], 10);
+                    if (Number.isFinite(hrefNum) && hrefNum > 0) {
+                        episodeNumbers.add(hrefNum);
+                    }
+                }
+
+                // Only trust data attributes from dedicated episode navigation nodes,
+                // or nodes whose href already matched this anime slug.
+                const isEpisodeNavAttrNode = selector === '[data-open-nav-episode]';
+                if (isEpisodeNavAttrNode || hrefMatch) {
+                    const attrNum = parseEpisodeNumber(node.getAttribute('data-open-nav-episode') || node.dataset?.openNavEpisode);
+                    if (attrNum) episodeNumbers.add(attrNum);
+                }
+            }
+        }
+
+        if (episodeNumbers.size === 0) return null;
+
+        const maxEpisode = Math.max(...episodeNumbers);
+        if (!Number.isFinite(maxEpisode) || maxEpisode <= 0 || maxEpisode > 9999) return null;
+        return maxEpisode;
+    },
+
+    /**
+     * Normalize slugs for known series when site slugs are inconsistent.
+     */
+    normalizeSlugByTitle(slug, title) {
+        const safeSlug = String(slug || '').toLowerCase();
+        const safeTitle = String(title || '').toLowerCase();
+        const context = `${safeSlug} ${safeTitle}`;
+
+        if (safeSlug.startsWith('jujutsu-kaisen') || safeTitle.includes('jujutsu kaisen')) {
+            if (/\b0\b|movie/.test(context)) return 'jujutsu-kaisen-0';
+            if (/season\s*3|part\s*3|culling\s*game|dead[-\s]*culling|shimetsu|kaiyuu/.test(context)) {
+                return 'jujutsu-kaisen-season-3';
+            }
+            if (/season\s*2|2nd\s*season|shibuya|kaigyoku|gyokusetsu/.test(context)) {
+                return 'jujutsu-kaisen-season-2';
+            }
+            return 'jujutsu-kaisen';
+        }
+
+        return slug;
     },
 
     /**

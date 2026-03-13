@@ -45,7 +45,7 @@
                 episodes: [],
                 totalWatchTime: 0,
                 lastWatched: null,
-                totalEpisodes: null,
+                totalEpisodes: Number.isFinite(info.totalEpisodes) ? info.totalEpisodes : null,
                 coverImage: info.coverImage || null
             };
         }
@@ -55,6 +55,19 @@
         // coverImage to avoid replacing a user-edited or previously saved image.
         if (!animeData[info.animeSlug].coverImage && info.coverImage) {
             animeData[info.animeSlug].coverImage = info.coverImage;
+        }
+
+        if (Number.isFinite(info.totalEpisodes) && info.totalEpisodes > 0 && info.totalEpisodes < 10000) {
+            const trackedEpisodes = animeData[info.animeSlug].episodes || [];
+            const maxTracked = Math.max(
+                0,
+                ...trackedEpisodes.map(ep => Number(ep.number) || 0),
+                Number(info.episodeNumber) || 0,
+                Number(info.secondEpisodeNumber) || 0
+            );
+            if (info.totalEpisodes >= maxTracked) {
+                animeData[info.animeSlug].totalEpisodes = info.totalEpisodes;
+            }
         }
 
         if (!Array.isArray(animeData[info.animeSlug].episodes)) {
@@ -484,7 +497,11 @@
         // parser was able to extract one, update the stored record. This ensures
         // that posters appear for partially watched anime (those with in-progress
         // episodes) without requiring the episode to be marked as completed.
-        if (animeInfo.coverImage) {
+        const hasDetectedTotal = Number.isFinite(animeInfo.totalEpisodes) &&
+            animeInfo.totalEpisodes > 0 &&
+            animeInfo.totalEpisodes < 10000;
+
+        if (animeInfo.coverImage || hasDetectedTotal) {
             try {
                 // Fetch animeData and groupCoverImages together. If the current
                 // anime exists, update its cover image. If it doesn't exist, create
@@ -503,6 +520,15 @@
                         if (!animeData[slug].coverImage) {
                             animeData[slug].coverImage = animeInfo.coverImage;
                         }
+                        if (hasDetectedTotal) {
+                            const existingMaxEpisode = Math.max(
+                                0,
+                                ...((animeData[slug].episodes || []).map(ep => Number(ep.number) || 0))
+                            );
+                            if (animeInfo.totalEpisodes >= existingMaxEpisode) {
+                                animeData[slug].totalEpisodes = animeInfo.totalEpisodes;
+                            }
+                        }
                     } else {
                         animeData[slug] = {
                             title: animeInfo.animeTitle,
@@ -510,8 +536,8 @@
                             episodes: [],
                             totalWatchTime: 0,
                             lastWatched: null,
-                            totalEpisodes: null,
-                            coverImage: animeInfo.coverImage
+                            totalEpisodes: hasDetectedTotal ? animeInfo.totalEpisodes : null,
+                            coverImage: animeInfo.coverImage || null
                         };
                     }
 

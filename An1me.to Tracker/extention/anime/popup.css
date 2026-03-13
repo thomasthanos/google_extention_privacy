@@ -637,6 +637,62 @@ body {
 
 /* ─── Anime List ─────────────────────────────────────────────── */
 .anime-list { display: flex; flex-direction: column; gap: 8px; }
+.completed-list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 4px;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(76,175,130,0.18);
+  background: linear-gradient(180deg, rgba(76,175,130,0.06) 0%, rgba(76,175,130,0.02) 100%);
+  overflow: hidden;
+}
+.completed-list-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  cursor: pointer;
+  user-select: none;
+  background: rgba(76,175,130,0.04);
+  transition: background var(--tf);
+}
+.completed-list-label:hover {
+  background: rgba(76,175,130,0.1);
+}
+.completed-list-label:hover .completed-list-label-title {
+  color: var(--cyan);
+}
+.completed-list-label-left {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.completed-list-label-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--green);
+  letter-spacing: 0.08em;
+  transition: color var(--tf);
+}
+.completed-list-label-sub {
+  font-size: 10px;
+  color: var(--t3);
+}
+.completed-chevron {
+  width: 12px;
+  height: 12px;
+  color: var(--t3);
+  flex-shrink: 0;
+  transition: transform var(--tn);
+}
+.completed-list-cards {
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 10px 10px;
+  border-top: 1px solid rgba(76,175,130,0.12);
+}
 
 /* ═══════════════════════════════════════════════════════════════
    ANIME CARD
@@ -729,8 +785,17 @@ body {
 .progress-bar.size-huge   { height: 6px; }
 .progress-container.filler-progress { margin-top: 5px; margin-bottom: 0; }
 .filler-progress .progress-info { color: var(--purple); font-size: 10px; }
-.filler-progress .progress-bar.filler-bar { background: rgba(155,106,255,0.1); }
-.filler-progress .progress-fill.filler-fill { background: linear-gradient(135deg, var(--purple), #7c3aed); }
+.filler-progress .progress-bar.filler-bar {
+  background: rgba(85, 47, 156, 0.35);
+  border: 1px solid rgba(155,106,255,0.22);
+}
+.filler-progress .progress-fill.filler-fill {
+  display: block;
+  height: 100%;
+  opacity: 1;
+  background: linear-gradient(90deg, #c084fc 0%, #a855f7 45%, #7c3aed 100%);
+  box-shadow: 0 0 10px rgba(168,85,247,0.5);
+}
 
 /* ─── Badges ────────────────────────────────────────────────── */
 .anime-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 0; max-height: 0; overflow: hidden; opacity: 0; transition: max-height var(--tn), opacity var(--tn), margin var(--tn); }
@@ -741,7 +806,7 @@ body {
 .badge-time     { color: var(--green);  background: rgba(76,175,130,0.07);  border-color: rgba(76,175,130,0.18); }
 .badge-watching { color: var(--amber);  background: rgba(240,192,64,0.08);  border-color: rgba(240,192,64,0.2); font-size: 9px; padding: 2px 8px; }
 .badge-filler   { color: var(--purple); background: rgba(155,106,255,0.07); border-color: rgba(155,106,255,0.18); font-size: 9px; }
-.skipped-fillers-badge { display: inline-flex; align-items: center; gap: 3px; margin-left: 5px; padding: 1px 5px; background: rgba(155,106,255,0.08); border: 1px solid rgba(155,106,255,0.2); border-radius: var(--r-xs); font-size: 8px; color: var(--purple); white-space: nowrap; }
+.skipped-fillers-badge { display: inline-flex; align-items: center; gap: 4px; margin-left: 5px; padding: 2px 7px; background: rgba(155,106,255,0.1); border: 1px solid rgba(155,106,255,0.24); border-radius: 9px; font-size: 9px; font-weight: 650; color: #c2a2f8; white-space: nowrap; }
 
 /* ─── In-progress section ───────────────────────────────────── */
 .anime-in-progress { margin-bottom: 0; padding: 0; background: rgba(240,192,64,0.04); border: 1px solid rgba(240,192,64,0.14); border-radius: var(--r-xs); max-height: 0; overflow: hidden; opacity: 0; transition: max-height var(--tn), opacity var(--tn), margin var(--tn), padding var(--tn); }
@@ -767,16 +832,24 @@ body {
 
 /* ─── Episodes ──────────────────────────────────────────────── */
 .anime-episodes { max-height: 0; overflow: hidden; opacity: 0; transition: max-height var(--tn), opacity var(--tn); }
-.anime-card.expanded .anime-episodes { max-height: 260px; opacity: 1; margin-top: 7px; }
-.anime-episodes.collapsible { background: rgba(0,0,0,0.12); border-radius: var(--r-xs); }
-.anime-card.expanded .anime-episodes.collapsible { padding: 6px; margin-top: 7px; }
-.anime-card.expanded .anime-episodes.collapsible.collapsed { max-height: 30px; }
-.episodes-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; padding: 1px 0; transition: color var(--tf); }
+.anime-card.expanded .anime-episodes { max-height: 290px; opacity: 1; margin-top: 7px; }
+.anime-episodes.collapsible {
+  background: linear-gradient(180deg, rgba(14,17,23,0.45) 0%, rgba(12,16,27,0.75) 100%);
+  border: 1px solid rgba(79,195,247,0.08);
+  border-radius: var(--r-sm);
+}
+.anime-card.expanded .anime-episodes.collapsible { padding: 7px 8px; margin-top: 7px; }
+.anime-card.expanded .anime-episodes.collapsible.collapsed {
+  max-height: 40px;
+  border-color: rgba(79,195,247,0.14);
+  background: rgba(12,16,27,0.55);
+}
+.episodes-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; min-height: 22px; padding: 2px 0; transition: color var(--tf); }
 .episodes-header:hover { color: var(--cyan); }
-.episodes-title { font-size: 10px; font-weight: 600; color: var(--t2); }
+.episodes-title { font-size: 11px; font-weight: 650; color: var(--t2); letter-spacing: 0.1px; }
 .episodes-header .collapse-icon { color: var(--t3); }
 .anime-episodes.collapsed .collapse-icon { transform: rotate(-90deg); }
-.episodes-content { margin-top: 6px; max-height: 120px; overflow-y: auto; transition: max-height var(--tn), margin var(--tn), opacity var(--tn); padding-right: 2px; }
+.episodes-content { margin-top: 6px; max-height: 145px; overflow-y: auto; transition: max-height var(--tn), margin var(--tn), opacity var(--tn); padding-right: 2px; }
 .anime-episodes.collapsed .episodes-content { max-height: 0; margin-top: 0; overflow: hidden; }
 .episodes-content::-webkit-scrollbar { width: 3px; }
 .episodes-content::-webkit-scrollbar-track { background: transparent; }
@@ -1045,6 +1118,16 @@ body {
 .season-progress-container { margin-bottom: 7px; }
 .season-progress-container .progress-info { display: flex; justify-content: space-between; font-size: 10px; color: var(--t2); margin-bottom: 3px; }
 .season-progress-container .progress-bar { height: 3px; }
+.season-progress-container .progress-container {
+  max-height: none;
+  opacity: 1;
+  overflow: visible;
+  margin-top: 6px;
+  margin-bottom: 0;
+}
+.season-progress-container .progress-container.filler-progress .progress-info {
+  color: var(--purple);
+}
 .season-episodes { max-height: 100px; overflow-y: auto; }
 .season-episodes::-webkit-scrollbar { width: 3px; }
 .season-episodes::-webkit-scrollbar-thumb { background: var(--t3); border-radius: 3px; }

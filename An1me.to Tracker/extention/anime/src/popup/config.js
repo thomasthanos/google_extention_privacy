@@ -23,6 +23,7 @@ const CONFIG = {
     // Episode display limits
     VISIBLE_EPISODES_LIMIT: 10,
     VISIBLE_FILLERS_LIMIT: 6,
+    COMPLETED_LIST_MIN_DAYS: 4,
 
     // Progress thresholds
     COMPLETED_PERCENTAGE: 85,

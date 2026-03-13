@@ -27,10 +27,10 @@ const Storage = {
                     resolve({});
                     return;
                 }
-                
-                const hasLocalData = keys.some(key => localResult[key] !== undefined && 
+
+                const hasLocalData = keys.some(key => localResult[key] !== undefined &&
                     (typeof localResult[key] !== 'object' || Object.keys(localResult[key]).length > 0));
-                
+
                 if (hasLocalData) {
                     resolve(localResult);
                 } else {
@@ -40,10 +40,10 @@ const Storage = {
                             resolve(localResult);
                             return;
                         }
-                        
+
                         const hasSyncData = keys.some(key => syncResult[key] !== undefined &&
                             (typeof syncResult[key] !== 'object' || Object.keys(syncResult[key]).length > 0));
-                        
+
                         if (hasSyncData) {
                             console.log('[Storage] Migrating from sync to local');
                             chrome.storage.local.set(syncResult, () => {
@@ -51,14 +51,14 @@ const Storage = {
                                 chrome.storage.sync.remove(['animeData', 'trackedEpisodes', 'videoProgress']);
                             });
                         }
-                        
+
                         resolve({ ...localResult, ...syncResult });
                     });
                 }
             });
         });
     },
-    
+
     /**
      * Set data to storage
      */
@@ -75,80 +75,193 @@ const Storage = {
     },
 
     /**
-     * Migrate multi-part anime entries to merged format
-     * Merges episodes from part-specific slugs into the base slug
+     * Migrate multi-part anime entries to merged format.
+     * Also fixes accidental slugs that end with -episode/-ep.
      */
     async migrateMultiPartAnime() {
         return new Promise((resolve) => {
-            chrome.storage.local.get(['animeData'], (result) => {
+            chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime'], (result) => {
                 if (chrome.runtime.lastError || !result.animeData) {
                     resolve(false);
                     return;
                 }
 
-                const animeData = result.animeData;
+                const animeData = result.animeData || {};
+                const videoProgress = result.videoProgress || {};
+                const deletedAnime = result.deletedAnime || {};
                 let migrated = false;
 
+                const mergeByNewer = (current, candidate) => {
+                    if (!current) return candidate;
+                    if (!candidate) return current;
+
+                    const currentTime = new Date(current.savedAt || current.deletedAt || 0).getTime();
+                    const candidateTime = new Date(candidate.savedAt || candidate.deletedAt || 0).getTime();
+                    const currentProgress = typeof current.currentTime === 'number' ? current.currentTime : 0;
+                    const candidateProgress = typeof candidate.currentTime === 'number' ? candidate.currentTime : 0;
+
+                    if (candidateProgress > currentProgress) return candidate;
+                    if (candidateProgress < currentProgress) return current;
+                    return candidateTime >= currentTime ? candidate : current;
+                };
+
+                const getCanonicalSlugFromTitle = (slug, title) => {
+                    const safeSlug = String(slug || '').toLowerCase();
+                    const safeTitle = String(title || '').toLowerCase();
+                    const context = `${safeSlug} ${safeTitle}`;
+
+                    if (safeSlug.startsWith('jujutsu-kaisen') || safeTitle.includes('jujutsu kaisen')) {
+                        if (/\b0\b|movie/.test(context)) return 'jujutsu-kaisen-0';
+                        if (/season\s*3|part\s*3|culling\s*game|dead[-\s]*culling|shimetsu|kaiyuu/.test(context)) {
+                            return 'jujutsu-kaisen-season-3';
+                        }
+                        if (/season\s*2|2nd\s*season|shibuya|kaigyoku|gyokusetsu/.test(context)) {
+                            return 'jujutsu-kaisen-season-2';
+                        }
+                        return 'jujutsu-kaisen';
+                    }
+
+                    return slug;
+                };
+
+                const migrateSlug = (oldSlug, newSlug, offset = 0, titleTransform = null) => {
+                    if (!animeData[oldSlug] || oldSlug === newSlug) return;
+
+                    console.log(`[Storage] Migrating ${oldSlug} -> ${newSlug}`);
+                    migrated = true;
+
+                    const oldEntry = animeData[oldSlug];
+
+                    if (!animeData[newSlug]) {
+                        animeData[newSlug] = {
+                            title: (titleTransform ? titleTransform(oldEntry.title || '') : oldEntry.title) || newSlug,
+                            slug: newSlug,
+                            episodes: [],
+                            totalWatchTime: 0,
+                            lastWatched: null,
+                            totalEpisodes: null,
+                            coverImage: oldEntry.coverImage || null
+                        };
+                    }
+
+                    const newEntry = animeData[newSlug];
+                    newEntry.slug = newSlug;
+                    if (!Array.isArray(newEntry.episodes)) newEntry.episodes = [];
+                    if (!newEntry.coverImage && oldEntry.coverImage) newEntry.coverImage = oldEntry.coverImage;
+                    if ((!newEntry.title || newEntry.title.trim() === '') && oldEntry.title) {
+                        newEntry.title = titleTransform ? titleTransform(oldEntry.title) : oldEntry.title;
+                    }
+
+                    const episodeMap = new Map();
+                    for (const ep of newEntry.episodes) {
+                        const num = Number(ep.number) || 0;
+                        if (num > 0) episodeMap.set(num, ep);
+                    }
+
+                    const oldEpisodes = Array.isArray(oldEntry.episodes) ? oldEntry.episodes : [];
+                    for (const ep of oldEpisodes) {
+                        const baseNum = Number(ep.number) || 0;
+                        const migratedNum = baseNum + offset;
+                        if (migratedNum <= 0) continue;
+
+                        const candidate = { ...ep, number: migratedNum };
+                        const existing = episodeMap.get(migratedNum);
+                        if (!existing) {
+                            episodeMap.set(migratedNum, candidate);
+                            continue;
+                        }
+
+                        const existingTs = existing.watchedAt ? new Date(existing.watchedAt).getTime() : 0;
+                        const candidateTs = candidate.watchedAt ? new Date(candidate.watchedAt).getTime() : 0;
+                        if (candidateTs >= existingTs) {
+                            episodeMap.set(migratedNum, candidate);
+                        }
+                    }
+
+                    newEntry.episodes = Array.from(episodeMap.values()).sort((a, b) => a.number - b.number);
+                    newEntry.totalWatchTime = newEntry.episodes.reduce((sum, ep) => sum + (ep.duration || 0), 0);
+
+                    const oldLastWatched = oldEntry.lastWatched ? new Date(oldEntry.lastWatched).getTime() : 0;
+                    const newLastWatched = newEntry.lastWatched ? new Date(newEntry.lastWatched).getTime() : 0;
+                    if (oldLastWatched > newLastWatched) {
+                        newEntry.lastWatched = oldEntry.lastWatched;
+                    }
+
+                    const oldTotal = Number.isFinite(oldEntry.totalEpisodes) ? oldEntry.totalEpisodes + offset : null;
+                    const newTotal = Number.isFinite(newEntry.totalEpisodes) ? newEntry.totalEpisodes : null;
+                    const maxTracked = newEntry.episodes.reduce((max, ep) => Math.max(max, Number(ep.number) || 0), 0);
+                    const candidateTotals = [oldTotal, newTotal, maxTracked].filter(n => Number.isFinite(n) && n > 0);
+                    newEntry.totalEpisodes = candidateTotals.length ? Math.max(...candidateTotals) : null;
+
+                    const oldPrefix = `${oldSlug}__episode-`;
+                    const progressKeys = Object.keys(videoProgress).filter(key => key.startsWith(oldPrefix));
+                    for (const key of progressKeys) {
+                        const match = key.match(/__episode-(\d+)$/i);
+                        if (!match) {
+                            delete videoProgress[key];
+                            continue;
+                        }
+
+                        const oldEpisodeNum = parseInt(match[1], 10);
+                        const newEpisodeNum = oldEpisodeNum + offset;
+                        const newKey = `${newSlug}__episode-${newEpisodeNum}`;
+                        const migratedProgress = { ...videoProgress[key] };
+
+                        videoProgress[newKey] = mergeByNewer(videoProgress[newKey], migratedProgress);
+                        if (newKey !== key) delete videoProgress[key];
+                    }
+
+                    if (deletedAnime[oldSlug]) {
+                        const oldDeleted = deletedAnime[oldSlug];
+                        const currentDeleted = deletedAnime[newSlug];
+                        const oldDeletedTs = oldDeleted?.deletedAt ? new Date(oldDeleted.deletedAt).getTime() : 0;
+                        const currentDeletedTs = currentDeleted?.deletedAt ? new Date(currentDeleted.deletedAt).getTime() : 0;
+                        if (!currentDeleted || oldDeletedTs > currentDeletedTs) {
+                            deletedAnime[newSlug] = oldDeleted;
+                        }
+                        delete deletedAnime[oldSlug];
+                    }
+
+                    delete animeData[oldSlug];
+                };
+
                 for (const [oldSlug, newSlug] of Object.entries(STORAGE_SLUG_NORMALIZATION)) {
-                    if (animeData[oldSlug]) {
-                        console.log(`[Storage] Migrating ${oldSlug} → ${newSlug}`);
-                        migrated = true;
+                    const offset = STORAGE_EPISODE_OFFSET_MAPPING[oldSlug] || 0;
+                    migrateSlug(
+                        oldSlug,
+                        newSlug,
+                        offset,
+                        (title) => title.replace(/ Ketsubetsu[ -]tan| Soukoku[ -]tan/gi, '').trim()
+                    );
+                }
 
-                        // Get offset for this part
-                        const offset = STORAGE_EPISODE_OFFSET_MAPPING[oldSlug] || 0;
+                // Generic migration for accidentally saved slugs ending in -episode/-ep.
+                for (const oldSlug of Object.keys(animeData)) {
+                    const cleanedSlug = oldSlug
+                        .replace(/-(?:episodes?|ep)$/i, '')
+                        .replace(/-+$/g, '');
+                    if (cleanedSlug && cleanedSlug !== oldSlug) {
+                        migrateSlug(
+                            oldSlug,
+                            cleanedSlug,
+                            0,
+                            (title) => (title || '').replace(/\s+Episode$/i, '').trim()
+                        );
+                    }
+                }
 
-                        // Create base entry if it doesn't exist
-                        if (!animeData[newSlug]) {
-                            animeData[newSlug] = {
-                                title: animeData[oldSlug].title.replace(/ Ketsubetsu[ -]tan| Soukoku[ -]tan/gi, '').trim(),
-                                slug: newSlug,
-                                episodes: [],
-                                totalWatchTime: 0,
-                                lastWatched: null,
-                                totalEpisodes: null
-                            };
-                        }
-
-                        // Ensure episodes array exists
-                        if (!Array.isArray(animeData[newSlug].episodes)) {
-                            animeData[newSlug].episodes = [];
-                        }
-
-                        // Merge episodes with offset
-                        const oldEpisodes = animeData[oldSlug].episodes || [];
-                        for (const ep of oldEpisodes) {
-                            const newEpNumber = ep.number + offset;
-                            const exists = animeData[newSlug].episodes.some(e => e.number === newEpNumber);
-                            if (!exists) {
-                                animeData[newSlug].episodes.push({
-                                    ...ep,
-                                    number: newEpNumber
-                                });
-                            }
-                        }
-
-                        // Sort episodes
-                        animeData[newSlug].episodes.sort((a, b) => a.number - b.number);
-
-                        // Update total watch time
-                        animeData[newSlug].totalWatchTime =
-                            (animeData[newSlug].totalWatchTime || 0) + (animeData[oldSlug].totalWatchTime || 0);
-
-                        // Update last watched
-                        const oldLastWatched = animeData[oldSlug].lastWatched;
-                        const newLastWatched = animeData[newSlug].lastWatched;
-                        if (oldLastWatched && (!newLastWatched || new Date(oldLastWatched) > new Date(newLastWatched))) {
-                            animeData[newSlug].lastWatched = oldLastWatched;
-                        }
-
-                        // Delete old entry
-                        delete animeData[oldSlug];
+                // Title-based canonical migration for known inconsistent slug families.
+                for (const oldSlug of Object.keys(animeData)) {
+                    const oldEntry = animeData[oldSlug];
+                    const canonicalSlug = getCanonicalSlugFromTitle(oldSlug, oldEntry?.title || '');
+                    if (canonicalSlug && canonicalSlug !== oldSlug) {
+                        migrateSlug(oldSlug, canonicalSlug, 0, (title) => title);
                     }
                 }
 
                 if (migrated) {
-                    chrome.storage.local.set({ animeData }, () => {
-                        console.log('[Storage] Multi-part anime migration complete');
+                    chrome.storage.local.set({ animeData, videoProgress, deletedAnime }, () => {
+                        console.log('[Storage] Anime slug migration complete');
                         resolve(true);
                     });
                 } else {

@@ -157,8 +157,8 @@ const AnimeCardRenderer = {
         const totalCanonDisplay = progressData.isGuessed ? `~${totalCanon}` : totalCanon;
 
         const progressInfoText = hasFillerData
-            ? `<span title="Canon: ${canonWatched}/${totalCanonDisplay} | Total: ${episodeCount}/${totalDisplay}${progressData.isGuessed ? ' (estimated)' : ''}">📍 ${currentEpText} · ${canonWatched}/${totalCanonDisplay} · ${totalFillerCount} filler</span>`
-            : `<span title="Current: Ep ${currentEpisode}${progressData.isGuessed ? ' (total estimated)' : ''}">📍 ${currentEpText} · ${episodeCount}/${totalDisplay}</span>`;
+            ? `<span title="Canon: ${canonWatched}/${totalCanonDisplay}">📍 ${currentEpText} · Canon ${canonWatched}/${totalCanonDisplay}</span>`
+            : `<span title="Current: Ep ${currentEpisode}${progressData.isGuessed ? ' (total estimated)' : ''}">📍 ${currentEpText} · Total ${episodeCount}/${totalDisplay}</span>`;
 
         // Filler progress section
         const watchedFillers = fillerInfo?.watched || 0;
@@ -168,11 +168,11 @@ const AnimeCardRenderer = {
         const fillerProgressSection = (hasFillerData && watchedFillers > 0) ? `
             <div class="progress-container filler-progress">
                 <div class="progress-info">
-                    <span class="filler-label">🎭 Filler ${watchedFillers}/${totalFillers}</span>
+                    <span class="filler-label" title="Watched fillers: ${watchedFillers} · Skipped fillers: ${skippedFillers.length}">🎭 Filler ${watchedFillers}/${totalFillers}</span>
                     <span>${fillerProgressPercent}%</span>
                 </div>
                 <div class="progress-bar filler-bar ${sizeClass}">
-                    <div class="progress-fill filler-fill" style="width: ${fillerProgressPercent}%"></div>
+                    <div class="progress-fill filler-fill" style="width: ${fillerProgressPercent}%; min-width: ${fillerProgressPercent > 0 ? 2 : 0}px; opacity: 1;"></div>
                 </div>
             </div>` : '';
 
@@ -196,19 +196,23 @@ const AnimeCardRenderer = {
         // Display summary information (episodes watched/total, status, last watched) when the card is expanded.
         const totalWatchedEpisodes = anime.episodes?.length || 0;
         const totalEpisodesPossible = progressData.total || 0;
-        const episodeProgressText = totalEpisodesPossible > 0 ? `${totalWatchedEpisodes}/${totalEpisodesPossible}` : '';
+        const isCardComplete = progressData.progress >= 100 && totalWatchedEpisodes > 0;
+        const totalProgressText = totalEpisodesPossible > 0 ? `${currentEpisode}/${totalEpisodesPossible}` : `${currentEpisode}`;
+        const canonProgressText = hasFillerData ? `${canonWatched}/${totalCanonDisplay}` : '';
+        const episodeProgressText = hasFillerData
+            ? `Ep ${totalProgressText} · Canon ${canonProgressText}`
+            : (totalEpisodesPossible > 0 ? `Ep ${totalWatchedEpisodes}/${totalEpisodesPossible}` : '');
         let statusTextCard = '';
         if (totalWatchedEpisodes === 0) {
             statusTextCard = 'Not started';
-        } else if (totalEpisodesPossible > 0 && totalWatchedEpisodes < totalEpisodesPossible) {
+        } else if (!isCardComplete) {
             statusTextCard = 'Watching';
         } else {
             statusTextCard = 'Completed';
         }
         const timeAgoText = anime.lastWatched ? UIHelpers.formatDate(anime.lastWatched) : 'Never';
-        const isCardComplete = totalEpisodesPossible > 0 && totalWatchedEpisodes >= totalEpisodesPossible;
         const progressBadge = !isCardComplete && episodeProgressText
-            ? `<span class="meta-badge meta-badge-progress">Ep ${episodeProgressText}</span>`
+            ? `<span class="meta-badge meta-badge-progress">${episodeProgressText}</span>`
             : '';
         const statusBadgeClass = isCardComplete ? 'meta-badge-complete' : (totalWatchedEpisodes > 0 ? 'meta-badge-watching' : 'meta-badge-notstarted');
         const statusBadgeIcon = isCardComplete ? '✓' : '⊙';
@@ -246,7 +250,6 @@ const AnimeCardRenderer = {
                     ${partsSection}
                     ${progressSection}
                     <div class="anime-meta">
-                        <span class="anime-last-watched-inline">${UIHelpers.createIcon('calendar')} ${lastWatched}</span>
                         ${skippedFillersIndicator}
                     </div>
                     <div class="anime-episodes collapsible collapsed">
@@ -700,11 +703,11 @@ const AnimeCardRenderer = {
                 const fillerProgressBar = (hasFillerData && watchedFillerCount > 0) ? `
                     <div class="progress-container filler-progress">
                         <div class="progress-info">
-                            <span class="filler-label">🎭 Filler ${watchedFillerCount}/${totalFillerCount}</span>
+                            <span class="filler-label" title="Watched fillers: ${watchedFillerCount} · Skipped fillers: ${skippedFillers.length}">🎭 Filler ${watchedFillerCount}/${totalFillerCount}</span>
                             <span>${fillerProgressPercent}%</span>
                         </div>
                         <div class="progress-bar filler-bar size-small">
-                            <div class="progress-fill filler-fill" style="width: ${fillerProgressPercent}%"></div>
+                            <div class="progress-fill filler-fill" style="width: ${fillerProgressPercent}%; min-width: ${fillerProgressPercent > 0 ? 2 : 0}px; opacity: 1;"></div>
                         </div>
                     </div>` : '';
 
@@ -715,8 +718,8 @@ const AnimeCardRenderer = {
                 const canonProgressWidth = hasFillerData ? (canonWatched / totalCanon) * 100 : progressData.progress;
 
                 const progressInfoText = hasFillerData
-                    ? `<span title="Canon: ${canonWatched}/${totalCanonDisplay} | Total: ${episodeCount}/${totalDisplay}${progressData.isGuessed ? ' (estimated)' : ''}">📍 Ep ${currentEp > 0 ? currentEp : episodeCount} · ${canonWatched}/${totalCanonDisplay} · ${totalFillerCount} filler</span>`
-                    : `<span>Ep ${currentEp > 0 ? currentEp : episodeCount} · ${episodeCount}/${totalDisplay}</span>`;
+                    ? `<span title="Canon: ${canonWatched}/${totalCanonDisplay}">📍 Ep ${currentEp > 0 ? currentEp : episodeCount} · Canon ${canonWatched}/${totalCanonDisplay}</span>`
+                    : `<span>Ep ${currentEp > 0 ? currentEp : episodeCount} · Total ${episodeCount}/${totalDisplay}</span>`;
 
                 progressInfoHTML = `
                     <div class="progress-info">

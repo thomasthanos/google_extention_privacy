@@ -369,13 +369,26 @@ const ProgressTracker = {
                     episodes: [],
                     totalWatchTime: 0,
                     lastWatched: null,
-                    totalEpisodes: null
+                    totalEpisodes: Number.isFinite(info.totalEpisodes) ? info.totalEpisodes : null
                 };
             }
 
             if (!Array.isArray(animeData[info.animeSlug].episodes)) {
                 Logger.warn('Episodes not an array, resetting:', info.animeSlug);
                 animeData[info.animeSlug].episodes = [];
+            }
+
+            if (Number.isFinite(info.totalEpisodes) && info.totalEpisodes > 0 && info.totalEpisodes < 10000) {
+                const trackedEpisodes = animeData[info.animeSlug].episodes || [];
+                const maxTracked = Math.max(
+                    0,
+                    ...trackedEpisodes.map(ep => Number(ep.number) || 0),
+                    Number(info.episodeNumber) || 0,
+                    Number(info.secondEpisodeNumber) || 0
+                );
+                if (info.totalEpisodes >= maxTracked) {
+                    animeData[info.animeSlug].totalEpisodes = info.totalEpisodes;
+                }
             }
 
             const existingIndex = animeData[info.animeSlug].episodes
