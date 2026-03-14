@@ -1138,6 +1138,7 @@ body {
 .meta-badge-watching   { color: var(--amber); background: rgba(240,192,64,0.1);  border: 1px solid rgba(240,192,64,0.22); }
 .meta-badge-complete   { color: var(--green); background: rgba(76,175,130,0.1);  border: 1px solid rgba(76,175,130,0.22); }
 .meta-badge-notstarted { color: var(--t3);    background: rgba(255,255,255,0.03); border: 1px solid var(--b0); }
+.meta-badge-airing     { color: #ff6b6b;      background: rgba(255,107,107,0.1);  border: 1px solid rgba(255,107,107,0.3); }
 .meta-time { font-size: 9px; color: var(--t2); white-space: nowrap; flex-shrink: 0; }
 
 /* ─── Export token ──────────────────────────────────────────── */

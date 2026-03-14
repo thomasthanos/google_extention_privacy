@@ -77,6 +77,17 @@ const ProgressTracker = {
         
         const filtered = entries.filter(([id, progress]) => {
             if (id === currentUniqueId) return true;
+
+            // Expire tombstones after 7 days (they only need to outlive the merge window)
+            if (progress.deleted) {
+                const tombstoneAge = now - (progress.deletedAt ? new Date(progress.deletedAt).getTime() : 0);
+                const TOMBSTONE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+                if (tombstoneAge > TOMBSTONE_MAX_AGE) {
+                    Logger.debug('Removing expired tombstone:', id);
+                    return false;
+                }
+                return true; // keep fresh tombstones so other browsers see the reset
+            }
             
             // Use CONFIG.COMPLETED_PERCENTAGE (85) consistently — not a hardcoded 80
             if (progress.percentage >= CONFIG.COMPLETED_PERCENTAGE || (progress.duration && (progress.duration - progress.currentTime) <= CONFIG.REMAINING_TIME_THRESHOLD)) {
@@ -280,6 +291,8 @@ const ProgressTracker = {
 
     /**
      * Get saved video progress
+     * Returns null for tombstoned (soft-deleted) entries so they are never
+     * treated as resumable progress.
      */
     async getSavedProgress(uniqueId) {
         const { Storage, Logger } = window.AnimeTrackerContent;
@@ -287,7 +300,10 @@ const ProgressTracker = {
         try {
             const result = await Storage.get(['videoProgress']);
             const videoProgress = result.videoProgress || {};
-            return videoProgress[uniqueId] || null;
+            const entry = videoProgress[uniqueId] || null;
+            // Treat soft-delete tombstones as "no saved progress"
+            if (entry && entry.deleted) return null;
+            return entry;
         } catch (e) {
             Logger.error('Exception getting progress:', e);
             return null;

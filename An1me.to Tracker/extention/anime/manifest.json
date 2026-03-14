@@ -16,7 +16,8 @@
     "https://identitytoolkit.googleapis.com/*",
     "https://securetoken.googleapis.com/*",
     "https://firestore.googleapis.com/*",
-    "https://www.animefillerlist.com/*"
+    "https://www.animefillerlist.com/*",
+    "https://graphql.anilist.co/*"
   ],
   "action": {
     "default_popup": "popup.html",

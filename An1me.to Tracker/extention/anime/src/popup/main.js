@@ -728,12 +728,18 @@
             }
 
             await FillerService.loadCachedEpisodeTypes(animeData);
+            await AT.AnilistService.loadCachedData(animeData);
 
             renderAnimeList();
             updateStats();
 
             // Run auto-fetch immediately (no delay) - re-renders when complete
             FillerService.autoFetchMissing(animeData, () => {
+                renderAnimeList(elements.searchInput?.value || '');
+                updateStats();
+            });
+
+            AT.AnilistService.autoFetchMissing(animeData, () => {
                 renderAnimeList(elements.searchInput?.value || '');
                 updateStats();
             });
@@ -822,6 +828,11 @@
 
                 // Run auto-fetch immediately - re-renders when complete
                 FillerService.autoFetchMissing(animeData, () => {
+                    renderAnimeList(elements.searchInput?.value || '');
+                    updateStats();
+                });
+
+                AT.AnilistService.autoFetchMissing(animeData, () => {
                     renderAnimeList(elements.searchInput?.value || '');
                     updateStats();
                 });

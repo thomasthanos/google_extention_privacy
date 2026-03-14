@@ -768,6 +768,15 @@ const FillerService = {
             }
         }
 
+        // AniList fallback — more reliable than standard guesses for most anime
+        const anilistService = window.AnimeTracker?.AnilistService;
+        if (anilistService) {
+            const anilistTotal = anilistService.getTotalEpisodes(normalizedSlug);
+            if (anilistTotal && anilistTotal >= watchedCount) {
+                return anilistTotal;
+            }
+        }
+
         // Standard cour lengths fallback (used for all multi-season anime and unknown anime)
         return this.getStandardFallbackTotal(watchedCount);
     },

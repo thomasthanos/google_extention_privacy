@@ -449,6 +449,83 @@
         teardownSyncTriggered = false;
     }
 
+    // ─── Reset a single episode's progress (Start Over) ───────────────────────
+    // 1. Deletes the entry from chrome.storage.local immediately.
+    // 2. Pushes the deletion to Firestore so other browsers pick it up.
+    // 3. Wakes the background SW so it can broadcast the change.
+
+    async function resetProgressInCloud(uniqueId) {
+        if (!uniqueId) return;
+
+        // We use a soft-delete tombstone ({ deleted: true, deletedAt }) instead of
+        // a hard delete. This is critical because mergeVideoProgress uses
+        // "keep the higher currentTime" logic — if we simply remove the key, any
+        // other browser that still has the old high-currentTime value in its local
+        // storage will win the next merge and resurrect the progress, causing the
+        // resume prompt to reappear. The tombstone has an explicit timestamp so the
+        // merge logic will prefer it over any stale local entry with an older savedAt.
+
+        const deletedAt = new Date().toISOString();
+        const tombstone = { deleted: true, deletedAt, currentTime: 0, duration: 0, percentage: 0, savedAt: deletedAt };
+
+        // ── 1. Write tombstone to local storage ──────────────────────────────
+        try {
+            const local = await chrome.storage.local.get(['videoProgress']);
+            const videoProgress = local.videoProgress || {};
+            videoProgress[uniqueId] = tombstone;
+            csPauseSync(2000); // prevent storage watcher from re-triggering a push
+            await chrome.storage.local.set({ videoProgress });
+            console.log(`[CS-Sync] ✓ Start Over: tombstoned local progress for ${uniqueId}`);
+        } catch (e) {
+            console.warn('[CS-Sync] Start Over: failed to tombstone local progress:', e.message);
+        }
+
+        // ── 2. Push the tombstone to Firestore ───────────────────────────────
+        const token = await getValidToken();
+        const user  = currentUser || await getUser();
+        if (!token || !user) return;
+
+        try {
+            const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
+            let cloudVP = {};
+            try {
+                const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+                if (r.ok) cloudVP = fromFSDoc(await r.json())?.videoProgress || {};
+            } catch { /* best-effort */ }
+
+            cloudVP[uniqueId] = tombstone;
+            lastPushedProgress = null; // invalidate snapshot so next push is not skipped
+
+            const updateMask = 'updateMask.fieldPaths=videoProgress&updateMask.fieldPaths=lastUpdated';
+            const res = await fetch(`${url}?${updateMask}`, {
+                method:  'PATCH',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    fields: toFSFields({
+                        videoProgress: cloudVP,
+                        lastUpdated:   deletedAt
+                    })
+                })
+            });
+
+            if (res.ok) {
+                lastPushedProgress = JSON.stringify(cloudVP);
+                console.log(`[CS-Sync] ✓ Start Over: tombstoned cloud progress for ${uniqueId}`);
+            } else {
+                console.warn('[CS-Sync] Start Over: cloud tombstone failed:', res.status);
+            }
+        } catch (e) {
+            console.warn('[CS-Sync] Start Over: cloud tombstone error:', e.message);
+        }
+
+        // ── 3. Wake background SW so other Chrome windows sync immediately ───
+        wakeBackgroundSW('SYNC_PROGRESS_ONLY').catch(() => {});
+    }
+
+    // Expose for other content-script modules
+    window.AnimeTrackerContent = window.AnimeTrackerContent || {};
+    window.AnimeTrackerContent.resetProgressInCloud = resetProgressInCloud;
+
     // ─── Apply incoming cloud update locally ──────────────────────────────────
 
     async function applyCloudUpdate(cloudDoc) {
@@ -850,5 +927,8 @@
     }, { passive: true });
 
     connectKeepalivePort();
+
+    // Re-export after IIFE body has run (ensures the reference is live)
+    window.AnimeTrackerContent.resetProgressInCloud = resetProgressInCloud;
 
 })();

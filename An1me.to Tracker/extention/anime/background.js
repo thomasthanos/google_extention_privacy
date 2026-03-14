@@ -612,6 +612,31 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     }
 });
 
+// ─── AniList fetcher ──────────────────────────────────────────────────────────
+
+async function fetchAnilistData(searchTitle) {
+    const query = `
+        query ($search: String) {
+            Media(search: $search, type: ANIME) {
+                id
+                title { romaji english }
+                episodes
+                duration
+                status
+            }
+        }
+    `;
+    const response = await fetch('https://graphql.anilist.co', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ query, variables: { search: searchTitle } })
+    });
+    if (!response.ok) throw new Error(`AniList HTTP ${response.status}`);
+    const json = await response.json();
+    if (json.errors) throw new Error(json.errors[0].message);
+    return json.data?.Media || null;
+}
+
 // ─── Episode type fetcher ─────────────────────────────────────────────────────
 
 async function fetchEpisodeTypesFromAnimeFillerList(animeSlug) {
@@ -841,6 +866,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     if (message.type === 'GET_VERSION') {
         sendResponse({ version: chrome.runtime.getManifest().version });
+        return true;
+    }
+
+    if (message.type === 'FETCH_ANILIST') {
+        if (!message.searchTitle) { sendResponse({ error: 'Missing searchTitle' }); return true; }
+        fetchAnilistData(message.searchTitle)
+            .then(media => sendResponse({ success: true, media }))
+            .catch(error => sendResponse({ success: false, error: error.message }));
         return true;
     }
 

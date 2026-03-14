@@ -191,6 +191,10 @@ const VideoMonitor = {
         if (animeInfo) {
             const savedProgress = await ProgressTracker.getSavedProgress(animeInfo.uniqueId);
             if (savedProgress && savedProgress.currentTime > CONFIG.MIN_PROGRESS_TO_SAVE) {
+                // Attach uniqueId so Notifications.showResumePrompt can pass it
+                // to resetProgressInCloud when the user picks "Start Over".
+                savedProgress.uniqueId = animeInfo.uniqueId;
+
                 let retryCount = 0;
                 const MAX_RETRIES = 20;
 
@@ -203,8 +207,9 @@ const VideoMonitor = {
                                 video.play().catch(() => {});
                                 Logger.success(`Resumed @ ${savedProgress.currentTime}s`);
                             },
-                            async () => {
-                                await ProgressTracker.clearSavedProgress(animeInfo.uniqueId);
+                            () => {
+                                // clearSavedProgress + cloud reset are handled inside
+                                // Notifications.showResumePrompt's onNo handler.
                                 video.currentTime = 0;
                                 video.play().catch(() => {});
                             }

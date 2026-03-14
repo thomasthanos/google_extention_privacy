@@ -213,7 +213,13 @@ const AnimeCardRenderer = {
         const statusBadgeClass = isCardComplete ? 'meta-badge-complete' : (totalWatchedEpisodes > 0 ? 'meta-badge-watching' : 'meta-badge-notstarted');
         const statusBadgeIcon = isCardComplete ? '✓' : '⊙';
         const statusBadge = `<span class="meta-badge ${statusBadgeClass}">${statusBadgeIcon} ${statusTextCard}</span>`;
-        const metaRowHtml = `<div class="anime-meta-row">${progressBadge}${statusBadge}<span class="meta-time">${timeAgoText}</span></div>`;
+
+        const anilistStatus = window.AnimeTracker?.AnilistService?.getStatus(slug);
+        const airingBadge = anilistStatus === 'RELEASING'
+            ? `<span class="meta-badge meta-badge-airing" title="Currently airing">⬤ Airing</span>`
+            : '';
+
+        const metaRowHtml = `<div class="anime-meta-row">${progressBadge}${statusBadge}${airingBadge}<span class="meta-time">${timeAgoText}</span></div>`;
 
         return `
             <div class="anime-card" data-slug="${slug}">
