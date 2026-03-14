@@ -71,6 +71,7 @@ const UIHelpers = {
         const date = new Date(isoString);
         const now = new Date();
         const diffMs = now - date;
+        const diffSeconds = Math.floor(diffMs / 1000);
         const diffMinutes = Math.floor(diffMs / (1000 * 60));
         const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
 
@@ -79,9 +80,9 @@ const UIHelpers = {
         const dateMidnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
         const diffDays = Math.round((todayMidnight - dateMidnight) / (1000 * 60 * 60 * 24));
         
-        if (diffMinutes < 1) return 'Just now';
-        if (diffMinutes < 60) return `${diffMinutes} minutes ago`;
-        if (diffHours < 24) return `${diffHours} hours ago`;
+        if (diffSeconds < 60) return `${Math.max(1, diffSeconds)}S ago`;
+        if (diffMinutes < 60) return `${diffMinutes}M ago`;
+        if (diffHours < 24) return `${diffHours}H ago`;
         if (diffDays === 1) return 'Yesterday';
         if (diffDays < 7) return `${diffDays} days ago`;
         
@@ -120,6 +121,24 @@ const UIHelpers = {
             .replace(/'/g, '&#039;')
             .replace(/`/g, '&#x60;')
             .replace(/\//g, '&#x2F;');
+    },
+
+    /**
+     * Sanitize image URLs used in popup templates.
+     * Allows only absolute HTTPS URLs.
+     */
+    sanitizeImageUrl(url) {
+        if (typeof url !== 'string') return null;
+        const trimmed = url.trim();
+        if (!trimmed) return null;
+
+        try {
+            const parsed = new URL(trimmed, window.location.origin);
+            if (parsed.protocol !== 'https:') return null;
+            return parsed.href;
+        } catch {
+            return null;
+        }
     },
 
     /**

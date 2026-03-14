@@ -36,6 +36,7 @@
         emptyState: document.getElementById('emptyState'),
         searchInput: document.getElementById('searchInput'),
         totalAnime: document.getElementById('totalAnime'),
+        totalMovies: document.getElementById('totalMovies'),
         totalEpisodes: document.getElementById('totalEpisodes'),
         totalTime: document.getElementById('totalTime'),
         confirmDialog: document.getElementById('confirmDialog'),
@@ -72,13 +73,53 @@
 
     // State for edit title
     let editingSlug = null;
+    let loadAndSyncInProgress = false;
 
-    // Timestamp of last save initiated by this popup (used to distinguish
-    // our own writes from background-SW cloud updates in the storage listener)
-    let lastInternalSaveAt = 0;
+    // Track writes initiated by this popup so storage.onChanged can distinguish
+    // local writes from external/background updates.
+    // Uses a per-write UUID token injected into the saved payload under the key
+    // '__writeToken'. This avoids relying on JSON.stringify key ordering
+    // (which is V8-stable but not ECMAScript-guaranteed) for change detection.
+    const OWN_WRITE_TTL_MS = 15000;
+    const ownWriteTokens = new Set();
 
-    function markInternalSave() {
-        lastInternalSaveAt = Date.now();
+    function generateWriteToken() {
+        try {
+            return crypto.randomUUID();
+        } catch {
+            // Fallback for environments where crypto.randomUUID is unavailable
+            return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        }
+    }
+
+    /**
+     * Inject a unique write token into the payload before saving.
+     * The token is stored in chrome.storage.local under '__writeToken' and
+     * in memory so the onChanged listener can identify our own writes.
+     * @param {object} data - The payload object passed to Storage.set().
+     *   The '__writeToken' key is added in-place so it is included in the write.
+     */
+    function markInternalSave(data = null) {
+        if (!data || typeof data !== 'object') return;
+        const token = generateWriteToken();
+        data.__writeToken = token;
+        ownWriteTokens.add(token);
+        setTimeout(() => ownWriteTokens.delete(token), OWN_WRITE_TTL_MS);
+    }
+
+    /**
+     * Returns true if the storage change batch originated from this popup.
+     * Checks for '__writeToken' in the change set and validates it against
+     * the in-memory set of tokens we generated.
+     * @param {object} changes - The full changes object from onChanged.
+     */
+    function isOwnStorageChange(changes) {
+        const tokenChange = changes.__writeToken;
+        if (!tokenChange) return false;
+        const token = tokenChange.newValue;
+        if (!token || !ownWriteTokens.has(token)) return false;
+        ownWriteTokens.delete(token);
+        return true;
     }
 
     function normalizeCategory(value) {
@@ -105,7 +146,7 @@
         if (watchedCount === 0) return false;
 
         // Movies are complete as soon as they are tracked once.
-        if (SeasonGrouping.isMovie(slug)) return true;
+        if (SeasonGrouping.isMovie(slug, anime)) return true;
 
         const progressData = FillerService.calculateProgress(watchedCount, slug, anime);
         return progressData.progress >= 100;
@@ -116,6 +157,82 @@
         if (!isAnimeCompleted(slug, anime)) return false;
         const daysSinceLastWatch = getCalendarDayDiff(anime?.lastWatched);
         return daysSinceLastWatch >= CONFIG.COMPLETED_LIST_MIN_DAYS;
+    }
+
+    function normalizeMovieDurations(data, progress = {}) {
+        const { SeasonGrouping } = AT;
+        const MIN_RELIABLE_DURATION_SECONDS = 30 * 60; // 30 minutes
+        const MAX_RELIABLE_DURATION_SECONDS = 6 * 60 * 60; // 6 hours
+        const LEGACY_DEFAULT_MOVIE_DURATION_SECONDS = 100 * 60; // 1h40m fallback
+        let changed = false;
+        let updatedEntries = 0;
+
+        for (const [slug, anime] of Object.entries(data || {})) {
+            if (!anime || !SeasonGrouping.isMovie(slug, anime)) continue;
+            if (!Array.isArray(anime.episodes) || anime.episodes.length === 0) continue;
+
+            const slugProgressDurations = Object.entries(progress || {})
+                .filter(([key, entry]) => key.startsWith(`${slug}__episode-`) && !entry?.deleted)
+                .map(([, entry]) => Number(entry?.duration) || 0)
+                .filter((d) => d >= MIN_RELIABLE_DURATION_SECONDS && d <= MAX_RELIABLE_DURATION_SECONDS);
+            const fallbackSlugDuration = slugProgressDurations.length > 0
+                ? Math.max(...slugProgressDurations)
+                : 0;
+
+            let entryChanged = false;
+            anime.episodes = anime.episodes.map((ep) => {
+                const episodeNum = Number(ep?.number) || 0;
+                const currentDuration = Number(ep?.duration) || 0;
+                const progressKey = `${slug}__episode-${episodeNum}`;
+                const progressEntry = progress?.[progressKey];
+                const exactProgressDuration = progressEntry?.deleted ? 0 : (Number(progressEntry?.duration) || 0);
+                const progressDuration = exactProgressDuration || fallbackSlugDuration;
+                const hasBetterProgressDuration =
+                    progressDuration >= MIN_RELIABLE_DURATION_SECONDS &&
+                    progressDuration <= MAX_RELIABLE_DURATION_SECONDS;
+                const isLegacyDuration =
+                    currentDuration === 1440 || currentDuration === 6000 || currentDuration === 7200;
+                const isUnknownDuration = currentDuration <= 0;
+                const isVideoMeasured = ep?.durationSource === 'video';
+
+                let nextDuration = currentDuration;
+                if (hasBetterProgressDuration && (isLegacyDuration || currentDuration < MIN_RELIABLE_DURATION_SECONDS)) {
+                    nextDuration = progressDuration;
+                } else if (isUnknownDuration && !isVideoMeasured) {
+                    // Recovery path: if legacy cleanup previously zeroed movie durations and
+                    // we still don't have real metadata, keep a stable estimate instead of 0.
+                    const fallbackFromTotal =
+                        anime.episodes?.length > 0
+                            ? Math.round((Number(anime.totalWatchTime) || 0) / anime.episodes.length)
+                            : 0;
+                    const hasValidFallbackFromTotal =
+                        fallbackFromTotal >= MIN_RELIABLE_DURATION_SECONDS &&
+                        fallbackFromTotal <= MAX_RELIABLE_DURATION_SECONDS;
+                    nextDuration = hasValidFallbackFromTotal
+                        ? fallbackFromTotal
+                        : LEGACY_DEFAULT_MOVIE_DURATION_SECONDS;
+                }
+
+                if (nextDuration !== currentDuration) {
+                    entryChanged = true;
+                    return {
+                        ...ep,
+                        duration: nextDuration,
+                        durationSource: hasBetterProgressDuration ? 'video' : (ep?.durationSource || 'legacy-estimate')
+                    };
+                }
+
+                return ep;
+            });
+
+            if (!entryChanged) continue;
+
+            anime.totalWatchTime = anime.episodes.reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
+            changed = true;
+            updatedEntries += 1;
+        }
+
+        return { changed, updatedEntries };
     }
 
     /**
@@ -171,7 +288,7 @@
         // Filter by category
         const categoryFilter = (slug, anime) => {
             if (currentCategory === 'all') return true;
-            const isMovie = SeasonGrouping.isMovie(slug);
+            const isMovie = SeasonGrouping.isMovie(slug, anime);
             if (currentCategory === 'movies') return isMovie;
             if (currentCategory === 'series') return !isMovie;
             return true;
@@ -186,13 +303,13 @@
 
         // Filter out deleted items for display
         const visibleProgress = Object.fromEntries(
-            Object.entries(videoProgress).filter(([_, p]) => !p.deleted)
+            Object.entries(videoProgress).filter(([, p]) => !p.deleted)
         );
 
         const inProgressOnly = ProgressManager.getInProgressOnlyAnime(animeData, visibleProgress)
             .filter(anime => {
                 const matchesSearch = !filter || anime.title.toLowerCase().includes(filter.toLowerCase());
-                const trackedAnime = anime.slug ? animeData[anime.slug] : null;
+                const trackedAnime = animeData[anime.slug] || anime;
                 const matchesCategory = categoryFilter(anime.slug || '', trackedAnime);
                 return matchesSearch && matchesCategory;
             })
@@ -309,8 +426,6 @@
      * Setup card event listeners
      */
     function setupCardEventListeners() {
-        const { FillerService } = AT;
-
         // In-progress headers - Click on HEADER toggles collapse
         elements.animeList.querySelectorAll('.in-progress-header').forEach(header => {
             const toggleCollapse = (e) => {
@@ -398,8 +513,6 @@
                 // Explicitly bind to title
                 const title = header.querySelector('.season-group-name');
                 if (title) title.addEventListener('click', (e) => { e.stopPropagation(); toggleGroup(); });
-                const titleContainer = header.querySelector('.season-group-title');
-                if (titleContainer) titleContainer.addEventListener('click', (e) => { e.stopPropagation(); toggleGroup(); });
             }
         });
 
@@ -446,9 +559,6 @@
             // Explicitly bind to label/title
             const label = header.querySelector('.season-label');
             if (label) label.addEventListener('click', toggleSeason);
-
-            const movieLabel = header.querySelector('.movie-label');
-            if (movieLabel) movieLabel.addEventListener('click', toggleSeason);
         });
 
         // Movie group headers
@@ -507,11 +617,13 @@
         const groups = SeasonGrouping.groupByBase(animeEntries);
         const totalAnimeCount = groups.size;
         elements.totalAnime.textContent = totalAnimeCount;
+        const totalMoviesCount = animeEntries.filter(([slug, anime]) => SeasonGrouping.isMovie(slug, anime)).length;
+        if (elements.totalMovies) elements.totalMovies.textContent = totalMoviesCount;
 
         let totalWatchedEpisodes = 0;
         let totalWatchTime = 0;
 
-        for (const [slug, anime] of animeEntries) {
+        for (const [, anime] of animeEntries) {
             const uniqueEpisodeNumbers = new Set(
                 (anime.episodes || [])
                     .map(ep => Number(ep?.number))
@@ -533,6 +645,7 @@
             await Storage.set({
                 cachedStats: {
                     totalAnime: totalAnimeCount,
+                    totalMovies: totalMoviesCount,
                     totalEpisodes: totalWatchedEpisodes,
                     totalTime: totalTimeStr
                 }
@@ -554,6 +667,7 @@
             if (cachedResult.cachedStats) {
                 const stats = cachedResult.cachedStats;
                 if (elements.totalAnime) elements.totalAnime.textContent = stats.totalAnime || 0;
+                if (elements.totalMovies) elements.totalMovies.textContent = stats.totalMovies || 0;
                 if (elements.totalEpisodes) elements.totalEpisodes.textContent = stats.totalEpisodes || 0;
                 if (elements.totalTime) elements.totalTime.textContent = stats.totalTime || '0h';
             }
@@ -583,15 +697,18 @@
 
             const cleanedData = ProgressManager.removeDuplicateEpisodes(animeData);
             const { repairedData, repairedCount } = ProgressManager.repairLikelyMissedEpisodes(cleanedData);
+            const rawProgressForDurations = videoProgress || {};
             const { cleaned: cleanedProgress, removedCount: progressRemoved } =
                 ProgressManager.cleanTrackedProgress(repairedData, videoProgress);
 
             const originalCount = UIHelpers.countEpisodes(result.animeData || {});
             const cleanedCount = UIHelpers.countEpisodes(repairedData);
+            const durationFix = normalizeMovieDurations(repairedData, rawProgressForDurations);
             const needsSave =
                 (originalCount !== cleanedCount) ||
                 (progressRemoved > 0) ||
                 (repairedCount > 0) ||
+                durationFix.changed ||
                 normalized.changed;
 
             if (needsSave) {
@@ -604,6 +721,7 @@
                 if (normalized.changed) {
                     payload.deletedAnime = normalized.deletedAnime || {};
                 }
+                markInternalSave(payload);
                 await Storage.set(payload);
             } else {
                 animeData = repairedData;
@@ -632,6 +750,9 @@
      * Load and sync with cloud
      */
     async function loadAndSyncData() {
+        if (loadAndSyncInProgress) return;
+        loadAndSyncInProgress = true;
+
         const { Storage, FirebaseSync, FillerService, ProgressManager } = AT;
 
         try {
@@ -640,6 +761,7 @@
             if (cachedResult.cachedStats) {
                 const stats = cachedResult.cachedStats;
                 if (elements.totalAnime) elements.totalAnime.textContent = stats.totalAnime || 0;
+                if (elements.totalMovies) elements.totalMovies.textContent = stats.totalMovies || 0;
                 if (elements.totalEpisodes) elements.totalEpisodes.textContent = stats.totalEpisodes || 0;
                 if (elements.totalTime) elements.totalTime.textContent = stats.totalTime || '0h';
             }
@@ -673,15 +795,17 @@
                 );
                 const deduped = ProgressManager.removeDuplicateEpisodes(normalized.animeData || {});
                 const { repairedData, repairedCount } = ProgressManager.repairLikelyMissedEpisodes(deduped);
+                const rawProgressForDurations = normalized.videoProgress || {};
                 const { cleaned: cleanedProgress, removedCount: progressRemoved } =
-                    ProgressManager.cleanTrackedProgress(repairedData, normalized.videoProgress || {});
+                    ProgressManager.cleanTrackedProgress(repairedData, rawProgressForDurations);
+                const durationFix = normalizeMovieDurations(repairedData, rawProgressForDurations);
 
                 animeData = repairedData;
                 videoProgress = cleanedProgress;
                 // Update global group cover images from synced data
                 window.AnimeTracker.groupCoverImages = data.groupCoverImages || {};
 
-                if (repairedCount > 0 || progressRemoved > 0 || normalized.changed) {
+                if (repairedCount > 0 || progressRemoved > 0 || durationFix.changed || normalized.changed) {
                     const payload = {
                         animeData: repairedData,
                         videoProgress: cleanedProgress
@@ -689,6 +813,7 @@
                     if (normalized.changed) {
                         payload.deletedAnime = normalized.deletedAnime || {};
                     }
+                    markInternalSave(payload);
                     await Storage.set(payload);
                 }
 
@@ -704,6 +829,8 @@
         } catch (error) {
             console.error('[Sync] Error:', error);
             loadData();
+        } finally {
+            loadAndSyncInProgress = false;
         }
     }
 
@@ -736,7 +863,7 @@
                 }
 
                 // Save locally first
-                markInternalSave();
+                markInternalSave(dataToSave);
                 await Storage.set(dataToSave);
 
             // Then force cloud sync (include group covers)
@@ -813,7 +940,7 @@
                 dataToSave.userId = user.uid;
             }
 
-            markInternalSave();
+            markInternalSave(dataToSave);
             await Storage.set(dataToSave);
 
             if (user) {
@@ -852,7 +979,7 @@
             dataToSave.userId = user.uid;
         }
 
-        markInternalSave();
+        markInternalSave(dataToSave);
         await Storage.set(dataToSave);
 
         if (user) {
@@ -1102,9 +1229,9 @@
             const now = new Date().toISOString();
 
             // Determine duration based on content type
-            // Movies: ~100 minutes (6000 seconds), Episodes: ~24 minutes (1440 seconds)
-            const isMovie = SeasonGrouping.isMovie(slug);
-            const defaultDuration = isMovie ? 6000 : 1440;
+            // Movies: keep unknown duration (0) until real video metadata is captured by tracker.
+            const isMovie = SeasonGrouping.isMovie(slug, { title });
+            const defaultDuration = isMovie ? 0 : 1440;
 
             // Build episodes array from parsed numbers
             const episodes = episodeNumbers.map(num => ({
@@ -1149,7 +1276,7 @@
                 dataToSave.userId = user.uid;
             }
 
-            markInternalSave();
+            markInternalSave(dataToSave);
             await Storage.set(dataToSave);
 
             // Update UI immediately
@@ -1238,7 +1365,7 @@
                 dataToSave.userId = user.uid;
             }
 
-            markInternalSave();
+            markInternalSave(dataToSave);
             await Storage.set(dataToSave);
 
             // Update UI
@@ -1404,7 +1531,7 @@
      * Initialize event listeners
      */
     function initEventListeners() {
-        const { CONFIG, DONATE_LINKS, UIHelpers, FirebaseSync, Storage } = AT;
+        const { CONFIG, DONATE_LINKS, FirebaseSync } = AT;
 
         // Auth
         if (elements.googleSignIn) {
@@ -1423,24 +1550,17 @@
             collapsibleHeader.addEventListener('click', () => {
                 const isExpanded = !collapsible.classList.contains('expanded');
                 toggleTokenMode(isExpanded);
-                try { localStorage.setItem('authAdvancedExpanded', isExpanded); } catch (_) {}
+                try { localStorage.setItem('authAdvancedExpanded', isExpanded); } catch {
+                    // Ignore localStorage failures in restricted/private contexts.
+                }
             });
             try {
                 const wasExpanded = localStorage.getItem('authAdvancedExpanded') === 'true';
                 if (wasExpanded) toggleTokenMode(true);
-            } catch (_) {}
+            } catch {
+                // Ignore localStorage failures in restricted/private contexts.
+            }
         }
-
-        // Help link — clears corrupt session
-        const helpLink = document.getElementById('helpLink');
-        if (helpLink) {
-            helpLink.addEventListener('click', async (e) => {
-                e.preventDefault();
-                await chrome.storage.local.remove(['firebase_user', 'firebase_tokens', 'userId']);
-                window.location.reload();
-            });
-        }
-
         // Token import sign in
         const tokenSignInBtn = document.getElementById('tokenSignIn');
         if (tokenSignInBtn) {
@@ -1746,51 +1866,34 @@
         // (e.g. real-time cloud sync from another device) — no manual refresh needed.
         let storageUpdateTimeout = null;
 
-        chrome.storage.local.onChanged.addListener((changes, namespace) => {
+        chrome.storage.onChanged.addListener((changes, namespace) => {
             if (namespace !== 'local') return;
-
-            // Changes within 1.5s of our own save are ours — skip re-upload.
-            // Anything older is from the background SW (another device's cloud update).
-            const isOwnWrite = (Date.now() - lastInternalSaveAt) < 1500;
-            const { UIHelpers } = AT;
-
+            // Distinguish own writes from external updates via the '__writeToken' key.
+            // isOwnStorageChange inspects the full changes batch once so we avoid
+            // repeated per-key JSON.stringify comparisons (which depend on V8 key order).
             let needsUpdate = false;
-            let needsCloudSync = false;
+            const isOwn = isOwnStorageChange(changes);
             let isExternalUpdate = false;
 
             if (changes.animeData) {
                 // Always update local animeData and re-render when animeData changes.
                 animeData = changes.animeData.newValue || {};
                 needsUpdate = true;
-                // If this write didn't originate from within the popup (e.g. from background SW)
-                // mark it as an external update so the UI can flash the sync indicator. Otherwise,
-                // mark for cloud sync so the change propagates to other devices.
-                if (!isOwnWrite) {
-                    isExternalUpdate = true;
-                } else {
-                    needsCloudSync = true;
-                }
+                if (!isOwn) isExternalUpdate = true;
             }
             if (changes.videoProgress) {
                 videoProgress = changes.videoProgress.newValue || {};
                 needsUpdate = true;
-                if (!isOwnWrite) isExternalUpdate = true;
+                if (!isOwn) isExternalUpdate = true;
             }
 
             // Detect changes in group cover images. When posters are updated
             // (e.g. another device added a new group cover), update the global
-            // cache and re-render. Treat this similar to animeData updates:
-            // external updates trigger a sync indicator, and local updates
-            // (not from the popup) should be synced to the cloud.
+            // cache and re-render.
             if (changes.groupCoverImages) {
                 window.AnimeTracker.groupCoverImages = changes.groupCoverImages.newValue || {};
                 needsUpdate = true;
-                if (!isOwnWrite) {
-                    isExternalUpdate = true;
-                } else {
-                    // If the popup itself triggered a write (unlikely), mark for cloud sync.
-                    needsCloudSync = true;
-                }
+                if (!isOwn) isExternalUpdate = true;
             }
 
             if (needsUpdate) {
@@ -1809,21 +1912,6 @@
                         }, 2500);
                     }
 
-                    // Only push back to cloud if the popup itself triggered new data
-                    if (FirebaseSync.getUser() && needsCloudSync) {
-                        markInternalSave();
-                        try {
-                            // Include groupCoverImages in sync data to persist posters across devices
-                            const result = await Storage.get(['animeData', 'videoProgress', 'groupCoverImages']);
-                            await FirebaseSync.saveToCloud({
-                                animeData: result.animeData || {},
-                                videoProgress: result.videoProgress || {},
-                                groupCoverImages: result.groupCoverImages || {}
-                            });
-                        } catch (error) {
-                            console.error('[Storage] Cloud save error:', error);
-                        }
-                    }
                 }, CONFIG.STORAGE_UPDATE_DEBOUNCE_MS);
             }
         });
@@ -1933,7 +2021,7 @@
                     clearTimeout(timer);
                     resolve(!chrome.runtime.lastError && !!resp);
                 });
-            } catch (_) {
+            } catch {
                 clearTimeout(timer);
                 resolve(false);
             }
@@ -1955,6 +2043,7 @@
             if (cachedResult.cachedStats) {
                 const stats = cachedResult.cachedStats;
                 if (elements.totalAnime) elements.totalAnime.textContent = stats.totalAnime || 0;
+                if (elements.totalMovies) elements.totalMovies.textContent = stats.totalMovies || 0;
                 if (elements.totalEpisodes) elements.totalEpisodes.textContent = stats.totalEpisodes || 0;
                 if (elements.totalTime) elements.totalTime.textContent = stats.totalTime || '0h';
             }
@@ -1985,14 +2074,16 @@
                 const bgAlive = await checkBackgroundAlive();
                 if (!bgAlive) {
                     console.log('[Popup] SW was asleep, sending wake-up sync signal');
-                    try { chrome.runtime.sendMessage({ type: 'SYNC_TO_FIREBASE' }); } catch (_) {}
+                    try { chrome.runtime.sendMessage({ type: 'SYNC_TO_FIREBASE' }); } catch {
+                        // Fire-and-forget wake-up; ignore if runtime is not reachable.
+                    }
                 }
                 loadAndSyncData();
             },
             onUserSignedOut: () => {
                 showAuthScreen();
             },
-            onError: (error) => {
+            onError: () => {
                 showMainApp(null);
                 loadData();
             }
@@ -2010,85 +2101,11 @@
         }
     });
 
-    // Debug functions
-    window.debugFillers = function (slug) {
-        const { FillerService } = AT;
-        const normalized = FillerService.getNormalizedFillerSlug(slug);
-        const fillers = FillerService.KNOWN_FILLERS[normalized];
-        console.log('[Debug] Slug:', slug);
-        console.log('[Debug] Normalized:', normalized);
-        console.log('[Debug] Has filler data:', !!fillers);
-        if (fillers) {
-            console.log('[Debug] Filler ranges:', fillers);
-            const total = fillers.reduce((sum, [s, e]) => sum + (e - s + 1), 0);
-            console.log('[Debug] Total fillers:', total);
-        }
-        return { slug, normalized, hasData: !!fillers };
-    };
-
-    window.showAllSlugs = function () {
-        const { FillerService } = AT;
-        console.log('[Debug] All anime slugs:');
-        Object.keys(animeData).forEach(slug => {
-            const normalized = FillerService.getNormalizedFillerSlug(slug);
-            const hasFillers = !!FillerService.KNOWN_FILLERS[normalized];
-            console.log(`  ${slug} -> ${normalized} (filler data: ${hasFillers})`);
-        });
-    };
-
-    window.testFetchFillers = async function (animeSlug) {
-        const { FillerService } = AT;
-        console.log(`[Test] Fetching filler data for: ${animeSlug}`);
-        try {
-            const episodeTypes = await FillerService.fetchEpisodeTypes(animeSlug);
-            if (episodeTypes) {
-                FillerService.updateFromEpisodeTypes(animeSlug, episodeTypes);
-                console.log('[Test] ✓ Success!', episodeTypes);
-            }
-            return episodeTypes;
-        } catch (error) {
-            console.error('[Test] ✗ Failed:', error);
-            return null;
-        }
-    };
-
-    window.cleanupDuplicates = async function () {
-        const { Storage, ProgressManager, UIHelpers, FirebaseSync } = AT;
-
-        console.log('[Cleanup] Starting manual cleanup...');
-
-        // Also retrieve groupCoverImages so we preserve them during cleanup
-        const result = await Storage.get(['animeData', 'videoProgress', 'userId', 'groupCoverImages']);
-        const originalCount = UIHelpers.countEpisodes(result.animeData || {});
-
-        const cleanedData = ProgressManager.removeDuplicateEpisodes(result.animeData || {});
-        const { cleaned: cleanedProgress, removedCount: progressRemoved } =
-            ProgressManager.cleanTrackedProgress(cleanedData, result.videoProgress || {});
-
-        const cleanedCount = UIHelpers.countEpisodes(cleanedData);
-        console.log('[Cleanup] Removed:', originalCount - cleanedCount, 'duplicates,', progressRemoved, 'progress entries');
-
-        await Storage.set({
-            animeData: cleanedData,
-            videoProgress: cleanedProgress,
-            groupCoverImages: result.groupCoverImages || {}
-        });
-
-        if (FirebaseSync.getUser()) {
-            // Also include group covers in the pending save
-            FirebaseSync.pendingSave = { animeData: cleanedData, videoProgress: cleanedProgress, groupCoverImages: result.groupCoverImages || {} };
-            await FirebaseSync.performCloudSave();
-        }
-
-        animeData = cleanedData;
-        videoProgress = cleanedProgress;
-        renderAnimeList(elements.searchInput?.value || '');
-        updateStats();
-
-        return { removed: originalCount - cleanedCount, progressRemoved };
-    };
-
     // Start
     init();
 
 })();
+
+
+
+

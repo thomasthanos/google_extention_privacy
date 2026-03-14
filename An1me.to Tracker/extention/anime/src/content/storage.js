@@ -10,7 +10,7 @@ const ContentStorage = {
     isContextValid() {
         try {
             return chrome.runtime && chrome.runtime.id;
-        } catch (e) {
+        } catch {
             return false;
         }
     },

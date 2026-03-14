@@ -28,6 +28,18 @@
     let currentUser      = null;
     let reconnectDelay   = 5000;
     const MAX_RECONNECT  = 60000;
+    let teardownSyncTriggered = false;
+
+    // ─── Sync pause guard (mirrors background.js pauseSync) ──────────────────
+    // Prevents the storage onChanged listener from re-triggering a push
+    // immediately after we write cloud data back to local storage (infinite loop).
+    let csSyncPausedUntil = 0;
+    function csPauseSync(ms = 4000) {
+        csSyncPausedUntil = Math.max(csSyncPausedUntil, Date.now() + ms);
+    }
+    function csIsSyncPaused() {
+        return Date.now() < csSyncPausedUntil;
+    }
 
     // ─── Firestore codec ──────────────────────────────────────────────────────
 
@@ -76,6 +88,54 @@
         return out;
     }
 
+    function areProgressMapsEqual(a, b) {
+        const aObj = a || {};
+        const bObj = b || {};
+        const aKeys = Object.keys(aObj);
+        const bKeys = Object.keys(bObj);
+        if (aKeys.length !== bKeys.length) return false;
+
+        for (const id of aKeys) {
+            const ap = aObj[id];
+            const bp = bObj[id];
+            if (!bp) return false;
+
+            if ((ap.currentTime || 0) !== (bp.currentTime || 0)) return false;
+            if ((ap.duration || 0) !== (bp.duration || 0)) return false;
+            if ((ap.percentage || 0) !== (bp.percentage || 0)) return false;
+            if (!!ap.deleted !== !!bp.deleted) return false;
+            if ((ap.savedAt || '') !== (bp.savedAt || '')) return false;
+            if ((ap.deletedAt || '') !== (bp.deletedAt || '')) return false;
+        }
+        return true;
+    }
+
+    function shallowEqualStringMap(a, b) {
+        const aObj = a || {};
+        const bObj = b || {};
+        const aKeys = Object.keys(aObj);
+        const bKeys = Object.keys(bObj);
+        if (aKeys.length !== bKeys.length) return false;
+        for (const key of aKeys) {
+            if (!Object.prototype.hasOwnProperty.call(bObj, key)) return false;
+            if ((aObj[key] || '') !== (bObj[key] || '')) return false;
+        }
+        return true;
+    }
+
+    function shallowEqualDeletedAnime(a, b) {
+        const aObj = a || {};
+        const bObj = b || {};
+        const aKeys = Object.keys(aObj);
+        const bKeys = Object.keys(bObj);
+        if (aKeys.length !== bKeys.length) return false;
+        for (const slug of aKeys) {
+            if (!bObj[slug]) return false;
+            if ((aObj[slug]?.deletedAt || '') !== (bObj[slug]?.deletedAt || '')) return false;
+        }
+        return true;
+    }
+
     // ─── Token ────────────────────────────────────────────────────────────────
 
     async function refreshToken(rt) {
@@ -98,7 +158,7 @@
             };
             await chrome.storage.local.set({ firebase_tokens: tokens });
             return tokens.idToken;
-        } catch (_) { return null; }
+        } catch { return null; }
     }
 
     async function getValidToken() {
@@ -108,14 +168,14 @@
             if (!t?.idToken) return null;
             if (t.expiresAt < Date.now() + 120000) return await refreshToken(t.refreshToken);
             return t.idToken;
-        } catch (_) { return null; }
+        } catch { return null; }
     }
 
     async function getUser() {
         try {
             const s = await chrome.storage.local.get(['firebase_user']);
             return s.firebase_user || null;
-        } catch (_) { return null; }
+        } catch { return null; }
     }
 
     // ─── Merge helpers (delegated to src/content/merge-utils.js) ─────────────
@@ -126,7 +186,8 @@
         mergeAnimeData,
         mergeVideoProgress,
         mergeDeletedAnime,
-        applyDeletedAnime
+        applyDeletedAnime,
+        mergeGroupCoverImages
     } = window.AnimeTrackerContent.MergeUtils;
 
     // ─── Direct push to Firestore (fallback when SW unavailable) ─────────────
@@ -156,14 +217,20 @@
             try {
                 const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
                 if (r.ok) cloudVP = fromFSDoc(await r.json())?.videoProgress || {};
-            } catch (_) {}
+            } catch {
+                // Cloud fetch is best-effort; continue with local-only payload.
+            }
 
             const mergedVP = mergeVideoProgress(localVP, cloudVP);
 
-            // Write back locally if cloud had additional entries from another device
+            // Write back locally if cloud had additional entries from another device.
+            // csPauseSync() MUST be called before the write to prevent the storage
+            // onChanged listener from seeing this write and scheduling another push
+            // (which would create an infinite push → write-back → push loop).
             const localCount  = Object.keys(localVP).length;
             const mergedCount = Object.keys(mergedVP).length;
             if (mergedCount > localCount) {
+                csPauseSync();
                 await chrome.storage.local.set({ videoProgress: mergedVP });
                 console.log(`[CS-Sync] ✓ Pulled ${mergedCount - localCount} new progress entries from cloud`);
             }
@@ -196,6 +263,9 @@
     // Full push: animeData + videoProgress (Orion / no-SW mode only)
     let fullPushInProgress = false;
     let fullPushPending    = false;
+    // Snapshot of the last successfully uploaded full state.
+    // Avoids redundant uploads when nothing changed (e.g. right after a cloud pull).
+    let lastPushedFullSnap = null;
 
     async function pushFullDirect() {
         if (fullPushInProgress) { fullPushPending = true; return; }
@@ -215,7 +285,9 @@
             try {
                 const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
                 if (r.ok) cloudData = fromFSDoc(await r.json());
-            } catch (_) {}
+            } catch {
+                // If cloud fetch fails, push using local snapshot only.
+            }
 
             // Merge deletedAnime first so we can apply it before uploading.
             const mergedDeleted = cloudData?.deletedAnime
@@ -233,23 +305,35 @@
                 ? mergeVideoProgress(local.videoProgress || {}, cloudData.videoProgress)
                 : (local.videoProgress || {});
 
-            // Merge group cover images: prefer local posters over cloud posters.
-            const localGroupCovers = local.groupCoverImages || {};
-            const cloudGroupCovers = cloudData?.groupCoverImages || {};
-            const mergedGroupCovers = { ...cloudGroupCovers, ...localGroupCovers };
+            // Merge group cover images: local always wins (see mergeGroupCoverImages for policy).
+            const localGroupCovers  = local.groupCoverImages       || {};
+            const cloudGroupCovers  = cloudData?.groupCoverImages  || {};
+            const mergedGroupCovers = mergeGroupCoverImages(localGroupCovers, cloudGroupCovers);
 
-            // Write back locally if cloud had more / different data
+            // Write back locally if cloud had more / different data.
+            // csPauseSync() MUST be called before the write to prevent the storage
+            // onChanged listener from seeing this write and scheduling another push
+            // (which would create an infinite push → write-back → push loop).
             const localEps  = Object.values(local.animeData || {}).reduce((s, a) => s + (a.episodes?.length || 0), 0);
             const mergedEps = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
-            const deletedDiff = Object.keys(mergedDeleted).length !== Object.keys(local.deletedAnime || {}).length;
-            const groupDiff   = Object.keys(mergedGroupCovers).length !== Object.keys(local.groupCoverImages || {}).length;
-            if (mergedEps > localEps || deletedDiff || groupDiff) {
+            const progressDiff = !areProgressMapsEqual(local.videoProgress || {}, mergedProgress);
+            const deletedDiff = !shallowEqualDeletedAnime(local.deletedAnime || {}, mergedDeleted);
+            const groupDiff   = !shallowEqualStringMap(local.groupCoverImages || {}, mergedGroupCovers);
+            if (mergedEps > localEps || progressDiff || deletedDiff || groupDiff) {
+                csPauseSync();
                 await chrome.storage.local.set({
                     animeData:        mergedAnime,
                     videoProgress:    mergedProgress,
                     deletedAnime:     mergedDeleted,
                     groupCoverImages: mergedGroupCovers
                 });
+            }
+
+            // Skip upload if the merged payload is identical to what we last pushed.
+            const uploadSnap = JSON.stringify({ mergedAnime, mergedProgress, mergedDeleted, mergedGroupCovers });
+            if (uploadSnap === lastPushedFullSnap) {
+                console.log('[CS-Sync] Full push skipped (no changes since last push)');
+                return;
             }
 
             const res = await fetch(url, {
@@ -267,8 +351,12 @@
                 })
             });
 
-            if (res.ok) console.log('[CS-Sync] ✓ Full push to Firestore');
-            else        console.warn('[CS-Sync] Full push failed:', res.status);
+            if (res.ok) {
+                lastPushedFullSnap = uploadSnap;
+                console.log('[CS-Sync] ✓ Full push to Firestore');
+            } else {
+                console.warn('[CS-Sync] Full push failed:', res.status);
+            }
         } catch (e) {
             console.warn('[CS-Sync] Full push error:', e.message);
         } finally {
@@ -289,7 +377,7 @@
                     resolve(false);
                     return;
                 }
-            } catch (_) {
+            } catch {
                 resolve(false);
                 return;
             }
@@ -305,7 +393,7 @@
                         resolve(true);
                     }
                 });
-            } catch (_) {
+            } catch {
                 // Calling sendMessage can throw if the extension context is invalid.
                 clearTimeout(timeout);
                 resolve(false);
@@ -341,6 +429,26 @@
         fullPushDebounce = setTimeout(() => { fullPushDebounce = null; pushFullDirect(); }, delay);
     }
 
+    function pushOnTeardown(isOrionMode) {
+        if (teardownSyncTriggered) return;
+        teardownSyncTriggered = true;
+
+        if (isOrionMode) {
+            if (fullPushDebounce) clearTimeout(fullPushDebounce);
+            pushFullDirect();
+            return;
+        }
+
+        if (progressDebounce) clearTimeout(progressDebounce);
+        wakeBackgroundSW('SYNC_PROGRESS_ONLY').then(alive => {
+            if (!alive) pushProgressDirect();
+        });
+    }
+
+    function resetTeardownSyncGuard() {
+        teardownSyncTriggered = false;
+    }
+
     // ─── Apply incoming cloud update locally ──────────────────────────────────
 
     async function applyCloudUpdate(cloudDoc) {
@@ -362,29 +470,23 @@
 
             const mergedProgress = mergeVideoProgress(local.videoProgress || {}, cloudDoc.videoProgress || {});
 
-            // Merge group cover images: prefer local posters over cloud posters. If a key
-            // exists locally, keep it; otherwise fall back to cloud. This prevents a
-            // remote update from overwriting the user's chosen group poster.
-            const localGroupCovers = local.groupCoverImages || {};
-            const cloudGroupCovers = cloudDoc.groupCoverImages || {};
-            const mergedGroupCovers = { ...cloudGroupCovers, ...localGroupCovers };
+            // Merge group cover images: local always wins (see mergeGroupCoverImages for policy).
+            const localGroupCovers  = local.groupCoverImages      || {};
+            const cloudGroupCovers  = cloudDoc.groupCoverImages   || {};
+            const mergedGroupCovers = mergeGroupCoverImages(localGroupCovers, cloudGroupCovers);
 
             const localEps  = Object.values(local.animeData || {}).reduce((s, a) => s + (a.episodes?.length || 0), 0);
             const mergedEps = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
 
-            let progressChanged = false;
-            for (const [id, mp] of Object.entries(mergedProgress)) {
-                const lp = (local.videoProgress || {})[id];
-                if (!lp || lp.currentTime !== mp.currentTime) { progressChanged = true; break; }
-            }
-
-            const deletedChanged = Object.keys(mergedDeleted).length !== Object.keys(local.deletedAnime || {}).length;
+            const progressChanged = !areProgressMapsEqual(local.videoProgress || {}, mergedProgress);
+            const deletedChanged = !shallowEqualDeletedAnime(local.deletedAnime || {}, mergedDeleted);
 
             // Determine if any group covers changed by comparing keys. If there are new keys
             // from cloud, mergedGroupCovers will have more entries than local.
-            const groupChanged = Object.keys(mergedGroupCovers).length !== Object.keys(local.groupCoverImages || {}).length;
+            const groupChanged = !shallowEqualStringMap(local.groupCoverImages || {}, mergedGroupCovers);
 
             if (mergedEps !== localEps || progressChanged || deletedChanged || groupChanged) {
+                csPauseSync(); // prevent storage listener from looping back
                 await chrome.storage.local.set({
                     animeData:       mergedAnime,
                     videoProgress:   mergedProgress,
@@ -412,6 +514,7 @@
         currentUser  = user;
 
         const docPath = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${user.uid}`;
+        let tokenRefreshInterval = null;
 
         try {
             const res = await fetch(`${LISTEN_URL}?key=${FIREBASE_API_KEY}`, {
@@ -429,11 +532,12 @@
             // Proactively refresh the token every 45 minutes while the stream is
             // open. This prevents a mid-stream expiry causing a hard reconnect
             // (the REMOVE/code-16 path handles it reactively, but this avoids it).
-            const tokenRefreshInterval = setInterval(async () => {
+            tokenRefreshInterval = setInterval(async () => {
                 const fresh = await getValidToken();
                 if (fresh && fresh !== currentToken) {
                     console.log('[CS-Sync] Token refreshed proactively, restarting stream');
                     clearInterval(tokenRefreshInterval);
+                    tokenRefreshInterval = null;
                     listenAbortCtrl?.abort();
                     currentToken = fresh;
                     startListening();
@@ -448,6 +552,13 @@
                 const { value, done } = await reader.read();
                 if (done) break;
                 buffer += decoder.decode(value, { stream: true });
+                // Guard against unbounded buffer growth (e.g. a stalled stream).
+                if (buffer.length > 256 * 1024) {
+                    console.warn('[CS-Sync] SSE buffer overflow, reconnecting');
+                    listenAbortCtrl?.abort();
+                    scheduleReconnect(1000);
+                    return;
+                }
                 const lines = buffer.split('\n');
                 buffer = lines.pop();
                 for (const line of lines) {
@@ -470,7 +581,9 @@
                             if (currentToken) startListening();
                             return;
                         }
-                    } catch (_) {}
+                    } catch {
+                        // Ignore partial SSE frame fragments that are not valid JSON yet.
+                    }
                 }
             }
         } catch (e) {
@@ -478,7 +591,10 @@
             console.warn('[CS-Sync] Stream error:', e.message);
         } finally {
             // Always clear the token-refresh timer when the stream exits
-            if (typeof tokenRefreshInterval !== 'undefined') clearInterval(tokenRefreshInterval);
+            if (tokenRefreshInterval) {
+                clearInterval(tokenRefreshInterval);
+                tokenRefreshInterval = null;
+            }
         }
         scheduleReconnect();
     }
@@ -500,6 +616,7 @@
             if (namespace !== 'local') return;
 
             if (changes.videoProgress) {
+                if (csIsSyncPaused()) return; // cloud write-back, skip to avoid loop
                 if (isOrionMode) {
                     scheduleFullPush(3000);
                 } else {
@@ -507,7 +624,7 @@
                 }
             }
 
-            if (changes.animeData) {
+            if (changes.animeData && !csIsSyncPaused()) {
                 const oldAnime = changes.animeData.oldValue || {};
                 const newAnime = changes.animeData.newValue || {};
                 const oldCount = Object.values(oldAnime)
@@ -545,22 +662,23 @@
 
         // Push on tab hide or close
         document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) return;
-            if (isOrionMode) {
-                if (fullPushDebounce) clearTimeout(fullPushDebounce);
-                pushFullDirect();
+            if (document.hidden) {
+                pushOnTeardown(isOrionMode);
             } else {
-                if (progressDebounce) clearTimeout(progressDebounce);
-                // Try SW first, then direct
-                wakeBackgroundSW('SYNC_PROGRESS_ONLY').then(alive => {
-                    if (!alive) pushProgressDirect();
-                });
+                resetTeardownSyncGuard();
             }
         });
 
-        window.addEventListener('pagehide', () => {
-            if (isOrionMode) pushFullDirect();
-            else             pushProgressDirect();
+        window.addEventListener('pagehide', (event) => {
+            // If the page is entering bfcache, avoid forcing a direct push.
+            // The page is not actually being torn down.
+            if (event && event.persisted) return;
+            pushOnTeardown(isOrionMode);
+        }, { passive: true });
+
+        window.addEventListener('pageshow', (event) => {
+            if (!event || !event.persisted) return;
+            resetTeardownSyncGuard();
         }, { passive: true });
     }
 
@@ -612,7 +730,7 @@
 
         window.addEventListener('beforeunload', () => {
             listenAbortCtrl?.abort();
-            pushFullDirect();
+            pushOnTeardown(true);
         });
     }
 
@@ -620,18 +738,116 @@
     setTimeout(init, 2000);
 
     // ─── Keep-alive port: resets the SW's 30s idle timer ──────────────────────
-    function connectKeepalivePort() {
-        try {
-            const port  = chrome.runtime.connect({ name: 'keepAlive' });
-            const timer = setTimeout(connectKeepalivePort, 25000);
-            port.onDisconnect.addListener(() => {
-                clearTimeout(timer);
-                setTimeout(connectKeepalivePort, 100);
-            });
-        } catch (_) {
-            setTimeout(connectKeepalivePort, 1000);
+    let keepAliveRetryDelay = 100;
+    let keepAliveRetryTimer = null;
+    let keepAlivePulseTimer = null;
+    let keepAlivePort = null;
+    let suppressKeepAliveReconnect = false;
+
+    function scheduleKeepaliveReconnect(delayMs) {
+        if (keepAliveRetryTimer) clearTimeout(keepAliveRetryTimer);
+        keepAliveRetryTimer = setTimeout(() => {
+            keepAliveRetryTimer = null;
+            connectKeepalivePort();
+        }, delayMs);
+    }
+
+    function disconnectKeepalivePort() {
+        if (keepAlivePort) {
+            suppressKeepAliveReconnect = true;
+            try { keepAlivePort.disconnect(); } catch {
+                // Port may already be closed; safe to ignore.
+            }
+            keepAlivePort = null;
+        }
+        if (keepAlivePulseTimer) {
+            clearTimeout(keepAlivePulseTimer);
+            keepAlivePulseTimer = null;
         }
     }
+
+    function connectKeepalivePort() {
+        // Avoid reconnect storms while the tab is hidden/in bfcache.
+        if (document.hidden) {
+            scheduleKeepaliveReconnect(3000);
+            return;
+        }
+
+        // Rotate any stale port before opening a fresh one.
+        disconnectKeepalivePort();
+
+        try {
+            const port = chrome.runtime.connect({ name: 'keepAlive' });
+            keepAlivePort = port;
+            keepAliveRetryDelay = 100;
+
+            keepAlivePulseTimer = setTimeout(() => {
+                keepAlivePulseTimer = null;
+                connectKeepalivePort();
+            }, 25000);
+
+            port.onDisconnect.addListener(() => {
+                // Ignore disconnects we triggered intentionally.
+                if (suppressKeepAliveReconnect) {
+                    suppressKeepAliveReconnect = false;
+                    return;
+                }
+
+                // Read lastError so Chrome does not emit "Unchecked runtime.lastError"
+                // when a tab enters bfcache and the keepAlive channel is closed.
+                const err = chrome.runtime.lastError;
+                if (err) {
+                    const msg = err.message || '';
+                    const isExpectedClose = msg.includes('back/forward cache') || msg.includes('message channel is closed');
+                    if (!isExpectedClose) {
+                        console.debug('[CS-Sync] keepAlive port disconnected:', msg);
+                    }
+                }
+
+                if (keepAlivePort === port) keepAlivePort = null;
+                if (keepAlivePulseTimer) {
+                    clearTimeout(keepAlivePulseTimer);
+                    keepAlivePulseTimer = null;
+                }
+
+                keepAliveRetryDelay = Math.min(keepAliveRetryDelay * 2, 5000);
+                scheduleKeepaliveReconnect(document.hidden ? 3000 : keepAliveRetryDelay);
+            });
+        } catch {
+            keepAliveRetryDelay = Math.min(keepAliveRetryDelay * 2, 5000);
+            scheduleKeepaliveReconnect(document.hidden ? 3000 : keepAliveRetryDelay);
+        }
+    }
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            // Let the page sleep cleanly (especially bfcache path).
+            disconnectKeepalivePort();
+            if (keepAliveRetryTimer) {
+                clearTimeout(keepAliveRetryTimer);
+                keepAliveRetryTimer = null;
+            }
+            return;
+        }
+
+        keepAliveRetryDelay = 100;
+        scheduleKeepaliveReconnect(50);
+    });
+
+    window.addEventListener('pageshow', (event) => {
+        if (!event || !event.persisted) return;
+        keepAliveRetryDelay = 100;
+        scheduleKeepaliveReconnect(50);
+    }, { passive: true });
+
+    window.addEventListener('pagehide', (event) => {
+        if (!event || !event.persisted) return;
+        disconnectKeepalivePort();
+        if (keepAliveRetryTimer) {
+            clearTimeout(keepAliveRetryTimer);
+            keepAliveRetryTimer = null;
+        }
+    }, { passive: true });
 
     connectKeepalivePort();
 

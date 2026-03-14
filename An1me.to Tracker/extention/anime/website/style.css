@@ -22,12 +22,7 @@
     --text-secondary: #a0a0b0;
     --text-muted: #5a5a6e;
     
-    --success: #4ade80;
-    --warning: #fbbf24;
-    --danger: #ef4444;
-    
     --border-light: rgba(255, 255, 255, 0.08);
-    --border-dark: rgba(0, 0, 0, 0.4);
     --border-accent: rgba(255, 107, 107, 0.3);
     
     /* Spacing */
@@ -38,19 +33,15 @@
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 16px;
-    --radius-xl: 24px;
     
     /* Shadows */
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
     --shadow-glow: 0 0 30px rgba(255, 107, 107, 0.2);
-    --shadow-glow-purple: 0 0 30px rgba(168, 85, 247, 0.2);
     
     /* Transitions */
     --transition-fast: 0.15s ease;
     --transition-normal: 0.3s ease;
-    --transition-slow: 0.5s ease;
 }
 
 /* Reset & Base */
@@ -278,17 +269,6 @@ p {
     color: var(--text-primary);
 }
 
-.btn-outline {
-    background: transparent;
-    color: var(--accent-primary);
-    border: 2px solid var(--accent-primary);
-}
-
-.btn-outline:hover {
-    background: var(--accent-primary);
-    color: white;
-}
-
 .btn-lg {
     padding: 16px 36px;
     font-size: 1.1rem;
@@ -493,12 +473,6 @@ p {
     bottom: 20%;
     right: -5%;
     animation-delay: 2s;
-}
-
-.floating-card.card-3 {
-    top: 40%;
-    right: -15%;
-    animation-delay: 4s;
 }
 
 @keyframes float {
@@ -1236,27 +1210,6 @@ section {
     }
 }
 
-/* Animations */
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(30px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.animate-fadeInUp {
-    animation: fadeInUp 0.6s ease forwards;
-}
-
-.delay-1 { animation-delay: 0.1s; }
-.delay-2 { animation-delay: 0.2s; }
-.delay-3 { animation-delay: 0.3s; }
-.delay-4 { animation-delay: 0.4s; }
-
 /* Chrome Web Store Button */
 .chrome-btn {
     display: inline-flex;
@@ -1284,23 +1237,3 @@ section {
 
 /* Utility Classes */
 .text-center { text-align: center; }
-.text-gradient {
-    background: var(--accent-gradient);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-
-/* Version Badge */
-.version-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 12px;
-    background: rgba(74, 222, 128, 0.15);
-    border: 1px solid rgba(74, 222, 128, 0.3);
-    border-radius: 50px;
-    font-size: 0.75rem;
-    color: var(--success);
-    font-weight: 600;
-}

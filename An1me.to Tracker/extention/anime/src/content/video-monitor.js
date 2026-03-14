@@ -117,7 +117,7 @@ const VideoMonitor = {
                         return video;
                     }
                 }
-            } catch (e) {
+            } catch {
                 Logger.debug('Cross-origin iframe, skipping');
             }
         }
@@ -149,6 +149,13 @@ const VideoMonitor = {
         if (eventHandlers.handleTimeUpdateRaw) {
             video.addEventListener('timeupdate', eventHandlers.handleTimeUpdateRaw, { passive: true });
         }
+        if (eventHandlers.handleVideoMetadata) {
+            video.addEventListener('loadedmetadata', eventHandlers.handleVideoMetadata, { passive: true });
+            video.addEventListener('durationchange', eventHandlers.handleVideoMetadata, { passive: true });
+            video.addEventListener('loadeddata', eventHandlers.handleVideoMetadata, { passive: true });
+            // Trigger once immediately in case metadata is already available.
+            Promise.resolve().then(() => eventHandlers.handleVideoMetadata());
+        }
         
         video.addEventListener('pause', eventHandlers.handlePause, { passive: true });
         video.addEventListener('seeked', eventHandlers.handleSeeked, { passive: true });
@@ -163,6 +170,11 @@ const VideoMonitor = {
             video.removeEventListener('timeupdate', eventHandlers.handleTimeUpdate);
             if (eventHandlers.handleTimeUpdateRaw) {
                 video.removeEventListener('timeupdate', eventHandlers.handleTimeUpdateRaw);
+            }
+            if (eventHandlers.handleVideoMetadata) {
+                video.removeEventListener('loadedmetadata', eventHandlers.handleVideoMetadata);
+                video.removeEventListener('durationchange', eventHandlers.handleVideoMetadata);
+                video.removeEventListener('loadeddata', eventHandlers.handleVideoMetadata);
             }
             video.removeEventListener('pause', eventHandlers.handlePause);
             video.removeEventListener('seeked', eventHandlers.handleSeeked);

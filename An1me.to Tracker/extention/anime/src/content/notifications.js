@@ -20,7 +20,7 @@ const Notifications = {
         this.cleanupFunctions.forEach(fn => {
             try {
                 fn();
-            } catch (e) {
+            } catch {
                 // Ignore cleanup errors
             }
         });

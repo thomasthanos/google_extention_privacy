@@ -12,4 +12,7 @@ const firebaseConfig = {
     appId: "1:851894443732:web:91f5dc69608fbf474f6541"
 };
 
+if (typeof window !== 'undefined') {
+    window.firebaseConfig = firebaseConfig;
+}
 

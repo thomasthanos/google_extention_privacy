@@ -338,6 +338,7 @@ const ProgressManager = {
     cleanTrackedProgress(animeData, videoProgress) {
         const { UIHelpers } = window.AnimeTracker;
         const { CONFIG } = window.AnimeTracker;
+        const { SeasonGrouping } = window.AnimeTracker;
         
         if (!videoProgress || Object.keys(videoProgress).length === 0) {
             return { cleaned: videoProgress, removedCount: 0 };
@@ -358,7 +359,18 @@ const ProgressManager = {
         for (const [id, progress] of Object.entries(videoProgress)) {
             const isTracked = trackedIds.has(id);
             const isCompleted = progress.percentage >= CONFIG.COMPLETED_PERCENTAGE;
-            
+            const slugMatch = id.match(/^(.+)__episode-\d+$/);
+            const animeSlug = slugMatch ? slugMatch[1] : '';
+            const animeEntry = animeSlug ? animeData[animeSlug] : null;
+            const isMovieProgress = !!animeEntry && SeasonGrouping?.isMovie?.(animeSlug, animeEntry);
+
+            // Keep movie progress entries so we can keep recovering true duration
+            // during future refresh/merge passes.
+            if (isTracked && isMovieProgress && !progress.deleted) {
+                cleaned[id] = progress;
+                continue;
+            }
+
             if (isTracked || isCompleted) {
                 removedCount++;
             } else {

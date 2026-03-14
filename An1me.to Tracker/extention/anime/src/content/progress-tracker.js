@@ -12,6 +12,21 @@ const ProgressTracker = {
     isProcessingQueue: false,
     pendingSeekSave: null,
     seekSaveTimeout: null,
+    MAX_REASONABLE_DURATION_SECONDS: 6 * 60 * 60,
+
+    normalizeDuration(duration) {
+        let value = Math.round(Number(duration) || 0);
+        if (!Number.isFinite(value) || value <= 0) return 0;
+        if (value > this.MAX_REASONABLE_DURATION_SECONDS) {
+            value = this.MAX_REASONABLE_DURATION_SECONDS;
+        }
+        return value;
+    },
+
+    isPlaceholderDuration(duration) {
+        const d = Number(duration) || 0;
+        return d <= 0 || d === 1440 || d === 6000 || d === 7200;
+    },
 
     /**
      * Check if episode should be marked as complete
@@ -25,20 +40,9 @@ const ProgressTracker = {
         const progress = currentTime / duration;
         const remainingTime = duration - currentTime;
 
-        // DYNAMIC CALCULATION:
-        // Complete if watched 85% or more of the ACTUAL video duration
-        // This ensures that a 23:17 video requires watching ~19:48 (85% of 23:17)
-        // and a 30:00 video requires watching ~25:30 (85% of 30:00)
-        
-        // Use 85% threshold for more accuracy (instead of 80%)
-        const DYNAMIC_THRESHOLD = 0.85;
-        
-        // Complete if:
-        // 1. Watched 85% or more of ACTUAL duration, OR
-        // 2. Less than 120 seconds (2 min) remaining - catches anime outro/ending skip
-        //    Typical anime: 90s ending + 30s preview = 120s total skip
-        const OUTRO_SKIP_THRESHOLD = 120; // 2 minutes for outro/ending/preview
-        const isComplete = progress >= DYNAMIC_THRESHOLD || remainingTime <= OUTRO_SKIP_THRESHOLD;
+        const progressThreshold = (CONFIG.COMPLETED_PERCENTAGE || 85) / 100;
+        const outroThreshold = CONFIG.REMAINING_TIME_THRESHOLD || 120;
+        const isComplete = progress >= progressThreshold || remainingTime <= outroThreshold;
 
         return isComplete;
     },
@@ -116,7 +120,7 @@ const ProgressTracker = {
      * Process save queue
      */
     async processSaveQueue() {
-        const { CONFIG, Logger } = window.AnimeTrackerContent;
+        const { Logger } = window.AnimeTrackerContent;
         
         if (this.isProcessingQueue || this.saveQueue.length === 0) return;
 
@@ -216,6 +220,7 @@ const ProgressTracker = {
                 // Silent - normal when extension reloads
             } else {
                 Logger.error('Save progress exception:', e);
+                throw e;
             }
         } finally {
             this.saveInProgress = false;
@@ -229,7 +234,7 @@ const ProgressTracker = {
      * Save video playback progress (public API)
      */
     saveVideoProgress(uniqueId, currentTime, duration, force = false) {
-        const { CONFIG, Logger, Storage } = window.AnimeTrackerContent;
+        const { CONFIG, Logger } = window.AnimeTrackerContent;
         
         if (currentTime < CONFIG.MIN_PROGRESS_TO_SAVE) return;
         if (this.shouldMarkComplete(currentTime, duration)) return;
@@ -265,7 +270,7 @@ const ProgressTracker = {
         this.cleanLastSavedProgress();
 
         const pct = Math.floor((currentTime / duration) * 100);
-        Logger.debug(`Progress saved: ${pct}% (need 85%) @ ${Math.floor(currentTime)}s / ${Math.floor(duration)}s`);
+        Logger.debug(`Progress saved: ${pct}% (need ${CONFIG.COMPLETED_PERCENTAGE}%) @ ${Math.floor(currentTime)}s / ${Math.floor(duration)}s`);
         Logger.progress(uniqueId, pct, Math.floor(currentTime));
 
         this.performSaveProgress(uniqueId, currentTime, duration).catch(e => {
@@ -341,6 +346,109 @@ const ProgressTracker = {
         }
     },
 
+    async refreshTrackedEpisodeDuration(info, videoDuration) {
+        const { Storage, Logger } = window.AnimeTrackerContent;
+
+        try {
+            if (!info || !info.animeSlug) return false;
+
+            const validDuration = this.normalizeDuration(videoDuration);
+            if (!validDuration) return false;
+
+            const result = await Storage.get(['animeData']);
+            const animeData = result.animeData || {};
+            const normalizeText = (value) =>
+                String(value || '')
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '');
+            const targetSlug = String(info.animeSlug || '').toLowerCase();
+            const targetTitle = normalizeText(info.animeTitle || '');
+            const targetEpisode = Number(info.episodeNumber) || 0;
+            const targetSecondEpisode = Number(info.secondEpisodeNumber) || 0;
+
+            const candidateKeys = Object.keys(animeData)
+                .map((key) => {
+                    const anime = animeData[key];
+                    if (!anime || !Array.isArray(anime.episodes)) return null;
+
+                    const keyLower = String(key || '').toLowerCase();
+                    const titleNorm = normalizeText(anime.title || '');
+                    let score = 0;
+
+                    if (keyLower === targetSlug) score += 10;
+                    if (targetSlug && (keyLower.includes(targetSlug) || targetSlug.includes(keyLower))) score += 4;
+                    if (targetTitle && titleNorm && targetTitle === titleNorm) score += 3;
+
+                    const hasTargetEpisode = targetEpisode > 0 && anime.episodes.some(ep => Number(ep?.number) === targetEpisode);
+                    const hasSecondEpisode = targetSecondEpisode > 0 && anime.episodes.some(ep => Number(ep?.number) === targetSecondEpisode);
+                    if (hasTargetEpisode) score += 3;
+                    if (hasSecondEpisode) score += 2;
+                    if (anime.episodes.length === 1) score += 1;
+
+                    return score > 0 ? { key, score } : null;
+                })
+                .filter(Boolean)
+                .sort((a, b) => b.score - a.score);
+
+            if (candidateKeys.length === 0) return false;
+
+            const animeKey = candidateKeys[0].key;
+            const anime = animeData[animeKey];
+            if (!anime || !Array.isArray(anime.episodes)) return false;
+
+            let changed = false;
+
+            const updateEpisodeDuration = (episodeNumber) => {
+                if (!Number.isFinite(episodeNumber) || episodeNumber <= 0) return false;
+
+                const idx = anime.episodes.findIndex(ep => Number(ep?.number) === episodeNumber);
+                if (idx === -1) return;
+
+                const existing = anime.episodes[idx] || {};
+                const currentDuration = Number(existing.duration) || 0;
+                if (!this.isPlaceholderDuration(currentDuration) || currentDuration === validDuration) return;
+
+                anime.episodes[idx] = {
+                    ...existing,
+                    duration: validDuration,
+                    durationSource: 'video'
+                };
+                changed = true;
+                return true;
+            };
+
+            const updatedMain = updateEpisodeDuration(targetEpisode);
+            if (info.isDoubleEpisode && targetSecondEpisode > 0) {
+                updateEpisodeDuration(targetSecondEpisode);
+            }
+
+            // Fallback for movie entries where parser/stored episode number differs.
+            if (!updatedMain && anime.episodes.length === 1) {
+                const onlyEpisode = anime.episodes[0] || {};
+                const onlyDuration = Number(onlyEpisode.duration) || 0;
+                if (this.isPlaceholderDuration(onlyDuration) && onlyDuration !== validDuration) {
+                    anime.episodes[0] = {
+                        ...onlyEpisode,
+                        duration: validDuration,
+                        durationSource: 'video'
+                    };
+                    changed = true;
+                }
+            }
+
+            if (!changed) return false;
+
+            anime.totalWatchTime = anime.episodes.reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
+            anime.lastWatched = new Date().toISOString();
+            await Storage.set({ animeData });
+            Logger.info(`Refreshed tracked duration from player metadata: ${animeKey} (${validDuration}s)`);
+            return true;
+        } catch (e) {
+            Logger.error('Failed to refresh tracked duration:', e);
+            return false;
+        }
+    },
+
     /**
      * Save watched episode to storage
      */
@@ -391,27 +499,44 @@ const ProgressTracker = {
                 }
             }
 
+            const validDuration = this.normalizeDuration(videoDuration);
+            if (!validDuration) {
+                Logger.error('Invalid normalized video duration:', videoDuration);
+                throw new Error('Invalid normalized video duration');
+            }
+
             const existingIndex = animeData[info.animeSlug].episodes
                 .findIndex(ep => ep.number === info.episodeNumber);
 
             if (existingIndex !== -1) {
+                const existing = animeData[info.animeSlug].episodes[existingIndex] || {};
+                const currentDuration = Number(existing.duration) || 0;
+
+                if (this.isPlaceholderDuration(currentDuration) && currentDuration !== validDuration) {
+                    animeData[info.animeSlug].episodes[existingIndex] = {
+                        ...existing,
+                        duration: validDuration,
+                        durationSource: 'video'
+                    };
+                    animeData[info.animeSlug].totalWatchTime = animeData[info.animeSlug].episodes
+                        .reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
+                    animeData[info.animeSlug].lastWatched = new Date().toISOString();
+                    await Storage.set({ animeData });
+                    Logger.info(`Updated placeholder duration for tracked episode: ${info.uniqueId}`);
+                    return true;
+                }
+
                 Logger.info('Episode already tracked:', info.uniqueId);
                 return false;
             }
 
             const now = new Date();
 
-            // Validate duration (typical anime: 20-30 min = 1200-1800s, max 2h = 7200s)
-            let validDuration = Math.round(videoDuration);
-            if (validDuration > 7200) {
-                Logger.warn(`Invalid duration ${validDuration}s, capping to 1800s`);
-                validDuration = 1800;
-            }
-
             const episodeData = {
                 number: info.episodeNumber,
                 watchedAt: now.toISOString().split('.')[0] + 'Z',
-                duration: validDuration
+                duration: validDuration,
+                durationSource: 'video'
             };
 
             animeData[info.animeSlug].episodes.push(episodeData);
@@ -419,6 +544,9 @@ const ProgressTracker = {
             animeData[info.animeSlug].lastWatched = new Date().toISOString();
 
             // ── Double episode: also save the second episode (e.g. ep 120 alongside ep 119) ──
+            // NOTE: We intentionally do NOT add validDuration again to totalWatchTime here.
+            // Both episodes share the same combined video file, so the duration has already
+            // been counted once above. Adding it again would double-count watch time.
             if (info.isDoubleEpisode && info.secondEpisodeNumber) {
                 const alreadyHasSecond = animeData[info.animeSlug].episodes
                     .some(ep => ep.number === info.secondEpisodeNumber);
@@ -426,9 +554,10 @@ const ProgressTracker = {
                     animeData[info.animeSlug].episodes.push({
                         number: info.secondEpisodeNumber,
                         watchedAt: now.toISOString().split('.')[0] + 'Z',
-                        duration: validDuration
+                        duration: validDuration,
+                        durationSource: 'video'
                     });
-                    animeData[info.animeSlug].totalWatchTime += validDuration;
+                    // totalWatchTime already includes validDuration from the first episode push above.
                     Logger.info(`Double episode: also tracked Ep${info.secondEpisodeNumber}`);
                 }
             }

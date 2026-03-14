@@ -17,12 +17,9 @@
 
   /* Accents */
   --cyan:   #4fc3f7;
-  --cyan-d: #29a8e0;
   --amber:  #f0c040;
   --green:  #4caf82;
-  --red:    #f04545;
   --purple: #9b6aff;
-  --blue:   #5ea8ff;
 
   /* Gradients */
   --grad-cyan: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
@@ -46,7 +43,6 @@
   --r-pill: 999px;
 
   /* Shadows */
-  --s1: 0 1px 4px rgba(0,0,0,0.35);
   --s2: 0 2px 12px rgba(0,0,0,0.45);
   --s3: 0 4px 24px rgba(0,0,0,0.55);
   --s4: 0 8px 40px rgba(0,0,0,0.65);
@@ -54,52 +50,13 @@
   /* Transitions */
   --tf: 0.12s ease;
   --tn: 0.2s ease;
-  --ts: 0.28s cubic-bezier(0.34,1.56,0.64,1);
 
   /* Popup */
   --w: 420px;
   --h: 590px;
 
   /* ─ Legacy aliases ─ */
-  --red:    var(--red);
-  --orange: var(--cyan);
   --accent: var(--grad-cyan);
-  --green:  var(--green);
-  --yellow: var(--amber);
-  --purple: var(--purple);
-  --blue:   var(--blue);
-  --danger: #f04545;
-
-  --bg-primary:    var(--bg-0);
-  --bg-secondary:  var(--bg-1);
-  --bg-tertiary:   var(--bg-2);
-  --bg-card-hover: var(--bg-3);
-  --accent-primary:    var(--cyan);
-  --accent-secondary:  var(--blue);
-  --accent-gradient:   var(--grad-cyan);
-  --text-primary:   var(--t1);
-  --text-secondary: var(--t2);
-  --text-muted:     var(--t3);
-  --success:        var(--green);
-  --success-glow:   rgba(76,175,130,0.2);
-  --warning:        var(--amber);
-  --border-3d-light: var(--b1);
-  --border-3d-dark:  rgba(0,0,0,0.4);
-  --border-accent:   rgba(79,195,247,0.25);
-  --border-radius:    var(--r-lg);
-  --border-radius-sm: var(--r-md);
-  --border-radius-xs: var(--r-sm);
-  --shadow-3d:    var(--s1);
-  --shadow-card:  var(--s2);
-  --shadow-glow:  none;
-  --transition-fast:   var(--tf);
-  --transition-normal: var(--tn);
-  --transition-bounce: var(--ts);
-  --popup-width: var(--w);
-  --popup-max-height: var(--h);
-  --b-red: rgba(79,195,247,0.25);
-  --r4:  4px; --r8: var(--r-xs); --r12: 12px; --r16: var(--r-lg); --r20: var(--r-xl);
-  --glow: none;
 }
 
 /* ─── Reset ─────────────────────────────────────────────────── */
@@ -345,7 +302,6 @@ body {
   color: rgba(79,195,247,0.45);
   position: relative; z-index: 1;
 }
-.auth-form { display: flex; flex-direction: column; gap: 10px; width: 100%; }
 .auth-input { width: 100%; padding: 10px 13px; background: rgba(255,255,255,0.04); border: 1px solid var(--b1); border-radius: var(--r-md); color: var(--t1); font-size: 13px; font-family: inherit; outline: none; transition: border-color var(--tn); }
 .auth-input:focus { border-color: rgba(79,195,247,0.3); }
 .auth-textarea { min-height: 75px; resize: none; font-size: 11px; font-family: monospace; background: rgba(0,0,0,0.2); border: 1px solid rgba(79,195,247,0.18); border-radius: var(--r-md); color: rgba(255,255,255,0.75); transition: border-color var(--tn), box-shadow var(--tn); }
@@ -396,17 +352,13 @@ body {
 .btn-icon svg { width: 16px; height: 16px; }
 .btn-icon:hover { background: var(--bg-4); border-color: var(--b2); color: var(--t1); }
 .btn-icon:active { background: var(--bg-0); }
-.btn-icon.btn-donate { background: var(--grad-cyan); border-color: transparent; color: #0e1117; }
-.btn-icon.btn-donate:hover { opacity: 0.85; }
-.btn-icon.btn-donate svg { fill: #0e1117; stroke: #0e1117; }
-.btn-icon.btn-danger:hover { background: rgba(240,69,69,0.1); color: #f04545; border-color: rgba(240,69,69,0.2); }
 
 /* ─── Stats Bar ─────────────────────────────────────────────── */
 /* ID override — υψηλότερη specificity από οποιοδήποτε class rule */
 /* Stats Bar - Perfect Centering */
 #statsBar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(0, 1fr);
   align-items: center;
   width: 100%;
   padding: 10px 0;
@@ -742,12 +694,6 @@ body {
 .anime-title { font-size: 14px; font-weight: 700; color: var(--t1); flex: 1; display: flex; align-items: center; gap: 5px; overflow: hidden; }
 .anime-title-text { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 200px; font-size: 14px; font-weight: 700; }
 
-.current-episode-badge {
-  font-size: 9px; font-weight: 700; color: var(--green);
-  background: rgba(76,175,130,0.1); border: 1px solid rgba(76,175,130,0.2);
-  padding: 1px 7px; border-radius: var(--r-pill); white-space: nowrap; flex-shrink: 0;
-}
-
 .anime-expand-icon {
   width: 14px; height: 14px; color: var(--t3); transition: all var(--tf); flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
@@ -798,14 +744,9 @@ body {
 }
 
 /* ─── Badges ────────────────────────────────────────────────── */
-.anime-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 0; max-height: 0; overflow: hidden; opacity: 0; transition: max-height var(--tn), opacity var(--tn), margin var(--tn); }
-.anime-card.expanded .anime-badges { max-height: 60px; opacity: 1; margin-bottom: 7px; }
 .badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; background: rgba(255,255,255,0.04); border: 1px solid var(--b1); border-radius: var(--r-pill); font-size: 9px; font-weight: 600; color: var(--t2); }
 .badge svg { width: 10px; height: 10px; }
-.badge-episodes { color: var(--cyan);   background: rgba(79,195,247,0.07);  border-color: rgba(79,195,247,0.18); }
-.badge-time     { color: var(--green);  background: rgba(76,175,130,0.07);  border-color: rgba(76,175,130,0.18); }
 .badge-watching { color: var(--amber);  background: rgba(240,192,64,0.08);  border-color: rgba(240,192,64,0.2); font-size: 9px; padding: 2px 8px; }
-.badge-filler   { color: var(--purple); background: rgba(155,106,255,0.07); border-color: rgba(155,106,255,0.18); font-size: 9px; }
 .skipped-fillers-badge { display: inline-flex; align-items: center; gap: 4px; margin-left: 5px; padding: 2px 7px; background: rgba(155,106,255,0.1); border: 1px solid rgba(155,106,255,0.24); border-radius: 9px; font-size: 9px; font-weight: 650; color: #c2a2f8; white-space: nowrap; }
 
 /* ─── In-progress section ───────────────────────────────────── */
@@ -817,7 +758,7 @@ body {
 .in-progress-header { display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: var(--amber); font-weight: 600; cursor: pointer; }
 .in-progress-header:hover { color: #fcd34d; }
 .in-progress-title { flex: 1; font-size: 10px; }
-.in-progress-icon, .in-progress-preview { display: none; }
+.in-progress-icon { display: none; }
 .collapse-icon { width: 12px; height: 12px; color: var(--amber); transition: transform var(--tf); opacity: 0.6; }
 .anime-in-progress.collapsed .collapse-icon { transform: rotate(-90deg); }
 .in-progress-content { margin-top: 6px; max-height: 130px; overflow: hidden; opacity: 1; transition: max-height var(--tn), margin var(--tn), opacity var(--tn); }
@@ -826,8 +767,6 @@ body {
 /* ─── Meta ─────────────────────────────────────────────────── */
 .anime-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; max-height: 0; overflow: hidden; opacity: 0; transition: max-height var(--tn), opacity var(--tn), margin var(--tn); }
 .anime-card.expanded .anime-meta { max-height: 36px; opacity: 1; margin-bottom: 5px; }
-.anime-last-watched-inline { font-size: 10px; color: var(--t3); display: flex; align-items: center; gap: 3px; }
-.anime-last-watched-inline svg { width: 10px; height: 10px; opacity: 0.6; }
 .anime-last-watched { font-size: 10px; color: var(--t3); display: none; }
 
 /* ─── Episodes ──────────────────────────────────────────────── */
@@ -983,7 +922,6 @@ body {
   color: rgba(130,160,190,0.55);
   line-height: 1.5;
 }
-.form-error { display: block; font-size: 10px; color: #f67; }
 .episodes-input-group { display: flex; flex-direction: column; gap: 2px; }
 .episodes-input-group input { width: 100%; }
 .episodes-preview { display: none; margin-top: 6px; padding: 6px 9px; border-radius: var(--r-xs); font-size: 11px; line-height: 1.5; }
@@ -994,7 +932,6 @@ body {
 .preview-error { color: #f04545; font-weight: 500; }
 .preview-fillers { color: var(--purple); font-size: 10px; opacity: 0.9; }
 @keyframes fadeIn { from{opacity:0;transform:translateY(-3px)} to{opacity:1;transform:translateY(0)} }
-@keyframes fadeInPreview { from{opacity:0;transform:translateY(-3px)} to{opacity:1;transform:translateY(0)} }
 .btn { padding: 8px 18px; border-radius: var(--r-xs); font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all var(--tf); border: 1px solid var(--b1); }
 .btn:active { transform: scale(0.97); }
 .btn-secondary { background: var(--bg-3); color: var(--t1); }
@@ -1004,11 +941,6 @@ body {
 .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
 .btn-danger { background: linear-gradient(135deg,#f04545,#c41e1e); border-color: transparent; color: #fff; }
 .btn-danger:hover { opacity: 0.9; }
-.checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; color: var(--t2); }
-.checkbox-label input[type="checkbox"] { position: absolute; opacity: 0; width: 0; height: 0; }
-.checkbox-custom { width: 16px; height: 16px; background: var(--bg-3); border: 1px solid var(--b2); border-radius: var(--r-xs); flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all var(--tf); }
-.checkbox-label input:checked + .checkbox-custom { background: var(--grad-cyan); border-color: transparent; }
-.checkbox-label input:checked + .checkbox-custom::after { content: '✓'; color: #0e1117; font-size: 11px; font-weight: bold; }
 
 /* ─── Parts ─────────────────────────────────────────────────── */
 .anime-parts { max-height: 0; overflow: hidden; opacity: 0; transition: max-height var(--tn), opacity var(--tn), margin var(--tn), padding var(--tn); background: rgba(79,195,247,0.03); border: 1px solid rgba(79,195,247,0.1); border-radius: var(--r-xs); margin-bottom: 0; padding: 0; }
@@ -1071,17 +1003,12 @@ body {
 }
 .anime-season-group:hover::before { opacity: 0.7; }
 .season-group-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; gap: 10px; }
-.season-group-title { display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 700; color: var(--t1); flex: 1; min-width: 0; }
-.season-group-icon { font-size: 13px; flex-shrink: 0; }
 .season-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.season-count-badge { font-size: 9px; font-weight: 700; color: var(--amber); background: rgba(240,192,64,0.08); border: 1px solid rgba(240,192,64,0.2); padding: 2px 7px; border-radius: var(--r-pill); white-space: nowrap; flex-shrink: 0; }
-.season-count-badge.complete { color: var(--green); background: rgba(76,175,130,0.08); border-color: rgba(76,175,130,0.2); }
 .season-group-actions { display: flex; align-items: center; gap: 3px; align-self: center; }
 .season-group-expand-icon { width: 14px; height: 14px; color: var(--t3); transition: all var(--tf); display: flex; align-items: center; justify-content: center; }
 .season-group-expand-icon svg { width: 14px; height: 14px; }
 .anime-season-group:hover .season-group-expand-icon { color: var(--t2); }
 .anime-season-group.expanded .season-group-expand-icon { color: var(--cyan); }
-.season-group-stats { display: none; }
 .season-group-content { display: flex; flex-direction: column; gap: 4px; max-height: 0; overflow: hidden; opacity: 0; margin-top: 0; transition: all var(--tn); }
 .anime-season-group.expanded .season-group-content { max-height: 460px; opacity: 1; margin-top: 8px; }
 
@@ -1150,20 +1077,28 @@ body {
 .anime-movie-group:hover { border-color: rgba(79,195,247,0.22); border-top-color: rgba(79,195,247,0.32); box-shadow: var(--s3); }
 .anime-movie-group:hover::before { opacity: 0.6; }
 .movie-group-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; gap: 10px; }
-.movie-group-title { display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 700; color: var(--t1); flex: 1; min-width: 0; }
-.movie-group-icon { font-size: 13px; flex-shrink: 0; }
 .movie-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.movie-count-badge { font-size: 9px; font-weight: 700; color: var(--amber); background: rgba(240,192,64,0.08); border: 1px solid rgba(240,192,64,0.2); padding: 2px 7px; border-radius: var(--r-pill); white-space: nowrap; flex-shrink: 0; }
-.movie-count-badge.single { color: var(--cyan); background: rgba(79,195,247,0.08); border-color: rgba(79,195,247,0.2); }
 .movie-group-actions { display: flex; align-items: center; gap: 3px; align-self: center; }
 .movie-group-expand-icon { width: 14px; height: 14px; color: var(--t3); transition: all var(--tf); display: flex; align-items: center; justify-content: center; }
 .movie-group-expand-icon svg { width: 14px; height: 14px; }
 .anime-movie-group:hover .movie-group-expand-icon { color: var(--cyan); }
 .anime-movie-group.expanded .movie-group-expand-icon { transform: rotate(90deg); color: var(--cyan); }
-.movie-group-stats { display: none; }
-.anime-movie-group.expanded .movie-group-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; padding-bottom: 5px; font-size: 10px; color: var(--t2); }
 .movie-group-content { display: flex; flex-direction: column; gap: 4px; max-height: 0; overflow: hidden; opacity: 0; margin-top: 0; transition: all var(--tn); }
-.anime-movie-group.expanded .movie-group-content { max-height: 460px; opacity: 1; margin-top: 8px; }
+.anime-movie-group.expanded .movie-group-content {
+    max-height: min(460px, calc(var(--h) - 220px));
+    opacity: 1;
+    margin-top: 8px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge legacy */
+    padding-right: 2px;
+}
+.anime-movie-group.expanded .movie-group-content::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}
 .anime-movie-group.single-movie .movie-group-content { display: none; }
 .anime-movie-group.single-movie.expanded .movie-group-content { display: flex; }
 .movie-item { display: flex; flex-direction: column; padding: 7px 9px; background: var(--bg-3); border: 1px solid var(--b1); border-radius: var(--r-sm); transition: all var(--tf); }
@@ -1183,11 +1118,6 @@ body {
 .movie-edit-btn:hover   { background: rgba(79,195,247,0.08); color: var(--cyan); }
 .movie-delete-btn:hover { background: rgba(240,69,69,0.08); color: #f04545; }
 
-/* ─── Single movie card ─────────────────────────────────────── */
-.single-movie-card { background: rgba(79,195,247,0.04); border: 1px solid rgba(79,195,247,0.1); border-radius: var(--r-md); margin-bottom: 7px; overflow: hidden; transition: all var(--tn); }
-.single-movie-card:hover { border-color: rgba(79,195,247,0.22); }
-.single-movie-card.watched { border-color: rgba(76,175,130,0.2); background: rgba(76,175,130,0.03); }
-
 /* ─── Meta rows ─────────────────────────────────────────────── */
 .anime-meta-row,
 .season-group-meta-row,
@@ -1197,7 +1127,6 @@ body {
   margin-top: 3px; gap: 4px; line-height: 1.3; flex-wrap: wrap; align-items: center;
 }
 .season-group-meta-row { font-size: 10px; }
-.meta-sep { color: var(--t3); font-size: 9px; opacity: 0.5; flex-shrink: 0; }
 
 /* ─── Meta badges ───────────────────────────────────────────── */
 .meta-badge {

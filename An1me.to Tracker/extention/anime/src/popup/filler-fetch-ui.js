@@ -24,7 +24,6 @@ const FillerFetchUI = {
         isOpen: false,
         isRunning: false,
         isCancelled: false,
-        currentIndex: 0,
         total: 0,
         fetched: 0,
         cached: 0,
@@ -379,7 +378,6 @@ const FillerFetchUI = {
     resetState() {
         this.state.isRunning = false;
         this.state.isCancelled = false;
-        this.state.currentIndex = 0;
         this.state.fetched = 0;
         this.state.cached = 0;
         this.state.skipped = 0;

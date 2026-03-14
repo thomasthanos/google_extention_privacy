@@ -3,26 +3,7 @@
  * Handles Firebase authentication and cloud synchronization
  */
 
-// mergeDeletedAnime → AnimeTracker.MergeUtils.mergeDeletedAnime (see src/popup/merge-utils.js)
-
-/**
- * Remove from animeData any slug that was deleted AFTER its last watched episode.
- * This stops deleted anime from being resurrected during merge.
- */
-function applyDeletedAnime(animeData, deletedAnime) {
-    for (const [slug, info] of Object.entries(deletedAnime)) {
-        if (!animeData[slug]) continue;
-        const deletedAt = new Date(info.deletedAt).getTime();
-        const lastWatched = animeData[slug].lastWatched
-            ? new Date(animeData[slug].lastWatched).getTime()
-            : 0;
-        // If deleted more recently than last watched → honour the deletion
-        if (deletedAt >= lastWatched) {
-            console.log(`[Sync] Honouring deletion of ${slug} (deleted ${info.deletedAt})`);
-            delete animeData[slug];
-        }
-    }
-}
+// Merge helpers are provided by AnimeTracker.MergeUtils (see src/common/merge-utils.js).
 
 const FirebaseSync = {
     // State
@@ -32,6 +13,28 @@ const FirebaseSync = {
     pendingSave: null,
     currentSavePromise: null,
     cloudSaveRetryCount: 0,
+
+    cloneSyncData(data) {
+        if (!data || typeof data !== 'object') return {};
+        try {
+            if (typeof structuredClone === 'function') {
+                return structuredClone(data);
+            }
+        } catch {
+            // Fall through to JSON clone.
+        }
+
+        try {
+            return JSON.parse(JSON.stringify(data));
+        } catch {
+            return {
+                animeData: data.animeData || {},
+                videoProgress: data.videoProgress || {},
+                deletedAnime: data.deletedAnime || {},
+                groupCoverImages: data.groupCoverImages || {}
+            };
+        }
+    },
 
     /**
      * Get current user
@@ -93,7 +96,7 @@ const FirebaseSync = {
         // Fix: Use the new data directly instead of merging.
         // This ensures that if items were deleted in 'data', they are removed from 'pendingSave' too.
         // Merging would keep the old keys (deleted items) in pendingSave, causing them to be resurrected.
-        this.pendingSave = data;
+        this.pendingSave = this.cloneSyncData(data);
 
         if (this.saveToCloudTimeout) {
             clearTimeout(this.saveToCloudTimeout);
@@ -124,7 +127,7 @@ const FirebaseSync = {
             if (this.currentSavePromise) {
                 try {
                     await this.currentSavePromise;
-                } catch (e) {
+                } catch {
                     // Ignore errors from previous save
                 }
             }
@@ -190,7 +193,7 @@ const FirebaseSync = {
 
                 setTimeout(() => {
                     if (this.currentUser) {
-                        this.pendingSave = dataToSave;
+                        this.pendingSave = this.cloneSyncData(dataToSave);
                         this.performCloudSave(elements);
                     }
                 }, retryDelay);
@@ -313,7 +316,7 @@ const FirebaseSync = {
                 // No additional override needed here.
 
                 // Apply deletedAnime: remove any anime that was deleted after its last watch
-                applyDeletedAnime(finalData.animeData, mergedDeletedAnime);
+                AnimeTracker.MergeUtils.applyDeletedAnime(finalData.animeData, mergedDeletedAnime);
                 finalData.deletedAnime = mergedDeletedAnime;
 
                 const { cleaned: cleanedProgress } = 
@@ -337,7 +340,7 @@ const FirebaseSync = {
                         clearTimeout(this.saveToCloudTimeout);
                         this.saveToCloudTimeout = null;
                     }
-                    this.pendingSave = finalData;
+                    this.pendingSave = this.cloneSyncData(finalData);
                     await this.performCloudSave(elements);
                 }
             } else {
@@ -359,7 +362,7 @@ const FirebaseSync = {
                         clearTimeout(this.saveToCloudTimeout);
                         this.saveToCloudTimeout = null;
                     }
-                    this.pendingSave = finalData;
+                    this.pendingSave = this.cloneSyncData(finalData);
                     await this.performCloudSave(elements);
                 } else {
                     finalData = { animeData: {}, videoProgress: {}, groupCoverImages: {} };

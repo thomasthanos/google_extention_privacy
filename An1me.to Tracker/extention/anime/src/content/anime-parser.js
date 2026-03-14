@@ -33,7 +33,7 @@ const AnimeParser = {
         
         Logger.debug(`Parsing: ${pathname}`);
         
-        const pathMatch = pathname.match(/\/watch\/([^\/]+)(?:\/([^\/]+))?/);
+        const pathMatch = pathname.match(/\/watch\/([^/]+)(?:\/([^/]+))?/);
         
         if (!pathMatch) {
             Logger.info('URL does not match watch pattern');

@@ -13,7 +13,6 @@ const AnimeCardRenderer = {
         const { CONFIG } = window.AnimeTracker;
 
         const episodeCount = anime.episodes?.length || 0;
-        const lastWatched = UIHelpers.formatDate(anime.lastWatched);
         const progressData = FillerService.calculateProgress(episodeCount, slug, anime);
         const sizeClass = UIHelpers.getProgressSizeClass(episodeCount, progressData.total);
 
@@ -150,9 +149,6 @@ const AnimeCardRenderer = {
             ? (canonWatched / totalCanon) * 100
             : progressData.progress;
 
-        const totalFillerCount = fillerInfo?.total || 0;
-        const watchedFillerCount = fillerInfo?.watched || 0;
-
         const totalDisplay = progressData.isGuessed ? `~${progressData.total}` : progressData.total;
         const totalCanonDisplay = progressData.isGuessed ? `~${totalCanon}` : totalCanon;
 
@@ -185,8 +181,9 @@ const AnimeCardRenderer = {
         // avoid modifying external CSS; these dimensions and styles match the
         // provided design (44x58 px, 8px radius, accent border/gradient).
         const firstLetter = (anime.title || '').trim().charAt(0) || '';
-        const coverHtml = anime.coverImage
-            ? `<img src="${anime.coverImage}" alt="${UIHelpers.escapeHtml(anime.title)}" style="border-radius:8px;width:44px;height:58px;object-fit:cover;">
+        const safeCoverImage = UIHelpers.sanitizeImageUrl(anime.coverImage);
+        const coverHtml = safeCoverImage
+            ? `<img src="${UIHelpers.escapeHtml(safeCoverImage)}" alt="${UIHelpers.escapeHtml(anime.title)}" style="border-radius:8px;width:44px;height:58px;object-fit:cover;">
               `
             : `<div style="width:44px;height:58px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff;">
                     ${UIHelpers.escapeHtml(firstLetter.toUpperCase())}
@@ -198,10 +195,9 @@ const AnimeCardRenderer = {
         const totalEpisodesPossible = progressData.total || 0;
         const isCardComplete = progressData.progress >= 100 && totalWatchedEpisodes > 0;
         const totalProgressText = totalEpisodesPossible > 0 ? `${currentEpisode}/${totalEpisodesPossible}` : `${currentEpisode}`;
-        const canonProgressText = hasFillerData ? `${canonWatched}/${totalCanonDisplay}` : '';
-        const episodeProgressText = hasFillerData
-            ? `Ep ${totalProgressText} · Canon ${canonProgressText}`
-            : (totalEpisodesPossible > 0 ? `Ep ${totalWatchedEpisodes}/${totalEpisodesPossible}` : '');
+        const episodeProgressText = totalEpisodesPossible > 0
+            ? `Ep ${totalProgressText}`
+            : (currentEpisode > 0 ? `Ep ${currentEpisode}` : '');
         let statusTextCard = '';
         if (totalWatchedEpisodes === 0) {
             statusTextCard = 'Not started';
@@ -452,28 +448,19 @@ const AnimeCardRenderer = {
         const groupImages = (window.AnimeTracker && window.AnimeTracker.groupCoverImages) || {};
         const coverImageGroup = groupImages[baseSlug] ||
             ((firstSeason?.anime && firstSeason.anime.coverImage) ? firstSeason.anime.coverImage : null);
+        const safeCoverImageGroup = UIHelpers.sanitizeImageUrl(coverImageGroup);
         const firstLetterGroup = (baseTitle || '').trim().charAt(0) || '';
-        const coverHtmlGroup = coverImageGroup
-            ? `<img src="${coverImageGroup}" alt="${UIHelpers.escapeHtml(baseTitle)}" style="border-radius:8px;width:44px;height:58px;object-fit:cover;">
+        const coverHtmlGroup = safeCoverImageGroup
+            ? `<img src="${UIHelpers.escapeHtml(safeCoverImageGroup)}" alt="${UIHelpers.escapeHtml(baseTitle)}" style="border-radius:8px;width:44px;height:58px;object-fit:cover;">
               `
             : `<div style="width:44px;height:58px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff;">
                     ${UIHelpers.escapeHtml(firstLetterGroup.toUpperCase())}
                </div>`;
 
         // Calculate total stats across all seasons
-        let totalEpisodes = 0;
-        let totalWatchTime = 0;
         let latestWatched = null;
 
-        seasons.forEach(({ slug, anime }) => {
-            // Don't count movies as episodes
-            const seasonLabel = SeasonGrouping.getSeasonLabel(slug, anime.title);
-            const isMovie = seasonLabel.includes('(Movie)') || slug.includes('third-stage');
-
-            if (!isMovie) {
-                totalEpisodes += anime.episodes?.length || 0;
-            }
-            totalWatchTime += anime.totalWatchTime || 0;
+        seasons.forEach(({ anime }) => {
             if (anime.lastWatched) {
                 const date = new Date(anime.lastWatched);
                 if (!latestWatched || date > latestWatched) {
@@ -504,7 +491,7 @@ const AnimeCardRenderer = {
         }
 
         // Build season items HTML
-        const seasonData = expandedSeasons.map(({ slug, anime, seasonNum, partConfig, partIndex }, index) => {
+        const seasonData = expandedSeasons.map(({ slug, anime, partConfig }, index) => {
             const { CONFIG } = window.AnimeTracker;
             const episodeCount = anime.episodes?.length || 0;
 
@@ -560,7 +547,6 @@ const AnimeCardRenderer = {
                     // Part-specific progress
                     const partProgress = (watchedInPart / partEpisodeCount) * 100;
                     progressPercent = Math.round(partProgress);
-                    const currentEpInPart = watchedInPart > 0 ? Math.max(...partEpisodes.map(ep => ep.number)) : 0;
                     isComplete = watchedInPart >= partEpisodeCount;
                     hasProgress = watchedInPart > 0;
                     statusClass = isComplete ? 'complete' : (hasProgress ? 'in-progress' : 'not-started');
@@ -794,13 +780,11 @@ const AnimeCardRenderer = {
         const seasonItemsHTML = seasonData.map(d => d.html).join('');
         const lastWatchedText = latestWatched ? UIHelpers.formatDate(latestWatched.toISOString()) : 'Never';
         const allSeasonsComplete = seasonData.every(d => d.isComplete);
-        const badgeClass = allSeasonsComplete ? 'complete' : '';
         const itemCount = expandedSeasons.length;
         const itemLabel = itemCount === seasons.length ? `${itemCount} seasons` : `${itemCount} parts`;
 
         // Compute meta information for season group. Show number of seasons watched vs total,
         // overall status, and last watched relative time.
-        const totalSeasons = seasons.length;
         const anyStarted = seasons.some(({ anime }) =>
             (anime.episodes?.length || 0) > 0 || (anime.totalWatchTime || 0) > 0
         );
@@ -878,7 +862,7 @@ const AnimeCardRenderer = {
     /**
      * Create a movie group box containing multiple movies of the same series
      */
-    createMovieGroup(baseSlug, movies, videoProgress = {}) {
+    createMovieGroup(baseSlug, movies) {
         const { UIHelpers, SeasonGrouping } = window.AnimeTracker;
 
         // Get the base title from the first movie
@@ -886,11 +870,9 @@ const AnimeCardRenderer = {
         const baseTitle = this.extractMovieBaseTitle(firstMovie.anime.title);
 
         // Calculate total stats across all movies
-        let totalWatchTime = 0;
         let latestWatched = null;
 
         movies.forEach(({ anime }) => {
-            totalWatchTime += anime.totalWatchTime || 0;
             if (anime.lastWatched) {
                 const date = new Date(anime.lastWatched);
                 if (!latestWatched || date > latestWatched) {
@@ -900,7 +882,7 @@ const AnimeCardRenderer = {
         });
 
         // Build movie items HTML
-        const movieItemsHTML = movies.map(({ slug, anime, movieNum }) => {
+        const movieItemsHTML = movies.map(({ slug, anime }) => {
             const movieLabel = SeasonGrouping.getMovieLabel(slug, anime.title);
             const watchTime = anime.totalWatchTime || 0;
             const formattedTime = UIHelpers.formatDuration(watchTime);
@@ -935,9 +917,10 @@ const AnimeCardRenderer = {
         // Determine cover image for movie group
         const groupImages = (window.AnimeTracker && window.AnimeTracker.groupCoverImages) || {};
         const coverImageGroup = groupImages[baseSlug] || ((firstMovie?.anime && firstMovie.anime.coverImage) ? firstMovie.anime.coverImage : null);
+        const safeCoverImageGroup = UIHelpers.sanitizeImageUrl(coverImageGroup);
         const firstLetterGroup = (baseTitle || '').trim().charAt(0) || '';
-        const coverHtmlGroup = coverImageGroup
-            ? `<img src="${coverImageGroup}" alt="${UIHelpers.escapeHtml(baseTitle)}" style="border-radius:8px;width:44px;height:58px;object-fit:cover;">`
+        const coverHtmlGroup = safeCoverImageGroup
+            ? `<img src="${UIHelpers.escapeHtml(safeCoverImageGroup)}" alt="${UIHelpers.escapeHtml(baseTitle)}" style="border-radius:8px;width:44px;height:58px;object-fit:cover;">`
             : `<div style="width:44px;height:58px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff;">
                     ${UIHelpers.escapeHtml(firstLetterGroup.toUpperCase())}
                </div>`;
@@ -980,7 +963,7 @@ const AnimeCardRenderer = {
     /**
      * Create a single movie card (collapsible like movie groups)
      */
-    createSingleMovieCard(slug, anime, videoProgress = {}) {
+    createSingleMovieCard(slug, anime) {
         const { UIHelpers } = window.AnimeTracker;
 
         const title = anime.title || slug;
@@ -991,9 +974,10 @@ const AnimeCardRenderer = {
 
         // Determine a cover image for single movie
         const coverImg = anime.coverImage || null;
+        const safeCoverImg = UIHelpers.sanitizeImageUrl(coverImg);
         const firstLetter = (title || '').trim().charAt(0) || '';
-        const coverHtml = coverImg
-            ? `<img src="${coverImg}" alt="${UIHelpers.escapeHtml(title)}" style="border-radius:8px;width:44px;height:58px;object-fit:cover;">`
+        const coverHtml = safeCoverImg
+            ? `<img src="${UIHelpers.escapeHtml(safeCoverImg)}" alt="${UIHelpers.escapeHtml(title)}" style="border-radius:8px;width:44px;height:58px;object-fit:cover;">`
             : `<div style="width:44px;height:58px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff;">
                     ${UIHelpers.escapeHtml(firstLetter.toUpperCase())}
                </div>`;

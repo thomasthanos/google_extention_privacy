@@ -22,7 +22,7 @@ const FirebaseLib = (function() {
     function getRedirectUrl() {
         try {
             return chrome.identity?.getRedirectURL?.() || '';
-        } catch (e) {
+        } catch {
             return '';
         }
     }
@@ -48,7 +48,7 @@ const FirebaseLib = (function() {
                 const shortUrl = ru.replace(/https:\/\/([a-z0-9]+)\.chromiumapp\.org.*/, 'chrome-extension://$1');
                 console.log('[Firebase] Extension redirect:', shortUrl);
             }
-        } catch (e) { /* non-Chrome browser */ }
+        } catch { /* non-Chrome browser */ }
         
         try {
             // Check for stored user
@@ -322,13 +322,6 @@ const FirebaseLib = (function() {
     }
 
     /**
-     * Get current user
-     */
-    function getCurrentUser() {
-        return currentUser;
-    }
-
-    /**
      * Add auth state listener
      */
     function onAuthStateChanged(callback) {
@@ -415,8 +408,9 @@ const FirebaseLib = (function() {
             });
 
             if (!response.ok) {
-                console.error('[Firestore] Set error:', response.status);
-                return false;
+                const errorText = await response.text().catch(() => '');
+                console.error('[Firestore] Set error:', response.status, errorText);
+                throw new Error(`Firestore set error: ${response.status}`);
             }
 
             return true;
@@ -506,64 +500,37 @@ const FirebaseLib = (function() {
     }
 
     /**
-     * Sign in with Email/Password (works on ALL browsers including Orion/Safari)
-     */
-    async function signInWithEmailPassword(email, password) {
-        const response = await fetch(
-            `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password, returnSecureToken: true })
-            }
-        );
-
-        const data = await response.json();
-        if (data.error) throw new Error(data.error.message);
-
-        currentUser = {
-            uid: data.localId,
-            email: data.email,
-            displayName: data.displayName || data.email.split('@')[0],
-            photoURL: null
-        };
-
-        const tokens = {
-            idToken: data.idToken,
-            refreshToken: data.refreshToken,
-            expiresAt: Date.now() + (parseInt(data.expiresIn) * 1000)
-        };
-
-        await chrome.storage.local.set({
-            [STORAGE_KEYS.USER]: currentUser,
-            [STORAGE_KEYS.TOKENS]: tokens
-        });
-
-        notifyAuthStateListeners(currentUser);
-        return currentUser;
-    }
-
-    /**
      * Sign in via exported token (for cross-browser transfer from Chrome)
      */
     async function signInWithExportedToken(tokenData) {
         if (!tokenData || !tokenData.user || !tokenData.tokens) {
             throw new Error('Invalid token data');
         }
+        if (!tokenData.tokens.refreshToken || typeof tokenData.tokens.refreshToken !== 'string') {
+            throw new Error('Invalid or missing refresh token in exported data.');
+        }
         // Verify token is still valid by refreshing it
-        const response = await fetch(
-            `https://securetoken.googleapis.com/v1/token?key=${API_KEY}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    grant_type: 'refresh_token',
-                    refresh_token: tokenData.tokens.refreshToken
-                })
-            }
-        );
-        const data = await response.json();
+        let response, data;
+        try {
+            response = await fetch(
+                `https://securetoken.googleapis.com/v1/token?key=${API_KEY}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        grant_type: 'refresh_token',
+                        refresh_token: tokenData.tokens.refreshToken
+                    })
+                }
+            );
+            data = await response.json();
+        } catch (networkError) {
+            throw new Error('Network error during token validation. Please check your connection.');
+        }
         if (data.error) throw new Error('Token expired or invalid. Please export a fresh token from Chrome.');
+        if (!data.id_token || !data.refresh_token || !data.expires_in) {
+            throw new Error('Unexpected response from token endpoint.');
+        }
 
         currentUser = tokenData.user;
         const tokens = {
@@ -599,13 +566,15 @@ const FirebaseLib = (function() {
     return {
         init,
         signInWithGoogle,
-        signInWithEmailPassword,
         signInWithExportedToken,
         exportSessionToken,
         signOut,
-        getCurrentUser,
         onAuthStateChanged,
         getDocument,
         setDocument
     };
 })();
+
+if (typeof window !== 'undefined') {
+    window.FirebaseLib = FirebaseLib;
+}

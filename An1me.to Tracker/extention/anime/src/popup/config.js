@@ -128,7 +128,7 @@ const ANIME_PARTS_CONFIG = {
         { name: 'Part 2: Ketsubetsu-tan', start: 14, end: 26 },
         { name: 'Part 3: Soukoku-tan', start: 27, end: 40 }  // soukoku-tan ep14 + offset 26 = ep40
     ],
-    // Add multi-part anime here (entries with only 1 part are pointless — skip them)
+    // Add multi-part anime here (entries with only 1 part are pointless - skip them)
     // Example:
     // 'attack-on-titan-final': [
     //     { name: 'Part 1', start: 1, end: 16 },
@@ -175,8 +175,10 @@ const KNOWN_MOVIE_SLUGS = [
  */
 const SeasonGrouping = {
     // Check if slug is a movie
-    isMovie(slug) {
-        const lowerSlug = slug.toLowerCase();
+    isMovie(slug, anime = null) {
+        const lowerSlug = String(slug || '').toLowerCase();
+        if (!lowerSlug) return false;
+        const lowerTitle = String(anime?.title || '').toLowerCase();
 
         // Exception: Initial D Third Stage should be treated as a season, not a movie
         if (lowerSlug.includes('initial-d') && (lowerSlug.includes('third-stage') || lowerSlug.includes('3rd-stage'))) {
@@ -204,11 +206,65 @@ const SeasonGrouping = {
             /-the-last$/i,
             /-mugen-train$/i
         ];
-        return moviePatterns.some(pattern => pattern.test(slug));
+        if (moviePatterns.some(pattern => pattern.test(lowerSlug))) {
+            return true;
+        }
+
+        const titleMoviePatterns = [
+            /\bmovie\b/i,
+            /\bfilm\b/i,
+            /\bthe movie\b/i,
+            /\bgekijouban\b/i,
+        ];
+
+        const nonMoviePatterns = [
+            /-ova(-|$)/i,
+            /-ona(-|$)/i,
+            /-special(-|$)/i,
+            /-recap(-|$)/i
+        ];
+        const titleNonMoviePatterns = [
+            /\bova\b/i,
+            /\bona\b/i,
+            /\bspecial\b/i,
+            /\brecap\b/i
+        ];
+
+        const hasNonMovieHint = nonMoviePatterns.some(pattern => pattern.test(lowerSlug)) ||
+            titleNonMoviePatterns.some(pattern => pattern.test(lowerTitle));
+        const hasTitleMovieHint = titleMoviePatterns.some(pattern => pattern.test(lowerTitle));
+        if (hasTitleMovieHint && !hasNonMovieHint) {
+            return true;
+        }
+
+        if (!anime || typeof anime !== 'object') {
+            return false;
+        }
+
+        const totalEpisodes = Number.isFinite(anime.totalEpisodes) ? anime.totalEpisodes : null;
+        const trackedEpisodes = Array.isArray(anime.episodes) ? anime.episodes.length : 0;
+        const totalWatchTimeSeconds = Number(anime.totalWatchTime) || 0;
+        const avgMinutes = trackedEpisodes > 0 ? (totalWatchTimeSeconds / 60) / trackedEpisodes : 0;
+
+        const hasSeriesSlugHint = /-season-?\d+|-s\d+|-(part|cour)-?\d+|-\d+(st|nd|rd|th)-season|-(ii|iii|iv|v|vi)$/i.test(lowerSlug);
+        const hasSeriesTitleHint = /\bseason\b|\bpart\b|\bcour\b/i.test(lowerTitle);
+
+        if (hasSeriesSlugHint || hasSeriesTitleHint || hasNonMovieHint) {
+            return false;
+        }
+
+        // Metadata fallback: single long entry is most likely a movie.
+        if (totalEpisodes === 1) return true;
+        if (trackedEpisodes === 1 && avgMinutes >= 70) return true;
+
+        return false;
     },
 
     // Extract movie number from slug
     getMovieNumber(slug) {
+        // One Piece chronology overrides (slugs without explicit movie-N).
+        if (slug.includes('one-piece-3d-mugiwara-chase')) return 11;
+
         // Check for explicit movie number: movie-01, movie-14, etc.
         let match = slug.match(/-movie-0?(\d+)/i);
         if (match) return parseInt(match[1], 10);
@@ -271,9 +327,9 @@ const SeasonGrouping = {
     },
 
     // Extract base slug by removing season/part indicators
-    getBaseSlug(slug) {
+    getBaseSlug(slug, anime = null) {
         // If it's a movie, use movie base slug extraction
-        if (this.isMovie(slug)) {
+        if (this.isMovie(slug, anime)) {
             return this.getMovieBaseSlug(slug);
         }
 
@@ -568,6 +624,11 @@ const SeasonGrouping = {
             if (numTitleMatch) {
                 return `Movie ${numTitleMatch[1]}`;
             }
+            // Check for "0 Movie", "1 Movie", etc.
+            const leadingNumMovieMatch = title.match(/\b(\d+)\s*Movie\b/i);
+            if (leadingNumMovieMatch) {
+                return `Movie ${leadingNumMovieMatch[1]}`;
+            }
             // Check for "Film: XXX"
             const filmTitleMatch = title.match(/Film[:\s]+([A-Za-z]+)/i);
             if (filmTitleMatch) {
@@ -575,9 +636,26 @@ const SeasonGrouping = {
             }
         }
 
-        // Last resort - get movie number
-        const movieNum = this.getMovieNumber(slug);
-        return `Movie ${movieNum}`;
+        // Last resort: only use "Movie N" when N is explicitly present in slug.
+        const explicitMovieNum = slug.match(/-movie-0?(\d+)/i);
+        if (explicitMovieNum) {
+            return `Movie ${parseInt(explicitMovieNum[1], 10)}`;
+        }
+
+        // For slugs like one-piece-3d-mugiwara-chase, build label from title/base.
+        if (title) {
+            const baseSlug = this.getMovieBaseSlug(slug);
+            const baseTitle = baseSlug
+                .replace(/-/g, ' ')
+                .replace(/\b\w/g, c => c.toUpperCase());
+            const cleaned = title
+                .replace(new RegExp(`^${baseTitle}\\s*[:\\-]?\\s*`, 'i'), '')
+                .trim();
+            if (cleaned) return cleaned;
+            return title.trim();
+        }
+
+        return 'Movie';
     },
 
     // Group anime entries by base slug
@@ -586,8 +664,8 @@ const SeasonGrouping = {
         const movieGroups = new Map();
 
         for (const [slug, anime] of animeEntries) {
-            const isMovie = this.isMovie(slug);
-            const baseSlug = this.getBaseSlug(slug);
+            const isMovie = this.isMovie(slug, anime);
+            const baseSlug = this.getBaseSlug(slug, anime);
 
             if (isMovie) {
                 // Group movies separately with a special key
@@ -614,13 +692,25 @@ const SeasonGrouping = {
         this.mergeRelatedGroups(groups);
 
         // Sort season groups by season number
-        for (const [baseSlug, entries] of groups) {
+        for (const [, entries] of groups) {
             entries.sort((a, b) => a.seasonNum - b.seasonNum);
         }
 
         // Sort movie groups by movie number
-        for (const [groupKey, entries] of movieGroups) {
-            entries.sort((a, b) => a.movieNum - b.movieNum);
+        for (const [, entries] of movieGroups) {
+            entries.sort((a, b) => {
+                if (a.movieNum !== b.movieNum) return a.movieNum - b.movieNum;
+
+                // If movie number ties, prefer explicit movie-number slugs first.
+                const aExplicit = /-movie-0?\d+/i.test(a.slug) ? 0 : 1;
+                const bExplicit = /-movie-0?\d+/i.test(b.slug) ? 0 : 1;
+                if (aExplicit !== bExplicit) return aExplicit - bExplicit;
+
+                // Stable, human-friendly tie-breaker.
+                const aLabel = this.getMovieLabel(a.slug, a.anime?.title || '');
+                const bLabel = this.getMovieLabel(b.slug, b.anime?.title || '');
+                return aLabel.localeCompare(bLabel, 'en', { numeric: true, sensitivity: 'base' });
+            });
         }
 
         // Merge movie groups into main groups
