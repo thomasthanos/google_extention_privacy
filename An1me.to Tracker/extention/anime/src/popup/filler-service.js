@@ -625,6 +625,8 @@ const FillerService = {
         'kimetsu-no-yaiba-katanakaji-no-sato-hen': 11,
         'kimetsu-no-yaiba-hashira-geiko-hen': 8,
         'kimetsu-no-yaiba-mugen-ressha-hen': 7,
+        'hunter-x-hunter': 148,
+        'hunter-x-hunter-2011': 148,
         'higashi-no-eden': 11,
         'jujutsu-kaisen-season-2': 23,
         'jujutsu-kaisen-2nd-season': 23, // Correct slug for S2

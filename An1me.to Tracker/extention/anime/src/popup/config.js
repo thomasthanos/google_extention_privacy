@@ -50,6 +50,8 @@ const ANIME_NO_FILLER_DATA = [
     'initial-d-fourth-stage', // Likely no specific filler list or handled by main
     'higashi-no-eden',     // Not on AnimeFillerList (moved from isUnlikelyToHaveFillerData)
     'darling-in-the-franxx', // Not on AnimeFillerList (moved from isUnlikelyToHaveFillerData)
+    'netsuzou-trap',       // Not on AnimeFillerList (404)
+    'seitokai-yakuindomo', // Not on AnimeFillerList (404)
 ];
 
 // Slug mapping for anime that have different names on animefillerlist.com

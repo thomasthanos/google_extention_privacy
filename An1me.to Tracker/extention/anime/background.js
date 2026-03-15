@@ -612,29 +612,31 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     }
 });
 
-// ─── AniList fetcher ──────────────────────────────────────────────────────────
+// ─── an1me.to anime info fetcher ─────────────────────────────────────────────
 
-async function fetchAnilistData(searchTitle) {
-    const query = `
-        query ($search: String) {
-            Media(search: $search, type: ANIME) {
-                id
-                title { romaji english }
-                episodes
-                duration
-                status
-            }
-        }
-    `;
-    const response = await fetch('https://graphql.anilist.co', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ query, variables: { search: searchTitle } })
-    });
-    if (!response.ok) throw new Error(`AniList HTTP ${response.status}`);
-    const json = await response.json();
-    if (json.errors) throw new Error(json.errors[0].message);
-    return json.data?.Media || null;
+async function fetchAnimePageInfo(slug) {
+    const url = `https://an1me.to/anime/${slug}/`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const html = await response.text();
+
+    // ── Total episodes ────────────────────────────────────────────────────────
+    // <dt ...>Επεισόδια</dt><dd ...>170</dd>  (or N/A when ongoing)
+    let totalEpisodes = null;
+    const epMatch = html.match(/Επεισόδια<\/dt>\s*<dd[^>]*>\s*(\d+)\s*<\/dd>/);
+    if (epMatch) totalEpisodes = parseInt(epMatch[1], 10);
+
+    // ── Status ────────────────────────────────────────────────────────────────
+    // <dt ...>Προβλήθηκε</dt> ... <time ...>Jan 9, 2026 to ?</time>
+    // A trailing "?" means still airing; a real end date means finished.
+    let status = null;
+    const dateMatch = html.match(/Προβλήθηκε<\/dt>[\s\S]{0,300}?<time[^>]*>([\s\S]*?)<\/time>/);
+    if (dateMatch) {
+        const dateText = dateMatch[1].replace(/\s+/g, ' ').trim();
+        status = dateText.includes('?') ? 'RELEASING' : 'FINISHED';
+    }
+
+    return { totalEpisodes, status };
 }
 
 // ─── Episode type fetcher ─────────────────────────────────────────────────────
@@ -869,10 +871,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return true;
     }
 
-    if (message.type === 'FETCH_ANILIST') {
-        if (!message.searchTitle) { sendResponse({ error: 'Missing searchTitle' }); return true; }
-        fetchAnilistData(message.searchTitle)
-            .then(media => sendResponse({ success: true, media }))
+    if (message.type === 'FETCH_ANIME_INFO') {
+        if (!message.slug) { sendResponse({ error: 'Missing slug' }); return true; }
+        fetchAnimePageInfo(message.slug)
+            .then(info => sendResponse({ success: true, info }))
             .catch(error => sendResponse({ success: false, error: error.message }));
         return true;
     }
