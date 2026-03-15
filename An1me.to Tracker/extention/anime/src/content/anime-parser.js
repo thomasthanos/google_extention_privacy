@@ -398,6 +398,8 @@ const AnimeParser = {
                     // Bare trailing digit sequence injected by page templates
                     // (only when preceded by whitespace to avoid "SAO II" etc.)
                     .replace(/\s+\d+\s*$/, '')
+                    // Standalone "Episode" at end with no number (e.g. "Bleach Episode")
+                    .replace(/\s+Episode\s*$/i, '')
                     // Year disambiguation "(2024)"
                     .replace(/\s*\(\d{4}\)\s*$/, '')
                     .trim();

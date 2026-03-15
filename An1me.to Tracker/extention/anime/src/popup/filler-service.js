@@ -114,13 +114,12 @@ const FillerService = {
             if (response.success) {
                 const cachedData = {
                     ...response.episodeTypes,
-                    cachedAt: Date.now()
+                    cachedAt: Date.now(),
+                    _fillerSlug: response.fillerSlug || null  // persist so loadCachedEpisodeTypes can use it
                 };
 
                 this.episodeTypesCache[animeSlug] = cachedData;
                 await Storage.set({ [`episodeTypes_${animeSlug}`]: cachedData });
-
-                cachedData._fillerSlug = response.fillerSlug || null;
 
                 Logger.success(`Fetched episode types for ${animeSlug} (filler slug: ${response.fillerSlug})`);
                 return cachedData;

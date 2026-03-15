@@ -1,564 +1,570 @@
 /**
- * Filler Fetch UI - Minimal Design
- * Χρησιμοποιεί τα χρώματα της εφαρμογής
+ * Filler Fetch UI
+ * Handles the "Fetch Filler Data" modal — correctly distinguishes
+ * fresh fetches, valid cache hits, notFound entries, movies, and errors.
  */
 
 const FillerFetchUI = {
-    // Unique IDs
     IDS: {
-        overlay: 'filler-fetch-ui-overlay',
-        container: 'filler-fetch-ui-container',
-        header: 'filler-fetch-ui-header',
-        body: 'filler-fetch-ui-body',
-        footer: 'filler-fetch-ui-footer',
-        progressBar: 'filler-fetch-ui-progress-bar',
+        overlay:      'filler-fetch-ui-overlay',
+        container:    'filler-fetch-ui-container',
         progressFill: 'filler-fetch-ui-progress-fill',
         progressText: 'filler-fetch-ui-progress-text',
-        closeBtn: 'filler-fetch-ui-close-btn',
-        startBtn: 'filler-fetch-ui-start-btn',
-        cancelBtn: 'filler-fetch-ui-cancel-btn',
+        logFeed:      'filler-fetch-ui-log',
+        closeBtn:     'filler-fetch-ui-close-btn',
+        startBtn:     'filler-fetch-ui-start-btn',
+        cancelBtn:    'filler-fetch-ui-cancel-btn',
     },
 
-    // State
     state: {
-        isOpen: false,
-        isRunning: false,
+        isOpen:      false,
+        isRunning:   false,
         isCancelled: false,
-        total: 0,
+        total:   0,
         fetched: 0,
-        cached: 0,
+        cached:  0,
         skipped: 0,
-        failed: 0,
+        failed:  0,
     },
 
-    // Callback function (set by main.js)
     onComplete: null,
 
-    /**
-     * Initialize
-     */
+    // ─── Init ───────────────────────────────────────────────────────────────
+
     init() {
+        this.injectStyles();
         this.createModal();
         this.attachEventListeners();
     },
 
-    /**
-     * Create modal HTML
-     */
+    // ─── Modal HTML ─────────────────────────────────────────────────────────
+
     createModal() {
-        const modalHTML = `
-            <div id="${this.IDS.overlay}" class="filler-fetch-overlay" style="display: none;">
-                <div id="${this.IDS.container}" class="filler-fetch-container">
-                    <!-- Header -->
-                    <div id="${this.IDS.header}" class="filler-fetch-header">
-                        <div class="filler-fetch-title">
-                            <span class="filler-fetch-icon">🎭</span>
-                            <span>Filler Data Fetch</span>
-                        </div>
-                        <button id="${this.IDS.closeBtn}" class="filler-fetch-close">×</button>
-                    </div>
+        const { overlay, container, progressFill, progressText,
+                logFeed, closeBtn, startBtn, cancelBtn } = this.IDS;
 
-                    <!-- Body -->
-                    <div id="${this.IDS.body}" class="filler-fetch-body">
-                        <!-- Progress -->
-                        <div class="filler-fetch-progress-section">
-                            <div class="filler-fetch-progress-info">
-                                <span id="${this.IDS.progressText}" class="filler-fetch-status-text">Ready to fetch filler data...</span>
-                                <span class="filler-fetch-percentage">0%</span>
-                            </div>
-                            <div id="${this.IDS.progressBar}" class="filler-fetch-progress-bar">
-                                <div id="${this.IDS.progressFill}" class="filler-fetch-progress-fill"></div>
-                            </div>
-                        </div>
+        const html = `
+        <div id="${overlay}" class="ffui-overlay" style="display:none">
+          <div id="${container}" class="ffui-box">
 
-                        <!-- Stats -->
-                        <div class="filler-fetch-stats">
-                            <div class="filler-fetch-stat-item">
-                                <span class="filler-fetch-stat-value" data-stat="fetched">0</span>
-                                <span class="filler-fetch-stat-label">Fetched</span>
-                            </div>
-                            <div class="filler-fetch-stat-item">
-                                <span class="filler-fetch-stat-value" data-stat="cached">0</span>
-                                <span class="filler-fetch-stat-label">Cached</span>
-                            </div>
-                            <div class="filler-fetch-stat-item">
-                                <span class="filler-fetch-stat-value" data-stat="skipped">0</span>
-                                <span class="filler-fetch-stat-label">Skipped</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Footer -->
-                    <div id="${this.IDS.footer}" class="filler-fetch-footer">
-                        <button id="${this.IDS.cancelBtn}" class="filler-fetch-btn filler-fetch-btn-secondary" style="display: none;">
-                            Cancel
-                        </button>
-                        <button id="${this.IDS.startBtn}" class="filler-fetch-btn filler-fetch-btn-primary">
-                            Start Fetch
-                        </button>
-                    </div>
-                </div>
+            <div class="ffui-header">
+              <span class="ffui-title"><span class="ffui-title-dot"></span>Filler Data Fetch</span>
+              <button id="${closeBtn}" class="ffui-close" aria-label="Close">×</button>
             </div>
-        `;
 
-        this.injectStyles();
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
+            <div class="ffui-body">
+
+              <!-- Progress bar -->
+              <div class="ffui-progress-wrap">
+                <div class="ffui-progress-info">
+                  <span id="${progressText}" class="ffui-progress-label">Ready…</span>
+                  <span class="ffui-pct">0%</span>
+                </div>
+                <div class="ffui-bar"><div id="${progressFill}" class="ffui-bar-fill"></div></div>
+              </div>
+
+              <!-- Stats -->
+              <div class="ffui-stats">
+                <div class="ffui-stat">
+                  <span class="ffui-stat-val ffui-stat-cyan" data-stat="fetched">0</span>
+                  <span class="ffui-stat-lbl">Fetched</span>
+                </div>
+                <div class="ffui-stat">
+                  <span class="ffui-stat-val" data-stat="cached">0</span>
+                  <span class="ffui-stat-lbl">Cached</span>
+                </div>
+                <div class="ffui-stat">
+                  <span class="ffui-stat-val" data-stat="skipped">0</span>
+                  <span class="ffui-stat-lbl">No Filler</span>
+                </div>
+                <div class="ffui-stat">
+                  <span class="ffui-stat-val ffui-stat-err" data-stat="failed">0</span>
+                  <span class="ffui-stat-lbl">Failed</span>
+                </div>
+              </div>
+
+              <!-- Live log -->
+              <div id="${logFeed}" class="ffui-log" style="display:none"></div>
+
+            </div>
+
+            <div class="ffui-footer">
+              <button id="${cancelBtn}" class="ffui-btn ffui-btn-sec" style="display:none">Cancel</button>
+              <button id="${startBtn}"  class="ffui-btn ffui-btn-pri">Start Fetch</button>
+            </div>
+
+          </div>
+        </div>`;
+
+        document.body.insertAdjacentHTML('beforeend', html);
     },
 
-    /**
-     * Inject CSS
-     */
+    // ─── CSS ────────────────────────────────────────────────────────────────
+
     injectStyles() {
-        const styles = `
-            <style id="filler-fetch-ui-styles">
-                .filler-fetch-overlay {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background: rgba(10, 10, 15, 0.85);
-                    backdrop-filter: blur(4px);
-                    z-index: 100000;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 20px;
-                    animation: filler-fade-in 0.2s ease;
-                }
+        if (document.getElementById('ffui-styles')) return;
+        const css = `
+        <style id="ffui-styles">
+        /* ── Overlay ─────────────────────────────────── */
+        .ffui-overlay {
+            position:fixed; inset:0;
+            background:rgba(7,9,14,.92);
+            backdrop-filter:blur(6px);
+            z-index:100000;
+            display:flex; align-items:center; justify-content:center;
+            padding:20px;
+            animation:ffui-fade .2s ease;
+        }
+        @keyframes ffui-fade { from{opacity:0} to{opacity:1} }
 
-                @keyframes filler-fade-in {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
+        /* ── Box ─────────────────────────────────────── */
+        .ffui-box {
+            background: #111520;
+            background-image: radial-gradient(ellipse at 50% 0%, rgba(79,195,247,0.06) 0%, transparent 65%);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-top-color: rgba(79,195,247,0.18);
+            border-radius: 18px;
+            box-shadow:
+                0 0 0 1px rgba(0,0,0,0.6),
+                0 8px 40px rgba(0,0,0,0.7),
+                0 1px 0 rgba(79,195,247,0.08) inset;
+            width:100%; max-width:400px;
+            display:flex; flex-direction:column;
+            overflow:hidden;
+            animation:ffui-up .28s cubic-bezier(.4,0,.2,1);
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+        }
+        @keyframes ffui-up {
+            from{transform:translateY(16px);opacity:0}
+            to  {transform:translateY(0);  opacity:1}
+        }
 
-                .filler-fetch-container {
-                    background: #14141f;
-                    border: 1px solid rgba(255, 255, 255, 0.08);
-                    border-radius: 14px;
-                    box-shadow: 
-                        0 1px 0 0 rgba(255, 255, 255, 0.08) inset,
-                        0 -1px 0 0 rgba(0, 0, 0, 0.4) inset,
-                        0 8px 24px rgba(0, 0, 0, 0.3);
-                    max-width: 400px;
-                    width: 100%;
-                    overflow: hidden;
-                    animation: filler-slide-up 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                }
+        /* ── Header ──────────────────────────────────── */
+        .ffui-header {
+            padding: 16px 18px 15px;
+            background: linear-gradient(180deg, rgba(79,195,247,0.07) 0%, transparent 100%);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            display:flex; align-items:center; justify-content:space-between;
+        }
+        .ffui-title {
+            font-size:14px; font-weight:700;
+            color:#e8edf8;
+            display:flex; align-items:center; gap:8px;
+            letter-spacing:.2px;
+        }
+        .ffui-title-dot {
+            width:7px; height:7px; border-radius:50%;
+            background: linear-gradient(135deg,#4fc3f7,#29b6f6);
+            box-shadow: 0 0 8px rgba(79,195,247,0.7);
+            flex-shrink:0;
+        }
+        .ffui-close {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 7px;
+            width:28px; height:28px; cursor:pointer;
+            color:#6b7694; font-size:20px; line-height:1;
+            display:flex; align-items:center; justify-content:center;
+            transition: all .15s;
+        }
+        .ffui-close:hover { background:rgba(255,255,255,.1); color:#e8edf8; border-color:rgba(255,255,255,.12); }
 
-                @keyframes filler-slide-up {
-                    from {
-                        transform: translateY(20px);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translateY(0);
-                        opacity: 1;
-                    }
-                }
+        /* ── Body ────────────────────────────────────── */
+        .ffui-body { padding:16px 18px; display:flex; flex-direction:column; gap:14px; }
 
-                .filler-fetch-header {
-                    padding: 20px;
-                    background: #1a1a25;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                }
+        /* ── Progress ────────────────────────────────── */
+        .ffui-progress-info {
+            display:flex; justify-content:space-between; align-items:center;
+            margin-bottom:7px;
+        }
+        .ffui-progress-label { font-size:11px; color:#6b7694; font-weight:500; }
+        .ffui-pct {
+            font-size:11px; font-weight:700;
+            color:#4fc3f7;
+            text-shadow: 0 0 10px rgba(79,195,247,0.5);
+        }
+        .ffui-bar {
+            height:5px;
+            background:rgba(255,255,255,0.05);
+            border-radius:999px;
+            overflow:hidden;
+        }
+        .ffui-bar-fill {
+            height:100%;
+            background: linear-gradient(90deg,#4fc3f7,#29b6f6);
+            border-radius:999px;
+            width:0%;
+            transition:width .35s ease;
+            box-shadow: 0 0 8px rgba(79,195,247,0.4);
+        }
 
-                .filler-fetch-title {
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    font-size: 16px;
-                    font-weight: 600;
-                    color: #ffffff;
-                }
+        /* ── Stats grid ──────────────────────────────── */
+        .ffui-stats {
+            display:grid; grid-template-columns:repeat(4,1fr); gap:7px;
+        }
+        .ffui-stat {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-top-color: rgba(255,255,255,0.09);
+            border-radius: 10px;
+            padding: 9px 4px 8px;
+            text-align:center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05);
+        }
+        .ffui-stat-val {
+            display:block; font-size:20px; font-weight:800;
+            color:#e8edf8; margin-bottom:3px; line-height:1;
+        }
+        .ffui-stat-val.ffui-stat-cyan {
+            color:#4fc3f7;
+            text-shadow: 0 0 12px rgba(79,195,247,0.5);
+        }
+        .ffui-stat-val.ffui-stat-err { color:#f07070; }
+        .ffui-stat-lbl {
+            display:block; font-size:9px; color:#353d55;
+            text-transform:uppercase; letter-spacing:.6px; font-weight:600;
+        }
 
-                .filler-fetch-icon {
-                    font-size: 20px;
-                }
+        /* ── Live log ────────────────────────────────── */
+        .ffui-log {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 8px 10px;
+            max-height: 148px;
+            overflow-y: auto;
+            display:flex; flex-direction:column; gap:2px;
+            scrollbar-width:thin;
+            scrollbar-color:rgba(79,195,247,.15) transparent;
+        }
+        .ffui-log-row {
+            display:flex; align-items:center; gap:7px;
+            font-size:11px; line-height:1.5;
+            padding: 1px 0;
+            animation:ffui-row-in .12s ease;
+        }
+        @keyframes ffui-row-in {
+            from{opacity:0;transform:translateX(-3px)}
+            to  {opacity:1;transform:translateX(0)}
+        }
+        .ffui-log-icon { flex-shrink:0; width:14px; text-align:center; font-size:10px; }
+        .ffui-log-name {
+            color:#9aa3bb; flex:1; min-width:0;
+            overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+            font-weight:500;
+        }
+        .ffui-log-detail {
+            flex-shrink:0; font-size:10px; font-weight:600;
+            padding: 1px 6px; border-radius:999px; white-space:nowrap;
+        }
+        /* detail badge colours by row type */
+        .ffui-log-row.is-fetch   .ffui-log-name  { color:#e8edf8; }
+        .ffui-log-row.is-fetch   .ffui-log-detail { background:rgba(79,195,247,0.12); color:#4fc3f7; }
+        .ffui-log-row.is-cached  .ffui-log-detail { background:rgba(107,118,148,0.12); color:#6b7694; }
+        .ffui-log-row.is-nofill  .ffui-log-detail { background:rgba(107,118,148,0.08); color:#4a5168; }
+        .ffui-log-row.is-movie   .ffui-log-detail { background:rgba(155,106,255,0.1); color:#9b6aff; }
+        .ffui-log-row.is-error   .ffui-log-detail { background:rgba(240,112,112,0.12); color:#f07070; }
+        .ffui-log-row.is-summary {
+            margin-top:5px; padding-top:6px;
+            border-top:1px solid rgba(255,255,255,0.06);
+            font-weight:700; color:#e8edf8;
+        }
+        .ffui-log-row.is-summary .ffui-log-name { color:#e8edf8; }
 
-                .filler-fetch-close {
-                    background: rgba(255, 255, 255, 0.05);
-                    border: none;
-                    border-radius: 8px;
-                    width: 32px;
-                    height: 32px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    cursor: pointer;
-                    color: #a0a0b0;
-                    font-size: 24px;
-                    line-height: 1;
-                    transition: all 0.15s;
-                }
+        /* ── Footer ──────────────────────────────────── */
+        .ffui-footer {
+            padding: 13px 18px;
+            background: rgba(0,0,0,0.2);
+            border-top: 1px solid rgba(255,255,255,0.05);
+            display:flex; gap:9px; justify-content:flex-end;
+        }
 
-                .filler-fetch-close:hover {
-                    background: rgba(255, 255, 255, 0.1);
-                    color: #ffffff;
-                }
+        /* Cancel — ghost */
+        .ffui-btn-sec {
+            padding: 0 18px; height:36px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 999px;
+            font-size:12px; font-weight:600; cursor:pointer;
+            color:#6b7694;
+            transition: all .15s;
+            font-family: inherit;
+        }
+        .ffui-btn-sec:hover:not(:disabled) { background:rgba(255,255,255,.09); color:#e8edf8; }
 
-                .filler-fetch-body {
-                    padding: 24px 20px;
-                }
-
-                .filler-fetch-progress-section {
-                    margin-bottom: 20px;
-                }
-
-                .filler-fetch-progress-info {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 8px;
-                }
-
-                .filler-fetch-status-text {
-                    font-size: 13px;
-                    color: #a0a0b0;
-                }
-
-                .filler-fetch-percentage {
-                    font-size: 13px;
-                    font-weight: 600;
-                    color: #ff6b6b;
-                }
-
-                .filler-fetch-progress-bar {
-                    height: 8px;
-                    background: rgba(255, 255, 255, 0.05);
-                    border-radius: 4px;
-                    overflow: hidden;
-                }
-
-                .filler-fetch-progress-fill {
-                    height: 100%;
-                    background: linear-gradient(90deg, #ff6b6b 0%, #ff8e53 100%);
-                    border-radius: 4px;
-                    width: 0%;
-                    transition: width 0.3s ease;
-                }
-
-                .filler-fetch-stats {
-                    display: grid;
-                    grid-template-columns: repeat(3, 1fr);
-                    gap: 12px;
-                }
-
-                .filler-fetch-stat-item {
-                    background: rgba(255, 255, 255, 0.03);
-                    border: 1px solid rgba(255, 255, 255, 0.05);
-                    border-radius: 10px;
-                    padding: 12px;
-                    text-align: center;
-                }
-
-                .filler-fetch-stat-value {
-                    display: block;
-                    font-size: 24px;
-                    font-weight: 700;
-                    color: #ffffff;
-                    margin-bottom: 4px;
-                }
-
-                .filler-fetch-stat-label {
-                    display: block;
-                    font-size: 11px;
-                    color: #5a5a6e;
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                }
-
-                .filler-fetch-footer {
-                    padding: 16px 20px;
-                    background: #1a1a25;
-                    border-top: 1px solid rgba(255, 255, 255, 0.05);
-                    display: flex;
-                    gap: 10px;
-                    justify-content: flex-end;
-                }
-
-                .filler-fetch-btn {
-                    padding: 10px 20px;
-                    border: none;
-                    border-radius: 10px;
-                    font-size: 14px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: all 0.15s;
-                }
-
-                .filler-fetch-btn-primary {
-                    background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%);
-                    color: white;
-                    box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
-                }
-
-                .filler-fetch-btn-primary:hover {
-                    transform: translateY(-1px);
-                    box-shadow: 0 6px 16px rgba(255, 107, 107, 0.4);
-                }
-
-                .filler-fetch-btn-secondary {
-                    background: rgba(255, 255, 255, 0.05);
-                    color: #a0a0b0;
-                }
-
-                .filler-fetch-btn-secondary:hover {
-                    background: rgba(255, 255, 255, 0.1);
-                    color: #ffffff;
-                }
-
-                .filler-fetch-btn:disabled {
-                    opacity: 0.5;
-                    cursor: not-allowed;
-                    transform: none !important;
-                }
-            </style>
-        `;
-
-        document.head.insertAdjacentHTML('beforeend', styles);
+        /* Start / Close — 3-D cyan (mirrors .btn-google-primary style) */
+        .ffui-btn-pri {
+            padding: 0 22px; height:36px;
+            background: linear-gradient(160deg, #3db8e8 0%, #1a96c8 45%, #0e79a8 100%);
+            border: none;
+            border-radius: 999px;
+            font-size:12px; font-weight:700; cursor:pointer;
+            color:#fff;
+            position:relative;
+            transition: all .15s;
+            font-family: inherit;
+            box-shadow:
+                0 1px 0 rgba(255,255,255,0.25) inset,
+                0 -2px 0 rgba(0,0,0,0.35) inset,
+                0 3px 10px rgba(14,121,168,0.55),
+                0 1px 3px rgba(0,0,0,0.5);
+        }
+        .ffui-btn-pri::before {
+            content:'';
+            position:absolute; inset:0;
+            border-radius:inherit;
+            background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 55%);
+            pointer-events:none;
+        }
+        .ffui-btn-pri:hover:not(:disabled) {
+            transform:translateY(-1px);
+            box-shadow:
+                0 1px 0 rgba(255,255,255,0.25) inset,
+                0 -2px 0 rgba(0,0,0,0.35) inset,
+                0 5px 16px rgba(14,121,168,0.65),
+                0 2px 5px rgba(0,0,0,0.5);
+        }
+        .ffui-btn-pri:active:not(:disabled) {
+            transform:translateY(1px);
+            box-shadow:
+                0 1px 0 rgba(255,255,255,0.15) inset,
+                0 -1px 0 rgba(0,0,0,0.3) inset,
+                0 2px 6px rgba(14,121,168,0.4);
+        }
+        .ffui-btn-pri:disabled, .ffui-btn-sec:disabled {
+            opacity:.4; cursor:not-allowed; transform:none!important;
+        }
+        </style>`;
+        document.head.insertAdjacentHTML('beforeend', css);
     },
 
-    /**
-     * Attach event listeners
-     */
+    // ─── Events ─────────────────────────────────────────────────────────────
+
     attachEventListeners() {
-        document.getElementById(this.IDS.closeBtn).addEventListener('click', () => {
-            if (!this.state.isRunning) this.close();
-        });
+        document.getElementById(this.IDS.closeBtn)
+            .addEventListener('click', () => { if (!this.state.isRunning) this.close(); });
 
-        document.getElementById(this.IDS.overlay).addEventListener('click', (e) => {
-            if (e.target.id === this.IDS.overlay && !this.state.isRunning) this.close();
-        });
+        document.getElementById(this.IDS.overlay)
+            .addEventListener('click', (e) => {
+                if (e.target.id === this.IDS.overlay && !this.state.isRunning) this.close();
+            });
 
-        document.getElementById(this.IDS.startBtn).addEventListener('click', () => {
-            this.startFetch();
-        });
+        document.getElementById(this.IDS.startBtn)
+            .addEventListener('click', () => this.startFetch());
 
-        document.getElementById(this.IDS.cancelBtn).addEventListener('click', () => {
-            this.cancel();
-        });
+        document.getElementById(this.IDS.cancelBtn)
+            .addEventListener('click', () => this.cancel());
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.state.isOpen && !this.state.isRunning) {
-                this.close();
-            }
+            if (e.key === 'Escape' && this.state.isOpen && !this.state.isRunning) this.close();
         });
     },
 
-    /**
-     * Open modal
-     */
+    // ─── Open / Close ────────────────────────────────────────────────────────
+
     async open() {
         this.state.isOpen = true;
-        this.resetState();
+        this.resetUI();
 
-        const { Storage } = window.AnimeTracker;
-        const data = await Storage.get(['animeData']);
-        const animeData = data.animeData || {};
-        this.state.total = Object.keys(animeData).length;
+        const data = await window.AnimeTracker.Storage.get(['animeData']);
+        this.state.total = Object.keys(data.animeData || {}).length;
 
         document.getElementById(this.IDS.overlay).style.display = 'flex';
     },
 
-    /**
-     * Close modal
-     */
     close() {
         this.state.isOpen = false;
         document.getElementById(this.IDS.overlay).style.display = 'none';
     },
 
-    /**
-     * Reset state
-     */
-    resetState() {
-        this.state.isRunning = false;
-        this.state.isCancelled = false;
-        this.state.fetched = 0;
-        this.state.cached = 0;
-        this.state.skipped = 0;
-        this.state.failed = 0;
+    // ─── UI helpers ─────────────────────────────────────────────────────────
 
-        this.updateProgress(0);
-        this.updateProgressText('Ready to fetch filler data...');
-        this.updateStat('fetched', 0);
-        this.updateStat('cached', 0);
-        this.updateStat('skipped', 0);
+    resetUI() {
+        Object.assign(this.state, {
+            isRunning: false, isCancelled: false,
+            fetched: 0, cached: 0, skipped: 0, failed: 0,
+        });
+
+        this._setProgress(0, 'Ready to fetch filler data…');
+        ['fetched','cached','skipped','failed'].forEach(k => this._setStat(k, 0));
+
+        const log = document.getElementById(this.IDS.logFeed);
+        log.innerHTML = '';
+        log.style.display = 'none';
 
         const startBtn = document.getElementById(this.IDS.startBtn);
-        startBtn.innerHTML = 'Start Fetch';
-        startBtn.style.display = 'flex';
+        startBtn.textContent = 'Start Fetch';
+        startBtn.style.display = '';
         startBtn.disabled = false;
         document.getElementById(this.IDS.cancelBtn).style.display = 'none';
     },
 
-    /**
-     * Update progress
-     */
-    updateProgress(percentage) {
-        document.getElementById(this.IDS.progressFill).style.width = `${percentage}%`;
-        document.querySelector('.filler-fetch-percentage').textContent = `${Math.round(percentage)}%`;
+    _setProgress(pct, label) {
+        document.getElementById(this.IDS.progressFill).style.width = `${pct}%`;
+        document.querySelector('.ffui-pct').textContent = `${Math.round(pct)}%`;
+        if (label !== undefined)
+            document.getElementById(this.IDS.progressText).textContent = label;
+    },
+
+    _setStat(name, value) {
+        const el = document.querySelector(`[data-stat="${name}"]`);
+        if (el) el.textContent = value;
     },
 
     /**
-     * Update progress text
+     * Append a row to the live log.
+     * @param {'fetch'|'cached'|'skip'|'error'|'movie'} type
+     * @param {string} name  - anime title
+     * @param {string} [detail] - short right-aligned note
      */
-    updateProgressText(text) {
-        document.getElementById(this.IDS.progressText).textContent = text;
+    _log(type, name, detail = '') {
+        const log = document.getElementById(this.IDS.logFeed);
+        if (log.style.display === 'none') log.style.display = 'flex';
+
+        const icons   = { fetch: '●', cached: '◌', skip: '□', nofill: '□', error: '×', movie: '▷' };
+        const classes = { fetch: 'is-fetch', cached: 'is-cached', skip: 'is-nofill', nofill: 'is-nofill', error: 'is-error', movie: 'is-movie' };
+
+        const row = document.createElement('div');
+        row.className = `ffui-log-row ${classes[type] || ''}`;
+        row.innerHTML = `
+            <span class="ffui-log-icon">${icons[type] || '□'}</span>
+            <span class="ffui-log-name" title="${name}">${name}</span>
+            ${detail ? `<span class="ffui-log-detail">${detail}</span>` : ''}`;
+        log.appendChild(row);
+        log.scrollTop = log.scrollHeight;
     },
 
-    /**
-     * Update stat
-     */
-    updateStat(statName, value) {
-        const statEl = document.querySelector(`[data-stat="${statName}"]`);
-        if (statEl) statEl.textContent = value;
-    },
+    // ─── Core fetch logic ────────────────────────────────────────────────────
 
-    /**
-     * Start fetch
-     */
     async startFetch() {
-        this.state.isRunning = true;
+        this.state.isRunning  = true;
         this.state.isCancelled = false;
 
-        document.getElementById(this.IDS.startBtn).style.display = 'none';
-        document.getElementById(this.IDS.cancelBtn).style.display = 'flex';
+        document.getElementById(this.IDS.startBtn).style.display  = 'none';
+        document.getElementById(this.IDS.cancelBtn).style.display = '';
 
-        const { FillerService, FillerConsoleLogger: logger, Storage, CONFIG, SeasonGrouping } = window.AnimeTracker;
+        const { FillerService, Storage, CONFIG } = window.AnimeTracker;
 
-        logger.groupStart('🎭 Filler Data Fetch', logger.COLORS.primary);
-
-        const data = await Storage.get(['animeData']);
+        const data     = await Storage.get(['animeData']);
         const animeData = data.animeData || {};
-        const animeList = Object.entries(animeData);
+        const entries  = Object.entries(animeData);
+        this.state.total = entries.length;
 
-        for (let i = 0; i < animeList.length; i++) {
-            if (this.state.isCancelled) {
-                logger.error('Fetch cancelled by user');
-                break;
-            }
+        for (let i = 0; i < entries.length; i++) {
+            if (this.state.isCancelled) break;
 
-            const [slug, anime] = animeList[i];
-            const progress = ((i + 1) / animeList.length) * 100;
-            const animeName = anime.title || slug;
+            const [slug, anime] = entries[i];
+            const title = anime.title || slug;
+            const pct   = ((i + 1) / entries.length) * 100;
 
-            this.updateProgress(progress);
-            this.updateProgressText(`${i + 1}/${animeList.length} - ${animeName}`);
+            this._setProgress(pct, `${i + 1} / ${entries.length} — ${title}`);
 
-            // Show progress every 10 items
-            if (i % 10 === 0 || i === animeList.length - 1) {
-                logger.progress(i + 1, animeList.length, animeName);
-            }
-
-            // Check if movie/OVA/special
+            // ── Skip movies / OVAs / specials ────────────────────────────────
             if (FillerService.isLikelyMovie(slug)) {
-                logger.skip(animeName, 'Movie/OVA/Special');
+                this._log('movie', title, 'movie/OVA');
                 this.state.skipped++;
-                this.updateStat('skipped', this.state.skipped);
+                this._setStat('skipped', this.state.skipped);
                 continue;
             }
 
-            // Check cache
-            if (FillerService.episodeTypesCache[slug]) {
-                const cached = FillerService.episodeTypesCache[slug];
-                const cacheAge = cached.cachedAt ? Date.now() - cached.cachedAt : Infinity;
+            // ── Check in-memory cache ────────────────────────────────────────
+            const cached = FillerService.episodeTypesCache[slug];
+            if (cached) {
+                const age = cached.cachedAt ? Date.now() - cached.cachedAt : Infinity;
 
-                if (cacheAge < CONFIG.EPISODE_TYPES_CACHE_TTL) {
-                    const ageMinutes = Math.round(cacheAge / 60000);
-                    const ageText = ageMinutes < 60 ? `${ageMinutes}m ago` : `${Math.round(ageMinutes / 60)}h ago`;
-                    logger.cached(animeName, ageText);
+                // notFound entry within its 7-day TTL → skip (do NOT count as cached)
+                if (cached.notFound) {
+                    const ttl = CONFIG.FILLER_NOT_FOUND_CACHE_TTL ?? (7 * 24 * 60 * 60 * 1000);
+                    if (age < ttl) {
+                        this._log('nofill', title, 'not listed');
+                        this.state.skipped++;
+                        this._setStat('skipped', this.state.skipped);
+                        continue;
+                    }
+                    // Expired notFound — clear it so fetchEpisodeTypes retries
+                    delete FillerService.episodeTypesCache[slug];
+                } else if (age < (CONFIG.EPISODE_TYPES_CACHE_TTL ?? Infinity)) {
+                    // Fresh valid cache
+                    const fillers = cached.filler?.length ?? 0;
+                    const detail  = fillers > 0 ? `${fillers} fillers` : 'no fillers';
+                    this._log('cached', title, detail);
                     this.state.cached++;
-                    this.updateStat('cached', this.state.cached);
+                    this._setStat('cached', this.state.cached);
                     continue;
                 }
+                // else: expired valid cache → fall through to fetch
             }
 
-            // Fetch episode types
+            // ── Fetch from AnimeFillerList via background ────────────────────
             try {
-                logger.fetchStart(animeName, slug);
-                const animeTitle = anime?.title || null;
-                const episodeTypes = await FillerService.fetchEpisodeTypes(slug, animeTitle);
+                const episodeTypes = await FillerService.fetchEpisodeTypes(slug, anime.title || null);
 
-                if (episodeTypes && episodeTypes.totalEpisodes) {
+                if (episodeTypes && !episodeTypes.notFound) {
                     FillerService.updateFromEpisodeTypes(slug, episodeTypes);
-                    
-                    const fillerCount = episodeTypes.filler ? episodeTypes.filler.length : 0;
-                    const fillerPercent = episodeTypes.totalEpisodes > 0 
-                        ? Math.round((fillerCount / episodeTypes.totalEpisodes) * 100) 
-                        : 0;
-                    
-                    logger.success(animeName, {
-                        total: episodeTypes.totalEpisodes,
-                        filler: fillerCount,
-                        fillerPercent: fillerPercent
-                    });
-                    
+
+                    const fillers = episodeTypes.filler?.length ?? 0;
+                    const total   = episodeTypes.totalEpisodes ?? '?';
+                    const pctFill = total > 0 ? ` (${Math.round(fillers / total * 100)}%)` : '';
+                    this._log('fetch', title, `${fillers} fillers / ${total} eps${pctFill}`);
+
                     this.state.fetched++;
-                    this.updateStat('fetched', this.state.fetched);
+                    this._setStat('fetched', this.state.fetched);
                 } else {
-                    logger.skip(animeName, 'No filler data found (404 or empty response)');
+                    // null → notFound cached by fetchEpisodeTypes
+                    this._log('nofill', title, 'not listed');
                     this.state.skipped++;
-                    this.updateStat('skipped', this.state.skipped);
+                    this._setStat('skipped', this.state.skipped);
                 }
-            } catch (error) {
-                logger.error(`Failed to fetch ${animeName}`, error.message);
+            } catch (err) {
+                this._log('error', title, err.message?.slice(0, 30) || 'error');
                 this.state.failed++;
-                this.state.skipped++;
-                this.updateStat('skipped', this.state.skipped);
+                this._setStat('failed', this.state.failed);
             }
 
-            await new Promise(resolve => setTimeout(resolve, 50));
+            // Small delay so we don't hammer animefillerlist.com
+            await new Promise(r => setTimeout(r, 150));
         }
 
+        // ── Done ─────────────────────────────────────────────────────────────
         this.state.isRunning = false;
-        this.updateProgress(100);
-        this.updateProgressText('✓ Complete!');
 
-        logger.summary({
-            total: this.state.total,
-            fetched: this.state.fetched,
-            cached: this.state.cached,
-            skipped: this.state.skipped,
-            failed: this.state.failed
-        });
+        // Summary row in log
+        const log = document.getElementById(this.IDS.logFeed);
+        if (log) {
+            log.style.display = 'flex';
+            const summary = document.createElement('div');
+            summary.className = 'ffui-log-row is-summary';
+            summary.innerHTML = this.state.isCancelled
+                ? `<span class="ffui-log-icon">□</span><span class="ffui-log-name">Cancelled — ${this.state.fetched} fetched, ${this.state.cached} cached, ${this.state.skipped} no-filler</span>`
+                : `<span class="ffui-log-icon">●</span><span class="ffui-log-name">Done — ${this.state.fetched} fetched, ${this.state.cached} cached, ${this.state.skipped} no-filler${this.state.failed > 0 ? `, ${this.state.failed} failed` : ''}</span>`;
+            log.appendChild(summary);
+            log.scrollTop = log.scrollHeight;
+        }
 
-        logger.groupEnd();
+        this._setProgress(this.state.isCancelled ? this.state.total > 0 ? (((this.state.fetched + this.state.cached + this.state.skipped) / this.state.total) * 100) : 0 : 100,
+            this.state.isCancelled ? 'Cancelled — see log above' : '✓ Complete — see log above');
 
         document.getElementById(this.IDS.cancelBtn).style.display = 'none';
         const startBtn = document.getElementById(this.IDS.startBtn);
-        startBtn.innerHTML = '✓ Done';
-        startBtn.style.display = 'flex';
-        startBtn.disabled = true; // Prevent spam clicks
+        startBtn.textContent = this.state.isCancelled ? 'Closed' : '✓ Done';
+        startBtn.style.display = '';
+        startBtn.disabled = true;
 
-        // Call onComplete callback only once
-        if (this.onComplete && typeof this.onComplete === 'function') {
+        if (!this.state.isCancelled && this.onComplete) {
             this.onComplete();
-            this.onComplete = null; // Clear to prevent multiple calls
+            this.onComplete = null;
         }
 
-        setTimeout(() => {
-            if (this.state.isOpen && !this.state.isRunning) this.close();
-        }, 2000);
+        // Re-enable start button so user can close manually or run again
+        startBtn.disabled = false;
+        startBtn.textContent = this.state.isCancelled ? 'Close' : 'Close';
+        startBtn.addEventListener('click', () => this.close(), { once: true });
     },
 
-    /**
-     * Cancel fetch
-     */
     cancel() {
         this.state.isCancelled = true;
-        this.state.isRunning = false;
-
-        this.updateProgressText('Cancelled');
-        document.getElementById(this.IDS.cancelBtn).style.display = 'none';
-        document.getElementById(this.IDS.startBtn).style.display = 'flex';
-    }
+    },
 };
 
-// Export
 window.AnimeTracker = window.AnimeTracker || {};
 window.AnimeTracker.FillerFetchUI = FillerFetchUI;

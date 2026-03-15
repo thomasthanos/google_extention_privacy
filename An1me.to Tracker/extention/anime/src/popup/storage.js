@@ -284,6 +284,19 @@ const Storage = {
                     }
                 }
 
+                // Clean up titles that have a trailing " Episode" or " – Episode N" suffix
+                // caused by the DOM extractor picking up the page title verbatim.
+                const TITLE_CLEANUP_RE = /(?:\s*[-–—]\s*Episode\s*\d*.*|\s+Episode)\s*$/i;
+                for (const [slug, entry] of Object.entries(animeData)) {
+                    if (!entry?.title) continue;
+                    const cleaned = entry.title.replace(TITLE_CLEANUP_RE, '').trim();
+                    if (cleaned && cleaned !== entry.title) {
+                        entry.title = cleaned;
+                        migrated = true;
+                        console.log(`[Storage] Cleaned title: "${entry.title}" → "${cleaned}" (${slug})`);
+                    }
+                }
+
                 if (migrated) {
                     chrome.storage.local.set({ animeData, videoProgress, deletedAnime }, () => {
                         console.log('[Storage] Anime slug migration complete');

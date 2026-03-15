@@ -677,13 +677,14 @@ function generateFillerSlugCandidates(an1meSlug, animeTitle) {
     const JP_TO_EN = {
         'shingeki-no-kyojin':             'attack-titan',
         'kimetsu-no-yaiba':               'demon-slayer-kimetsu-no-yaiba',
-        'boku-no-hero-academia':           'my-hero-academia',
-        'hagane-no-renkinjutsushi':        'fullmetal-alchemist',
-        'ansatsu-kyoushitsu':              'assassination-classroom',
-        'nanatsu-no-taizai':              'seven-deadly-sins',
-        'yakusoku-no-neverland':           'promised-neverland',
-        'tensei-shitara-slime-datta-ken':  'that-time-i-got-reincarnated-slime',
-        'kenpuu-denki':                    'berserk',
+        'boku-no-hero-academia':          'my-hero-academia',
+        'hagane-no-renkinjutsushi':       'fullmetal-alchemist',
+        'ansatsu-kyoushitsu':             'assassination-classroom',
+        'nanatsu-no-taizai':             'seven-deadly-sins',
+        'yakusoku-no-neverland':          'promised-neverland',
+        'tensei-shitara-slime-datta-ken': 'that-time-i-got-reincarnated-slime',
+        'kenpuu-denki':                   'berserk',
+        'naruto-shippuuden':              'naruto-shippuden',  // AnimeFillerList uses 'shippuden'
     };
     for (const [jpBase, enBase] of Object.entries(JP_TO_EN)) {
         if (slug.startsWith(jpBase)) {
