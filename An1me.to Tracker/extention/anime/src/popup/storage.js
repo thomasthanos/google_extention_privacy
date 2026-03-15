@@ -15,6 +15,8 @@ const STORAGE_EPISODE_OFFSET_MAPPING = {
     'bleach-sennen-kessen-hen-soukoku-tan': 26,
 };
 
+const CACHED_STATS_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days — invalidates stale stats after long installs
+
 const Storage = {
     /**
      * Get data from storage with sync migration
@@ -34,7 +36,6 @@ const Storage = {
                 if (hasLocalData) {
                     resolve(localResult);
                 } else {
-                    // Check sync for migration
                     chrome.storage.sync.get(keys, (syncResult) => {
                         if (chrome.runtime.lastError) {
                             resolve(localResult);
@@ -47,7 +48,6 @@ const Storage = {
                         if (hasSyncData) {
                             console.log('[Storage] Migrating from sync to local');
                             chrome.storage.local.set(syncResult, () => {
-                                // Clear large data from sync
                                 chrome.storage.sync.remove(['animeData', 'trackedEpisodes', 'videoProgress']);
                             });
                         }
@@ -69,6 +69,47 @@ const Storage = {
                     reject(new Error(chrome.runtime.lastError.message));
                 } else {
                     resolve();
+                }
+            });
+        });
+    },
+
+    /**
+     * Remove keys from storage
+     */
+    async remove(keys) {
+        return new Promise((resolve, reject) => {
+            chrome.storage.local.remove(keys, () => {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                } else {
+                    resolve();
+                }
+            });
+        });
+    },
+
+    async invalidateCachedStats(currentVersion) {
+        return new Promise((resolve) => {
+            chrome.storage.local.get(['cachedStats'], (result) => {
+                if (chrome.runtime.lastError || !result.cachedStats) {
+                    resolve(false);
+                    return;
+                }
+
+                const stats = result.cachedStats;
+                const versionMismatch = stats._version && stats._version !== currentVersion;
+                const age = stats._savedAt ? Date.now() - stats._savedAt : Infinity;
+                const tooOld = age > CACHED_STATS_MAX_AGE_MS;
+
+                if (versionMismatch || tooOld) {
+                    const reason = versionMismatch
+                        ? `version changed (${stats._version} → ${currentVersion})`
+                        : `cache too old (${Math.round(age / 86400000)}d)`;
+                    console.log(`[Storage] Clearing cachedStats: ${reason}`);
+                    chrome.storage.local.remove(['cachedStats'], () => resolve(true));
+                } else {
+                    resolve(false);
                 }
             });
         });
@@ -105,24 +146,8 @@ const Storage = {
                     return candidateTime >= currentTime ? candidate : current;
                 };
 
-                const getCanonicalSlugFromTitle = (slug, title) => {
-                    const safeSlug = String(slug || '').toLowerCase();
-                    const safeTitle = String(title || '').toLowerCase();
-                    const context = `${safeSlug} ${safeTitle}`;
-
-                    if (safeSlug.startsWith('jujutsu-kaisen') || safeTitle.includes('jujutsu kaisen')) {
-                        if (/\b0\b|movie/.test(context)) return 'jujutsu-kaisen-0';
-                        if (/season\s*3|part\s*3|culling\s*game|dead[-\s]*culling|shimetsu|kaiyuu/.test(context)) {
-                            return 'jujutsu-kaisen-season-3';
-                        }
-                        if (/season\s*2|2nd\s*season|shibuya|kaigyoku|gyokusetsu/.test(context)) {
-                            return 'jujutsu-kaisen-season-2';
-                        }
-                        return 'jujutsu-kaisen';
-                    }
-
-                    return slug;
-                };
+                const getCanonicalSlugFromTitle = (slug, title) =>
+                    window.AnimeTracker.SlugUtils.getCanonicalSlug(slug, title);
 
                 const migrateSlug = (oldSlug, newSlug, offset = 0, titleTransform = null) => {
                     if (!animeData[oldSlug] || oldSlug === newSlug) return;

@@ -429,7 +429,7 @@ const FillerFetchUI = {
         document.getElementById(this.IDS.startBtn).style.display = 'none';
         document.getElementById(this.IDS.cancelBtn).style.display = 'flex';
 
-        const { FillerService, FillerConsoleLogger: logger, Storage, CONFIG, ANIME_NO_FILLER_DATA, SeasonGrouping } = window.AnimeTracker;
+        const { FillerService, FillerConsoleLogger: logger, Storage, CONFIG, SeasonGrouping } = window.AnimeTracker;
 
         logger.groupStart('🎭 Filler Data Fetch', logger.COLORS.primary);
 
@@ -455,26 +455,9 @@ const FillerFetchUI = {
                 logger.progress(i + 1, animeList.length, animeName);
             }
 
-            // Check if in no-filler-data list
-            const baseSlug = SeasonGrouping.getBaseSlug(slug);
-            if (ANIME_NO_FILLER_DATA && (ANIME_NO_FILLER_DATA.includes(slug) || ANIME_NO_FILLER_DATA.includes(baseSlug))) {
-                logger.skip(animeName, 'In no-filler-data list');
-                this.state.skipped++;
-                this.updateStat('skipped', this.state.skipped);
-                continue;
-            }
-
             // Check if movie/OVA/special
             if (FillerService.isLikelyMovie(slug)) {
                 logger.skip(animeName, 'Movie/OVA/Special');
-                this.state.skipped++;
-                this.updateStat('skipped', this.state.skipped);
-                continue;
-            }
-
-            // Check if unlikely to have data
-            if (FillerService.isUnlikelyToHaveFillerData(slug)) {
-                logger.skip(animeName, 'Niche anime (not on AnimeFillerList)');
                 this.state.skipped++;
                 this.updateStat('skipped', this.state.skipped);
                 continue;
@@ -498,7 +481,8 @@ const FillerFetchUI = {
             // Fetch episode types
             try {
                 logger.fetchStart(animeName, slug);
-                const episodeTypes = await FillerService.fetchEpisodeTypes(slug);
+                const animeTitle = anime?.title || null;
+                const episodeTypes = await FillerService.fetchEpisodeTypes(slug, animeTitle);
 
                 if (episodeTypes && episodeTypes.totalEpisodes) {
                     FillerService.updateFromEpisodeTypes(slug, episodeTypes);

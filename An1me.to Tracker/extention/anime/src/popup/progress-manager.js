@@ -5,22 +5,7 @@
 
 const ProgressManager = {
     getCanonicalSlug(slug, title = '') {
-        const safeSlug = String(slug || '').toLowerCase();
-        const safeTitle = String(title || '').toLowerCase();
-        const context = `${safeSlug} ${safeTitle}`;
-
-        if (safeSlug.startsWith('jujutsu-kaisen') || safeTitle.includes('jujutsu kaisen')) {
-            if (/\b0\b|movie/.test(context)) return 'jujutsu-kaisen-0';
-            if (/season\s*3|part\s*3|culling\s*game|dead[-\s]*culling|shimetsu|kaiyuu/.test(context)) {
-                return 'jujutsu-kaisen-season-3';
-            }
-            if (/season\s*2|2nd\s*season|shibuya|kaigyoku|gyokusetsu/.test(context)) {
-                return 'jujutsu-kaisen-season-2';
-            }
-            return 'jujutsu-kaisen';
-        }
-
-        return slug;
+        return window.AnimeTracker.SlugUtils.getCanonicalSlug(slug, title);
     },
 
     /**
@@ -146,76 +131,6 @@ const ProgressManager = {
     },
 
     /**
-     * Clean orphaned video progress entries
-     */
-    cleanOrphanedProgress(animeData, videoProgress) {
-        const { CONFIG } = window.AnimeTracker;
-        const { UIHelpers } = window.AnimeTracker;
-        
-        if (!videoProgress || Object.keys(videoProgress).length === 0) {
-            return videoProgress;
-        }
-
-        const validSlugs = new Set(Object.keys(animeData));
-        const completedEpisodeIds = new Set();
-        
-        for (const [animeSlug, anime] of Object.entries(animeData)) {
-            if (anime.episodes) {
-                anime.episodes.forEach(ep => {
-                    completedEpisodeIds.add(UIHelpers.getUniqueId(animeSlug, ep.number));
-                });
-            }
-        }
-
-        const cleaned = {};
-        let removedCount = 0;
-        const MAX_ORPHAN_AGE_MS = CONFIG.ORPHAN_PROGRESS_MAX_AGE;
-
-        for (const [id, progress] of Object.entries(videoProgress)) {
-            const slugMatch = id.match(/^(.+)__episode-\d+$/);
-            if (!slugMatch) {
-                removedCount++;
-                continue;
-            }
-
-            const animeSlug = slugMatch[1];
-            const isAnimeTracked = validSlugs.has(animeSlug);
-            const isEpisodeCompleted = completedEpisodeIds.has(id);
-            const isRecent = progress.savedAt &&
-                (Date.now() - new Date(progress.savedAt).getTime()) < MAX_ORPHAN_AGE_MS;
-            const isSignificant = progress.percentage && progress.percentage > CONFIG.SIGNIFICANT_PROGRESS_PERCENTAGE;
-            const hasWatchTime = progress.currentTime && progress.currentTime > CONFIG.SIGNIFICANT_WATCH_TIME_SECONDS;
-            
-            // Allow soft-deleted items to persist for some time (e.g. 30 days) to ensure sync
-            // Then clean them up
-            if (progress.deleted) {
-                const deletedAt = progress.deletedAt ? new Date(progress.deletedAt).getTime() : 0;
-                const DELETE_RETENTION = 30 * 24 * 60 * 60 * 1000; // 30 days
-                if (Date.now() - deletedAt < DELETE_RETENTION) {
-                    cleaned[id] = progress;
-                } else {
-                     removedCount++;
-                     console.log('[Cleanup] Removing old soft-deleted progress:', id);
-                }
-                continue;
-            }
-
-            if (isAnimeTracked || isEpisodeCompleted || (isRecent && (isSignificant || hasWatchTime))) {
-                cleaned[id] = progress;
-            } else {
-                removedCount++;
-                console.log('[Cleanup] Removing orphaned progress:', id);
-            }
-        }
-
-        if (removedCount > 0) {
-            console.log('[Cleanup] Removed', removedCount, 'progress entries');
-        }
-
-        return cleaned;
-    },
-
-    /**
      * Remove duplicate episodes from anime data
      */
     removeDuplicateEpisodes(animeData) {
@@ -266,8 +181,8 @@ const ProgressManager = {
     },
 
     /**
-     * Repair likely missed tracking for small internal gaps.
-     * Only fills gaps of up to 2 episodes between already watched episodes.
+     * Fill small tracking gaps (up to 2 consecutive missing episodes).
+     * Skips filler episodes so intentionally-skipped fillers are not auto-added.
      */
     repairLikelyMissedEpisodes(animeData) {
         const { FillerService } = window.AnimeTracker;
@@ -306,7 +221,6 @@ const ProgressManager = {
                 for (let missing = left + 1; missing < right; missing++) {
                     if (episodeMap.has(missing)) continue;
 
-                    // Avoid auto-filling known filler episodes.
                     if (FillerService?.hasFillerData?.(slug) && FillerService.isFillerEpisode(slug, missing)) {
                         continue;
                     }
@@ -339,7 +253,7 @@ const ProgressManager = {
         const { UIHelpers } = window.AnimeTracker;
         const { CONFIG } = window.AnimeTracker;
         const { SeasonGrouping } = window.AnimeTracker;
-        
+
         if (!videoProgress || Object.keys(videoProgress).length === 0) {
             return { cleaned: videoProgress, removedCount: 0 };
         }
@@ -355,7 +269,7 @@ const ProgressManager = {
 
         const cleaned = {};
         let removedCount = 0;
-        
+
         for (const [id, progress] of Object.entries(videoProgress)) {
             const isTracked = trackedIds.has(id);
             const isCompleted = progress.percentage >= CONFIG.COMPLETED_PERCENTAGE;
@@ -364,8 +278,7 @@ const ProgressManager = {
             const animeEntry = animeSlug ? animeData[animeSlug] : null;
             const isMovieProgress = !!animeEntry && SeasonGrouping?.isMovie?.(animeSlug, animeEntry);
 
-            // Keep movie progress entries so we can keep recovering true duration
-            // during future refresh/merge passes.
+            // Keep movie progress entries for duration recovery
             if (isTracked && isMovieProgress && !progress.deleted) {
                 cleaned[id] = progress;
                 continue;
@@ -382,45 +295,12 @@ const ProgressManager = {
     },
 
     /**
-     * Merge local and cloud data.
-     * - animeData: episodes are union-merged (same episode number kept once).
-     * - videoProgress: per-entry conflict resolution:
-     *     both active    → higher currentTime wins; savedAt as tiebreaker
-     *     local deleted  → kept if deletedAt > cloud savedAt
-     *     cloud deleted  → kept unless local savedAt > cloud deletedAt
-     *     both deleted   → cloud version kept (equivalent)
-     */
-    mergeData(localData, cloudData) {
-        const { mergeAnimeData, mergeVideoProgress, mergeDeletedAnime, applyDeletedAnime } = AnimeTracker.MergeUtils;
-
-        // Merge deletedAnime first — we need it to filter the anime union below.
-        const mergedDeleted = mergeDeletedAnime(
-            localData.deletedAnime  || {},
-            cloudData.deletedAnime  || {}
-        );
-
-        const mergedAnime = mergeAnimeData(localData.animeData || {}, cloudData.animeData || {});
-
-        // Remove any anime that were deleted on another device (deletedAt >= lastWatched).
-        applyDeletedAnime(mergedAnime, mergedDeleted);
-
-        const mergedProgress = mergeVideoProgress(localData.videoProgress || {}, cloudData.videoProgress || {});
-        const normalized = this.normalizeCanonicalSlugs(mergedAnime, mergedProgress, mergedDeleted);
-
-        return {
-            animeData: this.removeDuplicateEpisodes(normalized.animeData),
-            videoProgress: normalized.videoProgress,
-            deletedAnime: normalized.deletedAnime
-        };
-    },
-
-    /**
      * Get anime that have progress but no completed episodes
      */
     getInProgressOnlyAnime(animeData, videoProgress) {
         const inProgressOnly = [];
         const trackedSlugs = new Set(Object.keys(animeData));
-        
+
         for (const [id, progress] of Object.entries(videoProgress)) {
             const slugMatch = id.match(/^(.+)__episode-(\d+)$/);
             if (!slugMatch) continue;
@@ -454,7 +334,7 @@ const ProgressManager = {
                 existing.lastProgress = progress.savedAt;
             }
         }
-        
+
         return inProgressOnly;
     }
 };

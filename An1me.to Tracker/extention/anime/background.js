@@ -22,41 +22,94 @@ const mergeDeletedAnime      = sharedMergeUtils.mergeDeletedAnime      || missin
 const applyDeletedAnime      = sharedMergeUtils.applyDeletedAnime      || missingMergeUtil('applyDeletedAnime');
 const mergeGroupCoverImages  = sharedMergeUtils.mergeGroupCoverImages  || missingMergeUtil('mergeGroupCoverImages');
 
+// ─── Storage helpers ─────────────────────────────────────────────────────────
+
+function bgStorageGet(keys) {
+    return new Promise((resolve, reject) => {
+        chrome.storage.local.get(keys, (result) => {
+            if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+            } else {
+                resolve(result);
+            }
+        });
+    });
+}
+
+function bgStorageSet(data) {
+    return new Promise((resolve, reject) => {
+        chrome.storage.local.set(data, () => {
+            if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+            } else {
+                resolve();
+            }
+        });
+    });
+}
+
+function bgStorageRemove(keys) {
+    return new Promise((resolve, reject) => {
+        chrome.storage.local.remove(keys, () => {
+            if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+            } else {
+                resolve();
+            }
+        });
+    });
+}
+
 // ─── State ────────────────────────────────────────────────────────────────────
 let syncInProgress      = false;
 let pendingSync         = false;
 let syncDebounceTimeout = null;
-// syncPausedUntil: timestamp (ms) until which animeData storage-change events
-// are ignored after we write cloud data locally, to avoid re-uploading it.
-// Using a timestamp instead of a boolean prevents premature reset when multiple
-// overlapping cloud updates occur within the pause window.
 let syncPausedUntil     = 0;
 
-/** Pause the animeData re-upload guard for `ms` milliseconds (default 3 s). */
 function pauseSync(ms = 3000) {
     syncPausedUntil = Math.max(syncPausedUntil, Date.now() + ms);
 }
-/** Returns true if the re-upload guard is currently active. */
 function isSyncPaused() {
     return Date.now() < syncPausedUntil;
 }
 
-let rtListenAbort     = null;
-let rtReconnectTimer  = null;
-let rtReconnectDelay  = 5000;
-const RT_MAX_DELAY    = 60000;
+let rtListenAbort    = null;
+let rtReconnectTimer = null;
+let rtReconnectDelay = 5000;
+const RT_MAX_DELAY   = 60000;
+
+// Max consecutive failures before the SSE listener pauses itself.
+// The alarm-based health check restarts it, preventing a tight reconnect loop.
+const RT_MAX_FAILURES = 10;
+let rtConsecutiveFailures = 0;
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
 
+async function signOutDueToTokenFailure() {
+    console.warn('[BG] Token refresh failed — signing user out to force re-auth');
+    try {
+        await bgStorageRemove(['firebase_tokens', 'firebase_user']);
+    } catch (e) {
+        console.error('[BG] Failed to clear auth storage during sign-out:', e);
+    }
+    // Stop the SSE listener so it does not keep retrying with a null token
+    if (rtListenAbort) rtListenAbort.abort();
+    if (rtReconnectTimer) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
+}
+
 async function getFirebaseToken() {
     try {
-        const stored = await chrome.storage.local.get(['firebase_tokens']);
+        const stored = await bgStorageGet(['firebase_tokens']);
         const tokens = stored.firebase_tokens;
         if (!tokens?.idToken) return null;
         // Refresh if token expires within 2 minutes
         if (tokens.expiresAt < Date.now() + 120000) {
             const refreshed = await refreshFirebaseToken(tokens.refreshToken);
-            return refreshed ? refreshed.idToken : null;
+            if (!refreshed) {
+                await signOutDueToTokenFailure();
+                return null;
+            }
+            return refreshed.idToken;
         }
         return tokens.idToken;
     } catch (e) {
@@ -84,7 +137,7 @@ async function refreshFirebaseToken(refreshToken) {
             refreshToken: data.refresh_token,
             expiresAt:    Date.now() + parseInt(data.expires_in) * 1000
         };
-        await chrome.storage.local.set({ firebase_tokens: tokens });
+        await bgStorageSet({ firebase_tokens: tokens });
         console.log('[BG] Token refreshed');
         return tokens;
     } catch (e) {
@@ -95,7 +148,7 @@ async function refreshFirebaseToken(refreshToken) {
 
 async function getFirebaseUser() {
     try {
-        const stored = await chrome.storage.local.get(['firebase_user']);
+        const stored = await bgStorageGet(['firebase_user']);
         return stored.firebase_user || null;
     } catch { return null; }
 }
@@ -145,9 +198,6 @@ function fromFSDoc(doc) {
 
 // ─── Merge helpers ────────────────────────────────────────────────────────────
 
-// Lightweight equality check for deletedAnime maps.
-// Two maps are equal when they have the same set of slugs with the same
-// deletedAt timestamps. Avoids serialising the entire object on every sync.
 function shallowEqualDeletedAnime(a, b) {
     const aKeys = Object.keys(a);
     const bKeys = Object.keys(b);
@@ -159,7 +209,6 @@ function shallowEqualDeletedAnime(a, b) {
     return true;
 }
 
-// Compares progress maps by the fields that affect sync/conflict resolution.
 function areProgressMapsEqual(a, b) {
     const aObj = a || {};
     const bObj = b || {};
@@ -209,18 +258,11 @@ async function fetchCloudData(user, token) {
     }
 }
 
-// ─── Push: videoProgress only (merged PATCH) ────────────────────────────────
-// Fetches current cloud videoProgress, merges with local (higher currentTime
-// wins), then writes the merged map back.  This prevents overwriting progress
-// that another device has written for a different episode.
-
-// Fast path: only read, merge and write videoProgress.
-// Uses a dedicated in-progress flag and snapshot so it never blocks
-// the full syncToFirebase path.
+// ─── Push: videoProgress only (merged PATCH) ─────────────────────────────────
 
 let progressSyncInProgress = false;
 let progressSyncPending    = false;
-let lastPushedProgressBG   = null; // JSON snapshot to skip no-op uploads
+let lastPushedProgressBG   = null;
 
 async function syncProgressOnly() {
     if (progressSyncInProgress) { progressSyncPending = true; return; }
@@ -231,32 +273,26 @@ async function syncProgressOnly() {
 
     progressSyncInProgress = true;
     try {
-        const result      = await chrome.storage.local.get(['videoProgress']);
-        const localVP     = result.videoProgress || {};
-        const snapshot    = JSON.stringify(localVP);
+        const result   = await bgStorageGet(['videoProgress']);
+        const localVP  = result.videoProgress || {};
+        const snapshot = JSON.stringify(localVP);
 
-        // Skip upload if nothing changed since last push
         if (snapshot === lastPushedProgressBG) return;
 
-        // Fetch only videoProgress from cloud to merge
         let cloudVP = {};
         try {
             const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
             const r   = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
             if (r.ok) cloudVP = fromFSDoc(await r.json())?.videoProgress || {};
-        } catch {
-            // Best-effort; proceed with local-only data
-        }
+        } catch {}
 
         const mergedVP = mergeVideoProgress(localVP, cloudVP);
 
-        // Write merged result back locally if cloud had extra entries
         if (!areProgressMapsEqual(localVP, mergedVP)) {
             pauseSync();
-            await chrome.storage.local.set({ videoProgress: mergedVP });
+            await bgStorageSet({ videoProgress: mergedVP });
         }
 
-        // PATCH only the two progress-related fields
         const url       = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         const fieldMask = 'updateMask.fieldPaths=videoProgress&updateMask.fieldPaths=lastUpdated';
         const response  = await fetch(`${url}?${fieldMask}`, {
@@ -282,7 +318,7 @@ async function syncProgressOnly() {
         progressSyncInProgress = false;
         if (progressSyncPending) {
             progressSyncPending = false;
-            setTimeout(syncProgressOnly, 1000); // retry with same fast path
+            setTimeout(syncProgressOnly, 1000);
         }
     }
 }
@@ -299,17 +335,14 @@ async function syncToFirebase() {
 
     syncInProgress = true;
     try {
-        // Also load groupCoverImages so we can sync poster data across devices
-        const result = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
-        const localAnime    = result.animeData    || {};
-        const localProgress = result.videoProgress || {};
-        const localDeleted  = result.deletedAnime  || {};
+        const result = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
+        const localAnime    = result.animeData        || {};
+        const localProgress = result.videoProgress    || {};
+        const localDeleted  = result.deletedAnime     || {};
         const localGroup    = result.groupCoverImages || {};
 
-        // Fetch cloud to merge animeData, videoProgress, deletedAnime and group cover images.
         const cloudDoc = await fetchCloudData(user, token);
 
-        // Merge deletedAnime first so we can apply it to animeData below.
         const mergedDeleted = cloudDoc?.deletedAnime
             ? mergeDeletedAnime(localDeleted, cloudDoc.deletedAnime)
             : localDeleted;
@@ -318,32 +351,27 @@ async function syncToFirebase() {
             ? mergeAnimeData(localAnime, cloudDoc.animeData)
             : { ...localAnime };
 
-        // Apply cross-device deletions before uploading.
         applyDeletedAnime(mergedAnime, mergedDeleted);
 
-        // For videoProgress: only pull FROM cloud entries that are NOT in local
-        // (i.e. from another device). Never overwrite local with older cloud data.
         const mergedProgress = cloudDoc?.videoProgress
             ? mergeVideoProgress(localProgress, cloudDoc.videoProgress)
             : localProgress;
 
-        // Merge group cover images: local always wins (see mergeGroupCoverImages for policy).
         const cloudGroup  = cloudDoc?.groupCoverImages || {};
         const mergedGroup = mergeGroupCoverImages(localGroup, cloudGroup);
 
-        const localEps   = Object.values(localAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
-        const mergedEps  = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
+        const localEps        = Object.values(localAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
+        const mergedEps       = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
         const progressChanged = !areProgressMapsEqual(localProgress, mergedProgress);
-        const deletedChanged = !shallowEqualDeletedAnime(localDeleted, mergedDeleted);
-        const groupChanged   = !shallowEqualStringMap(localGroup, mergedGroup);
+        const deletedChanged  = !shallowEqualDeletedAnime(localDeleted, mergedDeleted);
+        const groupChanged    = !shallowEqualStringMap(localGroup, mergedGroup);
 
-        // Write back locally if cloud had more/different data (e.g. from another device)
         if (mergedEps > localEps || progressChanged || deletedChanged || groupChanged) {
-            pauseSync(); // prevent this write from immediately re-triggering a full sync
-            await chrome.storage.local.set({
-                animeData:       mergedAnime,
-                videoProgress:   mergedProgress,
-                deletedAnime:    mergedDeleted,
+            pauseSync();
+            await bgStorageSet({
+                animeData:        mergedAnime,
+                videoProgress:    mergedProgress,
+                deletedAnime:     mergedDeleted,
                 groupCoverImages: mergedGroup
             });
         }
@@ -358,12 +386,12 @@ async function syncToFirebase() {
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body:    JSON.stringify({
                 fields: jsonToFirestoreFields({
-                    animeData:       mergedAnime,
-                    videoProgress:   mergedProgress,
-                    deletedAnime:    mergedDeleted,
+                    animeData:        mergedAnime,
+                    videoProgress:    mergedProgress,
+                    deletedAnime:     mergedDeleted,
                     groupCoverImages: mergedGroup,
-                    lastUpdated:     new Date().toISOString(),
-                    email:           user.email
+                    lastUpdated:      new Date().toISOString(),
+                    email:            user.email
                 })
             })
         });
@@ -390,24 +418,19 @@ async function syncToFirebase() {
 async function applyCloudUpdate(cloudDoc) {
     if (!cloudDoc) return;
     try {
-        // Also load groupCoverImages so posters can be synced across devices
-        const local = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
+        const local = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
 
-        // Merge deletedAnime from cloud so cross-device deletions propagate here too.
         const mergedDeleted = cloudDoc.deletedAnime
             ? mergeDeletedAnime(local.deletedAnime || {}, cloudDoc.deletedAnime)
             : (local.deletedAnime || {});
 
         const mergedAnime = mergeAnimeData(local.animeData || {}, cloudDoc.animeData || {});
 
-        // Apply deletions: remove anime that were deleted on another device.
         applyDeletedAnime(mergedAnime, mergedDeleted);
 
-        // For videoProgress: keep local if it's higher — cloud update might be from another tab
         const mergedProgress = mergeVideoProgress(local.videoProgress || {}, cloudDoc.videoProgress || {});
 
-        // Merge group cover images: local always wins (see mergeGroupCoverImages for policy).
-        const localGroup  = local.groupCoverImages  || {};
+        const localGroup  = local.groupCoverImages   || {};
         const cloudGroup  = cloudDoc.groupCoverImages || {};
         const mergedGroup = mergeGroupCoverImages(localGroup, cloudGroup);
 
@@ -415,13 +438,12 @@ async function applyCloudUpdate(cloudDoc) {
         const mergedEps = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
 
         const progressChanged = !areProgressMapsEqual(local.videoProgress || {}, mergedProgress);
-
-        const deletedChanged = !shallowEqualDeletedAnime(local.deletedAnime || {}, mergedDeleted);
-        const groupChanged   = !shallowEqualStringMap(local.groupCoverImages || {}, mergedGroup);
+        const deletedChanged  = !shallowEqualDeletedAnime(local.deletedAnime || {}, mergedDeleted);
+        const groupChanged    = !shallowEqualStringMap(local.groupCoverImages || {}, mergedGroup);
 
         if (mergedEps !== localEps || progressChanged || deletedChanged || groupChanged) {
-            pauseSync(); // prevent this write from immediately re-triggering a full sync
-            await chrome.storage.local.set({
+            pauseSync();
+            await bgStorageSet({
                 animeData:        mergedAnime,
                 videoProgress:    mergedProgress,
                 deletedAnime:     mergedDeleted,
@@ -435,6 +457,11 @@ async function applyCloudUpdate(cloudDoc) {
 }
 
 async function startRealtimeListener() {
+    if (rtConsecutiveFailures >= RT_MAX_FAILURES) {
+        console.warn(`[BG-RT] ${RT_MAX_FAILURES} consecutive failures — pausing listener. Will retry on next alarm.`);
+        return;
+    }
+
     if (rtListenAbort) rtListenAbort.abort();
     if (rtReconnectTimer) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
 
@@ -446,9 +473,6 @@ async function startRealtimeListener() {
     }
 
     // ── Catch-up fetch ────────────────────────────────────────────────────────
-    // If the stream was silent for more than 45 seconds (SW was asleep or the
-    // stream died), do a one-shot REST read BEFORE opening the new stream.
-    // This ensures we never miss changes that arrived while we were offline.
     const gapSinceLastMessage = Date.now() - lastStreamMessageAt;
     if (gapSinceLastMessage > 45000) {
         console.debug(`[BG-RT] Catching up after ${Math.round(gapSinceLastMessage / 1000)}s gap...`);
@@ -464,6 +488,7 @@ async function startRealtimeListener() {
     const docPath = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${user.uid}`;
 
     console.debug('[BG-RT] Opening real-time stream...');
+    let streamSucceeded = false;
     try {
         const res = await fetch(`${LISTEN_URL}?key=${FIREBASE_API_KEY}`, {
             method:  'POST',
@@ -472,10 +497,14 @@ async function startRealtimeListener() {
             signal:  rtListenAbort.signal
         });
 
-        if (!res.ok) { scheduleRtReconnect(); return; }
+        if (!res.ok) {
+            scheduleRtReconnect();
+            return;
+        }
 
+        rtConsecutiveFailures = 0;
+        streamSucceeded = true;
         rtReconnectDelay = 5000;
-        // Reset stream-alive timer so the new connection isn't immediately flagged as stale
         markStreamAlive();
         console.debug('[BG-RT] ✓ Real-time stream connected');
 
@@ -490,6 +519,13 @@ async function startRealtimeListener() {
             markStreamAlive();
 
             buffer += decoder.decode(value, { stream: true });
+            // Guard against unbounded buffer growth
+            if (buffer.length > 256 * 1024) {
+                console.warn('[BG-RT] SSE buffer overflow, reconnecting');
+                rtListenAbort.abort();
+                scheduleRtReconnect();
+                return;
+            }
             const lines = buffer.split('\n');
             buffer = lines.pop();
 
@@ -511,7 +547,7 @@ async function startRealtimeListener() {
                         return;
                     }
                 } catch {
-                    // Ignore non-JSON stream fragments; the next chunk may complete them.
+                    // Ignore non-JSON stream fragments
                 }
             }
         }
@@ -519,64 +555,47 @@ async function startRealtimeListener() {
         if (e.name === 'AbortError') return;
         console.warn('[BG-RT] Stream error:', e.message);
     }
+
+    if (!streamSucceeded) {
+        rtConsecutiveFailures++;
+    }
     scheduleRtReconnect();
 }
 
 function scheduleRtReconnect() {
-    // Use a short initial delay (2s) on the first retry so changes from another
-    // device are picked up quickly after a natural stream EOF (e.g. server-side
-    // keep-alive reset). Subsequent retries use exponential back-off.
     const delay = rtReconnectDelay === 5000 ? 2000 : rtReconnectDelay;
     rtReconnectTimer = setTimeout(startRealtimeListener, delay);
     rtReconnectDelay = Math.min(rtReconnectDelay * 1.5, RT_MAX_DELAY);
 }
 
 // ─── Storage change listener ──────────────────────────────────────────────────
-//
-// Key rules:
-//  • videoProgress changes: ALWAYS sync, use fast path (field-mask PATCH, no GET).
-//    This is written by the content script in real time and must never be blocked.
-//  • animeData changes (new episode): full sync, but respect the sync pause guard
-//    to avoid re-uploading data we just wrote from the cloud.
 
-let progressSyncDebounce = null;  // debounce for fast videoProgress path
-// NOTE: Full-sync debounce reuses syncDebounceTimeout (defined in State above)
-// so only ONE full-sync timer is ever pending, regardless of trigger source.
+let progressSyncDebounce = null;
 
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace !== 'local') return;
 
-    // ── videoProgress: fast path, always runs ──────────────────────────────
     if (changes.videoProgress && !isSyncPaused()) {
         if (progressSyncDebounce) clearTimeout(progressSyncDebounce);
         progressSyncDebounce = setTimeout(() => {
             progressSyncDebounce = null;
             syncProgressOnly();
-        }, 3000); // 3s debounce — wait for burst of saves to settle
+        }, 3000);
     }
 
-    // ── animeData: full sync, respect syncPaused ───────────────────────────
     if (changes.animeData && !isSyncPaused()) {
         const oldAnime = changes.animeData.oldValue || {};
         const newAnime = changes.animeData.newValue || {};
 
-        // Calculate episode counts to detect new episodes
-        const oldCount = Object.values(oldAnime)
-            .reduce((s, a) => s + (a.episodes?.length || 0), 0);
-        const newCount = Object.values(newAnime)
-            .reduce((s, a) => s + (a.episodes?.length || 0), 0);
+        const oldCount = Object.values(oldAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
+        const newCount = Object.values(newAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
 
-        // Detect cover changes: if any slug has a different coverImage value
         let coverChanged = false;
         if (!coverChanged && (newCount === oldCount)) {
             for (const slug of Object.keys(newAnime)) {
                 const oldCover = oldAnime[slug]?.coverImage || null;
                 const newCover = newAnime[slug]?.coverImage || null;
-                // Treat undefined vs null as equal; only trigger when value changes from falsy to non-null or vice versa or differs
-                if (oldCover !== newCover) {
-                    coverChanged = true;
-                    break;
-                }
+                if (oldCover !== newCover) { coverChanged = true; break; }
             }
         }
 
@@ -590,17 +609,11 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
             } else {
                 console.log('[BG] Anime metadata changed (cover updated), scheduling sync');
             }
-            // Reuse syncDebounceTimeout so storage listener and message handler share the same timer
             if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
             syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 2000);
         }
     }
 
-    // ── groupCoverImages: full sync when new posters are added ──────────────
-    // When group posters are updated locally (e.g. a content script saved a
-    // new group poster), schedule a full sync so the change propagates to
-    // Firestore and other devices. Ignore changes during sync pauses to
-    // prevent re-triggering syncs for remote updates.
     if (changes.groupCoverImages && !isSyncPaused()) {
         const oldLen = Object.keys(changes.groupCoverImages.oldValue || {}).length;
         const newLen = Object.keys(changes.groupCoverImages.newValue || {}).length;
@@ -612,23 +625,155 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     }
 });
 
+// ─── AnimeFillerList slug discovery ──────────────────────────────────────────
+
+const fillerSlugCache = {};
+
+function generateFillerSlugCandidates(an1meSlug, animeTitle) {
+    const seen = new Set();
+    const candidates = [];
+
+    function add(s) {
+        if (!s || s.length < 2) return;
+        const clean = s.replace(/-+/g, '-').replace(/^-|-$/g, '').toLowerCase();
+        if (clean && !seen.has(clean)) { seen.add(clean); candidates.push(clean); }
+    }
+
+    function addWithStripping(s) {
+        add(s);
+        const stripped = s
+            .replace(/-the-final-season-kanketsu-hen$/i, '')
+            .replace(/-the-final-season-part-\d+$/i, '')
+            .replace(/-the-final-season$/i, '')
+            .replace(/-season-\d+-part-\d+$/i, '')
+            .replace(/-season-?\d+$/i, '')
+            .replace(/-s\d+$/i, '')
+            .replace(/-(2nd|3rd|4th|5th|6th|7th)-season$/i, '')
+            .replace(/-(part|cour)-?\d+$/i, '')
+            .replace(/-(final|last)-season$/i, '')
+            .replace(/-new-world$/i, '')
+            .replace(/-[a-z]+-hen$/i, '')
+            .replace(/-(ii|iii|iv|v|vi)$/i, '')
+            .replace(/-[2-9]$/i, '')
+            .replace(/-\d{4}$/i, '');
+        if (stripped && stripped !== s) add(stripped);
+    }
+
+    const slug = an1meSlug
+        .replace(/-episode.*$/i, '')
+        .replace(/-ep-?\d+$/i, '')
+        .toLowerCase();
+
+    addWithStripping(slug);
+
+    if (slug.includes('shippuuden')) {
+        addWithStripping(slug.replace(/shippuuden/g, 'shippuden'));
+    }
+
+    if (slug.includes('sennen-kessen-hen')) {
+        addWithStripping(slug.replace(/sennen-kessen-hen.*/i, 'thousand-year-blood-war'));
+    }
+
+    const JP_TO_EN = {
+        'shingeki-no-kyojin':             'attack-titan',
+        'kimetsu-no-yaiba':               'demon-slayer-kimetsu-no-yaiba',
+        'boku-no-hero-academia':           'my-hero-academia',
+        'hagane-no-renkinjutsushi':        'fullmetal-alchemist',
+        'ansatsu-kyoushitsu':              'assassination-classroom',
+        'nanatsu-no-taizai':              'seven-deadly-sins',
+        'yakusoku-no-neverland':           'promised-neverland',
+        'tensei-shitara-slime-datta-ken':  'that-time-i-got-reincarnated-slime',
+        'kenpuu-denki':                    'berserk',
+    };
+    for (const [jpBase, enBase] of Object.entries(JP_TO_EN)) {
+        if (slug.startsWith(jpBase)) {
+            add(enBase);
+            const suffix = slug.slice(jpBase.length);
+            if (suffix) addWithStripping(enBase + suffix);
+        }
+    }
+
+    if (animeTitle) {
+        const titleSlug = String(animeTitle)
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-|-$/g, '');
+        addWithStripping(titleSlug);
+    }
+
+    return candidates;
+}
+
+async function discoverFillerSlug(an1meSlug, animeTitle) {
+    const cacheKey = an1meSlug.toLowerCase();
+
+    if (cacheKey in fillerSlugCache) return fillerSlugCache[cacheKey];
+
+    const storageKey = `fillerslug_${cacheKey}`;
+    try {
+        const stored = await bgStorageGet([storageKey]);
+        const cached = stored[storageKey];
+        if (cached !== undefined) {
+            if (typeof cached === 'string') {
+                fillerSlugCache[cacheKey] = cached;
+                return cached;
+            }
+            if (cached?.notFound) {
+                // 7-day TTL — mirrors CONFIG.FILLER_NOT_FOUND_CACHE_TTL in the popup.
+                // Both values must be kept in sync; use FillerService.clearCache() to force a re-check.
+                const age = cached.cachedAt ? Date.now() - cached.cachedAt : Infinity;
+                if (age < 7 * 24 * 60 * 60 * 1000) {
+                    fillerSlugCache[cacheKey] = null;
+                    return null;
+                }
+                await bgStorageRemove([storageKey]);
+            }
+        }
+    } catch (e) {
+        console.warn('[BG] discoverFillerSlug storage read failed:', e.message);
+    }
+
+    const candidates = generateFillerSlugCandidates(an1meSlug, animeTitle);
+    for (const candidate of candidates) {
+        try {
+            const resp = await fetch(`https://www.animefillerlist.com/shows/${candidate}`, { method: 'HEAD' });
+            if (resp.ok) {
+                fillerSlugCache[cacheKey] = candidate;
+                await bgStorageSet({ [storageKey]: candidate });
+                console.log(`[AnimeTracker] Filler slug discovered: ${an1meSlug} → ${candidate}`);
+                return candidate;
+            }
+        } catch {}
+    }
+
+    const notFoundEntry = { notFound: true, cachedAt: Date.now() };
+    fillerSlugCache[cacheKey] = null;
+    try {
+        await bgStorageSet({ [storageKey]: notFoundEntry });
+    } catch (e) {
+        console.warn('[BG] Failed to cache notFound filler slug:', e.message);
+    }
+    console.log(`[AnimeTracker] No filler data for ${an1meSlug} (tried ${candidates.length} candidates)`);
+    return null;
+}
+
 // ─── an1me.to anime info fetcher ─────────────────────────────────────────────
 
 async function fetchAnimePageInfo(slug) {
-    const url = `https://an1me.to/anime/${slug}/`;
+    const cleanSlug = slug.replace(/-\d+$/, '');
+    const url = `https://an1me.to/anime/${cleanSlug}/`;
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const html = await response.text();
 
-    // ── Total episodes ────────────────────────────────────────────────────────
-    // <dt ...>Επεισόδια</dt><dd ...>170</dd>  (or N/A when ongoing)
     let totalEpisodes = null;
-    const epMatch = html.match(/Επεισόδια<\/dt>\s*<dd[^>]*>\s*(\d+)\s*<\/dd>/);
-    if (epMatch) totalEpisodes = parseInt(epMatch[1], 10);
+    const epDdMatch = html.match(/Επεισόδια<\/dt>\s*(<dd[^>]*>[\s\S]{0,200}?<\/dd>)/);
+    if (epDdMatch) {
+        const numMatch = epDdMatch[1].match(/>(\d+)</);
+        if (numMatch) totalEpisodes = parseInt(numMatch[1], 10);
+    }
 
-    // ── Status ────────────────────────────────────────────────────────────────
-    // <dt ...>Προβλήθηκε</dt> ... <time ...>Jan 9, 2026 to ?</time>
-    // A trailing "?" means still airing; a real end date means finished.
     let status = null;
     const dateMatch = html.match(/Προβλήθηκε<\/dt>[\s\S]{0,300}?<time[^>]*>([\s\S]*?)<\/time>/);
     if (dateMatch) {
@@ -653,38 +798,39 @@ async function fetchEpisodeTypesFromAnimeFillerList(animeSlug) {
         const html         = await response.text();
         const episodeTypes = { canon: [], filler: [], mixed: [], anime_canon: [], totalEpisodes: null };
 
-        function parseEpisodeText(text) {
-            const episodes  = [];
-            text            = text.trim();
-            const rangeMatch = text.match(/^(\d+)-(\d+)$/);
-            if (rangeMatch) {
-                for (let ep = parseInt(rangeMatch[1]); ep <= parseInt(rangeMatch[2]); ep++)
-                    episodes.push(ep);
-            } else {
-                const epNum = parseInt(text);
-                if (!isNaN(epNum)) episodes.push(epNum);
-            }
-            return episodes;
+        const trPattern = /<tr[^>]*\bclass=["']([^"']+)["'][^>]*>([\s\S]*?)<\/tr>/gi;
+        let trMatch;
+        while ((trMatch = trPattern.exec(html)) !== null) {
+            const classes    = trMatch[1].toLowerCase();
+            const rowContent = trMatch[2];
+
+            let type = null;
+            if (/\bmanga_canon\b/.test(classes))     type = 'canon';
+            else if (/\bmixed_canon/.test(classes))  type = 'mixed';
+            else if (/\banime_canon\b/.test(classes)) type = 'anime_canon';
+            else if (/\bfiller\b/.test(classes))     type = 'filler';
+
+            if (!type) continue;
+
+            const numMatch = rowContent.match(/>(\d+)</);
+            if (!numMatch) continue;
+
+            const epNum = parseInt(numMatch[1], 10);
+            if (!Number.isFinite(epNum) || epNum <= 0) continue;
+
+            episodeTypes[type].push(epNum);
         }
 
-        function parseSection(html, className) {
-            const match = html.match(new RegExp(
-                `<div[^>]*class=["'][^"']*${className}[^"']*["'][^>]*>[\\s\\S]*?` +
-                `<span[^>]*class=["']Episodes["'][^>]*>(.*?)<\\/span>[\\s\\S]*?<\\/div>`, 'i'
-            ));
-            if (!match) return [];
-            const result = [];
-            for (const m of match[1].matchAll(/<a[^>]*>([^<]+)<\/a>/gi)) {
-                if (/^[\d-]+$/.test(m[1].trim())) result.push(...parseEpisodeText(m[1]));
-            }
-            return result;
+        for (const key of ['canon', 'filler', 'mixed', 'anime_canon']) {
+            episodeTypes[key] = [...new Set(episodeTypes[key])].sort((a, b) => a - b);
         }
 
-        episodeTypes.canon  = parseSection(html, 'manga_canon');
-        episodeTypes.mixed  = parseSection(html, 'mixed_canon\\/filler');
-        episodeTypes.filler = parseSection(html, 'filler["\'\\s]');
-
-        const all = [...episodeTypes.canon, ...episodeTypes.mixed, ...episodeTypes.filler, ...episodeTypes.anime_canon];
+        const all = [
+            ...episodeTypes.canon,
+            ...episodeTypes.mixed,
+            ...episodeTypes.filler,
+            ...episodeTypes.anime_canon
+        ];
         if (all.length > 0) episodeTypes.totalEpisodes = Math.max(...all);
 
         console.log(`[Anime Tracker] ✓ Fetched episode types for ${animeSlug}:`, episodeTypes);
@@ -699,7 +845,12 @@ async function fetchEpisodeTypesFromAnimeFillerList(animeSlug) {
 
 async function migrateFromSyncToLocal() {
     try {
-        const syncData        = await chrome.storage.sync.get(['animeData', 'videoProgress']);
+        const syncData        = await new Promise((resolve, reject) => {
+            chrome.storage.sync.get(['animeData', 'videoProgress'], (result) => {
+                if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+                else resolve(result);
+            });
+        });
         const validAnimeData  = syncData.animeData
             && typeof syncData.animeData === 'object'
             && !Array.isArray(syncData.animeData);
@@ -709,13 +860,15 @@ async function migrateFromSyncToLocal() {
         const hasSyncData = (validAnimeData    && Object.keys(syncData.animeData).length > 0) ||
                             (validVideoProgress && Object.keys(syncData.videoProgress).length > 0);
         if (hasSyncData) {
-            const localData = await chrome.storage.local.get(['animeData', 'videoProgress']);
+            const localData = await bgStorageGet(['animeData', 'videoProgress']);
             const merged    = {
                 animeData:     { ...(validAnimeData     ? syncData.animeData    : {}), ...(localData.animeData    || {}) },
                 videoProgress: { ...(validVideoProgress ? syncData.videoProgress : {}), ...(localData.videoProgress || {}) }
             };
-            await chrome.storage.local.set(merged);
-            await chrome.storage.sync.remove(['animeData', 'trackedEpisodes', 'videoProgress']);
+            await bgStorageSet(merged);
+            await new Promise((resolve) => {
+                chrome.storage.sync.remove(['animeData', 'trackedEpisodes', 'videoProgress'], () => resolve());
+            });
             console.log('[Anime Tracker] Migration complete');
         }
     } catch (error) {
@@ -743,8 +896,8 @@ async function persistBeforeUnloadTrack(animeInfo, duration) {
         throw new Error('Invalid animeInfo for TRACK_BEFORE_UNLOAD');
     }
 
-    const result = await chrome.storage.local.get(['animeData', 'videoProgress']);
-    const animeData = result.animeData || {};
+    const result = await bgStorageGet(['animeData', 'videoProgress']);
+    const animeData     = result.animeData     || {};
     const videoProgress = result.videoProgress || {};
 
     const slug = animeInfo.animeSlug;
@@ -820,38 +973,33 @@ async function persistBeforeUnloadTrack(animeInfo, duration) {
     if (changed || progressChanged) {
         const payload = { animeData };
         if (progressChanged) payload.videoProgress = videoProgress;
-        await chrome.storage.local.set(payload);
+        await bgStorageSet(payload);
     }
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === 'GET_STATS') {
-        chrome.storage.local.get(['animeData'], (result) => {
-            if (chrome.runtime.lastError) {
-                sendResponse({ error: chrome.runtime.lastError.message });
-                return;
-            }
-            const data = result.animeData || {};
-            sendResponse({
-                totalAnime:     Object.keys(data).length,
-                totalEpisodes:  Object.values(data).reduce((s, a) => s + (a.episodes?.length || 0), 0),
-                totalWatchTime: Object.values(data).reduce((s, a) => s + (a.totalWatchTime    || 0), 0)
-            });
-        });
+        bgStorageGet(['animeData'])
+            .then((result) => {
+                const data = result.animeData || {};
+                sendResponse({
+                    totalAnime:     Object.keys(data).length,
+                    totalEpisodes:  Object.values(data).reduce((s, a) => s + (a.episodes?.length || 0), 0),
+                    totalWatchTime: Object.values(data).reduce((s, a) => s + (a.totalWatchTime    || 0), 0)
+                });
+            })
+            .catch((e) => sendResponse({ error: e.message }));
         return true;
     }
 
     if (message.type === 'CLEAR_DATA') {
-        chrome.storage.local.set({ animeData: {}, videoProgress: {} }, () => {
-            sendResponse(chrome.runtime.lastError
-                ? { success: false, error: chrome.runtime.lastError.message }
-                : { success: true });
-        });
+        bgStorageSet({ animeData: {}, videoProgress: {} })
+            .then(() => sendResponse({ success: true }))
+            .catch((e) => sendResponse({ success: false, error: e.message }));
         return true;
     }
 
     if (message.type === 'SYNC_TO_FIREBASE') {
-        // Wake-up call from content script — run full sync immediately
         sendResponse({ received: true });
         if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
         syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 500);
@@ -859,7 +1007,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
 
     if (message.type === 'SYNC_PROGRESS_ONLY') {
-        // Fast path: content script is asking us to push videoProgress only
         sendResponse({ received: true });
         if (progressSyncDebounce) clearTimeout(progressSyncDebounce);
         progressSyncDebounce = setTimeout(() => { progressSyncDebounce = null; syncProgressOnly(); }, 500);
@@ -879,11 +1026,41 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return true;
     }
 
+    if (message.type === 'CLEAR_FILLER_CACHE') {
+        // Allows the popup's FillerService.clearCache() to also purge the
+        // background-side in-memory slug cache and the persisted storageKey.
+        const slug = (message.animeSlug || '').toLowerCase();
+        if (slug) {
+            delete fillerSlugCache[slug];
+            const storageKey = `fillerslug_${slug}`;
+            bgStorageRemove([storageKey])
+                .then(() => sendResponse({ success: true }))
+                .catch((e) => sendResponse({ success: false, error: e.message }));
+        } else {
+            sendResponse({ success: false, error: 'Missing animeSlug' });
+        }
+        return true;
+    }
+
     if (message.type === 'FETCH_EPISODE_TYPES') {
         if (!message.animeSlug) { sendResponse({ error: 'Missing animeSlug' }); return true; }
-        fetchEpisodeTypesFromAnimeFillerList(message.animeSlug)
-            .then(episodeTypes => sendResponse({ success: true,  episodeTypes }))
-            .catch(error       => sendResponse({ success: false, error: error.message }));
+        (async () => {
+            try {
+                const fillerSlug = await discoverFillerSlug(message.animeSlug, message.animeTitle || null);
+                if (!fillerSlug) {
+                    sendResponse({ success: false, notFound: true, error: 'Not found on animefillerlist.com' });
+                    return;
+                }
+                const episodeTypes = await fetchEpisodeTypesFromAnimeFillerList(fillerSlug);
+                if (episodeTypes) {
+                    sendResponse({ success: true, episodeTypes, fillerSlug });
+                } else {
+                    sendResponse({ success: false, error: 'Failed to parse episode types' });
+                }
+            } catch (error) {
+                sendResponse({ success: false, error: error.message });
+            }
+        })();
         return true;
     }
 
@@ -902,11 +1079,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 chrome.runtime.onInstalled.addListener((details) => {
     if (details.reason === 'install') {
-        chrome.storage.local.set({
+        bgStorageSet({
             animeData:    {},
             videoProgress: {},
             settings:     { watchThreshold: 0.85, notifications: true }
-        });
+        }).catch(e => console.error('[BG] Failed to init storage on install:', e));
     } else if (details.reason === 'update') {
         const style = [
             'color:rgb(255,107,107)',
@@ -928,13 +1105,10 @@ chrome.runtime.onStartup.addListener(() => {
     setTimeout(startRealtimeListener, 2000);
 });
 
-// ─── Keep-alive port (content scripts connect every 25s to keep SW awake) ────
+// ─── Keep-alive port ──────────────────────────────────────────────────────────
 chrome.runtime.onConnect.addListener((port) => {
     if (port.name !== 'keepAlive') return;
-    // Simply accepting the connection keeps the SW alive; no tracking needed.
     port.onDisconnect.addListener(() => {
-        // Consume lastError to avoid noisy "Unchecked runtime.lastError" logs
-        // when a page is moved to bfcache and closes the port.
         const err = chrome.runtime.lastError;
         if (err) {
             const msg = err.message || '';
@@ -947,16 +1121,16 @@ chrome.runtime.onConnect.addListener((port) => {
 });
 
 // ─── Alarm: keep SW alive + health checks ────────────────────────────────────
-chrome.alarms.create('keepAlive', { periodInMinutes: 0.33 }); // every ~20s
+chrome.alarms.create('keepAlive', { periodInMinutes: 0.33 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name !== 'keepAlive') return;
 
-    // Restart SSE stream if dead
     const streamDead = !rtListenAbort || rtListenAbort.signal.aborted;
     if (streamDead) {
-    console.debug('[BG] keepAlive: stream dead, restarting...');
-    startRealtimeListener();
+        console.debug('[BG] keepAlive: stream dead, restarting...');
+        rtConsecutiveFailures = 0;
+        startRealtimeListener();
     }
 
     checkStreamHealth();
@@ -974,6 +1148,7 @@ function checkStreamHealth() {
     if (elapsed > 90000) {
         console.debug(`[BG] Stream silent for ${Math.round(elapsed / 1000)}s, reconnecting`);
         lastStreamMessageAt = Date.now();
+        rtConsecutiveFailures = 0;
         if (rtListenAbort) rtListenAbort.abort();
         startRealtimeListener();
     }

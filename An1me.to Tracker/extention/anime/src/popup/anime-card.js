@@ -14,11 +14,11 @@ const AnimeCardRenderer = {
 
         const episodeCount = anime.episodes?.length || 0;
         const progressData = FillerService.calculateProgress(episodeCount, slug, anime);
-        const sizeClass = UIHelpers.getProgressSizeClass(episodeCount, progressData.total);
+        const sizeClass = UIHelpers.getProgressSizeClass(episodeCount, progressData.total || episodeCount);
 
         // Canon episode counts
         const canonWatched = FillerService.getCanonEpisodeCount(slug, anime.episodes);
-        const totalCanon = FillerService.getTotalCanonEpisodes(slug, progressData.total);
+        const totalCanon = FillerService.getTotalCanonEpisodes(slug, progressData.total || episodeCount);
         const hasFillerData = FillerService.hasFillerData(slug);
 
         // Get highest completed episode
@@ -142,19 +142,25 @@ const AnimeCardRenderer = {
 
         // Progress info
         const currentEpText = currentEpisode > 0 ? `Ep ${currentEpisode}` : '';
-        const canonProgressPercent = hasFillerData
-            ? Math.round((canonWatched / totalCanon) * 100)
+        const unknownTotal = progressData.total == null;
+        const canonProgressPercent = unknownTotal ? null
+            : hasFillerData ? Math.round((canonWatched / totalCanon) * 100)
             : Math.round(progressData.progress);
-        const canonProgressWidth = hasFillerData
-            ? (canonWatched / totalCanon) * 100
+        const canonProgressWidth = unknownTotal ? 0
+            : hasFillerData ? (canonWatched / totalCanon) * 100
             : progressData.progress;
 
-        const totalDisplay = progressData.isGuessed ? `~${progressData.total}` : progressData.total;
-        const totalCanonDisplay = progressData.isGuessed ? `~${totalCanon}` : totalCanon;
+        const totalDisplay = unknownTotal ? null : progressData.total;
+        const totalCanonDisplay = unknownTotal ? null : totalCanon;
 
-        const progressInfoText = hasFillerData
+        const anilistStatusForProgress = window.AnimeTracker?.AnilistService?.getStatus(slug);
+        const progressInfoText = unknownTotal
+            ? (anilistStatusForProgress === 'FINISHED'
+                ? `<span>📍 ${currentEpText} · Watched ${episodeCount} eps</span>`
+                : `<span>📍 ${currentEpText} · Airing</span>`)
+            : hasFillerData
             ? `<span title="Canon: ${canonWatched}/${totalCanonDisplay}">📍 ${currentEpText} · Canon ${canonWatched}/${totalCanonDisplay}</span>`
-            : `<span title="Current: Ep ${currentEpisode}${progressData.isGuessed ? ' (total estimated)' : ''}">📍 ${currentEpText} · Total ${episodeCount}/${totalDisplay}</span>`;
+            : `<span>📍 ${currentEpText} · Total ${episodeCount}/${totalDisplay}</span>`;
 
         // Filler progress section
         const watchedFillers = fillerInfo?.watched || 0;
@@ -193,11 +199,10 @@ const AnimeCardRenderer = {
         // Display summary information (episodes watched/total, status, last watched) when the card is expanded.
         const totalWatchedEpisodes = anime.episodes?.length || 0;
         const totalEpisodesPossible = progressData.total || 0;
-        const isCardComplete = progressData.progress >= 100 && totalWatchedEpisodes > 0;
+        const isCardComplete = (progressData.progress === 100 && totalWatchedEpisodes > 0)
+            || (progressData.total == null && anilistStatusForProgress === 'FINISHED' && totalWatchedEpisodes > 0);
         const totalProgressText = totalEpisodesPossible > 0 ? `${currentEpisode}/${totalEpisodesPossible}` : `${currentEpisode}`;
-        const episodeProgressText = totalEpisodesPossible > 0
-            ? `Ep ${totalProgressText}`
-            : (currentEpisode > 0 ? `Ep ${currentEpisode}` : '');
+        const episodeProgressText = currentEpisode > 0 ? `Ep ${totalProgressText}` : '';
         let statusTextCard = '';
         if (totalWatchedEpisodes === 0) {
             statusTextCard = 'Not started';
@@ -242,7 +247,7 @@ const AnimeCardRenderer = {
                     <div class="progress-container header-progress">
                         <div class="progress-info">
                             ${progressInfoText}
-                            <span>${canonProgressPercent}%</span>
+                            <span>${canonProgressPercent != null ? canonProgressPercent + "%" : ""}</span>
                         </div>
                         <div class="progress-bar ${sizeClass}">
                             <div class="progress-fill" style="width: ${canonProgressWidth}%"></div>
@@ -256,7 +261,7 @@ const AnimeCardRenderer = {
                     </div>
                     <div class="anime-episodes collapsible collapsed">
                         <div class="episodes-header">
-                            <span class="episodes-title">Episodes ${episodeCount}</span>
+                            <span class="episodes-title">Watched ${episodeCount}${progressData.total ? `/${progressData.total}` : ''}</span>
                             <svg class="collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="6 9 12 15 18 9"/>
                             </svg>
@@ -624,17 +629,22 @@ const AnimeCardRenderer = {
                     currentEp = Math.max(currentEp, Math.max(...inProgressEps.map(ep => ep.number)));
                 }
 
-                isComplete = progressPercent >= 100;
-
-                // For Naruto/Long running: if we reached the last episode, mark as complete even if we skipped fillers
-                if (!isComplete && anime.episodes?.length > 0) {
-                    const totalEps = FillerService.getTotalEpisodes(slug, episodeCount, anime);
-                    if (currentEp >= totalEps && totalEps > 0) {
-                        isComplete = true;
+                // Handle null progress (unknown total)
+                const anilistSt = window.AnimeTracker?.AnilistService?.getStatus(slug);
+                if (progressData.progress === null) {
+                    // Total unknown: FINISHED = complete, RELEASING = in-progress
+                    isComplete = anilistSt === 'FINISHED' && episodeCount > 0;
+                    hasProgress = episodeCount > 0;
+                    progressPercent = isComplete ? 100 : 0;
+                } else {
+                    isComplete = progressPercent >= 100;
+                    // For long-running: if reached last episode, mark complete
+                    if (!isComplete && anime.episodes?.length > 0) {
+                        const totalEps = FillerService.getTotalEpisodes(slug, episodeCount, anime);
+                        if (totalEps && currentEp >= totalEps) isComplete = true;
                     }
+                    hasProgress = progressPercent > 0 || episodeCount > 0;
                 }
-
-                hasProgress = progressPercent > 0;
                 statusClass = isComplete ? 'complete' : (hasProgress ? 'in-progress' : 'not-started');
                 statusIcon = isComplete ? '✓' : (hasProgress ? '▶' : '○');
 
@@ -644,7 +654,7 @@ const AnimeCardRenderer = {
                 // Filler data for this season
                 const hasFillerData = FillerService.hasFillerData(slug);
                 const canonWatched = FillerService.getCanonEpisodeCount(slug, anime.episodes);
-                const totalCanon = FillerService.getTotalCanonEpisodes(slug, progressData.total);
+                const totalCanon = FillerService.getTotalCanonEpisodes(slug, progressData.total || episodeCount);
                 const fillerInfo = FillerService.getFillerInfo(slug, anime.episodes);
                 const skippedFillers = FillerService.getSkippedFillers(slug, anime.episodes, currentEp);
                 const skippedFillersText = FillerService.formatSkippedFillersCompact(skippedFillers);
@@ -704,19 +714,26 @@ const AnimeCardRenderer = {
                     </div>` : '';
 
                 // Progress bar info - use canon counts when filler data is available
-                const totalDisplay = progressData.isGuessed ? `~${progressData.total}` : progressData.total;
-                const totalCanonDisplay = progressData.isGuessed ? `~${totalCanon}` : totalCanon;
-                const canonProgressPercent = hasFillerData ? Math.round((canonWatched / totalCanon) * 100) : progressPercent;
-                const canonProgressWidth = hasFillerData ? (canonWatched / totalCanon) * 100 : progressData.progress;
+                const unknownTotalSeason = progressData.total == null;
+                const totalDisplay = unknownTotalSeason ? null : progressData.total;
+                const totalCanonDisplay = unknownTotalSeason ? null : totalCanon;
+                const canonProgressPercent = unknownTotalSeason ? (isComplete ? 100 : 0)
+                    : hasFillerData ? Math.round((canonWatched / totalCanon) * 100) : progressPercent;
+                const canonProgressWidth = unknownTotalSeason ? (isComplete ? 100 : 0)
+                    : hasFillerData ? (canonWatched / totalCanon) * 100 : progressData.progress;
 
-                const progressInfoText = hasFillerData
+                const progressInfoText = unknownTotalSeason
+                    ? (anilistSt === 'FINISHED'
+                        ? `<span>📍 Ep ${currentEp > 0 ? currentEp : episodeCount} · Watched ${episodeCount} eps</span>`
+                        : `<span>📍 Ep ${currentEp > 0 ? currentEp : episodeCount} · Airing</span>`)
+                    : hasFillerData
                     ? `<span title="Canon: ${canonWatched}/${totalCanonDisplay}">📍 Ep ${currentEp > 0 ? currentEp : episodeCount} · Canon ${canonWatched}/${totalCanonDisplay}</span>`
                     : `<span>Ep ${currentEp > 0 ? currentEp : episodeCount} · Total ${episodeCount}/${totalDisplay}</span>`;
 
                 progressInfoHTML = `
                     <div class="progress-info">
                         ${progressInfoText}
-                        <span>${canonProgressPercent}%</span>
+                        <span>${canonProgressPercent > 0 ? canonProgressPercent + '%' : ''}</span>
                     </div>
                     <div class="progress-bar size-small">
                         <div class="progress-fill" style="width: ${canonProgressWidth}%"></div>

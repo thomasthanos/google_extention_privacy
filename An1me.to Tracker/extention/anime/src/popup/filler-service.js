@@ -4,130 +4,21 @@
  */
 
 const FillerService = {
-    // Known filler episodes - pre-seeded with verified data, also populated dynamically
-    KNOWN_FILLERS: {
-        // Bleach (2004) - verified filler ranges
-        'bleach': [
-            [33,33],[50,50],[64,108],[128,137],[147,149],[168,189],
-            [204,205],[213,214],[228,266],[287,287],[298,299],[303,305],
-            [311,341],[355,355]
-        ],
-        // Bleach TYBW entries are separate and should not inherit main-series fillers
-        'bleach-sennen-kessen-hen': [],
-        'bleach-sennen-kessen-hen-ketsubetsu-tan': [],
-        'bleach-sennen-kessen-hen-soukoku-tan': [],
-
-        // Naruto Shippuden - verified filler list
-        'naruto-shippuuden': [
-            [57,71],[91,112],[144,151],[170,171],[176,196],
-            [223,242],[257,260],[271,271],[279,281],[284,295],
-            [303,320],[347,361],[376,377],[388,390],[394,413],
-            [416,417],[422,423],[427,450],[464,468],[480,483]
-        ],
-        'naruto-shippuden': [
-            [57,71],[91,112],[144,151],[170,171],[176,196],
-            [223,242],[257,260],[271,271],[279,281],[284,295],
-            [303,320],[347,361],[376,377],[388,390],[394,413],
-            [416,417],[422,423],[427,450],[464,468],[480,483]
-        ],
-        // Naruto (original) - verified filler list
-        'naruto': [
-            [26,26],[97,106],[136,140],[143,219]
-        ],
-    },
-
-    // Known anime totals - populated dynamically
-    KNOWN_ANIME_TOTALS: {},
+    // Known filler episodes - populated dynamically from animefillerlist.com
+    KNOWN_FILLERS: {},
 
     // Episode types cache
     episodeTypesCache: {},
 
     /**
-     * Get the correct slug for animefillerlist.com
-     */
-    getAnimeFillerListSlug(slug) {
-        const { ANIME_FILLER_LIST_SLUG_MAPPING } = window.AnimeTracker;
-
-        // Clean up the slug
-        let cleanSlug = slug
-            .replace(/-episode.*$/i, '')
-            .replace(/-ep-?\d+$/i, '')
-            .toLowerCase();
-
-        // Check exact mapping first
-        if (ANIME_FILLER_LIST_SLUG_MAPPING[cleanSlug]) {
-            return ANIME_FILLER_LIST_SLUG_MAPPING[cleanSlug];
-        }
-
-        // Try without year
-        const withoutYear = cleanSlug.replace(/-\d{4}$/i, '');
-        if (ANIME_FILLER_LIST_SLUG_MAPPING[withoutYear]) {
-            return ANIME_FILLER_LIST_SLUG_MAPPING[withoutYear];
-        }
-
-        // Apply intelligent transformations
-        let transformedSlug = cleanSlug;
-
-        // Remove common season indicators (order matters - more specific patterns first)
-        transformedSlug = transformedSlug
-            .replace(/-the-final-season-kanketsu-hen$/i, '')
-            .replace(/-the-final-season-part-\d+$/i, '')
-            .replace(/-the-final-season$/i, '')
-            .replace(/-season-\d+-part-\d+$/i, '')
-            .replace(/-season-?\d+$/i, '')
-            .replace(/-s\d+$/i, '')
-            .replace(/-(2nd|3rd|4th|5th|6th|7th)-season$/i, '')
-            .replace(/-(part|cour)-?\d+$/i, '')
-            .replace(/-(final|last)-season$/i, '')
-            .replace(/-new-world$/i, '')
-            .replace(/-stone-age$/i, '')
-            .replace(/-[a-z]+-hen$/i, '')  // Remove Japanese arc names like -yuukaku-hen
-            .replace(/-2$/i, '')
-            .replace(/-3$/i, '')
-            .replace(/-4$/i, '')
-            .replace(/-5$/i, '')
-            .replace(/-6$/i, '')
-            .replace(/-7$/i, '')
-            .replace(/-ii$/i, '')
-            .replace(/-iii$/i, '')
-            .replace(/-iv$/i, '');
-
-        // Common Japanese to English mappings
-        const japaneseMappings = {
-            'boku-no-hero-academia': 'my-hero-academia',
-            'shingeki-no-kyojin': 'attack-titan',
-            'kimetsu-no-yaiba': 'demon-slayer-kimetsu-no-yaiba',
-            'hagane-no-renkinjutsushi': 'fullmetal-alchemist',
-            'kenpuu-denki': 'berserk',
-            'ansatsu-kyoushitsu': 'assassination-classroom',
-            'nanatsu-no-taizai': 'seven-deadly-sins',
-            'yakusoku-no-neverland': 'promised-neverland',
-            'tensei-shitara-slime-datta-ken': 'that-time-i-got-reincarnated-slime'
-        };
-
-        // Check if any Japanese name matches
-        for (const [jpSlug, enSlug] of Object.entries(japaneseMappings)) {
-            if (transformedSlug.includes(jpSlug)) {
-                transformedSlug = transformedSlug.replace(jpSlug, enSlug);
-                break;
-            }
-        }
-
-        // Try transformed slug in mapping
-        if (ANIME_FILLER_LIST_SLUG_MAPPING[transformedSlug]) {
-            return ANIME_FILLER_LIST_SLUG_MAPPING[transformedSlug];
-        }
-
-        // Return transformed slug if different, otherwise original clean slug
-        return transformedSlug !== cleanSlug ? transformedSlug : cleanSlug;
-    },
-
-    /**
-     * Get normalized slug for filler lookup
+     * Get normalized slug for filler lookup.
+     * Keys are checked longest-first so that more specific slugs (e.g.
+     * "naruto-shippuden") always win over shorter prefixes (e.g. "naruto").
      */
     getNormalizedFillerSlug(slug) {
         const lowerSlug = slug.toLowerCase();
 
+        // Fast path: exact match
         if (this.KNOWN_FILLERS[lowerSlug]) return lowerSlug;
 
         const cleanSlug = lowerSlug
@@ -136,7 +27,11 @@ const FillerService = {
 
         if (this.KNOWN_FILLERS[cleanSlug]) return cleanSlug;
 
-        for (const key of Object.keys(this.KNOWN_FILLERS)) {
+        // Sort keys longest-first so more specific slugs (e.g. "naruto-shippuden")
+        // are matched before shorter prefixes (e.g. "naruto").
+        const sortedKeys = Object.keys(this.KNOWN_FILLERS).sort((a, b) => b.length - a.length);
+
+        for (const key of sortedKeys) {
             if (lowerSlug === key || cleanSlug === key) {
                 return key;
             }
@@ -158,7 +53,7 @@ const FillerService = {
             /-gekijouban/i,
             /-the-movie/i,
             /^.*-movie-\d+/i,
-            /-3d-/i,  // 3D movies
+            /-3d-/i,
             /-ova(-|$)/i,
             /-special(-|$)/i,
             /-recap(-|$)/i
@@ -167,56 +62,30 @@ const FillerService = {
     },
 
     /**
-     * Check if this is an anime unlikely to have filler data on AnimeFillerList
-     * (newer/niche anime that the site doesn't cover)
+     * Fetch episode types from animefillerlist.com via background script.
+     * Pass animeTitle so background can use it for slug discovery.
+     * Returns the cached/fetched episode types, or null if not available.
      */
-    isUnlikelyToHaveFillerData(slug) {
-        const nicherAnime = [
-            'cyberpunk-edgerunners',
-            'yofukashi-no-uta',
-            'mashle',
-            'call-of-the-night',
-            'dandadan',
-            'vinland-saga'
-            // Note: 'higashi-no-eden' and 'darling-in-the-franxx' removed — already in ANIME_NO_FILLER_DATA config
-        ];
-        return nicherAnime.some(name => slug.includes(name));
-    },
-
-    /**
-     * Fetch episode types from animefillerlist.com via background script
-     */
-    async fetchEpisodeTypes(animeSlug) {
-        const { CONFIG, ANIME_NO_FILLER_DATA, SeasonGrouping } = window.AnimeTracker;
+    async fetchEpisodeTypes(animeSlug, animeTitle = null) {
+        const { CONFIG } = window.AnimeTracker;
         const { Storage } = window.AnimeTracker;
         const { Logger } = window.AnimeTracker;
 
-        // Check if this anime is known to not have filler data
-        const baseSlug = SeasonGrouping.getBaseSlug(animeSlug);
-        if (ANIME_NO_FILLER_DATA && (ANIME_NO_FILLER_DATA.includes(animeSlug) || ANIME_NO_FILLER_DATA.includes(baseSlug))) {
-            Logger.info(`Skipping filler fetch for ${animeSlug} (in no-filler-data list)`);
-            return null;
-        }
-
-        // Skip movies, OVAs, specials - they don't have filler data
         if (this.isLikelyMovie(animeSlug)) {
             Logger.info(`Skipping filler fetch for ${animeSlug} (detected as movie/OVA/special)`);
             return null;
         }
 
-        // Skip niche anime unlikely to be on AnimeFillerList
-        if (this.isUnlikelyToHaveFillerData(animeSlug)) {
-            Logger.info(`Skipping filler fetch for ${animeSlug} (unlikely to have filler data)`);
-            return null;
-        }
-
-        const fillerListSlug = this.getAnimeFillerListSlug(animeSlug);
-
-        // Check cache with TTL validation
         if (this.episodeTypesCache[animeSlug]) {
             const cached = this.episodeTypesCache[animeSlug];
-            const cacheAge = cached.cachedAt ? Date.now() - cached.cachedAt : Infinity;
 
+            if (cached.notFound) {
+                const age = cached.cachedAt ? Date.now() - cached.cachedAt : Infinity;
+                if (age < CONFIG.FILLER_NOT_FOUND_CACHE_TTL) return null;
+                delete this.episodeTypesCache[animeSlug];
+            }
+
+            const cacheAge = cached.cachedAt ? Date.now() - cached.cachedAt : Infinity;
             if (cacheAge < CONFIG.EPISODE_TYPES_CACHE_TTL) {
                 Logger.info(`Using cached episode types for ${animeSlug} (age: ${Math.round(cacheAge / 60000)}min)`);
                 return cached;
@@ -227,11 +96,11 @@ const FillerService = {
         }
 
         try {
-            Logger.info(`Fetching episode types for ${animeSlug} (using slug: ${fillerListSlug})...`);
+            Logger.info(`Fetching episode types for ${animeSlug}...`);
 
             const response = await new Promise((resolve, reject) => {
                 chrome.runtime.sendMessage(
-                    { type: 'FETCH_EPISODE_TYPES', animeSlug: fillerListSlug },
+                    { type: 'FETCH_EPISODE_TYPES', animeSlug, animeTitle },
                     (response) => {
                         if (chrome.runtime.lastError) {
                             reject(new Error(chrome.runtime.lastError.message));
@@ -251,20 +120,26 @@ const FillerService = {
                 this.episodeTypesCache[animeSlug] = cachedData;
                 await Storage.set({ [`episodeTypes_${animeSlug}`]: cachedData });
 
-                Logger.success(`Fetched episode types for ${animeSlug}`, response.episodeTypes);
+                cachedData._fillerSlug = response.fillerSlug || null;
+
+                Logger.success(`Fetched episode types for ${animeSlug} (filler slug: ${response.fillerSlug})`);
                 return cachedData;
+            } else if (response.notFound) {
+                const notFoundEntry = { notFound: true, cachedAt: Date.now() };
+                this.episodeTypesCache[animeSlug] = notFoundEntry;
+                await Storage.set({ [`episodeTypes_${animeSlug}`]: notFoundEntry });
+                return null;
             } else {
                 throw new Error(response.error || 'Unknown error');
             }
         } catch (error) {
-            // Logger.error(`Failed to fetch episode types for ${animeSlug}:`, error);
             Logger.info(`Failed to fetch episode types for ${animeSlug}: ${error.message}`);
             return null;
         }
     },
 
     /**
-     * Update KNOWN_FILLERS and KNOWN_ANIME_TOTALS from fetched episode types
+     * Update KNOWN_FILLERS from fetched episode types.
      */
     updateFromEpisodeTypes(animeSlug, episodeTypes) {
         const { Logger } = window.AnimeTracker;
@@ -276,29 +151,18 @@ const FillerService = {
 
         Logger.info(`updateFromEpisodeTypes called for ${animeSlug}`, episodeTypes);
 
-        const slugVariations = [
+        const slugVariations = new Set([
             animeSlug.toLowerCase(),
             animeSlug.toLowerCase().replace(/-\d{4}$/i, ''),
-            this.getAnimeFillerListSlug(animeSlug)
-        ];
+        ]);
+        if (episodeTypes._fillerSlug) slugVariations.add(episodeTypes._fillerSlug.toLowerCase());
 
-        // Update total episodes if available
-        if (episodeTypes.totalEpisodes && episodeTypes.totalEpisodes > 0) {
-            slugVariations.forEach(slug => {
-                this.KNOWN_ANIME_TOTALS[slug] = episodeTypes.totalEpisodes;
-            });
-            Logger.success(`Updated KNOWN_ANIME_TOTALS for ${animeSlug}: ${episodeTypes.totalEpisodes} episodes`);
-        }
-
-        // Process filler data
         let fillerRanges = [];
 
         if (!episodeTypes.filler || episodeTypes.filler.length === 0) {
-            fillerRanges = [];
             Logger.info(`No fillers found for ${animeSlug}`);
         } else {
             const sortedFillers = [...episodeTypes.filler].sort((a, b) => a - b);
-
             let start = sortedFillers[0];
             let end = sortedFillers[0];
 
@@ -316,12 +180,8 @@ const FillerService = {
             Logger.success(`Updated KNOWN_FILLERS for ${animeSlug}`, fillerRanges);
         }
 
-        // Hardcoded/verified filler lists take priority — don't overwrite them
-        const PROTECTED_SLUGS = ['bleach', 'naruto-shippuuden', 'naruto-shippuden', 'naruto'];
         slugVariations.forEach(slug => {
-            if (!PROTECTED_SLUGS.includes(slug.toLowerCase())) {
-                this.KNOWN_FILLERS[slug] = fillerRanges;
-            }
+            this.KNOWN_FILLERS[slug] = fillerRanges;
         });
     },
 
@@ -355,10 +215,11 @@ const FillerService = {
     },
 
     /**
-     * Auto-fetch missing episode types with rate limiting
+     * Auto-fetch missing episode types with rate limiting.
+     * Returns true if any new data was fetched, false if everything was cached.
      */
     async autoFetchMissing(animeData, onComplete) {
-        const { CONFIG, ANIME_NO_FILLER_DATA, SeasonGrouping } = window.AnimeTracker;
+        const { CONFIG } = window.AnimeTracker;
         const { Logger } = window.AnimeTracker;
 
         try {
@@ -367,43 +228,42 @@ const FillerService = {
 
             for (const slug of animeSlugs) {
                 if (this.episodeTypesCache[slug]) continue;
-                const normalizedSlug = slug.toLowerCase();
-                if (this.KNOWN_ANIME_TOTALS[normalizedSlug]) continue;
-                // Skip anime known to have no filler data - avoids repeated failed requests
-                const baseSlug = SeasonGrouping.getBaseSlug(slug);
-                if (ANIME_NO_FILLER_DATA && (ANIME_NO_FILLER_DATA.includes(slug) || ANIME_NO_FILLER_DATA.includes(baseSlug))) continue;
                 if (this.isLikelyMovie(slug)) continue;
-                if (this.isUnlikelyToHaveFillerData(slug)) continue;
                 slugsToFetch.push(slug);
             }
 
             if (slugsToFetch.length === 0) {
                 Logger.info('No anime need episode type fetching');
-                return;
+                return false;
             }
 
-            Logger.info(`Auto-fetching episode types for ${slugsToFetch.length} anime...`);
+            const MAX_TOTAL = CONFIG.AUTO_FETCH_MAX_TOTAL;
+            const limited   = slugsToFetch.slice(0, MAX_TOTAL);
+            if (slugsToFetch.length > MAX_TOTAL) {
+                Logger.warn(`Auto-fetch: capping at ${MAX_TOTAL} of ${slugsToFetch.length} pending anime`);
+            }
+
+            Logger.info(`Auto-fetching episode types for ${limited.length} anime...`);
 
             const BATCH_SIZE = CONFIG.AUTO_FETCH_BATCH_SIZE;
             const BASE_DELAY = CONFIG.AUTO_FETCH_BASE_DELAY_MS;
             let successCount = 0;
             let failCount = 0;
 
-            for (let i = 0; i < slugsToFetch.length; i += BATCH_SIZE) {
-                const batch = slugsToFetch.slice(i, i + BATCH_SIZE);
+            for (let i = 0; i < limited.length; i += BATCH_SIZE) {
+                const batch = limited.slice(i, i + BATCH_SIZE);
 
                 const results = await Promise.allSettled(
                     batch.map(async (slug) => {
                         try {
-                            const episodeTypes = await this.fetchEpisodeTypes(slug);
+                            const animeTitle = animeData[slug]?.title || null;
+                            const episodeTypes = await this.fetchEpisodeTypes(slug, animeTitle);
                             if (episodeTypes) {
                                 this.updateFromEpisodeTypes(slug, episodeTypes);
                                 return { slug, success: true };
                             }
                             return { slug, success: false };
                         } catch (error) {
-                            // Suppress logs for expected errors (like 404s that we might not catch elsewhere)
-                            // Logger.error(`Failed to auto-fetch for ${slug}:`, error);
                             return { slug, success: false, error };
                         }
                     })
@@ -423,16 +283,19 @@ const FillerService = {
                     Logger.warn(`Rate limit suspected, backing off to ${delay}ms`);
                 }
 
-                if (i + BATCH_SIZE < slugsToFetch.length) {
+                if (i + BATCH_SIZE < limited.length) {
                     await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
 
             Logger.info(`Auto-fetch complete: ${successCount} success, ${failCount} failed`);
 
-            if (onComplete) onComplete();
+            if (onComplete && successCount > 0) onComplete();
+
+            return successCount > 0;
         } catch (error) {
             Logger.error('Auto-fetch error:', error);
+            return false;
         }
     },
 
@@ -443,12 +306,11 @@ const FillerService = {
         const normalizedSlug = this.getNormalizedFillerSlug(slug);
         const fillers = this.KNOWN_FILLERS[normalizedSlug];
         if (!fillers) return false;
-
         return fillers.some(([start, end]) => episodeNum >= start && episodeNum <= end);
     },
 
     /**
-     * Count filler episodes in a range
+     * Count filler episodes watched
      */
     countFillerEpisodes(slug, episodes) {
         const normalizedSlug = this.getNormalizedFillerSlug(slug);
@@ -468,23 +330,19 @@ const FillerService = {
         const watchedFillers = this.countFillerEpisodes(slug, episodes);
         const skippedFillers = totalFillers - watchedFillers;
 
-        return {
-            total: totalFillers,
-            watched: watchedFillers,
-            skipped: skippedFillers
-        };
+        return { total: totalFillers, watched: watchedFillers, skipped: skippedFillers };
     },
 
     /**
-     * Get skipped filler episodes
+     * Get skipped filler episodes (watched past them but didn't watch them)
      */
     getSkippedFillers(slug, episodes, currentEpisode) {
         const normalizedSlug = this.getNormalizedFillerSlug(slug);
         const fillers = this.KNOWN_FILLERS[normalizedSlug];
         if (!fillers || fillers.length === 0) return [];
 
-        const skippedFillers = [];
         const watchedEpisodeNumbers = new Set((episodes || []).map(ep => ep.number));
+        const skippedFillers = [];
 
         for (const [start, end] of fillers) {
             for (let ep = start; ep <= end; ep++) {
@@ -529,7 +387,7 @@ const FillerService = {
     },
 
     /**
-     * Get unwatched filler episodes for display
+     * Get unwatched filler episodes up to a given total
      */
     getUnwatchedFillers(slug, episodes, totalEpisodes) {
         const normalizedSlug = this.getNormalizedFillerSlug(slug);
@@ -551,7 +409,7 @@ const FillerService = {
     },
 
     /**
-     * Get canon episode count
+     * Get watched canon episode count (total minus fillers)
      */
     getCanonEpisodeCount(slug, episodes) {
         if (!episodes) return 0;
@@ -572,290 +430,86 @@ const FillerService = {
     },
 
     /**
-     * Check if slug belongs to a multi-season anime that should use per-season totals
-     */
-    isMultiSeasonAnime(slug) {
-        const multiSeasonPrefixes = [
-            'one-punch-man',        // One Punch Man
-            'shingeki-no-kyojin',  // Attack on Titan
-            'kimetsu-no-yaiba',     // Demon Slayer
-            'boku-no-hero-academia', // My Hero Academia
-            'jujutsu-kaisen',       // Jujutsu Kaisen
-            'naruto',               // Naruto (original + Shippuden + Boruto)
-            'boruto',               // Boruto (Naruto Next Generations)
-            'initial-d'             // Initial D (all stages)
-        ];
-        return multiSeasonPrefixes.some(prefix => slug.toLowerCase().startsWith(prefix));
-    },
-
-    /**
-     * Detect multi-season context from title when slug is ambiguous.
-     */
-    isMultiSeasonTitle(title) {
-        const t = String(title || '').toLowerCase();
-        if (!t) return false;
-        return /jujutsu\s*kaisen|attack\s*on\s*titan|shingeki|demon\s*slayer|kimetsu|my\s*hero|boku\s*no\s*hero|one\s*punch\s*man|naruto|boruto|initial\s*d/.test(t);
-    },
-
-    // Manual episode count overrides
-    MANUAL_EPISODE_COUNTS: {
-        'one-punch-man': 12,
-        'one-punch-man-2': 12,
-        'one-punch-man-season-2': 12,
-        'one-punch-man-season-3': 12,
-        'wanpanman': 12, // Japanese romanization
-        'wanpanman-2': 12,
-        'wanpanman-season-2': 12,
-        'wanpanman-season-3': 1,
-        'death-note': 37,
-        'cyberpunk-edgerunners': 10,
-        'bleach': 366,
-        'bleach-sennen-kessen-hen': 40,
-        'bleach-sennen-kessen-hen-ketsubetsu-tan': 26,
-        'bleach-sennen-kessen-hen-soukoku-tan': 40,
-        'shingeki-no-kyojin': 25,
-        'shingeki-no-kyojin-season-2': 12,
-        'shingeki-no-kyojin-season-3': 12,
-        'shingeki-no-kyojin-season-3-part-2': 10,
-        'shingeki-no-kyojin-the-final-season': 16,
-        'shingeki-no-kyojin-the-final-season-part-2': 12,
-        'shingeki-no-kyojin-the-final-season-kanketsu-hen': 2, // The two long specials
-        'kimetsu-no-yaiba': 26,
-        'kimetsu-no-yaiba-yuukaku-hen': 11,
-        'kimetsu-no-yaiba-katanakaji-no-sato-hen': 11,
-        'kimetsu-no-yaiba-hashira-geiko-hen': 8,
-        'kimetsu-no-yaiba-mugen-ressha-hen': 7,
-        'hunter-x-hunter': 148,
-        'hunter-x-hunter-2011': 148,
-        'higashi-no-eden': 11,
-        'jujutsu-kaisen-season-2': 23,
-        'jujutsu-kaisen-2nd-season': 23, // Correct slug for S2
-        'jujutsu-kaisen-season-3': 12, // Fallback if user considers Hidden Inventory/Premature Death as S3
-
-        // Naruto series
-        'naruto': 220,
-        'naruto-original': 220,
-        'naruto-complete': 220,
-        'naruto-episode': 220,  // Fallback if episodes included in slug
-        'naruto-shippuden': 500,
-        'naruto-shippuuden': 500,  // Alternative spelling (actual site spelling)
-        'naruto-shippuden-complete': 500,
-        'naruto-shippuuden-complete': 500,
-        'naruto-shippuden-episode': 500,
-        'naruto-shippuuden-episode': 500,
-        'boruto': 293,  // Boruto: Naruto Next Generations
-        'naruto-boruto': 293,
-        'boruto-naruto-next-generations': 293,
-        'boruto-episode': 293,
-
-        // Initial D stage-specific counts
-        'initial-d': 26,  // First stage default
-        'initial-d-first-stage': 26,
-        'initial-d-second-stage': 13,
-        'initial-d-third-stage': 1, // Movie (duration handled elsewhere)
-        'initial-d-fourth-stage': 24,
-        'initial-d-fifth-stage': 14,
-        'initial-d-sixth-stage': 4,
-        'initial-d-final-stage': 4,
-    },
-
-    getStandardFallbackTotal(watchedCount) {
-        if (watchedCount <= 12) return 12;
-        if (watchedCount <= 13) return 13;
-        if (watchedCount <= 24) return 24;
-        if (watchedCount <= 26) return 26;
-        if (watchedCount <= 39) return 39;
-        if (watchedCount <= 50) return 50;
-        if (watchedCount <= 52) return 52;
-        if (watchedCount <= 100) return 100;
-        if (watchedCount <= 150) return 150;
-        if (watchedCount <= 200) return 200;
-        return Math.ceil(watchedCount / 25) * 25 + 25;
-    },
-
-    /**
-     * Get total episodes for anime with improved fallback
+     * Get total episodes for anime.
+     * Priority: AnilistService → stored anime.totalEpisodes → null.
      */
     getTotalEpisodes(slug, watchedCount, anime = null) {
         const normalizedSlug = slug.toLowerCase();
-        const hasMultiSeasonContext =
-            this.isMultiSeasonAnime(slug) ||
-            this.isMultiSeasonTitle(anime?.title);
 
-        // Exact manual override always wins.
-        if (this.MANUAL_EPISODE_COUNTS[normalizedSlug]) {
-            return this.MANUAL_EPISODE_COUNTS[normalizedSlug];
+        const anilistTotal = window.AnimeTracker?.AnilistService?.getTotalEpisodes(normalizedSlug);
+        if (anilistTotal && anilistTotal > 0) return anilistTotal;
+
+        if (anime && Number.isFinite(anime.totalEpisodes) && anime.totalEpisodes > 0) {
+            return anime.totalEpisodes;
         }
 
-        // For Naruto - check without hyphenated parts
-        if (normalizedSlug.startsWith('naruto')) {
-            // Try to match partial slugs like "naruto-episode-220"
-            const isShippuuden = normalizedSlug.includes('shippuuden') || normalizedSlug.includes('shippuden') || normalizedSlug.includes('-2');
-            if (isShippuuden) {
-                const count = this.MANUAL_EPISODE_COUNTS['naruto-shippuuden'] || this.MANUAL_EPISODE_COUNTS['naruto-shippuden'];
-                if (count) return count;
-                // Hardcode fallback
-                return 500;
-            } else {
-                const count = this.MANUAL_EPISODE_COUNTS['naruto'];
-                if (count) return count;
-                // Hardcode fallback
-                return 220;
-            }
-        }
-
-        // For Initial D - check stage indicators
-        if (normalizedSlug.startsWith('initial-d')) {
-            if (normalizedSlug.includes('sixth-stage') || normalizedSlug.includes('6th-stage') || normalizedSlug.includes('final-stage')) {
-                const count = this.MANUAL_EPISODE_COUNTS['initial-d-final-stage'];
-                if (count) return count;
-                return 4;
-            }
-            if (normalizedSlug.includes('fifth-stage') || normalizedSlug.includes('5th-stage')) {
-                const count = this.MANUAL_EPISODE_COUNTS['initial-d-fifth-stage'];
-                if (count) return count;
-                return 14;
-            }
-            if (normalizedSlug.includes('fourth-stage') || normalizedSlug.includes('4th-stage')) {
-                const count = this.MANUAL_EPISODE_COUNTS['initial-d-fourth-stage'];
-                if (count) return count;
-                return 24;
-            }
-            if (normalizedSlug.includes('third-stage') || normalizedSlug.includes('3rd-stage')) {
-                const count = this.MANUAL_EPISODE_COUNTS['initial-d-third-stage'];
-                if (count) return count;
-                return 1;
-            }
-            if (normalizedSlug.includes('second-stage') || normalizedSlug.includes('2nd-stage')) {
-                const count = this.MANUAL_EPISODE_COUNTS['initial-d-second-stage'];
-                if (count) return count;
-                return 13;
-            }
-            if (normalizedSlug.includes('first-stage') || normalizedSlug.includes('1st-stage')) {
-                const count = this.MANUAL_EPISODE_COUNTS['initial-d-first-stage'];
-                if (count) return count;
-                return 26;
-            }
-            // Fallback to first stage if no specific stage detected
-            const count = this.MANUAL_EPISODE_COUNTS['initial-d'];
-            if (count) return count;
-            return 26;
-        }
-
-        // Prefer explicit totals captured from the source page when available.
-        if (anime && Number.isFinite(anime.totalEpisodes)) {
-            const explicitTotal = Number(anime.totalEpisodes);
-            if (explicitTotal >= watchedCount && explicitTotal > 0 && explicitTotal < 10000) {
-                // For multi-season shows, page-derived totals are often "currently released"
-                // counts (or noisy values). Keep at least a cour-sized estimate.
-                if (hasMultiSeasonContext) {
-                    return Math.max(explicitTotal, this.getStandardFallbackTotal(watchedCount));
-                }
-                return explicitTotal;
-            }
-        }
-
-        // For multi-season anime, DON'T use the global KNOWN_ANIME_TOTALS
-        // because it contains the total for ALL seasons combined
-        // Instead, use standard cour lengths for individual seasons
-        if (!hasMultiSeasonContext) {
-            const knownTotal = this.KNOWN_ANIME_TOTALS[normalizedSlug];
-            if (knownTotal && knownTotal >= watchedCount) {
-                return knownTotal;
-            }
-
-            const cachedTypes = this.episodeTypesCache[slug];
-            if (cachedTypes && cachedTypes.totalEpisodes && cachedTypes.totalEpisodes >= watchedCount) {
-                return cachedTypes.totalEpisodes;
-            }
-        }
-
-        // AniList fallback — more reliable than standard guesses for most anime
-        const anilistService = window.AnimeTracker?.AnilistService;
-        if (anilistService) {
-            const anilistTotal = anilistService.getTotalEpisodes(normalizedSlug);
-            if (anilistTotal && anilistTotal >= watchedCount) {
-                return anilistTotal;
-            }
-        }
-
-        // Standard cour lengths fallback (used for all multi-season anime and unknown anime)
-        return this.getStandardFallbackTotal(watchedCount);
+        return null;
     },
 
     /**
-     * Calculate progress percentage
+     * Calculate progress percentage.
+     * Returns { progress, total, isGuessed }.
+     * total=null means the episode count is unknown (airing / N/A on site).
      */
     calculateProgress(episodeCount, slug, anime = null) {
         const totalEpisodes = this.getTotalEpisodes(slug, episodeCount, anime);
 
-        // Bleach-specific override:
-        // if the user has reached the last episode number, mark it complete
-        // even when some fillers/episodes are missing from tracked history.
-        if (anime && Array.isArray(anime.episodes) && slug.toLowerCase().startsWith('bleach')) {
-            const maxEpisodeWatched = anime.episodes.reduce((max, ep) => {
-                const n = Number(ep?.number) || 0;
-                return n > max ? n : max;
-            }, 0);
-
-            if (totalEpisodes > 0 && maxEpisodeWatched >= totalEpisodes) {
-                return {
-                    progress: 100,
-                    total: totalEpisodes,
-                    isGuessed: false
-                };
-            }
+        if (!totalEpisodes) {
+            return { progress: null, total: null, isGuessed: false };
         }
 
-        // Check for complete canon viewing
         if (anime && anime.episodes) {
             const canonWatched = this.getCanonEpisodeCount(slug, anime.episodes);
             const totalCanon = this.getTotalCanonEpisodes(slug, totalEpisodes);
-
-            // If user has watched all canon episodes, force 100% progress even if fillers are skipped
             if (canonWatched >= totalCanon && totalCanon > 0) {
-                return {
-                    progress: 100,
-                    total: totalEpisodes,
-                    isGuessed: false
-                };
+                return { progress: 100, total: totalEpisodes, isGuessed: false };
             }
         }
 
+        if (episodeCount >= totalEpisodes) {
+            return { progress: 100, total: totalEpisodes, isGuessed: false };
+        }
+
         const progress = (episodeCount / totalEpisodes) * 100;
-
-        // For multi-season anime, we always use guessed totals per season
-        const isMultiSeason =
-            this.isMultiSeasonAnime(slug) ||
-            this.isMultiSeasonTitle(anime?.title);
-
-        const normalizedSlug = slug.toLowerCase();
-
-        // Check for known totals - including Naruto and Initial D special cases
-        let hasKnownTotal = this.MANUAL_EPISODE_COUNTS[normalizedSlug];
-
-        // For Naruto and Initial D, only mark as NOT guessed if user has watched all episodes
-        if (!hasKnownTotal && normalizedSlug.startsWith('naruto')) {
-            // Only show green (not guessed) if episodeCount >= totalEpisodes (completed the season)
-            hasKnownTotal = (episodeCount >= totalEpisodes);
-        }
-
-        if (!hasKnownTotal && normalizedSlug.startsWith('initial-d')) {
-            // Only show green (not guessed) if episodeCount >= totalEpisodes (completed the stage)
-            hasKnownTotal = (episodeCount >= totalEpisodes);
-        }
-
-        if (!hasKnownTotal && !isMultiSeason) {
-            hasKnownTotal = this.KNOWN_ANIME_TOTALS[normalizedSlug] ||
-                (anime && anime.totalEpisodes) ||
-                (this.episodeTypesCache[slug] && this.episodeTypesCache[slug].totalEpisodes);
-        }
+        const hasKnownTotal = window.AnimeTracker?.AnilistService?.getTotalEpisodes(slug.toLowerCase()) != null
+            || (anime && Number.isFinite(anime.totalEpisodes) && anime.totalEpisodes > 0);
 
         return {
             progress: Math.min(progress, 100),
             total: totalEpisodes,
             isGuessed: !hasKnownTotal
         };
+    },
+
+    /**
+     * Clear cached filler data for a specific slug (in-memory + storage).
+     * Useful when a show gets a filler list added to animefillerlist.com and
+     * the notFound entry would otherwise block re-fetching for 7 days.
+     *
+     * @param {string} animeSlug  - the an1me.to slug
+     * @param {boolean} [persist=true] - also remove from chrome.storage.local
+     * @returns {Promise<void>}
+     */
+    async clearCache(animeSlug, persist = true) {
+        const { Storage } = window.AnimeTracker;
+        const { Logger } = window.AnimeTracker;
+
+        delete this.episodeTypesCache[animeSlug];
+
+        if (persist) {
+            try {
+                await Storage.remove([`episodeTypes_${animeSlug}`]);
+                await new Promise((resolve) => {
+                    chrome.runtime.sendMessage(
+                        { type: 'CLEAR_FILLER_CACHE', animeSlug },
+                        () => { chrome.runtime.lastError; resolve(); }
+                    );
+                });
+                Logger.success(`Cleared filler cache for ${animeSlug}`);
+            } catch (e) {
+                Logger.warn(`Failed to clear filler storage for ${animeSlug}:`, e);
+            }
+        }
     },
 
     /**

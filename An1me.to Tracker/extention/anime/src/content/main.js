@@ -26,22 +26,12 @@
 
     /**
      * Shared helper: write a completed episode into animeData synchronously.
-     * Used by both trackImmediately() and handleBeforeUnload() to avoid duplicated logic.
-     *
-     * @param {object} info      - animeInfo object
-     * @param {number} duration  - video duration in seconds
-     * @param {object} animeData - mutable animeData from storage
-     * @param {string} logPrefix - label for log messages ('Immediate' | 'beforeunload')
-     * @returns {boolean} true if the episode was newly written, false if already existed
+     * Used by trackImmediately() to avoid Chrome storage async limitations.
      */
     function writeSyncEpisode(info, duration, animeData, logPrefix) {
         const { Logger } = AT;
 
         if (!animeData[info.animeSlug]) {
-            // When encountering a new anime slug for the first time, initialise the
-            // record with the provided metadata. Include the coverImage if it exists
-            // in the parsed info. Without this, only episodes and watch time are
-            // stored, which would cause the popup to miss the cover image.
             animeData[info.animeSlug] = {
                 title: info.animeTitle,
                 slug: info.animeSlug,
@@ -53,9 +43,6 @@
             };
         }
 
-        // If a cover image was parsed and the stored anime record does not yet
-        // have one, persist it. We deliberately do not overwrite an existing
-        // coverImage to avoid replacing a user-edited or previously saved image.
         if (!animeData[info.animeSlug].coverImage && info.coverImage) {
             animeData[info.animeSlug].coverImage = info.coverImage;
         }
@@ -77,7 +64,6 @@
             animeData[info.animeSlug].episodes = [];
         }
 
-        // Validate duration (allow long movies; cap only extreme outliers)
         const MAX_REASONABLE_DURATION_SECONDS = 6 * 60 * 60;
         let validDuration = Math.round(Number(duration) || 0);
         if (!Number.isFinite(validDuration) || validDuration <= 0) {
@@ -123,10 +109,6 @@
         animeData[info.animeSlug].totalWatchTime =
             (animeData[info.animeSlug].totalWatchTime || 0) + validDuration;
 
-        // Double episode: also save the second episode (e.g. ep 119 + 120)
-        // NOTE: We intentionally do NOT add validDuration again to totalWatchTime here.
-        // Both episodes share the same combined video file, so the duration has already
-        // been counted once above. Adding it again would double-count watch time.
         if (info.isDoubleEpisode && info.secondEpisodeNumber) {
             const alreadyHasSecond = animeData[info.animeSlug].episodes
                 .some(ep => ep.number === info.secondEpisodeNumber);
@@ -137,7 +119,6 @@
                     duration: validDuration,
                     durationSource: 'video'
                 });
-                // totalWatchTime already includes validDuration from the first episode push above.
             }
         }
 
@@ -147,14 +128,13 @@
     }
 
     /**
-     * Immediately track episode (no debounce, synchronous)
-     * Used when we need to track RIGHT NOW before navigation
+     * Immediately track episode (no debounce, synchronous storage path).
+     * Used when we need to track RIGHT NOW before navigation.
      */
     function trackImmediately() {
         const { Logger, ProgressTracker, VideoMonitor, Notifications } = AT;
         const videoElement = VideoMonitor.getVideoElement();
 
-        // Guard: already tracked, no info, no video, or another call already in flight
         if (!animeInfo || isTracked || !videoElement || isTrackingImmediate) return;
 
         const duration    = videoElement.duration;
@@ -162,7 +142,6 @@
 
         if (!duration || !ProgressTracker.shouldMarkComplete(currentTime, duration)) return;
 
-        // Lock immediately before the async storage read to prevent race conditions
         isTrackingImmediate = true;
         isTracked = true;
 
@@ -183,7 +162,6 @@
                             Logger.success('✓ Immediate track successful');
                             Notifications.showCompletion(animeInfo);
 
-                            // Clear in-progress record
                             chrome.storage.local.get(['videoProgress'], (progressResult) => {
                                 if (!chrome.runtime.lastError) {
                                     const videoProgress = progressResult.videoProgress || {};
@@ -203,9 +181,6 @@
         }
     }
 
-    /**
-     * Debounce function
-     */
     function debounce(func, wait) {
         let timeout;
         return function executedFunction(...args) {
@@ -218,7 +193,6 @@
         };
     }
 
-    // Track if we've already done the early track for this episode
     let earlyTrackDone = false;
 
     async function tryRefreshTrackedDuration(videoElement, reason = 'metadata') {
@@ -250,23 +224,21 @@
     }
 
     /**
-     * Raw timeupdate handler for early/immediate tracking
-     * This runs WITHOUT debounce to catch the threshold moment
+     * Raw timeupdate handler — runs WITHOUT debounce to catch the threshold moment.
      */
     const handleTimeUpdateRaw = async () => {
         const { ProgressTracker, VideoMonitor, Logger } = AT;
         const videoElement = VideoMonitor.getVideoElement();
-        
+
         if (!videoElement || isTracked || earlyTrackDone || !animeInfo) return;
-        
+
         const duration = videoElement.duration;
         const currentTime = videoElement.currentTime;
-        
+
         if (!duration || duration === 0 || isNaN(duration)) return;
 
         await tryRefreshTrackedDuration(videoElement, 'timeupdate');
-        
-        // Check if we've hit the threshold
+
         if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
             earlyTrackDone = true;
             Logger.info('Threshold reached, tracking immediately (no debounce)');
@@ -280,16 +252,12 @@
         await tryRefreshTrackedDuration(videoElement, 'loadedmetadata');
     };
 
-    /**
-     * Handle video time update
-     */
     const handleTimeUpdate = debounce(async function() {
         const { CONFIG, Logger, ProgressTracker, VideoMonitor } = AT;
         const videoElement = VideoMonitor.getVideoElement();
-        
+
         if (!videoElement || isTracked || !animeInfo) return;
 
-        // Check if episode changed
         if (currentEpisodeId && currentEpisodeId !== animeInfo.uniqueId) {
             Logger.info('Episode changed, resetting isTracked');
             isTracked = false;
@@ -301,12 +269,10 @@
 
         if (!duration || duration === 0 || isNaN(duration)) return;
 
-        // Save progress if not yet complete
         if (currentTime > CONFIG.MIN_PROGRESS_TO_SAVE && !ProgressTracker.shouldMarkComplete(currentTime, duration)) {
             ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration);
         }
 
-        // Check if should mark as complete
         if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
             if (isTrackingInProgress) {
                 Logger.debug('Tracking already in progress, skipping');
@@ -361,39 +327,29 @@
         }
     }, AT.CONFIG.DEBOUNCE_DELAY);
 
-    /**
-     * Handle video pause
-     */
     const handlePause = () => {
         const { ProgressTracker, VideoMonitor } = AT;
         const videoElement = VideoMonitor.getVideoElement();
-        
+
         if (animeInfo && !isTracked && videoElement && videoElement.currentTime > 0) {
             ProgressTracker.saveVideoProgress(animeInfo.uniqueId, videoElement.currentTime, videoElement.duration, true);
         }
     };
 
-    /**
-     * Handle video seeked
-     */
     const handleSeeked = () => {
         const { ProgressTracker, VideoMonitor } = AT;
         const videoElement = VideoMonitor.getVideoElement();
-        
+
         if (animeInfo && !isTracked && videoElement && videoElement.currentTime > 0) {
             ProgressTracker.saveVideoProgress(animeInfo.uniqueId, videoElement.currentTime, videoElement.duration, false);
         }
     };
 
-    /**
-     * Handle video ended
-     */
     const handleEnded = async () => {
         const { Logger, ProgressTracker, VideoMonitor, Notifications } = AT;
         const videoElement = VideoMonitor.getVideoElement();
 
         if (animeInfo && videoElement) {
-            // Always show notification when episode ends, even if already tracked
             if (isTracked) {
                 Logger.info('Episode ended (already tracked), showing notification');
                 Notifications.showCompletion(animeInfo);
@@ -406,7 +362,6 @@
                 try {
                     await ProgressTracker.saveWatchedEpisode(animeInfo, videoElement.duration);
                     await ProgressTracker.clearSavedProgress(animeInfo.uniqueId);
-                    // Notification is shown by saveWatchedEpisode
                 } catch (error) {
                     Logger.error('End track failed', error);
                 }
@@ -419,20 +374,16 @@
                 } catch (error) {
                     Logger.warn('Failed to refresh duration on end:', error);
                 }
-                // Episode was already tracked, but video just ended - show notification
                 Logger.info('Episode ended (was tracked before), showing notification');
                 Notifications.showCompletion(animeInfo);
             }
         }
     };
 
-    /**
-     * Handle visibility change
-     */
     const handleVisibilityChange = async () => {
         const { Logger, ProgressTracker, VideoMonitor } = AT;
         const videoElement = VideoMonitor.getVideoElement();
-        
+
         if (document.hidden && animeInfo && !isTracked && videoElement && videoElement.currentTime > 0) {
             const duration = videoElement.duration;
             const currentTime = videoElement.currentTime;
@@ -465,84 +416,41 @@
         }
     };
 
-    /**
-     * Handle before unload
-     */
     const handleBeforeUnload = () => {
-        const { Logger, ProgressTracker, VideoMonitor, Notifications } = AT;
+        const { Logger, ProgressTracker, VideoMonitor } = AT;
         const videoElement = VideoMonitor.getVideoElement();
 
-        if (animeInfo && !isTracked && videoElement && videoElement.currentTime > 0) {
-            const duration = videoElement.duration;
-            const currentTime = videoElement.currentTime;
+        if (!animeInfo || !videoElement || videoElement.currentTime <= 0) return;
 
-            if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
-                isTracked = true;
+        const duration = videoElement.duration;
+        const currentTime = videoElement.currentTime;
 
-                try {
-                    // Ask background SW to persist the episode as an unload-safe path.
-                    // We keep the local storage write below as an additional fallback.
-                    chrome.runtime.sendMessage({
-                        type: 'TRACK_BEFORE_UNLOAD',
-                        animeInfo: {
-                            animeSlug: animeInfo.animeSlug,
-                            animeTitle: animeInfo.animeTitle,
-                            episodeNumber: animeInfo.episodeNumber,
-                            secondEpisodeNumber: animeInfo.secondEpisodeNumber,
-                            isDoubleEpisode: animeInfo.isDoubleEpisode,
-                            uniqueId: animeInfo.uniqueId,
-                            totalEpisodes: animeInfo.totalEpisodes,
-                            coverImage: animeInfo.coverImage
-                        },
-                        duration
-                    }, () => {
-                        // Consume lastError to avoid noisy "Unchecked runtime.lastError"
-                        // if the runtime is unavailable during teardown.
-                        void chrome.runtime.lastError;
-                    });
-                } catch {
-                    // Ignore runtime errors during teardown.
-                }
+        if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
+            if (isTracked) return;
 
-                try {
-                    chrome.storage.local.get(['animeData'], (result) => {
-                        if (chrome.runtime.lastError) {
-                            Logger.warn('beforeunload: Failed to get animeData');
-                            return;
-                        }
+            isTracked = true;
 
-                        const animeData = result.animeData || {};
-                        const written = writeSyncEpisode(animeInfo, duration, animeData, 'beforeunload');
-
-                        if (written) {
-                            chrome.storage.local.set({ animeData }, () => {
-                                if (!chrome.runtime.lastError) {
-                                    Logger.success('✓ Tracked on beforeunload (synchronous)');
-                                    Notifications.showCompletion(animeInfo);
-
-                                    chrome.storage.local.get(['videoProgress'], (progressResult) => {
-                                        if (!chrome.runtime.lastError) {
-                                            const videoProgress = progressResult.videoProgress || {};
-                                            delete videoProgress[animeInfo.uniqueId];
-                                            chrome.storage.local.set({ videoProgress });
-                                        }
-                                    });
-                                }
-                            });
-                        } else {
-                            Logger.debug('Episode already tracked in beforeunload');
-                        }
-                    });
-                } catch (error) {
-                    Logger.error('beforeunload sync save failed:', error);
-                }
-            } else {
-                ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration, true);
-            }
+            try {
+                chrome.runtime.sendMessage({
+                    type: 'TRACK_BEFORE_UNLOAD',
+                    animeInfo: {
+                        animeSlug:          animeInfo.animeSlug,
+                        animeTitle:         animeInfo.animeTitle,
+                        episodeNumber:      animeInfo.episodeNumber,
+                        secondEpisodeNumber: animeInfo.secondEpisodeNumber,
+                        isDoubleEpisode:    animeInfo.isDoubleEpisode,
+                        uniqueId:           animeInfo.uniqueId,
+                        totalEpisodes:      animeInfo.totalEpisodes,
+                        coverImage:         animeInfo.coverImage
+                    },
+                    duration
+                }, () => { void chrome.runtime.lastError; });
+            } catch {}
+        } else {
+            ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration, true);
         }
     };
 
-    // Event handlers object
     const eventHandlers = {
         handleTimeUpdate,
         handleTimeUpdateRaw,
@@ -554,22 +462,15 @@
         handleBeforeUnload
     };
 
-    // ─── Utility: Compute base slug for grouping ──────────────────────────
-    // Groups anime by removing season/part indicators and special cases. This
-    // replicates the logic used in the popup's SeasonGrouping.getBaseSlug() but
-    // simplified for use in the content script. It returns a consistent base
-    // slug used to map multiple seasons (e.g. "naruto-shippuuden" → "naruto").
     function getBaseSlug(slug) {
         if (!slug || typeof slug !== 'string') return slug || '';
         const lower = slug.toLowerCase();
-        // Special cases – group all related seasons under a single slug
         if (lower.startsWith('naruto')) return 'naruto';
         if (lower.startsWith('one-punch-man')) return 'one-punch-man';
         if (lower.startsWith('kimetsu-no-yaiba')) return 'kimetsu-no-yaiba';
         if (lower.startsWith('shingeki-no-kyojin')) return 'shingeki-no-kyojin';
         if (lower.startsWith('initial-d')) return 'initial-d';
         if (lower.startsWith('bleach')) return 'bleach';
-        // Generic: strip season/part indicators, years, roman numerals, and arc suffixes
         return lower
             .replace(/-season-?\d+(-[a-z-]+)?$/i, '')
             .replace(/-s\d+$/i, '')
@@ -580,20 +481,15 @@
             .replace(/-[a-z]+-hen$/i, '');
     }
 
-    /**
-     * Initialize tracker
-     */
     async function init() {
         const { Logger, AnimeParser, ProgressTracker, VideoMonitor, Notifications } = AT;
-        
+
         Logger.info('Init', window.location.pathname);
 
-        // Cleanup
         VideoMonitor.cleanup();
         Notifications.cleanup();
         ProgressTracker.reset();
 
-        // Reset state
         isTracked = false;
         isTrackingInProgress = false;
         isTrackingImmediate = false;
@@ -608,30 +504,18 @@
             return;
         }
 
-        // ── Persist cover image on first page load (even if episode not completed) ──
-        // If the current anime exists in storage but lacks a cover image, and the
-        // parser was able to extract one, update the stored record. This ensures
-        // that posters appear for partially watched anime (those with in-progress
-        // episodes) without requiring the episode to be marked as completed.
         const hasDetectedTotal = Number.isFinite(animeInfo.totalEpisodes) &&
             animeInfo.totalEpisodes > 0 &&
             animeInfo.totalEpisodes < 10000;
 
         if (animeInfo.coverImage || hasDetectedTotal) {
             try {
-                // Fetch animeData and groupCoverImages together. If the current
-                // anime exists, update its cover image. If it doesn't exist, create
-                // a minimal entry so that posters appear even for in-progress anime.
-                // Also compute the baseSlug and persist a group cover image if not
-                // already stored for this group. This ensures group cards show a
-                // consistent poster across all seasons, and avoids overwriting once
-                // a group cover has been set.
                 chrome.storage.local.get(['animeData', 'groupCoverImages'], (result) => {
                     if (chrome.runtime.lastError) return;
                     const animeData = result.animeData || {};
                     const groupCoverImages = result.groupCoverImages || {};
                     const slug = animeInfo.animeSlug;
-                    // Update or create anime entry with cover image
+
                     if (animeData[slug]) {
                         if (!animeData[slug].coverImage) {
                             animeData[slug].coverImage = animeInfo.coverImage;
@@ -657,10 +541,6 @@
                         };
                     }
 
-                    // Determine the group base slug for this anime and set group cover
-                    // only if it hasn't been set previously. This uses the utility
-                    // defined above. We don't overwrite an existing group cover to
-                    // respect the user's request to keep the first assigned cover.
                     try {
                         const baseSlug = getBaseSlug(slug);
                         if (animeInfo.coverImage && !groupCoverImages[baseSlug]) {
@@ -673,7 +553,6 @@
                     chrome.storage.local.set({ animeData, groupCoverImages });
                 });
             } catch (e) {
-                // Silent catch: storage errors should not block init
                 Logger.warn('Cover image update failed:', e);
             }
         }
@@ -681,17 +560,14 @@
         Logger.info(`Detected: ${animeInfo.animeTitle} Ep${animeInfo.episodeNumber}`);
         Logger.debug(`ID: ${animeInfo.uniqueId}`);
 
-        // Check if already tracked
         const alreadyTracked = await ProgressTracker.isEpisodeTracked(animeInfo.uniqueId);
         if (alreadyTracked) {
             isTracked = true;
             Logger.debug('Already tracked (monitoring metadata for duration refresh)');
         }
 
-        // Start watching for video
         VideoMonitor.startWatching(animeInfo, eventHandlers);
 
-        // Periodic check to catch missed episodes (every 5 seconds)
         const periodicCheck = setInterval(() => {
             if (isTracked || !animeInfo) {
                 clearInterval(periodicCheck);
@@ -711,10 +587,8 @@
             }
         }, 5000);
 
-        // Cleanup interval after 30 minutes
         const periodicCheckTimeout = setTimeout(() => clearInterval(periodicCheck), 30 * 60 * 1000);
 
-        // Register for cleanup on navigation - prevents interval leak across episodes
         VideoMonitor.addCleanup(() => {
             clearInterval(periodicCheck);
             clearTimeout(periodicCheckTimeout);
@@ -737,17 +611,15 @@
 
     const setupNavigationObserver = () => {
         const { Logger, ProgressTracker, VideoMonitor } = AT;
-        
+
         if (navigationObserver) {
             navigationObserver.disconnect();
         }
 
-        // Single merged click listener: handles an1me.to nav, generic nav patterns, and any outbound link
         document.addEventListener('click', (e) => {
             const target = e.target.closest('[data-open-nav-episode], .episode-navigation, .next-episode, .prev-episode, .episode-list-item, a, button');
             if (!target) return;
 
-            // Check if it's a navigation element specific to an1me.to
             const isAn1meNav =
                 target.hasAttribute('data-open-nav-episode') ||
                 target.classList.contains('episode-navigation') ||
@@ -763,14 +635,12 @@
                 return;
             }
 
-            // Check for any outbound link click
             const link = e.target.closest('a[href]');
             if (link && link.href && link.href !== location.href) {
                 trackImmediately();
                 return;
             }
 
-            // Fallback: generic navigation patterns
             const href = target.getAttribute('href') || '';
             const text = (target.textContent || '').toLowerCase();
             const className = (target.className || '').toLowerCase();
@@ -794,7 +664,6 @@
         navigationObserver = new MutationObserver(() => {
             if (location.href === lastUrl) return;
 
-            // Track before URL change is processed
             trackImmediately();
 
             if (navigationDebounceTimeout) {
@@ -806,7 +675,6 @@
                     lastUrl = location.href;
                     Logger.info('URL changed, reinit...');
 
-                    // Reset state
                     isTracked = false;
                     isTrackingInProgress = false;
                     currentEpisodeId = null;
@@ -830,7 +698,6 @@
             });
         }
 
-        // Add cleanup
         VideoMonitor.addCleanup(() => {
             if (navigationDebounceTimeout) {
                 clearTimeout(navigationDebounceTimeout);

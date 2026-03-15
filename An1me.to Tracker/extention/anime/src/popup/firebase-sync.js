@@ -3,8 +3,6 @@
  * Handles Firebase authentication and cloud synchronization
  */
 
-// Merge helpers are provided by AnimeTracker.MergeUtils (see src/common/merge-utils.js).
-
 const FirebaseSync = {
     // State
     currentUser: null,
@@ -93,9 +91,6 @@ const FirebaseSync = {
         
         if (!this.currentUser) return Promise.resolve();
 
-        // Fix: Use the new data directly instead of merging.
-        // This ensures that if items were deleted in 'data', they are removed from 'pendingSave' too.
-        // Merging would keep the old keys (deleted items) in pendingSave, causing them to be resurrected.
         this.pendingSave = this.cloneSyncData(data);
 
         if (this.saveToCloudTimeout) {
@@ -125,11 +120,7 @@ const FirebaseSync = {
         if (this.isSavingToCloud) {
             console.log('[Firebase] Save in progress, waiting...');
             if (this.currentSavePromise) {
-                try {
-                    await this.currentSavePromise;
-                } catch {
-                    // Ignore errors from previous save
-                }
+                try { await this.currentSavePromise; } catch {}
             }
             if (this.pendingSave) {
                 await new Promise(resolve => setTimeout(resolve, 100));
@@ -224,7 +215,6 @@ const FirebaseSync = {
         
         if (!this.currentUser) return null;
 
-        // Show syncing status
         if (elements?.syncStatus) {
             elements.syncStatus.classList.remove('synced');
             elements.syncStatus.classList.add('syncing');
@@ -232,19 +222,16 @@ const FirebaseSync = {
         }
 
         try {
-            // On Orion/mobile (no background service worker), push local videoProgress
-            // to cloud BEFORE fetching, so we don't lose progress saved by content scripts
+            // On Orion/mobile (no SW), push local videoProgress before fetching
+            // to avoid losing progress saved by content scripts.
             const localSnapshot = await Storage.get(['videoProgress', 'userId']);
             if (localSnapshot.userId === this.currentUser.uid && localSnapshot.videoProgress && Object.keys(localSnapshot.videoProgress).length > 0) {
                 try {
-                    // Read current cloud doc and merge, don't overwrite
                     const currentCloud = await FirebaseLib.getDocument('users', this.currentUser.uid);
                     if (currentCloud) {
                         const cloudVP = currentCloud.videoProgress || {};
                         const localVP = localSnapshot.videoProgress;
-                        // Full merge delegated to shared MergeUtils (soft-delete + currentTime aware)
                         const merged = AnimeTracker.MergeUtils.mergeVideoProgress(localVP, cloudVP);
-                        // Only update if there are actual changes
                         const hasChanges = Object.entries(merged).some(([id, val]) => {
                             return !cloudVP[id] || val.currentTime !== cloudVP[id].currentTime;
                         });
@@ -262,7 +249,6 @@ const FirebaseSync = {
                 }
             }
 
-            // Get cloud data with retry
             let cloudData = null;
             let retryCount = 0;
             const maxRetries = 3;
@@ -288,14 +274,16 @@ const FirebaseSync = {
             if (cloudData) {
                 const shouldMerge = localData.userId === this.currentUser.uid;
 
-                // Merge deletedAnime logs from both sides (union, keep newest deletedAt)
                 const mergedDeletedAnime = AnimeTracker.MergeUtils.mergeDeletedAnime(
                     localData.deletedAnime || {},
                     cloudData.deletedAnime || {}
                 );
 
                 if (shouldMerge && localData.animeData && Object.keys(localData.animeData).length > 0) {
-                    finalData = ProgressManager.mergeData(localData, cloudData);
+                    finalData = {
+                        animeData:     AnimeTracker.MergeUtils.mergeAnimeData(localData.animeData || {}, cloudData.animeData || {}),
+                        videoProgress: AnimeTracker.MergeUtils.mergeVideoProgress(localData.videoProgress || {}, cloudData.videoProgress || {})
+                    };
                     console.log('[Sync] Merged episodes:', UIHelpers.countEpisodes(finalData.animeData));
                 } else {
                     finalData = {
@@ -305,27 +293,18 @@ const FirebaseSync = {
                     finalData.animeData = ProgressManager.removeDuplicateEpisodes(finalData.animeData);
                 }
 
-                // Merge groupCoverImages: prefer local keys over cloud keys to preserve posters
+                // Prefer local covers to preserve user-set posters
                 const localGroupCovers = localData.groupCoverImages || {};
                 const cloudGroupCovers = cloudData.groupCoverImages || {};
                 const mergedGroupCovers = { ...cloudGroupCovers, ...localGroupCovers };
 
-                // videoProgress is already correctly merged by ProgressManager.mergeData:
-                // it uses currentTime as the primary conflict resolver (higher wins),
-                // with savedAt as tiebreaker, and honours soft-delete flags.
-                // No additional override needed here.
-
-                // Apply deletedAnime: remove any anime that was deleted after its last watch
                 AnimeTracker.MergeUtils.applyDeletedAnime(finalData.animeData, mergedDeletedAnime);
                 finalData.deletedAnime = mergedDeletedAnime;
 
-                const { cleaned: cleanedProgress } = 
+                const { cleaned: cleanedProgress } =
                     ProgressManager.cleanTrackedProgress(finalData.animeData, finalData.videoProgress);
                 finalData.videoProgress = cleanedProgress;
-                
-                finalData.videoProgress = ProgressManager.cleanOrphanedProgress(finalData.animeData, finalData.videoProgress);
 
-                // Attach merged group covers to finalData before saving
                 finalData.groupCoverImages = mergedGroupCovers;
                 await Storage.set({
                     animeData: finalData.animeData,
@@ -375,7 +354,6 @@ const FirebaseSync = {
                 }
             }
 
-            // Load cached episode types
             await FillerService.loadCachedEpisodeTypes(finalData.animeData);
 
             if (elements?.syncStatus) {

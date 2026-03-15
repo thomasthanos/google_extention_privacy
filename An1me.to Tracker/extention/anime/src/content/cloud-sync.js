@@ -1,17 +1,11 @@
 /**
  * Anime Tracker - Content Script Cloud Sync
  *
- * Responsibilities (Chrome with background SW):
- *   1. Keep the background SW alive via a persistent keepAlive port.
- *   2. Whenever videoProgress is saved locally, wake up the SW so it can
- *      push it to Firestore immediately (instead of waiting for an alarm).
- *   3. If the SW does NOT respond (e.g. crashed/disabled), fall back to
- *      pushing directly from the content script using a field-mask PATCH.
+ * Chrome + SW: keeps the SW alive, wakes it on progress changes, falls back
+ * to direct Firestore PATCH if the SW is unavailable.
  *
- * Responsibilities (Orion / Safari — no SW):
- *   1. Open a Firestore SSE "Listen" stream for real-time pull.
- *   2. Push all local changes directly to Firestore.
- *   3. Reconnect automatically with exponential back-off.
+ * Orion / Safari (no SW): opens a Firestore SSE stream for real-time pull,
+ * pushes changes directly, reconnects with exponential back-off.
  */
 (function () {
     'use strict';
@@ -20,6 +14,8 @@
     const FIREBASE_PROJECT_ID = 'anime-tracker-64d86';
     const FIRESTORE_BASE      = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)`;
     const LISTEN_URL          = `${FIRESTORE_BASE}/documents:listen`;
+
+    const Logger = window.AnimeTrackerContent?.Logger;
 
     let initialized      = false;
     let listenAbortCtrl  = null;
@@ -30,9 +26,7 @@
     const MAX_RECONNECT  = 60000;
     let teardownSyncTriggered = false;
 
-    // ─── Sync pause guard (mirrors background.js pauseSync) ──────────────────
-    // Prevents the storage onChanged listener from re-triggering a push
-    // immediately after we write cloud data back to local storage (infinite loop).
+    // ─── Sync pause guard ─────────────────────────────────────────────────────
     let csSyncPausedUntil = 0;
     function csPauseSync(ms = 4000) {
         csSyncPausedUntil = Math.max(csSyncPausedUntil, Date.now() + ms);
@@ -99,7 +93,6 @@
             const ap = aObj[id];
             const bp = bObj[id];
             if (!bp) return false;
-
             if ((ap.currentTime || 0) !== (bp.currentTime || 0)) return false;
             if ((ap.duration || 0) !== (bp.duration || 0)) return false;
             if ((ap.percentage || 0) !== (bp.percentage || 0)) return false;
@@ -138,6 +131,19 @@
 
     // ─── Token ────────────────────────────────────────────────────────────────
 
+    async function signOutDueToTokenFailure() {
+        Logger?.warn('Token refresh failed — signing out to force re-auth');
+        try {
+            await chrome.storage.local.remove(['firebase_tokens', 'firebase_user']);
+        } catch (e) {
+            Logger?.warn(`Failed to clear auth storage during sign-out: ${e.message}`);
+        }
+        if (listenAbortCtrl) listenAbortCtrl.abort();
+        if (reconnectTimeout) { clearTimeout(reconnectTimeout); reconnectTimeout = null; }
+        currentToken = null;
+        currentUser  = null;
+    }
+
     async function refreshToken(rt) {
         try {
             const res = await fetch(
@@ -166,7 +172,14 @@
             const s = await chrome.storage.local.get(['firebase_tokens']);
             const t = s.firebase_tokens;
             if (!t?.idToken) return null;
-            if (t.expiresAt < Date.now() + 120000) return await refreshToken(t.refreshToken);
+            if (t.expiresAt < Date.now() + 120000) {
+                const newIdToken = await refreshToken(t.refreshToken);
+                if (!newIdToken) {
+                    await signOutDueToTokenFailure();
+                    return null;
+                }
+                return newIdToken;
+            }
             return t.idToken;
         } catch { return null; }
     }
@@ -178,9 +191,7 @@
         } catch { return null; }
     }
 
-    // ─── Merge helpers (delegated to src/content/merge-utils.js) ─────────────
-    // merge-utils.js loads before this file (see manifest.json) and registers
-    // all four helpers on window.AnimeTrackerContent.MergeUtils.
+    // ─── Merge helpers ────────────────────────────────────────────────────────
 
     const {
         mergeAnimeData,
@@ -192,14 +203,11 @@
 
     // ─── Direct push to Firestore (fallback when SW unavailable) ─────────────
 
-    // Merged push: fetch cloud videoProgress, merge (higher currentTime + soft-delete
-    // awareness), then write the result back. Prevents wiping progress written by
-    // another device.
-    let lastPushedProgress    = null;
-    let isPushingProgressDirect = false; // guard against concurrent calls (#5)
+    let lastPushedProgress      = null;
+    let isPushingProgressDirect = false;
 
     async function pushProgressDirect() {
-        if (isPushingProgressDirect) return; // already in-flight
+        if (isPushingProgressDirect) return;
         const token = await getValidToken();
         const user  = currentUser || await getUser();
         if (!token || !user) return;
@@ -209,30 +217,23 @@
             const local   = await chrome.storage.local.get(['videoProgress']);
             const localVP = local.videoProgress || {};
             const snapshot = JSON.stringify(localVP);
-            if (snapshot === lastPushedProgress) return; // nothing changed
+            if (snapshot === lastPushedProgress) return;
 
-            // Fetch cloud so we can merge — prevents overwriting another device's progress
             const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
             let cloudVP = {};
             try {
                 const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
                 if (r.ok) cloudVP = fromFSDoc(await r.json())?.videoProgress || {};
-            } catch {
-                // Cloud fetch is best-effort; continue with local-only payload.
-            }
+            } catch {}
 
             const mergedVP = mergeVideoProgress(localVP, cloudVP);
 
-            // Write back locally if cloud had additional entries from another device.
-            // csPauseSync() MUST be called before the write to prevent the storage
-            // onChanged listener from seeing this write and scheduling another push
-            // (which would create an infinite push → write-back → push loop).
             const localCount  = Object.keys(localVP).length;
             const mergedCount = Object.keys(mergedVP).length;
             if (mergedCount > localCount) {
                 csPauseSync();
                 await chrome.storage.local.set({ videoProgress: mergedVP });
-                console.log(`[CS-Sync] ✓ Pulled ${mergedCount - localCount} new progress entries from cloud`);
+                Logger?.info(`Pulled ${mergedCount - localCount} new progress entries from cloud`);
             }
 
             const updateMask = 'updateMask.fieldPaths=videoProgress&updateMask.fieldPaths=lastUpdated';
@@ -249,22 +250,19 @@
 
             if (res.ok) {
                 lastPushedProgress = JSON.stringify(mergedVP);
-                console.log('[CS-Sync] ✓ videoProgress pushed (merged)');
+                Logger?.info('videoProgress pushed (merged)');
             } else {
-                console.warn('[CS-Sync] Direct progress push failed:', res.status);
+                Logger?.warn(`Direct progress push failed: ${res.status}`);
             }
         } catch (e) {
-            console.warn('[CS-Sync] Direct progress push error:', e.message);
+            Logger?.warn(`Direct progress push error: ${e.message}`);
         } finally {
             isPushingProgressDirect = false;
         }
     }
 
-    // Full push: animeData + videoProgress (Orion / no-SW mode only)
     let fullPushInProgress = false;
     let fullPushPending    = false;
-    // Snapshot of the last successfully uploaded full state.
-    // Avoids redundant uploads when nothing changed (e.g. right after a cloud pull).
     let lastPushedFullSnap = null;
 
     async function pushFullDirect() {
@@ -275,21 +273,15 @@
 
         fullPushInProgress = true;
         try {
-            // Fetch local animeData, videoProgress, deletedAnime and groupCoverImages.
-            // We need group covers so they are synced to the cloud when the SW is unavailable.
             const local = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
 
-            // Fetch cloud to safely merge animeData (keep episodes from both sides)
-            const url       = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
-            let cloudData   = null;
+            const url     = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
+            let cloudData = null;
             try {
                 const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
                 if (r.ok) cloudData = fromFSDoc(await r.json());
-            } catch {
-                // If cloud fetch fails, push using local snapshot only.
-            }
+            } catch {}
 
-            // Merge deletedAnime first so we can apply it before uploading.
             const mergedDeleted = cloudData?.deletedAnime
                 ? mergeDeletedAnime(local.deletedAnime || {}, cloudData.deletedAnime)
                 : (local.deletedAnime || {});
@@ -298,27 +290,21 @@
                 ? mergeAnimeData(local.animeData || {}, cloudData.animeData)
                 : { ...(local.animeData || {}) };
 
-            // Apply cross-device deletions before uploading.
             applyDeletedAnime(mergedAnime, mergedDeleted);
 
             const mergedProgress = cloudData?.videoProgress
                 ? mergeVideoProgress(local.videoProgress || {}, cloudData.videoProgress)
                 : (local.videoProgress || {});
 
-            // Merge group cover images: local always wins (see mergeGroupCoverImages for policy).
-            const localGroupCovers  = local.groupCoverImages       || {};
+            const localGroupCovers  = local.groupCoverImages      || {};
             const cloudGroupCovers  = cloudData?.groupCoverImages  || {};
             const mergedGroupCovers = mergeGroupCoverImages(localGroupCovers, cloudGroupCovers);
 
-            // Write back locally if cloud had more / different data.
-            // csPauseSync() MUST be called before the write to prevent the storage
-            // onChanged listener from seeing this write and scheduling another push
-            // (which would create an infinite push → write-back → push loop).
             const localEps  = Object.values(local.animeData || {}).reduce((s, a) => s + (a.episodes?.length || 0), 0);
             const mergedEps = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
             const progressDiff = !areProgressMapsEqual(local.videoProgress || {}, mergedProgress);
-            const deletedDiff = !shallowEqualDeletedAnime(local.deletedAnime || {}, mergedDeleted);
-            const groupDiff   = !shallowEqualStringMap(local.groupCoverImages || {}, mergedGroupCovers);
+            const deletedDiff  = !shallowEqualDeletedAnime(local.deletedAnime || {}, mergedDeleted);
+            const groupDiff    = !shallowEqualStringMap(local.groupCoverImages || {}, mergedGroupCovers);
             if (mergedEps > localEps || progressDiff || deletedDiff || groupDiff) {
                 csPauseSync();
                 await chrome.storage.local.set({
@@ -329,10 +315,9 @@
                 });
             }
 
-            // Skip upload if the merged payload is identical to what we last pushed.
             const uploadSnap = JSON.stringify({ mergedAnime, mergedProgress, mergedDeleted, mergedGroupCovers });
             if (uploadSnap === lastPushedFullSnap) {
-                console.log('[CS-Sync] Full push skipped (no changes since last push)');
+                Logger?.debug('Full push skipped (no changes since last push)');
                 return;
             }
 
@@ -353,12 +338,12 @@
 
             if (res.ok) {
                 lastPushedFullSnap = uploadSnap;
-                console.log('[CS-Sync] ✓ Full push to Firestore');
+                Logger?.info('Full push to Firestore complete');
             } else {
-                console.warn('[CS-Sync] Full push failed:', res.status);
+                Logger?.warn(`Full push failed: ${res.status}`);
             }
         } catch (e) {
-            console.warn('[CS-Sync] Full push error:', e.message);
+            Logger?.warn(`Full push error: ${e.message}`);
         } finally {
             fullPushInProgress = false;
             if (fullPushPending) { fullPushPending = false; setTimeout(pushFullDirect, 1000); }
@@ -369,8 +354,6 @@
 
     async function wakeBackgroundSW(messageType = 'SYNC_PROGRESS_ONLY') {
         return new Promise((resolve) => {
-            // If the extension context is invalid, immediately resolve false. Use the
-            // Storage helper to avoid accessing chrome.runtime when invalid.
             try {
                 const Storage = (window.AnimeTrackerContent && window.AnimeTrackerContent.Storage) || null;
                 if (!Storage || !Storage.isContextValid()) {
@@ -386,7 +369,6 @@
             try {
                 chrome.runtime.sendMessage({ type: messageType }, (response) => {
                     clearTimeout(timeout);
-                    // If there's an error or no response, treat the SW as unavailable.
                     if (chrome.runtime.lastError || !response) {
                         resolve(false);
                     } else {
@@ -394,7 +376,6 @@
                     }
                 });
             } catch {
-                // Calling sendMessage can throw if the extension context is invalid.
                 clearTimeout(timeout);
                 resolve(false);
             }
@@ -402,8 +383,6 @@
     }
 
     // ─── Debounced progress push (Chrome path) ────────────────────────────────
-    // 1. Try to wake the background SW (it will do the actual push).
-    // 2. If SW is unreachable, push directly from the content script.
 
     let progressDebounce = null;
 
@@ -413,8 +392,7 @@
             progressDebounce = null;
             const swAlive = await wakeBackgroundSW('SYNC_PROGRESS_ONLY');
             if (!swAlive) {
-                // SW is dead/sleeping and didn't wake — push directly
-                console.log('[CS-Sync] SW unreachable, pushing progress directly');
+                Logger?.debug('SW unreachable, pushing progress directly');
                 await pushProgressDirect();
             }
         }, delay);
@@ -449,105 +427,23 @@
         teardownSyncTriggered = false;
     }
 
-    // ─── Reset a single episode's progress (Start Over) ───────────────────────
-    // 1. Deletes the entry from chrome.storage.local immediately.
-    // 2. Pushes the deletion to Firestore so other browsers pick it up.
-    // 3. Wakes the background SW so it can broadcast the change.
-
-    async function resetProgressInCloud(uniqueId) {
-        if (!uniqueId) return;
-
-        // We use a soft-delete tombstone ({ deleted: true, deletedAt }) instead of
-        // a hard delete. This is critical because mergeVideoProgress uses
-        // "keep the higher currentTime" logic — if we simply remove the key, any
-        // other browser that still has the old high-currentTime value in its local
-        // storage will win the next merge and resurrect the progress, causing the
-        // resume prompt to reappear. The tombstone has an explicit timestamp so the
-        // merge logic will prefer it over any stale local entry with an older savedAt.
-
-        const deletedAt = new Date().toISOString();
-        const tombstone = { deleted: true, deletedAt, currentTime: 0, duration: 0, percentage: 0, savedAt: deletedAt };
-
-        // ── 1. Write tombstone to local storage ──────────────────────────────
-        try {
-            const local = await chrome.storage.local.get(['videoProgress']);
-            const videoProgress = local.videoProgress || {};
-            videoProgress[uniqueId] = tombstone;
-            csPauseSync(2000); // prevent storage watcher from re-triggering a push
-            await chrome.storage.local.set({ videoProgress });
-            console.log(`[CS-Sync] ✓ Start Over: tombstoned local progress for ${uniqueId}`);
-        } catch (e) {
-            console.warn('[CS-Sync] Start Over: failed to tombstone local progress:', e.message);
-        }
-
-        // ── 2. Push the tombstone to Firestore ───────────────────────────────
-        const token = await getValidToken();
-        const user  = currentUser || await getUser();
-        if (!token || !user) return;
-
-        try {
-            const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
-            let cloudVP = {};
-            try {
-                const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-                if (r.ok) cloudVP = fromFSDoc(await r.json())?.videoProgress || {};
-            } catch { /* best-effort */ }
-
-            cloudVP[uniqueId] = tombstone;
-            lastPushedProgress = null; // invalidate snapshot so next push is not skipped
-
-            const updateMask = 'updateMask.fieldPaths=videoProgress&updateMask.fieldPaths=lastUpdated';
-            const res = await fetch(`${url}?${updateMask}`, {
-                method:  'PATCH',
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body:    JSON.stringify({
-                    fields: toFSFields({
-                        videoProgress: cloudVP,
-                        lastUpdated:   deletedAt
-                    })
-                })
-            });
-
-            if (res.ok) {
-                lastPushedProgress = JSON.stringify(cloudVP);
-                console.log(`[CS-Sync] ✓ Start Over: tombstoned cloud progress for ${uniqueId}`);
-            } else {
-                console.warn('[CS-Sync] Start Over: cloud tombstone failed:', res.status);
-            }
-        } catch (e) {
-            console.warn('[CS-Sync] Start Over: cloud tombstone error:', e.message);
-        }
-
-        // ── 3. Wake background SW so other Chrome windows sync immediately ───
-        wakeBackgroundSW('SYNC_PROGRESS_ONLY').catch(() => {});
-    }
-
-    // Expose for other content-script modules
-    window.AnimeTrackerContent = window.AnimeTrackerContent || {};
-    window.AnimeTrackerContent.resetProgressInCloud = resetProgressInCloud;
-
     // ─── Apply incoming cloud update locally ──────────────────────────────────
 
     async function applyCloudUpdate(cloudDoc) {
         if (!cloudDoc) return;
         try {
-            // Fetch animeData, videoProgress, deletedAnime and groupCoverImages from storage.
-            // We need groupCoverImages here so we can merge posters across devices.
             const local = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
 
-            // Merge deletedAnime so cross-device deletions propagate in Orion too.
             const mergedDeleted = cloudDoc.deletedAnime
                 ? mergeDeletedAnime(local.deletedAnime || {}, cloudDoc.deletedAnime)
                 : (local.deletedAnime || {});
 
             const mergedAnime = mergeAnimeData(local.animeData || {}, cloudDoc.animeData || {});
 
-            // Apply cross-device deletions.
             applyDeletedAnime(mergedAnime, mergedDeleted);
 
             const mergedProgress = mergeVideoProgress(local.videoProgress || {}, cloudDoc.videoProgress || {});
 
-            // Merge group cover images: local always wins (see mergeGroupCoverImages for policy).
             const localGroupCovers  = local.groupCoverImages      || {};
             const cloudGroupCovers  = cloudDoc.groupCoverImages   || {};
             const mergedGroupCovers = mergeGroupCoverImages(localGroupCovers, cloudGroupCovers);
@@ -556,24 +452,21 @@
             const mergedEps = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
 
             const progressChanged = !areProgressMapsEqual(local.videoProgress || {}, mergedProgress);
-            const deletedChanged = !shallowEqualDeletedAnime(local.deletedAnime || {}, mergedDeleted);
-
-            // Determine if any group covers changed by comparing keys. If there are new keys
-            // from cloud, mergedGroupCovers will have more entries than local.
-            const groupChanged = !shallowEqualStringMap(local.groupCoverImages || {}, mergedGroupCovers);
+            const deletedChanged  = !shallowEqualDeletedAnime(local.deletedAnime || {}, mergedDeleted);
+            const groupChanged    = !shallowEqualStringMap(local.groupCoverImages || {}, mergedGroupCovers);
 
             if (mergedEps !== localEps || progressChanged || deletedChanged || groupChanged) {
-                csPauseSync(); // prevent storage listener from looping back
+                csPauseSync();
                 await chrome.storage.local.set({
-                    animeData:       mergedAnime,
-                    videoProgress:   mergedProgress,
-                    deletedAnime:    mergedDeleted,
+                    animeData:        mergedAnime,
+                    videoProgress:    mergedProgress,
+                    deletedAnime:     mergedDeleted,
                     groupCoverImages: mergedGroupCovers
                 });
-                console.log(`[CS-Sync] ← Cloud update applied (eps: ${localEps}→${mergedEps})`);
+                Logger?.info(`Cloud update applied (eps: ${localEps}→${mergedEps})`);
             }
         } catch (e) {
-            console.warn('[CS-Sync] Apply cloud update failed:', e.message);
+            Logger?.warn(`Apply cloud update failed: ${e.message}`);
         }
     }
 
@@ -604,15 +497,17 @@
             if (!res.ok) { scheduleReconnect(); return; }
 
             reconnectDelay = 5000;
-            console.log('[CS-Sync] ✓ Firestore stream connected');
+            Logger?.info('Firestore stream connected');
 
-            // Proactively refresh the token every 45 minutes while the stream is
-            // open. This prevents a mid-stream expiry causing a hard reconnect
-            // (the REMOVE/code-16 path handles it reactively, but this avoids it).
             tokenRefreshInterval = setInterval(async () => {
                 const fresh = await getValidToken();
-                if (fresh && fresh !== currentToken) {
-                    console.log('[CS-Sync] Token refreshed proactively, restarting stream');
+                if (!fresh) {
+                    clearInterval(tokenRefreshInterval);
+                    tokenRefreshInterval = null;
+                    listenAbortCtrl?.abort();
+                    return;
+                }
+                if (fresh !== currentToken) {
                     clearInterval(tokenRefreshInterval);
                     tokenRefreshInterval = null;
                     listenAbortCtrl?.abort();
@@ -629,9 +524,8 @@
                 const { value, done } = await reader.read();
                 if (done) break;
                 buffer += decoder.decode(value, { stream: true });
-                // Guard against unbounded buffer growth (e.g. a stalled stream).
                 if (buffer.length > 256 * 1024) {
-                    console.warn('[CS-Sync] SSE buffer overflow, reconnecting');
+                    Logger?.warn('SSE buffer overflow, reconnecting');
                     listenAbortCtrl?.abort();
                     scheduleReconnect(1000);
                     return;
@@ -648,9 +542,6 @@
                         if (msg.documentChange?.document?.fields) {
                             await applyCloudUpdate(fromFSDoc(msg.documentChange.document));
                         }
-                        if (msg.targetChange?.targetChangeType === 'CURRENT') {
-                            // Stream is up-to-date, nothing to do
-                        }
                         if (msg.targetChange?.targetChangeType === 'REMOVE' &&
                             msg.targetChange?.cause?.code === 16) {
                             listenAbortCtrl.abort();
@@ -658,16 +549,13 @@
                             if (currentToken) startListening();
                             return;
                         }
-                    } catch {
-                        // Ignore partial SSE frame fragments that are not valid JSON yet.
-                    }
+                    } catch {}
                 }
             }
         } catch (e) {
             if (e.name === 'AbortError') return;
-            console.warn('[CS-Sync] Stream error:', e.message);
+            Logger?.warn(`Stream error: ${e.message}`);
         } finally {
-            // Always clear the token-refresh timer when the stream exits
             if (tokenRefreshInterval) {
                 clearInterval(tokenRefreshInterval);
                 tokenRefreshInterval = null;
@@ -684,16 +572,13 @@
     }
 
     // ─── Storage watcher ──────────────────────────────────────────────────────
-    // Called in both Chrome and Orion modes.
-    // Chrome: wakes the SW (fast) or falls back to direct push.
-    // Orion:  schedules a direct push.
 
     function watchStorage(isOrionMode) {
         chrome.storage.onChanged.addListener((changes, namespace) => {
             if (namespace !== 'local') return;
 
             if (changes.videoProgress) {
-                if (csIsSyncPaused()) return; // cloud write-back, skip to avoid loop
+                if (csIsSyncPaused()) return;
                 if (isOrionMode) {
                     scheduleFullPush(3000);
                 } else {
@@ -704,30 +589,22 @@
             if (changes.animeData && !csIsSyncPaused()) {
                 const oldAnime = changes.animeData.oldValue || {};
                 const newAnime = changes.animeData.newValue || {};
-                const oldCount = Object.values(oldAnime)
-                    .reduce((s, a) => s + (a.episodes?.length || 0), 0);
-                const newCount = Object.values(newAnime)
-                    .reduce((s, a) => s + (a.episodes?.length || 0), 0);
+                const oldCount = Object.values(oldAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
+                const newCount = Object.values(newAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
 
-                // Detect cover changes when episode count hasn't changed
                 let coverChanged = false;
                 if (newCount === oldCount) {
                     for (const slug of Object.keys(newAnime)) {
                         const oldCover = oldAnime[slug]?.coverImage || null;
                         const newCover = newAnime[slug]?.coverImage || null;
-                        if (oldCover !== newCover) {
-                            coverChanged = true;
-                            break;
-                        }
+                        if (oldCover !== newCover) { coverChanged = true; break; }
                     }
                 }
 
                 if (newCount > oldCount || coverChanged) {
                     if (isOrionMode) {
-                        // In no-SW mode, schedule a full push to upload updated animeData
                         scheduleFullPush(1500);
                     } else {
-                        // Wake SW for a full sync when anime metadata changes (new episode or cover)
                         setTimeout(async () => {
                             const swAlive = await wakeBackgroundSW('SYNC_TO_FIREBASE');
                             if (!swAlive) pushFullDirect();
@@ -737,7 +614,6 @@
             }
         });
 
-        // Push on tab hide or close
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
                 pushOnTeardown(isOrionMode);
@@ -747,8 +623,6 @@
         });
 
         window.addEventListener('pagehide', (event) => {
-            // If the page is entering bfcache, avoid forcing a direct push.
-            // The page is not actually being torn down.
             if (event && event.persisted) return;
             pushOnTeardown(isOrionMode);
         }, { passive: true });
@@ -766,40 +640,34 @@
 
         currentUser = await getUser();
         if (!currentUser) {
-            console.log('[CS-Sync] No user, skipping sync');
+            Logger?.debug('No user, skipping sync');
             return;
         }
 
-        // Detect whether the background SW is available (Chrome) or not (Orion)
         const swAvailable = await wakeBackgroundSW('GET_VERSION');
 
         if (swAvailable) {
-            // ── Chrome mode: background SW handles everything ──────────────
-            // Content script role: keep SW alive + wake it on storage changes.
-            console.log('[CS-Sync] SW available — acting as wake-up agent');
+            Logger?.info('SW available — acting as wake-up agent');
             initialized = true;
             watchStorage(false);
-            // Initial push in case SW missed something while sleeping
             scheduleProgressPush(5000);
             return;
         }
 
-        // ── Orion / Safari mode: full content-script sync ──────────────────
-        console.log('[CS-Sync] No SW — starting full sync mode (Orion)');
+        Logger?.info('No SW — starting full sync mode (Orion)');
         initialized = true;
         watchStorage(true);
         startListening();
-        scheduleFullPush(4000); // push any locally unsynced data on startup
+        scheduleFullPush(4000);
 
-        // Reconnect stream when tab becomes visible
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) startListening();
         });
 
-        // Refresh token every 50 min (tokens expire after 1h)
         setInterval(async () => {
             const newToken = await getValidToken();
-            if (newToken && newToken !== currentToken) {
+            if (!newToken) return;
+            if (newToken !== currentToken) {
                 currentToken = newToken;
                 startListening();
             }
@@ -811,10 +679,10 @@
         });
     }
 
-    // Delay init slightly to let the page settle
     setTimeout(init, 2000);
 
-    // ─── Keep-alive port: resets the SW's 30s idle timer ──────────────────────
+    // ─── Keep-alive port ──────────────────────────────────────────────────────
+
     let keepAliveRetryDelay = 100;
     let keepAliveRetryTimer = null;
     let keepAlivePulseTimer = null;
@@ -832,9 +700,7 @@
     function disconnectKeepalivePort() {
         if (keepAlivePort) {
             suppressKeepAliveReconnect = true;
-            try { keepAlivePort.disconnect(); } catch {
-                // Port may already be closed; safe to ignore.
-            }
+            try { keepAlivePort.disconnect(); } catch {}
             keepAlivePort = null;
         }
         if (keepAlivePulseTimer) {
@@ -844,13 +710,11 @@
     }
 
     function connectKeepalivePort() {
-        // Avoid reconnect storms while the tab is hidden/in bfcache.
         if (document.hidden) {
             scheduleKeepaliveReconnect(3000);
             return;
         }
 
-        // Rotate any stale port before opening a fresh one.
         disconnectKeepalivePort();
 
         try {
@@ -864,20 +728,17 @@
             }, 25000);
 
             port.onDisconnect.addListener(() => {
-                // Ignore disconnects we triggered intentionally.
                 if (suppressKeepAliveReconnect) {
                     suppressKeepAliveReconnect = false;
                     return;
                 }
 
-                // Read lastError so Chrome does not emit "Unchecked runtime.lastError"
-                // when a tab enters bfcache and the keepAlive channel is closed.
                 const err = chrome.runtime.lastError;
                 if (err) {
                     const msg = err.message || '';
                     const isExpectedClose = msg.includes('back/forward cache') || msg.includes('message channel is closed');
                     if (!isExpectedClose) {
-                        console.debug('[CS-Sync] keepAlive port disconnected:', msg);
+                        Logger?.debug(`keepAlive port disconnected: ${msg}`);
                     }
                 }
 
@@ -898,7 +759,6 @@
 
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
-            // Let the page sleep cleanly (especially bfcache path).
             disconnectKeepalivePort();
             if (keepAliveRetryTimer) {
                 clearTimeout(keepAliveRetryTimer);
@@ -927,8 +787,5 @@
     }, { passive: true });
 
     connectKeepalivePort();
-
-    // Re-export after IIFE body has run (ensures the reference is live)
-    window.AnimeTrackerContent.resetProgressInCloud = resetProgressInCloud;
 
 })();

@@ -24,158 +24,184 @@ const AnimeParser = {
     },
 
     /**
-     * Extract anime information from the main page URL and DOM
+     * Extract anime information from the main page URL and DOM.
+     * Wrapped in try/catch so a DOM or parsing error never crashes the content script.
+     *
+     * Processing order (3.1):
+     *   1. Parse URL → raw animeSlug + episodeNumber
+     *   2. Apply EPISODE_OFFSET_MAPPING using the RAW (pre-normalisation) slug
+     *      so the offset lookup key always matches what the site puts in the URL.
+     *   3. Apply SLUG_NORMALIZATION to merge multi-part slugs into one storage key.
+     *   4. Apply title-based canonical slug normalisation (e.g. Jujutsu Kaisen).
+     * Never swap steps 2 and 3 — the offset table is keyed on the original slug.
      */
     extractAnimeInfo() {
         const { Logger } = window.AnimeTrackerContent;
-        
-        const pathname = window.location.pathname;
-        
-        Logger.debug(`Parsing: ${pathname}`);
-        
-        const pathMatch = pathname.match(/\/watch\/([^/]+)(?:\/([^/]+))?/);
-        
-        if (!pathMatch) {
-            Logger.info('URL does not match watch pattern');
+
+        try {
+            const pathname = window.location.pathname;
+
+            Logger.debug(`Parsing: ${pathname}`);
+
+            const pathMatch = pathname.match(/\/watch\/([^/]+)(?:\/([^/]+))?/);
+
+            if (!pathMatch) {
+                Logger.info('URL does not match watch pattern');
+                return null;
+            }
+
+            let animeSlug = pathMatch[1];
+            // Strip trailing "-episode" / "-ep" tokens that occasionally appear
+            // in the slug segment of some an1me.to URLs.
+            animeSlug = animeSlug
+                .replace(/[-_](?:episodes?|ep)$/i, '')
+                .replace(/[-_]+$/g, '');
+            let episodeSlug = pathMatch[2] || null;
+            let episodeNumber = 1;
+
+            Logger.debug(`Slug: ${animeSlug} | Ep: ${episodeSlug || 'none'}`);
+
+            let episodeFound = false;
+            let isDoubleEpisode = false;
+            let secondEpisodeNumber = null;
+
+            // ── Double-episode detection (3.2) ──────────────────────────────────
+            // Must run BEFORE the single-episode patterns so the combined
+            // "119-120" suffix is matched as a unit and not split by Pattern 4.
+            // We also validate that the second number is strictly greater than
+            // the first to reject false positives like "sword-art-online-2".
+            const doubleEpMatch = animeSlug.match(/^(.+?)[-_]ep(?:isode)?[-_]?(\d+)[-_](\d+)$/i);
+            if (doubleEpMatch) {
+                const ep1 = parseInt(doubleEpMatch[2], 10);
+                const ep2 = parseInt(doubleEpMatch[3], 10);
+                // Only treat as a double episode when ep2 is the immediate successor
+                // or at most a few episodes ahead. A large gap (e.g. "sword-art-online-2")
+                // is almost certainly a season number, not a double episode.
+                const looksLikeDoubleEp = ep2 > ep1 && ep2 - ep1 <= 4;
+                if (looksLikeDoubleEp) {
+                    animeSlug = doubleEpMatch[1];
+                    episodeNumber = ep1;
+                    secondEpisodeNumber = ep2;
+                    episodeSlug = `episode-${episodeNumber}`;
+                    isDoubleEpisode = true;
+                    episodeFound = true;
+                    Logger.debug(`Double episode: ${animeSlug} Ep${episodeNumber}-${secondEpisodeNumber}`);
+                }
+                // If it doesn't look like a double episode, fall through to normal patterns.
+            }
+
+            // ── Single-episode patterns ──────────────────────────────────────────
+            const episodePatterns = [
+                /^(.+?)[-_]ep(?:isode)?[-_]?(\d+)$/i,
+                /^(.+?)[-_]ch(?:apter)?[-_]?(\d+)$/i,
+                /^(.+?)[-_]part[-_]?(\d+)$/i,
+                /^(.+?)[-_](\d+)$/
+            ];
+
+            for (const pattern of episodePatterns) {
+                if (episodeFound) break;
+                const match = animeSlug.match(pattern);
+                if (match) {
+                    animeSlug = match[1];
+                    episodeNumber = parseInt(match[2], 10);
+                    episodeSlug = `episode-${episodeNumber}`;
+                    episodeFound = true;
+                    Logger.debug(`Extracted: ${animeSlug} Ep${episodeNumber}`);
+                    break;
+                }
+            }
+
+            if (!episodeFound && episodeSlug) {
+                const epMatch = episodeSlug.match(/ep(?:isode)?[-_]?(\d+)/i) ||
+                               episodeSlug.match(/(\d+)/);
+                if (epMatch) {
+                    episodeNumber = parseInt(epMatch[1], 10);
+                    Logger.debug(`Ep from path: ${episodeNumber}`);
+                }
+            }
+
+            if (!episodeFound && !episodeSlug) {
+                episodeNumber = this.findEpisodeFromDOM() || 1;
+                if (episodeNumber > 1) {
+                    episodeSlug = `episode-${episodeNumber}`;
+                    episodeFound = true;
+                }
+            }
+
+            if (!episodeSlug) {
+                episodeSlug = 'episode-1';
+                episodeNumber = 1;
+            }
+
+            if (episodeNumber < 1 || episodeNumber > 9999) {
+                Logger.warn(`Invalid ep ${episodeNumber}, using 1`);
+                episodeNumber = 1;
+            }
+
+            // ── Step 2: apply episode offset (3.1) ──────────────────────────────
+            // The offset table is keyed on the ORIGINAL (pre-normalisation) slug so
+            // the lookup always matches the URL slug the site serves. We capture it
+            // BEFORE any normalisation below. Do NOT move steps 3/4 above this.
+            const originalSlug = animeSlug;
+            let totalEpisodes = this.detectTotalEpisodes(originalSlug);
+
+            const offsetMapping = window.AnimeTrackerContent?.EPISODE_OFFSET_MAPPING || {};
+            const offset = offsetMapping[originalSlug] || 0;
+            if (offset > 0) {
+                Logger.debug(`Applying offset +${offset} to ${originalSlug}`);
+                episodeNumber += offset;
+                // Offset the second episode too so double-episode saves remain consistent.
+                // e.g. bleach-TYBW-part-2 episode 1-2 → stored as episodes 14 and 15.
+                if (secondEpisodeNumber !== null) {
+                    secondEpisodeNumber += offset;
+                }
+                if (Number.isFinite(totalEpisodes) && totalEpisodes > 0) {
+                    totalEpisodes += offset;
+                }
+            }
+
+            // ── Step 3: slug normalisation (3.1) ────────────────────────────────
+            // Merge multi-part slugs into a single storage key AFTER the offset
+            // has been applied. Swapping this with step 2 would break the offset
+            // lookup because the normalised slug is not in EPISODE_OFFSET_MAPPING.
+            const slugNormalization = window.AnimeTrackerContent?.SLUG_NORMALIZATION || {};
+            if (slugNormalization[originalSlug]) {
+                animeSlug = slugNormalization[originalSlug];
+                Logger.debug(`Normalized ${originalSlug} → ${animeSlug}`);
+            }
+
+            // ── Step 4: title-based canonical slug ──────────────────────────────
+            let animeTitle = this.extractTitle(animeSlug);
+
+            const canonicalSlug = this.normalizeSlugByTitle(animeSlug, animeTitle);
+            if (canonicalSlug !== animeSlug) {
+                Logger.debug(`Title-based normalize ${animeSlug} -> ${canonicalSlug}`);
+                animeSlug = canonicalSlug;
+            }
+
+            const uniqueId = `${animeSlug}__episode-${episodeNumber}`;
+
+            Logger.info(`${animeTitle} Ep${episodeNumber}`, { id: uniqueId });
+
+            const coverImageElement = document.querySelector('.anime-featured img');
+            const coverImage = coverImageElement ? coverImageElement.src || null : null;
+
+            return {
+                animeSlug,
+                animeTitle: this.escapeHtml(animeTitle),
+                episodeSlug: `episode-${episodeNumber}`,
+                episodeNumber,
+                uniqueId,
+                url: window.location.href,
+                isDoubleEpisode,
+                secondEpisodeNumber,
+                coverImage,
+                totalEpisodes
+            };
+        } catch (e) {
+            Logger.error('extractAnimeInfo failed:', e);
             return null;
         }
-
-        let animeSlug = pathMatch[1];
-        // Some an1me URLs include a trailing "-episode" in the slug segment.
-        // Normalize it early so episodes don't split across two different anime keys.
-        animeSlug = animeSlug
-            .replace(/[-_](?:episodes?|ep)$/i, '')
-            .replace(/[-_]+$/g, '');
-        let episodeSlug = pathMatch[2] || null;
-        let episodeNumber = 1;
-        
-        Logger.debug(`Slug: ${animeSlug} | Ep: ${episodeSlug || 'none'}`);
-
-        // ── Double episode detection (e.g. naruto-shippuuden-episode-119-120) ──
-        // Must run BEFORE normal patterns so Pattern 4 doesn't mangle the slug.
-        let episodeFound = false;
-        let isDoubleEpisode = false;
-        let secondEpisodeNumber = null;
-
-        const doubleEpMatch = animeSlug.match(/^(.+?)[-_]ep(?:isode)?[-_]?(\d+)[-_](\d+)$/i);
-        if (doubleEpMatch) {
-            animeSlug = doubleEpMatch[1];               // e.g. 'naruto-shippuuden'
-            episodeNumber = parseInt(doubleEpMatch[2]); // first ep  (119)
-            secondEpisodeNumber = parseInt(doubleEpMatch[3]); // second ep (120)
-            episodeSlug = `episode-${episodeNumber}`;
-            isDoubleEpisode = true;
-            episodeFound = true;
-            Logger.debug(`Double episode: ${animeSlug} Ep${episodeNumber}-${secondEpisodeNumber}`);
-        }
-
-        // Episode detection patterns
-        const episodePatterns = [
-            /^(.+?)[-_]ep(?:isode)?[-_]?(\d+)$/i,
-            /^(.+?)[-_]ch(?:apter)?[-_]?(\d+)$/i,
-            /^(.+?)[-_]part[-_]?(\d+)$/i,
-            /^(.+?)[-_](\d+)$/
-        ];
-
-        for (const pattern of episodePatterns) {
-            if (episodeFound) break;
-            const match = animeSlug.match(pattern);
-            if (match) {
-                animeSlug = match[1];
-                episodeNumber = parseInt(match[2]);
-                episodeSlug = `episode-${episodeNumber}`;
-                episodeFound = true;
-                Logger.debug(`Extracted: ${animeSlug} Ep${episodeNumber}`);
-                break;
-            }
-        }
-        
-        if (!episodeFound && episodeSlug) {
-            const epMatch = episodeSlug.match(/ep(?:isode)?[-_]?(\d+)/i) || 
-                           episodeSlug.match(/(\d+)/);
-            if (epMatch) {
-                episodeNumber = parseInt(epMatch[1]);
-                Logger.debug(`Ep from path: ${episodeNumber}`);
-            }
-        }
-        
-        if (!episodeFound && !episodeSlug) {
-            episodeNumber = this.findEpisodeFromDOM() || 1;
-            if (episodeNumber > 1) {
-                episodeSlug = `episode-${episodeNumber}`;
-                episodeFound = true;
-            }
-        }
-        
-        if (!episodeSlug) {
-            episodeSlug = 'episode-1';
-            episodeNumber = 1;
-        }
-
-        if (episodeNumber < 1 || episodeNumber > 9999) {
-            Logger.warn(`Invalid ep ${episodeNumber}, using 1`);
-            episodeNumber = 1;
-        }
-
-        // Store original slug for offset lookup
-        const originalSlug = animeSlug;
-        let totalEpisodes = this.detectTotalEpisodes(originalSlug);
-
-        // Apply episode offset for multi-part anime
-        const offsetMapping = window.AnimeTrackerContent?.EPISODE_OFFSET_MAPPING || {};
-        const offset = offsetMapping[originalSlug] || 0;
-        if (offset > 0) {
-            Logger.debug(`Applying offset +${offset} to ${originalSlug}`);
-            episodeNumber += offset;
-            // Also offset the second episode so double-episode saves are consistent
-            // e.g. bleach-TYBW-part-2-episode-1-2 → episodes 14 and 15, not 14 and 2
-            if (secondEpisodeNumber !== null) {
-                secondEpisodeNumber += offset;
-            }
-            if (Number.isFinite(totalEpisodes) && totalEpisodes > 0) {
-                totalEpisodes += offset;
-            }
-        }
-
-        // Normalize slug to merge multi-part anime into one entry
-        const slugNormalization = window.AnimeTrackerContent?.SLUG_NORMALIZATION || {};
-        if (slugNormalization[originalSlug]) {
-            animeSlug = slugNormalization[originalSlug];
-            Logger.debug(`Normalized ${originalSlug} → ${animeSlug}`);
-        }
-
-        // Extract anime title
-        let animeTitle = this.extractTitle(animeSlug);
-
-        // Normalize ambiguous slugs using title hints (e.g. Jujutsu Kaisen parts/arcs).
-        const canonicalSlug = this.normalizeSlugByTitle(animeSlug, animeTitle);
-        if (canonicalSlug !== animeSlug) {
-            Logger.debug(`Title-based normalize ${animeSlug} -> ${canonicalSlug}`);
-            animeSlug = canonicalSlug;
-        }
-
-        const uniqueId = `${animeSlug}__episode-${episodeNumber}`;
-
-        Logger.info(`${animeTitle} Ep${episodeNumber}`, { id: uniqueId });
-
-        // ── Extract cover image from the page ──
-        // The an1me.to site places the featured image inside a .anime-featured div. If no image
-        // exists (e.g. on non-anime pages), fall back to null. This property will be saved
-        // alongside other anime information when first stored. See README for details.
-        const coverImageElement = document.querySelector('.anime-featured img');
-        const coverImage = coverImageElement ? coverImageElement.src || null : null;
-
-        return {
-            animeSlug,
-            animeTitle: this.escapeHtml(animeTitle),
-            episodeSlug: `episode-${episodeNumber}`,
-            episodeNumber,
-            uniqueId,
-            url: window.location.href,
-            isDoubleEpisode,
-            secondEpisodeNumber,
-            coverImage,
-            totalEpisodes
-        };
     },
 
     /**
@@ -183,7 +209,7 @@ const AnimeParser = {
      */
     findEpisodeFromDOM() {
         const { Logger } = window.AnimeTrackerContent;
-        
+
         const activeEpisodeSelectors = [
             '.episode-list .active',
             '.episodes .current',
@@ -195,22 +221,26 @@ const AnimeParser = {
             'li.active a[href*="episode"]',
             'a.active[href*="episode"]'
         ];
-        
+
         for (const selector of activeEpisodeSelectors) {
-            const activeEpisode = document.querySelector(selector);
-            if (activeEpisode) {
-                const epText = activeEpisode.textContent || activeEpisode.getAttribute('title') || '';
-                const epNumMatch = epText.match(/Episode\s*(\d+)/i) || 
-                                  epText.match(/Ep\s*(\d+)/i) || 
-                                  epText.match(/^\s*(\d+)\s*$/);
-                if (epNumMatch) {
-                    const episodeNumber = parseInt(epNumMatch[1]);
-                    Logger.debug(`Ep from DOM: ${episodeNumber}`);
-                    return episodeNumber;
+            try {
+                const activeEpisode = document.querySelector(selector);
+                if (activeEpisode) {
+                    const epText = activeEpisode.textContent || activeEpisode.getAttribute('title') || '';
+                    const epNumMatch = epText.match(/Episode\s*(\d+)/i) ||
+                                      epText.match(/Ep\s*(\d+)/i) ||
+                                      epText.match(/^\s*(\d+)\s*$/);
+                    if (epNumMatch) {
+                        const episodeNumber = parseInt(epNumMatch[1], 10);
+                        Logger.debug(`Ep from DOM: ${episodeNumber}`);
+                        return episodeNumber;
+                    }
                 }
+            } catch {
+                // Ignore selector errors and try the next one
             }
         }
-        
+
         return null;
     },
 
@@ -219,58 +249,62 @@ const AnimeParser = {
      * Returns highest episode number found, or null.
      */
     detectTotalEpisodes(animeSlug) {
-        const episodeNumbers = new Set();
-        const escapedSlug = (animeSlug || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const hasSlug = Boolean(escapedSlug);
-        const hrefPattern = hasSlug
-            ? new RegExp(`/watch/${escapedSlug}-episode-(\\d+)`, 'i')
-            : /\/watch\/[^/]+-episode-(\d+)/i;
+        try {
+            const episodeNumbers = new Set();
+            const escapedSlug = (animeSlug || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const hasSlug = Boolean(escapedSlug);
+            const hrefPattern = hasSlug
+                ? new RegExp(`/watch/${escapedSlug}-episode-(\\d+)`, 'i')
+                : /\/watch\/[^/]+-episode-(\d+)/i;
 
-        const selectors = [
-            `a[href*="/watch/${animeSlug}-episode-"]`,
-            `a[href*="${animeSlug}-episode-"]`,
-            '.episode-list a[href*="-episode-"]',
-            '.episodes a[href*="-episode-"]',
-            '[data-open-nav-episode]',
-            'a[href*="-episode-"]'
-        ];
+            const selectors = [
+                `a[href*="/watch/${animeSlug}-episode-"]`,
+                `a[href*="${animeSlug}-episode-"]`,
+                '.episode-list a[href*="-episode-"]',
+                '.episodes a[href*="-episode-"]',
+                '[data-open-nav-episode]',
+                'a[href*="-episode-"]'
+            ];
 
-        const parseEpisodeNumber = (value) => {
-            if (!value) return null;
-            const text = String(value);
-            const match = text.match(/(?:episode|ep)\s*[-_#:]?\s*(\d{1,4})/i) || text.match(/\b(\d{1,4})\b/);
-            if (!match) return null;
-            const num = parseInt(match[1], 10);
-            return Number.isFinite(num) && num > 0 ? num : null;
-        };
+            const parseEpisodeNumber = (value) => {
+                if (!value) return null;
+                const text = String(value);
+                const match = text.match(/(?:episode|ep)\s*[-_#:]?\s*(\d{1,4})/i) || text.match(/\b(\d{1,4})\b/);
+                if (!match) return null;
+                const num = parseInt(match[1], 10);
+                return Number.isFinite(num) && num > 0 ? num : null;
+            };
 
-        for (const selector of selectors) {
-            const nodes = document.querySelectorAll(selector);
-            for (const node of nodes) {
-                const href = node.getAttribute('href') || '';
-                const hrefMatch = href.match(hrefPattern);
-                if (hrefMatch) {
-                    const hrefNum = parseInt(hrefMatch[1], 10);
-                    if (Number.isFinite(hrefNum) && hrefNum > 0) {
-                        episodeNumbers.add(hrefNum);
+            for (const selector of selectors) {
+                const nodes = document.querySelectorAll(selector);
+                for (const node of nodes) {
+                    const href = node.getAttribute('href') || '';
+                    const hrefMatch = href.match(hrefPattern);
+                    if (hrefMatch) {
+                        const hrefNum = parseInt(hrefMatch[1], 10);
+                        if (Number.isFinite(hrefNum) && hrefNum > 0) {
+                            episodeNumbers.add(hrefNum);
+                        }
+                    }
+
+                    const isEpisodeNavAttrNode = selector === '[data-open-nav-episode]';
+                    if (isEpisodeNavAttrNode || hrefMatch) {
+                        const attrNum = parseEpisodeNumber(
+                            node.getAttribute('data-open-nav-episode') || node.dataset?.openNavEpisode
+                        );
+                        if (attrNum) episodeNumbers.add(attrNum);
                     }
                 }
-
-                // Only trust data attributes from dedicated episode navigation nodes,
-                // or nodes whose href already matched this anime slug.
-                const isEpisodeNavAttrNode = selector === '[data-open-nav-episode]';
-                if (isEpisodeNavAttrNode || hrefMatch) {
-                    const attrNum = parseEpisodeNumber(node.getAttribute('data-open-nav-episode') || node.dataset?.openNavEpisode);
-                    if (attrNum) episodeNumbers.add(attrNum);
-                }
             }
+
+            if (episodeNumbers.size === 0) return null;
+
+            const maxEpisode = Math.max(...episodeNumbers);
+            if (!Number.isFinite(maxEpisode) || maxEpisode <= 0 || maxEpisode > 9999) return null;
+            return maxEpisode;
+        } catch {
+            return null;
         }
-
-        if (episodeNumbers.size === 0) return null;
-
-        const maxEpisode = Math.max(...episodeNumbers);
-        if (!Number.isFinite(maxEpisode) || maxEpisode <= 0 || maxEpisode > 9999) return null;
-        return maxEpisode;
     },
 
     /**
@@ -296,7 +330,26 @@ const AnimeParser = {
     },
 
     /**
-     * Extract anime title from slug or DOM
+     * Extract anime title from slug or DOM (3.3).
+     *
+     * The cleaning patterns are anchored so they only strip episode/part
+     * markers from the END of the title string, preceded by a separator
+     * character (–, ~, space, or similar). This prevents false positives
+     * like "Sword Art Online: Alicization – War of Underworld" losing
+     * "Underworld", or a title that legitimately contains the word "Episode".
+     *
+     * Removal order matters:
+     *   1. "– Episode N …"   (separator + keyword + number + anything after)
+     *   2. "– Ep N …"        (abbreviated form)
+     *   3. "– Part N …"      (multi-part indicator)
+     *   4. "– Chapter N …"   (manga adaptation indicator)
+     *   5. Trailing " N"     (bare number at the very end, no separator)
+     *   6. Trailing "(YYYY)" (year disambiguation)
+     *
+     * Rules 1–4 require a separator so "Sword Art Online II" is not truncated
+     * at "II", and "Dr. STONE: New World" is not truncated at "World".
+     * Rule 5 only fires when the title ends with whitespace + digits, which
+     * is almost always an episode suffix injected by the page template.
      */
     extractTitle(animeSlug) {
         let animeTitle = animeSlug
@@ -317,24 +370,44 @@ const AnimeParser = {
             '.title-container h1'
         ];
 
+        // Separator character class: dash, en-dash, em-dash, tilde, pipe, colon
+        // followed by optional spaces. Used to anchor the removal patterns so
+        // that only genuine episode/part suffixes are stripped.
+        const SEP = /\s*[-–—~|]\s*/;
+
         for (const selector of titleSelectors) {
-            const titleElement = document.querySelector(selector);
-            if (titleElement) {
+            try {
+                const titleElement = document.querySelector(selector);
+                if (!titleElement) continue;
+
                 let extractedTitle = titleElement.textContent.trim();
-                
+
+                // Strip episode/part markers anchored to the END of the string.
+                // Each pattern requires a leading separator (SEP) so mid-title
+                // keywords like "Episode of Merry", "Part of Your World", or
+                // "Chapter Black" are left intact.
                 extractedTitle = extractedTitle
-                    .replace(/\s*[-~]\s*Episode\s*\d+.*/gi, '')
-                    .replace(/\s*[-~]\s*Ep\s*\d+.*/gi, '')
-                    .replace(/\s*[-~]\s*Part\s*\d+.*/gi, '')
-                    .replace(/\s*[-~]\s*Chapter\s*\d+.*/gi, '')
-                    .replace(/\s*\d+\s*$/, '')
-                    .replace(/\s*\(\d{4}\)$/, '')
+                    // "– Episode 12" / "– Episode 12 (Special)" / "– Episode 12: Sub-title"
+                    .replace(new RegExp(`${SEP.source}Episode\\s*\\d+.*$`, 'i'), '')
+                    // "– Ep12" / "– Ep 12"
+                    .replace(new RegExp(`${SEP.source}Ep\\s*\\d+.*$`, 'i'), '')
+                    // "– Part 2"
+                    .replace(new RegExp(`${SEP.source}Part\\s*\\d+.*$`, 'i'), '')
+                    // "– Chapter 5"
+                    .replace(new RegExp(`${SEP.source}Chapter\\s*\\d+.*$`, 'i'), '')
+                    // Bare trailing digit sequence injected by page templates
+                    // (only when preceded by whitespace to avoid "SAO II" etc.)
+                    .replace(/\s+\d+\s*$/, '')
+                    // Year disambiguation "(2024)"
+                    .replace(/\s*\(\d{4}\)\s*$/, '')
                     .trim();
-                
+
                 if (extractedTitle && extractedTitle.length > 2 && extractedTitle.length < 150) {
                     animeTitle = extractedTitle;
                     break;
                 }
+            } catch {
+                // Ignore selector errors and try the next one
             }
         }
 
