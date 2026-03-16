@@ -41,6 +41,7 @@ const AnimeCardRenderer = {
                 if (parts.length !== 2 || !parts[1]) return;
 
                 const epNum = parseInt(parts[1], 10);
+                if (isNaN(epNum)) return;
                 if (trackedEpisodeNumbers.has(epNum)) return;
                 if (progress.percentage >= CONFIG.COMPLETED_PERCENTAGE) return;
 
@@ -199,8 +200,14 @@ const AnimeCardRenderer = {
         // Display summary information (episodes watched/total, status, last watched) when the card is expanded.
         const totalWatchedEpisodes = anime.episodes?.length || 0;
         const totalEpisodesPossible = progressData.total || 0;
-        const isCardComplete = (progressData.progress === 100 && totalWatchedEpisodes > 0)
-            || (progressData.total == null && anilistStatusForProgress === 'FINISHED' && totalWatchedEpisodes > 0);
+        const isManuallyCompleted = !!anime.completedAt && totalWatchedEpisodes > 0;
+        // AniList says FINISHED: complete if total is unknown, progress=100, or highest tracked ep >= total
+        const isFinishedByAnilist = anilistStatusForProgress === 'FINISHED' && totalWatchedEpisodes > 0
+            && (progressData.total == null || progressData.progress >= 100
+                || (progressData.total > 0 && highestCompletedEp >= progressData.total));
+        const isCardComplete = isManuallyCompleted
+            || (progressData.progress === 100 && totalWatchedEpisodes > 0)
+            || isFinishedByAnilist;
         const totalProgressText = totalEpisodesPossible > 0 ? `${currentEpisode}/${totalEpisodesPossible}` : `${currentEpisode}`;
         const episodeProgressText = currentEpisode > 0 ? `Ep ${totalProgressText}` : '';
         let statusTextCard = '';
@@ -237,6 +244,7 @@ const AnimeCardRenderer = {
                         ${metaRowHtml}
                     </div>
                     <div class="anime-card-actions">
+                        <button class="anime-complete-toggle" data-slug="${slug}" data-completed="${isManuallyCompleted}" title="${isManuallyCompleted ? 'Unmark as completed' : 'Mark as completed'}">${UIHelpers.createIcon('check')}</button>
                         <button class="anime-edit-title" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
                         <button class="anime-delete" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
                     </div>
@@ -952,13 +960,11 @@ const AnimeCardRenderer = {
         const totalMovies = movies.length;
         const statusGroup = (watchedCount === 0) ? 'Not started' : (watchedCount < totalMovies ? 'Watching' : 'Completed');
         const allMoviesWatched = watchedCount >= totalMovies;
-        const movieProgressBadge = !allMoviesWatched
-            ? `<span class="meta-badge meta-badge-progress">${movies.length} movies</span>`
-            : '';
+        const movieTypeBadge = `<span class="meta-badge" style="color:#f4a261;background:rgba(244,162,97,0.12);border:1px solid rgba(244,162,97,0.35);">${totalMovies} Movies</span>`;
         const movieStatusClass = allMoviesWatched ? 'meta-badge-complete' : (watchedCount > 0 ? 'meta-badge-watching' : 'meta-badge-notstarted');
         const movieStatusIcon = allMoviesWatched ? '✓' : '⊙';
         const movieStatusBadge = `<span class="meta-badge ${movieStatusClass}">${movieStatusIcon} ${statusGroup}</span>`;
-        const metaRowHtml = `<div class="movie-group-meta-row">${movieProgressBadge}${movieStatusBadge}<span class="meta-time">${lastWatchedText}</span></div>`;
+        const metaRowHtml = `<div class="movie-group-meta-row">${movieTypeBadge}${movieStatusBadge}<span class="meta-time">${lastWatchedText}</span></div>`;
 
         return `
             <div class="anime-movie-group" data-base-slug="${baseSlug}">

@@ -221,9 +221,9 @@ const ProgressManager = {
                 for (let missing = left + 1; missing < right; missing++) {
                     if (episodeMap.has(missing)) continue;
 
-                    if (FillerService?.hasFillerData?.(slug) && FillerService.isFillerEpisode(slug, missing)) {
-                        continue;
-                    }
+                    // Without filler data we can't tell intentional skips from accidents — skip repair
+                    if (!FillerService?.hasFillerData?.(slug)) continue;
+                    if (FillerService.isFillerEpisode(slug, missing)) continue;
 
                     const rightEp = episodeMap.get(right);
                     episodeMap.set(missing, {

@@ -5,7 +5,7 @@
 const CONFIG = {
     // Cache settings
     EPISODE_TYPES_CACHE_TTL:    24 * 60 * 60 * 1000, // 24 hours
-    FILLER_NOT_FOUND_CACHE_TTL:  7 * 24 * 60 * 60 * 1000, // 7 days — longer because shows rarely gain a filler list
+    FILLER_NOT_FOUND_CACHE_TTL:  3 * 24 * 60 * 60 * 1000, // 3 days — retry sooner in case a filler list gets added
 
     // UI settings
     SEARCH_DEBOUNCE_MS: 150,
@@ -22,7 +22,7 @@ const CONFIG = {
     COMPLETED_LIST_MIN_DAYS: 4,
 
     // Progress thresholds
-    COMPLETED_PERCENTAGE: 85
+    COMPLETED_PERCENTAGE: 85 // must match ContentConfig.COMPLETED_PERCENTAGE in src/content/config.js
 };
 
 // Donate links

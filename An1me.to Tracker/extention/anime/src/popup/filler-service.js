@@ -99,9 +99,11 @@ const FillerService = {
             Logger.info(`Fetching episode types for ${animeSlug}...`);
 
             const response = await new Promise((resolve, reject) => {
+                const timer = setTimeout(() => reject(new Error('Message timeout after 15s')), 15000);
                 chrome.runtime.sendMessage(
                     { type: 'FETCH_EPISODE_TYPES', animeSlug, animeTitle },
                     (response) => {
+                        clearTimeout(timer);
                         if (chrome.runtime.lastError) {
                             reject(new Error(chrome.runtime.lastError.message));
                         } else {
@@ -499,9 +501,10 @@ const FillerService = {
             try {
                 await Storage.remove([`episodeTypes_${animeSlug}`]);
                 await new Promise((resolve) => {
+                    const timer = setTimeout(resolve, 5000);
                     chrome.runtime.sendMessage(
                         { type: 'CLEAR_FILLER_CACHE', animeSlug },
-                        () => { chrome.runtime.lastError; resolve(); }
+                        () => { clearTimeout(timer); chrome.runtime.lastError; resolve(); }
                     );
                 });
                 Logger.success(`Cleared filler cache for ${animeSlug}`);

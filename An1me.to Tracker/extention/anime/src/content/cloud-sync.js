@@ -688,6 +688,8 @@
     let keepAlivePulseTimer = null;
     let keepAlivePort = null;
     let suppressKeepAliveReconnect = false;
+    let keepAliveFailCount = 0;
+    const KEEPALIVE_MAX_FAILS = 8; // stop retrying after ~16s of backoff (no background SW)
 
     function scheduleKeepaliveReconnect(delayMs) {
         if (keepAliveRetryTimer) clearTimeout(keepAliveRetryTimer);
@@ -721,6 +723,7 @@
             const port = chrome.runtime.connect({ name: 'keepAlive' });
             keepAlivePort = port;
             keepAliveRetryDelay = 100;
+            keepAliveFailCount = 0;
 
             keepAlivePulseTimer = setTimeout(() => {
                 keepAlivePulseTimer = null;
@@ -752,6 +755,12 @@
                 scheduleKeepaliveReconnect(document.hidden ? 3000 : keepAliveRetryDelay);
             });
         } catch {
+            keepAliveFailCount++;
+            if (keepAliveFailCount >= KEEPALIVE_MAX_FAILS) {
+                // No background service worker available (e.g. Orion/Safari) — stop retrying
+                Logger?.debug('keepAlive: no background SW detected, stopping retries');
+                return;
+            }
             keepAliveRetryDelay = Math.min(keepAliveRetryDelay * 2, 5000);
             scheduleKeepaliveReconnect(document.hidden ? 3000 : keepAliveRetryDelay);
         }

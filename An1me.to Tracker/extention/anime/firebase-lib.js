@@ -224,8 +224,8 @@ const FirebaseLib = (function() {
             );
 
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error('[Firebase] Token refresh HTTP error:', response.status, errorText);
+                await response.text(); // consume body
+                console.error('[Firebase] Token refresh HTTP error:', response.status);
                 throw new Error(`HTTP error: ${response.status}`);
             }
 
@@ -237,7 +237,8 @@ const FirebaseLib = (function() {
 
             // FIX: Validate response data
             if (!data.id_token || !data.refresh_token || !data.expires_in) {
-                console.error('[Firebase] Invalid token refresh response:', data);
+                const missing = ['id_token', 'refresh_token', 'expires_in'].filter(k => !data[k]);
+                console.error('[Firebase] Invalid token refresh response, missing fields:', missing);
                 throw new Error('Invalid token refresh response');
             }
 
@@ -271,7 +272,8 @@ const FirebaseLib = (function() {
 
         // FIX: Validate tokens object structure
         if (!tokens.idToken || !tokens.refreshToken || !tokens.expiresAt) {
-            console.error('[Firebase] Invalid tokens structure:', tokens);
+            const missing = ['idToken', 'refreshToken', 'expiresAt'].filter(k => !tokens[k]);
+            console.error('[Firebase] Invalid tokens structure, missing fields:', missing);
             // FIX D12: Clear invalid tokens
             await signOut();
             return null;

@@ -353,45 +353,12 @@ const ProgressTracker = {
 
             const result = await Storage.get(['animeData']);
             const animeData = result.animeData || {};
-            const normalizeText = (value) =>
-                String(value || '')
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]+/g, '');
-            const targetSlug = String(info.animeSlug || '').toLowerCase();
-            const targetTitle = normalizeText(info.animeTitle || '');
-            const targetEpisode = Number(info.episodeNumber) || 0;
-            const targetSecondEpisode = Number(info.secondEpisodeNumber) || 0;
-
-            const candidateKeys = Object.keys(animeData)
-                .map((key) => {
-                    const anime = animeData[key];
-                    if (!anime || !Array.isArray(anime.episodes)) return null;
-
-                    const keyLower = String(key || '').toLowerCase();
-                    const titleNorm = normalizeText(anime.title || '');
-                    let score = 0;
-
-                    if (keyLower === targetSlug) score += 10;
-                    if (targetSlug && (keyLower.includes(targetSlug) || targetSlug.includes(keyLower))) score += 4;
-                    if (targetTitle && titleNorm && targetTitle === titleNorm) score += 3;
-
-                    const hasTargetEpisode = targetEpisode > 0 && anime.episodes.some(ep => Number(ep?.number) === targetEpisode);
-                    const hasSecondEpisode = targetSecondEpisode > 0 && anime.episodes.some(ep => Number(ep?.number) === targetSecondEpisode);
-                    if (hasTargetEpisode) score += 3;
-                    if (hasSecondEpisode) score += 2;
-                    if (anime.episodes.length === 1) score += 1;
-
-                    return score > 0 ? { key, score } : null;
-                })
-                .filter(Boolean)
-                .sort((a, b) => b.score - a.score);
-
-            if (candidateKeys.length === 0) return false;
-
-            const animeKey = candidateKeys[0].key;
+            const animeKey = info.animeSlug;
             const anime = animeData[animeKey];
             if (!anime || !Array.isArray(anime.episodes)) return false;
 
+            const targetEpisode = Number(info.episodeNumber) || 0;
+            const targetSecondEpisode = Number(info.secondEpisodeNumber) || 0;
             let changed = false;
 
             const updateEpisodeDuration = (episodeNumber) => {

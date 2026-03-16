@@ -287,8 +287,11 @@ const AnimeParser = {
                         }
                     }
 
-                    const isEpisodeNavAttrNode = selector === '[data-open-nav-episode]';
-                    if (isEpisodeNavAttrNode || hrefMatch) {
+                    // Only read data-open-nav-episode when the href already matches the slug pattern.
+                    // Without this guard, unrelated series links on the same page (e.g. Naruto
+                    // Shippuden links shown on the Naruto page) would inflate the total and prevent
+                    // the anime from ever reaching 100% progress.
+                    if (hrefMatch) {
                         const attrNum = parseEpisodeNumber(
                             node.getAttribute('data-open-nav-episode') || node.dataset?.openNavEpisode
                         );

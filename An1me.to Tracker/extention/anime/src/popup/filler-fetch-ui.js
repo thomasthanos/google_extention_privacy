@@ -472,9 +472,9 @@ const FillerFetchUI = {
             if (cached) {
                 const age = cached.cachedAt ? Date.now() - cached.cachedAt : Infinity;
 
-                // notFound entry within its 7-day TTL → skip (do NOT count as cached)
+                // notFound entry within TTL → skip (do NOT count as cached)
                 if (cached.notFound) {
-                    const ttl = CONFIG.FILLER_NOT_FOUND_CACHE_TTL ?? (7 * 24 * 60 * 60 * 1000);
+                    const ttl = CONFIG.FILLER_NOT_FOUND_CACHE_TTL;
                     if (age < ttl) {
                         this._log('nofill', title, 'not listed');
                         this.state.skipped++;

@@ -418,30 +418,38 @@ async function syncToFirebase() {
 async function applyCloudUpdate(cloudDoc) {
     if (!cloudDoc) return;
     try {
+        // First read: baseline local state
         const local = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
 
         const mergedDeleted = cloudDoc.deletedAnime
             ? mergeDeletedAnime(local.deletedAnime || {}, cloudDoc.deletedAnime)
             : (local.deletedAnime || {});
 
-        const mergedAnime = mergeAnimeData(local.animeData || {}, cloudDoc.animeData || {});
-
+        let mergedAnime = mergeAnimeData(local.animeData || {}, cloudDoc.animeData || {});
         applyDeletedAnime(mergedAnime, mergedDeleted);
 
-        const mergedProgress = mergeVideoProgress(local.videoProgress || {}, cloudDoc.videoProgress || {});
+        let mergedProgress = mergeVideoProgress(local.videoProgress || {}, cloudDoc.videoProgress || {});
 
         const localGroup  = local.groupCoverImages   || {};
         const cloudGroup  = cloudDoc.groupCoverImages || {};
-        const mergedGroup = mergeGroupCoverImages(localGroup, cloudGroup);
+        let mergedGroup = mergeGroupCoverImages(localGroup, cloudGroup);
 
-        const localEps  = Object.values(local.animeData || {}).reduce((s, a) => s + (a.episodes?.length || 0), 0);
+        // Second read: pick up any local writes that arrived during the merge computation
+        // (e.g. a content script saving video progress between the first read and now).
+        const fresh = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
+        if (fresh.animeData)       mergedAnime     = mergeAnimeData(mergedAnime, fresh.animeData);
+        if (fresh.videoProgress)   mergedProgress  = mergeVideoProgress(mergedProgress, fresh.videoProgress);
+        if (fresh.groupCoverImages) mergedGroup    = mergeGroupCoverImages(mergedGroup, fresh.groupCoverImages);
+        applyDeletedAnime(mergedAnime, mergedDeleted);
+
+        const freshEps  = Object.values(fresh.animeData || {}).reduce((s, a) => s + (a.episodes?.length || 0), 0);
         const mergedEps = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
 
-        const progressChanged = !areProgressMapsEqual(local.videoProgress || {}, mergedProgress);
-        const deletedChanged  = !shallowEqualDeletedAnime(local.deletedAnime || {}, mergedDeleted);
-        const groupChanged    = !shallowEqualStringMap(local.groupCoverImages || {}, mergedGroup);
+        const progressChanged = !areProgressMapsEqual(fresh.videoProgress || {}, mergedProgress);
+        const deletedChanged  = !shallowEqualDeletedAnime(fresh.deletedAnime || {}, mergedDeleted);
+        const groupChanged    = !shallowEqualStringMap(fresh.groupCoverImages || {}, mergedGroup);
 
-        if (mergedEps !== localEps || progressChanged || deletedChanged || groupChanged) {
+        if (mergedEps !== freshEps || progressChanged || deletedChanged || groupChanged) {
             pauseSync();
             await bgStorageSet({
                 animeData:        mergedAnime,
@@ -449,7 +457,7 @@ async function applyCloudUpdate(cloudDoc) {
                 deletedAnime:     mergedDeleted,
                 groupCoverImages: mergedGroup
             });
-            console.log(`[BG-RT] ← Cloud update applied (eps: ${localEps}→${mergedEps})`);
+            console.log(`[BG-RT] ← Cloud update applied (eps: ${freshEps}→${mergedEps})`);
         }
     } catch (e) {
         console.warn('[BG-RT] Apply update failed:', e.message);
@@ -627,6 +635,33 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
 // ─── AnimeFillerList slug discovery ──────────────────────────────────────────
 
+// Direct an1me.to slug → animefillerlist.com slug mappings for well-known series.
+// Avoids HEAD request discovery entirely for these entries.
+// Add new entries here instead of relying on the generic heuristic.
+const KNOWN_FILLER_SLUGS = {
+    'naruto':                                'naruto',
+    'naruto-shippuuden':                     'naruto-shippuden',
+    'one-piece':                             'one-piece',
+    'bleach':                                'bleach',
+    'bleach-sennen-kessen-hen':              'bleach',
+    'dragon-ball-z':                         'dragon-ball-z',
+    'dragon-ball-super':                     'dragon-ball-super',
+    'fairy-tail':                            'fairy-tail',
+    'shingeki-no-kyojin':                    'attack-on-titan',
+    'kimetsu-no-yaiba':                      'demon-slayer-kimetsu-no-yaiba',
+    'boku-no-hero-academia':                 'my-hero-academia',
+    'hunter-x-hunter-2011':                 'hunter-x-hunter-2011',
+    'fullmetal-alchemist-brotherhood':       'fullmetal-alchemist-brotherhood',
+    'sword-art-online':                      'sword-art-online',
+    'black-clover':                          'black-clover',
+    'boruto-naruto-next-generations':        'boruto-naruto-next-generations',
+    'one-punch-man':                         'one-punch-man',
+    'jujutsu-kaisen':                        'jujutsu-kaisen',
+    'shingeki-no-kyojin-season-2':           'attack-on-titan',
+    'shingeki-no-kyojin-season-3':           'attack-on-titan',
+    'shingeki-no-kyojin-the-final-season':   'attack-on-titan',
+};
+
 const fillerSlugCache = {};
 
 function generateFillerSlugCandidates(an1meSlug, animeTitle) {
@@ -711,6 +746,13 @@ async function discoverFillerSlug(an1meSlug, animeTitle) {
 
     if (cacheKey in fillerSlugCache) return fillerSlugCache[cacheKey];
 
+    // Check pre-defined known mappings first — no HEAD request needed
+    if (cacheKey in KNOWN_FILLER_SLUGS) {
+        const known = KNOWN_FILLER_SLUGS[cacheKey];
+        fillerSlugCache[cacheKey] = known;
+        return known;
+    }
+
     const storageKey = `fillerslug_${cacheKey}`;
     try {
         const stored = await bgStorageGet([storageKey]);
@@ -721,10 +763,9 @@ async function discoverFillerSlug(an1meSlug, animeTitle) {
                 return cached;
             }
             if (cached?.notFound) {
-                // 7-day TTL — mirrors CONFIG.FILLER_NOT_FOUND_CACHE_TTL in the popup.
-                // Both values must be kept in sync; use FillerService.clearCache() to force a re-check.
+                // 3-day TTL — must match FILLER_NOT_FOUND_CACHE_TTL in src/popup/config.js
                 const age = cached.cachedAt ? Date.now() - cached.cachedAt : Infinity;
-                if (age < 7 * 24 * 60 * 60 * 1000) {
+                if (age < 3 * 24 * 60 * 60 * 1000) {
                     fillerSlugCache[cacheKey] = null;
                     return null;
                 }
@@ -735,17 +776,27 @@ async function discoverFillerSlug(an1meSlug, animeTitle) {
         console.warn('[BG] discoverFillerSlug storage read failed:', e.message);
     }
 
-    const candidates = generateFillerSlugCandidates(an1meSlug, animeTitle);
-    for (const candidate of candidates) {
+    // Try candidates in parallel (cap at 5 to avoid hammering the server)
+    const candidates = generateFillerSlugCandidates(an1meSlug, animeTitle).slice(0, 5);
+    const tryCandidate = async (candidate) => {
+        const headCtrl = new AbortController();
+        const timer = setTimeout(() => headCtrl.abort(), 10000);
         try {
-            const resp = await fetch(`https://www.animefillerlist.com/shows/${candidate}`, { method: 'HEAD' });
-            if (resp.ok) {
-                fillerSlugCache[cacheKey] = candidate;
-                await bgStorageSet({ [storageKey]: candidate });
-                console.log(`[AnimeTracker] Filler slug discovered: ${an1meSlug} → ${candidate}`);
-                return candidate;
-            }
+            const resp = await fetch(`https://www.animefillerlist.com/shows/${candidate}`, { method: 'HEAD', signal: headCtrl.signal });
+            if (resp.ok) return candidate;
         } catch {}
+        finally { clearTimeout(timer); }
+        return null;
+    };
+
+    const results = await Promise.all(candidates.map(tryCandidate));
+    const found = results.find(r => r !== null) ?? null;
+
+    if (found) {
+        fillerSlugCache[cacheKey] = found;
+        await bgStorageSet({ [storageKey]: found });
+        console.log(`[AnimeTracker] Filler slug discovered: ${an1meSlug} → ${found}`);
+        return found;
     }
 
     const notFoundEntry = { notFound: true, cachedAt: Date.now() };
@@ -764,22 +815,59 @@ async function discoverFillerSlug(an1meSlug, animeTitle) {
 async function fetchAnimePageInfo(slug) {
     const cleanSlug = slug.replace(/-\d+$/, '');
     const url = `https://an1me.to/anime/${cleanSlug}/`;
-    const response = await fetch(url);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
+    let response;
+    try {
+        response = await fetch(url, { signal: ctrl.signal });
+    } finally {
+        clearTimeout(timer);
+    }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const html = await response.text();
 
+    // ── Episode count ────────────────────────────────────────────────────────
+    // Try multiple patterns: Greek label, English label, generic <dt> with number.
+    // After capturing the <dd> block, strip all HTML tags and grab the first
+    // 1-4 digit number so formats like "220 επεισόδια" or "220 Episodes" work.
     let totalEpisodes = null;
-    const epDdMatch = html.match(/Επεισόδια<\/dt>\s*(<dd[^>]*>[\s\S]{0,200}?<\/dd>)/);
+    const epDdMatch = html.match(
+        /(?:Επεισόδια|Episodes?)<\/dt>\s*(<dd[^>]*>[\s\S]{0,300}?<\/dd>)/
+    );
     if (epDdMatch) {
-        const numMatch = epDdMatch[1].match(/>(\d+)</);
+        const text = epDdMatch[1].replace(/<[^>]+>/g, ' ');
+        const numMatch = text.match(/\b(\d{1,4})\b/);
         if (numMatch) totalEpisodes = parseInt(numMatch[1], 10);
     }
 
+    // Fallback: scan episode links on the page for the highest episode number
+    if (!totalEpisodes) {
+        const epPattern = new RegExp(`/watch/${cleanSlug}-episode-(\\d+)`, 'gi');
+        let m;
+        let maxEp = 0;
+        while ((m = epPattern.exec(html)) !== null) {
+            const n = parseInt(m[1], 10);
+            if (n > maxEp) maxEp = n;
+        }
+        if (maxEp > 0) totalEpisodes = maxEp;
+    }
+
+    // ── Status ───────────────────────────────────────────────────────────────
+    // Try Greek "Προβλήθηκε" and English "Aired" <dt> labels.
+    // A "?" in the date text means the end date is unknown → still airing.
+    // Also recognise explicit "Finished Airing" / "Currently Airing" text.
     let status = null;
-    const dateMatch = html.match(/Προβλήθηκε<\/dt>[\s\S]{0,300}?<time[^>]*>([\s\S]*?)<\/time>/);
+    const dateMatch = html.match(
+        /(?:Προβλήθηκε|Aired?)<\/dt>[\s\S]{0,300}?<time[^>]*>([\s\S]*?)<\/time>/
+    );
     if (dateMatch) {
         const dateText = dateMatch[1].replace(/\s+/g, ' ').trim();
         status = dateText.includes('?') ? 'RELEASING' : 'FINISHED';
+    }
+
+    if (!status) {
+        if (/Finished\s+Airing|Ολοκληρώθηκε/i.test(html)) status = 'FINISHED';
+        else if (/Currently\s+Airing|Προβάλλεται\s+τώρα/i.test(html)) status = 'RELEASING';
     }
 
     return { totalEpisodes, status };
@@ -791,7 +879,14 @@ async function fetchEpisodeTypesFromAnimeFillerList(animeSlug) {
     try {
         const url      = `https://www.animefillerlist.com/shows/${animeSlug}`;
         console.log(`[Anime Tracker] Fetching episode types from ${url}`);
-        const response = await fetch(url);
+        const ctrl     = new AbortController();
+        const timer    = setTimeout(() => ctrl.abort(), 15000);
+        let response;
+        try {
+            response = await fetch(url, { signal: ctrl.signal });
+        } finally {
+            clearTimeout(timer);
+        }
         if (!response.ok) {
             if (response.status === 404) return null;
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -833,6 +928,12 @@ async function fetchEpisodeTypesFromAnimeFillerList(animeSlug) {
             ...episodeTypes.anime_canon
         ];
         if (all.length > 0) episodeTypes.totalEpisodes = Math.max(...all);
+
+        // If nothing was parsed at all, treat as not-found rather than caching empty data
+        if (all.length === 0) {
+            console.warn(`[Anime Tracker] ⚠ No episodes parsed for ${animeSlug} — site structure may have changed`);
+            return null;
+        }
 
         console.log(`[Anime Tracker] ✓ Fetched episode types for ${animeSlug}:`, episodeTypes);
         return episodeTypes;

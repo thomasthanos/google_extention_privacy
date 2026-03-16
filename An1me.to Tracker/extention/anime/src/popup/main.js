@@ -29,6 +29,7 @@
         settingsUserEmail: document.getElementById('settingsUserEmail'),
         settingsDonate: document.getElementById('settingsDonate'),
         settingsRefresh: document.getElementById('settingsRefresh'),
+        settingsRefreshInfo: document.getElementById('settingsRefreshInfo'),
         settingsClear: document.getElementById('settingsClear'),
         settingsSignOut: document.getElementById('settingsSignOut'),
         // Main
@@ -118,18 +119,33 @@
     }
 
     function isAnimeCompleted(slug, anime) {
-        const { FillerService, SeasonGrouping } = AT;
+        const { FillerService, SeasonGrouping, AnilistService } = AT;
         if (!anime) return false;
         const watchedCount = anime.episodes?.length || 0;
         if (watchedCount === 0) return false;
+        if (anime.completedAt) return true;
         if (SeasonGrouping.isMovie(slug, anime)) return true;
         const progressData = FillerService.calculateProgress(watchedCount, slug, anime);
-        return progressData.progress >= 100;
+        if (progressData.progress >= 100) return true;
+        // AniList says FINISHED and total is unknown → user has watched all available episodes
+        const anilistStatus = AnilistService?.getStatus(slug.toLowerCase());
+        if (anilistStatus === 'FINISHED' && progressData.total == null) return true;
+        // AniList says FINISHED and user has tracked the final episode (handles gaps in the middle)
+        if (anilistStatus === 'FINISHED' && progressData.total != null) {
+            const highestEp = Math.max(0, ...(anime.episodes || []).map(ep => Number(ep.number) || 0));
+            if (highestEp >= progressData.total) return true;
+        }
+        return false;
     }
 
     function isAgedCompleted(slug, anime) {
-        const { CONFIG } = AT;
+        const { CONFIG, AnilistService } = AT;
         if (!isAnimeCompleted(slug, anime)) return false;
+        if (anime.completedAt) return true;
+        // For definitively finished series, move to completed section immediately
+        const anilistStatus = AnilistService?.getStatus(slug.toLowerCase());
+        if (anilistStatus === 'FINISHED') return true;
+        // For airing/unknown series, wait a few days to avoid false moves
         const daysSinceLastWatch = getCalendarDayDiff(anime?.lastWatched);
         return daysSinceLastWatch >= CONFIG.COMPLETED_LIST_MIN_DAYS;
     }
@@ -201,6 +217,29 @@
         }
 
         return { changed, updatedEntries };
+    }
+
+    // Remove phantom movies: movies tracked but watched for ≤5 min and older than 1 day.
+    function cleanupPhantomMovies(data, existingDeletedAnime = {}) {
+        const { SeasonGrouping } = AT;
+        const MAX_PHANTOM_WATCH_SECONDS = 5 * 60;
+        const MIN_AGE_MS = 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        const updatedDeletedAnime = { ...existingDeletedAnime };
+        let changed = false;
+
+        for (const [slug, anime] of Object.entries(data)) {
+            if (!anime || !SeasonGrouping.isMovie(slug, anime)) continue;
+            if ((Number(anime.totalWatchTime) || 0) > MAX_PHANTOM_WATCH_SECONDS) continue;
+            const lastTouched = anime.lastWatched ? new Date(anime.lastWatched).getTime() : 0;
+            if (!lastTouched || (now - lastTouched) < MIN_AGE_MS) continue;
+
+            delete data[slug];
+            updatedDeletedAnime[slug] = { deletedAt: new Date().toISOString() };
+            changed = true;
+        }
+
+        return { changed, deletedAnime: updatedDeletedAnime };
     }
 
     function showAuthScreen() {
@@ -491,7 +530,7 @@
             const header = card.querySelector('.anime-card-header');
             if (header) {
                 const toggleCard = (e) => {
-                    if (e.target.closest('.anime-delete') || e.target.closest('.anime-edit-title') || e.target.closest('.anime-fetch-filler')) return;
+                    if (e.target.closest('.anime-delete') || e.target.closest('.anime-edit-title') || e.target.closest('.anime-fetch-filler') || e.target.closest('.anime-complete-toggle')) return;
                     e.stopPropagation();
                     card.classList.toggle('expanded');
                 };
@@ -661,15 +700,19 @@
             const originalCount = UIHelpers.countEpisodes(result.animeData || {});
             const cleanedCount = UIHelpers.countEpisodes(repairedData);
             const durationFix = normalizeMovieDurations(repairedData, rawProgressForDurations);
+            const phantomCleanup = cleanupPhantomMovies(
+                repairedData,
+                normalized.deletedAnime || result.deletedAnime || {}
+            );
             const needsSave =
                 (originalCount !== cleanedCount) || (progressRemoved > 0) ||
-                (repairedCount > 0) || durationFix.changed || normalized.changed;
+                (repairedCount > 0) || durationFix.changed || normalized.changed || phantomCleanup.changed;
 
             if (needsSave) {
                 animeData = repairedData;
                 videoProgress = cleanedProgress;
                 const payload = { animeData: repairedData, videoProgress: cleanedProgress };
-                if (normalized.changed) payload.deletedAnime = normalized.deletedAnime || {};
+                if (normalized.changed || phantomCleanup.changed) payload.deletedAnime = phantomCleanup.deletedAnime;
                 markInternalSave(payload);
                 await Storage.set(payload);
             } else {
@@ -753,14 +796,18 @@
                 const { cleaned: cleanedProgress, removedCount: progressRemoved } =
                     ProgressManager.cleanTrackedProgress(repairedData, rawProgressForDurations);
                 const durationFix = normalizeMovieDurations(repairedData, rawProgressForDurations);
+                const phantomCleanup = cleanupPhantomMovies(
+                    repairedData,
+                    normalized.deletedAnime || data.deletedAnime || {}
+                );
 
                 animeData = repairedData;
                 videoProgress = cleanedProgress;
                 window.AnimeTracker.groupCoverImages = data.groupCoverImages || {};
 
-                if (repairedCount > 0 || progressRemoved > 0 || durationFix.changed || normalized.changed) {
+                if (repairedCount > 0 || progressRemoved > 0 || durationFix.changed || normalized.changed || phantomCleanup.changed) {
                     const payload = { animeData: repairedData, videoProgress: cleanedProgress };
-                    if (normalized.changed) payload.deletedAnime = normalized.deletedAnime || {};
+                    if (normalized.changed || phantomCleanup.changed) payload.deletedAnime = phantomCleanup.deletedAnime;
                     markInternalSave(payload);
                     await Storage.set(payload);
                 }
@@ -889,6 +936,44 @@
         } catch (e) {
             console.error('[Delete] Error:', e);
             alert('Failed to delete anime. Please try again.');
+        }
+    }
+
+    /**
+     * Toggle manual completed status
+     */
+    async function toggleAnimeCompleted(slug) {
+        const { Storage, FirebaseSync } = AT;
+        if (!animeData[slug]) return;
+
+        try {
+            if (animeData[slug].completedAt) {
+                delete animeData[slug].completedAt;
+            } else {
+                animeData[slug].completedAt = new Date().toISOString();
+            }
+
+            const result = await Storage.get(['videoProgress', 'deletedAnime', 'groupCoverImages']);
+            const currentVideoProgress = result.videoProgress || {};
+            const deletedAnime = result.deletedAnime || {};
+
+            const dataToSave = { animeData, videoProgress: currentVideoProgress, deletedAnime };
+            const user = FirebaseSync.getUser();
+            if (user) dataToSave.userId = user.uid;
+            markInternalSave(dataToSave);
+            await Storage.set(dataToSave);
+
+            if (user) {
+                await FirebaseSync.saveToCloud({
+                    animeData, videoProgress: currentVideoProgress, deletedAnime,
+                    groupCoverImages: result.groupCoverImages || {}
+                }, true);
+            }
+
+            renderAnimeList(elements.searchInput?.value || '');
+            updateStats();
+        } catch (e) {
+            console.error('[Complete] Error:', e);
         }
     }
 
@@ -1312,6 +1397,29 @@
             } catch {}
         }
 
+        const pasteTokenBtn = document.getElementById('pasteTokenBtn');
+        if (pasteTokenBtn) {
+            pasteTokenBtn.addEventListener('click', async () => {
+                try {
+                    const text = await navigator.clipboard.readText();
+                    const input = document.getElementById('authTokenInput');
+                    if (input) {
+                        input.value = text;
+                        input.dispatchEvent(new Event('input'));
+                        pasteTokenBtn.textContent = '✓';
+                        pasteTokenBtn.style.background = 'linear-gradient(160deg,#1a8a5a 0%,#0e6644 45%,#075230 100%)';
+                        setTimeout(() => {
+                            pasteTokenBtn.textContent = 'Paste';
+                            pasteTokenBtn.style.background = '';
+                        }, 1500);
+                    }
+                } catch {
+                    // Clipboard read failed — focus textarea so user can Ctrl+V
+                    document.getElementById('authTokenInput')?.focus();
+                }
+            });
+        }
+
         const tokenSignInBtn = document.getElementById('tokenSignIn');
         if (tokenSignInBtn) {
             tokenSignInBtn.addEventListener('click', async () => {
@@ -1348,12 +1456,17 @@
                     overlay.className = 'export-token-overlay';
                     overlay.innerHTML = `
                         <div class="export-token-box">
-                            <h3>🔑 Export Token</h3>
-                            <p>Copy this token and paste it in the <strong>Import</strong> tab on Orion/Safari. Valid for ~1 hour.</p>
-                            <textarea class="export-token-text" readonly>${tokenStr}</textarea>
-                            <div class="export-token-actions">
-                                <button class="btn-copy-token">Copy Token</button>
-                                <button class="btn-close-token">Close</button>
+                            <div class="export-token-header">
+                                <span class="export-token-header-dot"></span>
+                                <h3>Export Token</h3>
+                            </div>
+                            <div class="export-token-body">
+                                <p>Copy this token and paste it in the <strong>Import Token</strong> panel on Orion/Safari. Valid for ~1 hour.</p>
+                                <textarea class="export-token-text" readonly>${tokenStr}</textarea>
+                                <div class="export-token-actions">
+                                    <button class="btn-copy-token">Copy Token</button>
+                                    <button class="btn-close-token">Close</button>
+                                </div>
                             </div>
                         </div>
                     `;
@@ -1410,6 +1523,31 @@
                 if (FirebaseSync.getUser()) await loadAndSyncData();
                 else loadData();
                 setTimeout(() => elements.settingsRefresh.classList.remove('loading'), 500);
+            });
+        }
+
+        if (elements.settingsRefreshInfo) {
+            elements.settingsRefreshInfo.addEventListener('click', async () => {
+                const { Storage, AnilistService } = AT;
+                elements.settingsRefreshInfo.classList.add('loading');
+                elements.settingsDropdown.classList.remove('visible');
+                try {
+                    // Clear all cached anime info from storage so autoFetchMissing re-fetches everything
+                    const allKeys = await new Promise(resolve => chrome.storage.local.get(null, resolve));
+                    const infoKeys = Object.keys(allKeys).filter(k => k.startsWith('animeinfo_'));
+                    if (infoKeys.length > 0) await Storage.remove(infoKeys);
+                    // Clear in-memory cache too
+                    AnilistService.cache = {};
+                    // Re-fetch for all tracked anime
+                    await AnilistService.autoFetchMissing(animeData, () => {
+                        renderAnimeList(elements.searchInput?.value || '');
+                        updateStats();
+                    });
+                } catch (e) {
+                    console.error('[RefreshInfo] Error:', e);
+                } finally {
+                    setTimeout(() => elements.settingsRefreshInfo.classList.remove('loading'), 500);
+                }
             });
         }
 
@@ -1587,6 +1725,12 @@
                     const slug = btn.dataset.slug;
                     const episodeNum = parseInt(btn.dataset.episode, 10);
                     if (slug && episodeNum) await deleteProgress(slug, episodeNum);
+                    return;
+                }
+
+                if (target.classList.contains('anime-complete-toggle') || target.closest('.anime-complete-toggle')) {
+                    const btn = target.classList.contains('anime-complete-toggle') ? target : target.closest('.anime-complete-toggle');
+                    if (btn.dataset.slug) await toggleAnimeCompleted(btn.dataset.slug);
                     return;
                 }
 
