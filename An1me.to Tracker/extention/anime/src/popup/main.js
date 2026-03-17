@@ -927,6 +927,53 @@
         }
     }
 
+    // Delete an "in-progress only" anime — one that exists only in videoProgress, not animeData.
+    async function deleteInProgressOnly(slug) {
+        const { Storage, FirebaseSync } = AT;
+        try {
+            const result = await Storage.get(['videoProgress']);
+            const currentVideoProgress = result.videoProgress || {};
+            const prefix = slug + '__episode-';
+            const now = Date.now();
+            let changed = false;
+
+            for (const id of Object.keys(currentVideoProgress)) {
+                if (!id.startsWith(prefix)) continue;
+                const entry = currentVideoProgress[id];
+                const savedAt = entry.savedAt ? new Date(entry.savedAt).getTime() : now;
+                const deletedAt = new Date(Math.max(now, savedAt + 5001)).toISOString();
+                currentVideoProgress[id] = { ...entry, deleted: true, deletedAt };
+                changed = true;
+            }
+
+            if (!changed) return;
+
+            videoProgress = currentVideoProgress;
+            const dataToSave = { videoProgress: currentVideoProgress };
+            const user = FirebaseSync.getUser();
+            if (user) dataToSave.userId = user.uid;
+            markInternalSave(dataToSave);
+            await Storage.set(dataToSave);
+
+            if (user) {
+                try {
+                    const gcResult = await Storage.get(['groupCoverImages']);
+                    await FirebaseSync.saveToCloud({
+                        animeData, videoProgress: currentVideoProgress,
+                        groupCoverImages: gcResult.groupCoverImages || {}
+                    }, true);
+                } catch (syncErr) {
+                    console.error('[DeleteInProgressOnly] Cloud sync failed:', syncErr);
+                }
+            }
+
+            renderAnimeList(elements.searchInput?.value || '');
+        } catch (e) {
+            console.error('[DeleteInProgressOnly] Error:', e);
+            alert('Failed to delete. Please try again.');
+        }
+    }
+
     async function toggleAnimeCompleted(slug) {
         const { Storage, FirebaseSync } = AT;
         if (!animeData[slug]) return;
@@ -1709,6 +1756,13 @@
                     const slug = btn.dataset.slug;
                     const episodeNum = parseInt(btn.dataset.episode, 10);
                     if (slug && episodeNum) await deleteProgress(slug, episodeNum);
+                    return;
+                }
+
+                // ── ip-delete-btn: delete an in-progress-only entry (not in animeData) ──
+                if (target.classList.contains('ip-delete-btn') || target.closest('.ip-delete-btn')) {
+                    const btn = target.classList.contains('ip-delete-btn') ? target : target.closest('.ip-delete-btn');
+                    if (btn.dataset.slug) await deleteInProgressOnly(btn.dataset.slug);
                     return;
                 }
 
