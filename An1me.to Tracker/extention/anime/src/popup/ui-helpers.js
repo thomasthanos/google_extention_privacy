@@ -1,12 +1,5 @@
-/**
- * Anime Tracker - UI Helpers
- * Formatting, escaping, and icon utilities
- */
 
 const UIHelpers = {
-    /**
-     * Simple logger - set DEBUG to true for verbose logging
-     */
     DEBUG: false,
     Logger: {
         info: (msg, data) => { if (UIHelpers.DEBUG) console.log('[Anime Tracker]', msg, data !== undefined ? data : ''); },
@@ -14,17 +7,9 @@ const UIHelpers = {
         error: (msg, data) => console.error('[Anime Tracker] ✗', msg, data !== undefined ? data : ''),
         warn: (msg, data) => { if (UIHelpers.DEBUG) console.warn('[Anime Tracker] ⚠', msg, data !== undefined ? data : ''); }
     },
-
-    /**
-     * Compute uniqueId from anime slug and episode number
-     */
     getUniqueId(animeSlug, episodeNumber) {
         return `${animeSlug}__episode-${episodeNumber}`;
     },
-
-    /**
-     * Format duration from seconds to readable string
-     */
     formatDuration(seconds) {
         if (!seconds || seconds === 0) return '0m';
         
@@ -36,10 +21,6 @@ const UIHelpers = {
         }
         return `${minutes}m`;
     },
-
-    /**
-     * Format duration for stats (shorter format)
-     */
     formatDurationShort(seconds) {
         if (!seconds || seconds === 0) return '0h';
 
@@ -61,10 +42,6 @@ const UIHelpers = {
         }
         return `${minutes}m`;
     },
-
-    /**
-     * Format date to relative or absolute string
-     */
     formatDate(isoString) {
         if (!isoString) return '';
         
@@ -92,10 +69,6 @@ const UIHelpers = {
             year: diffDays > 365 ? 'numeric' : undefined
         });
     },
-
-    /**
-     * Get progress bar size class based on episode count
-     */
     getProgressSizeClass(episodeCount, totalEpisodes) {
         const total = totalEpisodes || episodeCount;
         if (total >= 200) return 'size-huge';
@@ -103,10 +76,6 @@ const UIHelpers = {
         if (total >= 50) return 'size-medium';
         return 'size-small';
     },
-
-    /**
-     * Escape HTML - handles XSS edge cases
-     */
     escapeHtml(str) {
         if (typeof str !== 'string') {
             if (str === null || str === undefined) return '';
@@ -122,11 +91,6 @@ const UIHelpers = {
             .replace(/`/g, '&#x60;')
             .replace(/\//g, '&#x2F;');
     },
-
-    /**
-     * Sanitize image URLs used in popup templates.
-     * Allows only absolute HTTPS URLs.
-     */
     sanitizeImageUrl(url) {
         if (typeof url !== 'string') return null;
         const trimmed = url.trim();
@@ -140,10 +104,6 @@ const UIHelpers = {
             return null;
         }
     },
-
-    /**
-     * Create SVG icon
-     */
     createIcon(name) {
         const icons = {
             // Grid-style episodes icon — rounded rect with soft inner lines
@@ -163,10 +123,6 @@ const UIHelpers = {
         };
         return icons[name] || '';
     },
-
-    /**
-     * Count total episodes in anime data
-     */
     countEpisodes(animeData) {
         if (!animeData) return 0;
         return Object.values(animeData).reduce((sum, anime) => sum + (anime.episodes?.length || 0), 0);

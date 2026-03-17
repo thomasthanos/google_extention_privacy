@@ -1,6 +1,3 @@
-/**
- * Anime Tracker - Configuration Constants
- */
 
 const CONFIG = {
     // Cache settings
@@ -39,11 +36,6 @@ const ANIME_PARTS_CONFIG = {
         { name: 'Part 3: Soukoku-tan', start: 27, end: 40 }
     ],
 };
-
-
-/**
- * Season Grouping Utility
- */
 const SeasonGrouping = {
     isMovie(slug, anime = null) {
         const lowerSlug = String(slug || '').toLowerCase();

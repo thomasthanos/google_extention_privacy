@@ -1,9 +1,3 @@
-/**
- * Anime Tracker - Background Service Worker
- * Handles extension lifecycle, message passing, and auto-sync to Firebase
- */
-
-// ─── Config ───────────────────────────────────────────────────────────────────
 const FIREBASE_API_KEY    = "AIzaSyCDF9US2OwARlyZ0AH_zDpjzmOXRtrGKMg";
 const FIREBASE_PROJECT_ID = "anime-tracker-64d86";
 const FIRESTORE_BASE      = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)`;
@@ -21,8 +15,6 @@ const mergeAnimeData         = sharedMergeUtils.mergeAnimeData         || missin
 const mergeDeletedAnime      = sharedMergeUtils.mergeDeletedAnime      || missingMergeUtil('mergeDeletedAnime');
 const applyDeletedAnime      = sharedMergeUtils.applyDeletedAnime      || missingMergeUtil('applyDeletedAnime');
 const mergeGroupCoverImages  = sharedMergeUtils.mergeGroupCoverImages  || missingMergeUtil('mergeGroupCoverImages');
-
-// ─── Storage helpers ─────────────────────────────────────────────────────────
 
 function bgStorageGet(keys) {
     return new Promise((resolve, reject) => {
@@ -60,7 +52,6 @@ function bgStorageRemove(keys) {
     });
 }
 
-// ─── State ────────────────────────────────────────────────────────────────────
 let syncInProgress      = false;
 let pendingSync         = false;
 let syncDebounceTimeout = null;
@@ -83,8 +74,6 @@ const RT_MAX_DELAY   = 60000;
 const RT_MAX_FAILURES = 10;
 let rtConsecutiveFailures = 0;
 
-// ─── Token helpers ────────────────────────────────────────────────────────────
-
 async function signOutDueToTokenFailure() {
     console.warn('[BG] Token refresh failed — signing user out to force re-auth');
     try {
@@ -102,7 +91,6 @@ async function getFirebaseToken() {
         const stored = await bgStorageGet(['firebase_tokens']);
         const tokens = stored.firebase_tokens;
         if (!tokens?.idToken) return null;
-        // Refresh if token expires within 2 minutes
         if (tokens.expiresAt < Date.now() + 120000) {
             const refreshed = await refreshFirebaseToken(tokens.refreshToken);
             if (!refreshed) {
@@ -138,7 +126,6 @@ async function refreshFirebaseToken(refreshToken) {
             expiresAt:    Date.now() + parseInt(data.expires_in) * 1000
         };
         await bgStorageSet({ firebase_tokens: tokens });
-        console.log('[BG] Token refreshed');
         return tokens;
     } catch (e) {
         console.error('[BG] Token refresh failed:', e);
@@ -152,8 +139,6 @@ async function getFirebaseUser() {
         return stored.firebase_user || null;
     } catch { return null; }
 }
-
-// ─── Firestore codec ──────────────────────────────────────────────────────────
 
 function jsonToFirestoreFields(obj) {
     const fields = {};
@@ -195,8 +180,6 @@ function fromFSDoc(doc) {
     for (const [k, v] of Object.entries(doc.fields)) out[k] = fromFSValue(v);
     return out;
 }
-
-// ─── Merge helpers ────────────────────────────────────────────────────────────
 
 function shallowEqualDeletedAnime(a, b) {
     const aKeys = Object.keys(a);
@@ -244,8 +227,6 @@ function shallowEqualStringMap(a, b) {
     return true;
 }
 
-// ─── Cloud fetch ──────────────────────────────────────────────────────────────
-
 async function fetchCloudData(user, token) {
     try {
         const url      = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
@@ -257,8 +238,6 @@ async function fetchCloudData(user, token) {
         return null;
     }
 }
-
-// ─── Push: videoProgress only (merged PATCH) ─────────────────────────────────
 
 let progressSyncInProgress = false;
 let progressSyncPending    = false;
@@ -308,7 +287,6 @@ async function syncProgressOnly() {
 
         if (response.ok) {
             lastPushedProgressBG = JSON.stringify(mergedVP);
-            console.log('[BG] ✓ videoProgress synced (fast path)');
         } else {
             console.warn('[BG] Progress sync failed:', response.status);
         }
@@ -322,8 +300,6 @@ async function syncProgressOnly() {
         }
     }
 }
-
-// ─── Push: full sync (animeData + videoProgress) ─────────────────────────────
 
 async function syncToFirebase() {
     if (syncInProgress) { pendingSync = true; return; }
@@ -396,13 +372,7 @@ async function syncToFirebase() {
             })
         });
 
-        if (response.ok) {
-            console.log(
-                `%cBackground %c⚙️ Synced (${mergedEps} eps)`,
-                'color:rgb(96,165,250);font-weight:bold;font-size:12px',
-                'color:rgb(148,163,184);font-size:11px'
-            );
-        } else {
+        if (!response.ok) {
             console.error('[BG] Sync failed:', response.status);
         }
     } catch (error) {
@@ -412,8 +382,6 @@ async function syncToFirebase() {
         if (pendingSync) { pendingSync = false; setTimeout(syncToFirebase, 1000); }
     }
 }
-
-// ─── Real-time listener (SSE) ─────────────────────────────────────────────────
 
 async function applyCloudUpdate(cloudDoc) {
     if (!cloudDoc) return;
@@ -457,7 +425,6 @@ async function applyCloudUpdate(cloudDoc) {
                 deletedAnime:     mergedDeleted,
                 groupCoverImages: mergedGroup
             });
-            console.log(`[BG-RT] ← Cloud update applied (eps: ${freshEps}→${mergedEps})`);
         }
     } catch (e) {
         console.warn('[BG-RT] Apply update failed:', e.message);
@@ -480,10 +447,8 @@ async function startRealtimeListener() {
         return;
     }
 
-    // ── Catch-up fetch ────────────────────────────────────────────────────────
     const gapSinceLastMessage = Date.now() - lastStreamMessageAt;
     if (gapSinceLastMessage > 45000) {
-        console.debug(`[BG-RT] Catching up after ${Math.round(gapSinceLastMessage / 1000)}s gap...`);
         try {
             const cloudDoc = await fetchCloudData(user, token);
             if (cloudDoc) await applyCloudUpdate(cloudDoc);
@@ -495,7 +460,6 @@ async function startRealtimeListener() {
     rtListenAbort = new AbortController();
     const docPath = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${user.uid}`;
 
-    console.debug('[BG-RT] Opening real-time stream...');
     let streamSucceeded = false;
     try {
         const res = await fetch(`${LISTEN_URL}?key=${FIREBASE_API_KEY}`, {
@@ -514,7 +478,6 @@ async function startRealtimeListener() {
         streamSucceeded = true;
         rtReconnectDelay = 5000;
         markStreamAlive();
-        console.debug('[BG-RT] ✓ Real-time stream connected');
 
         const reader  = res.body.getReader();
         const decoder = new TextDecoder();
@@ -576,8 +539,6 @@ function scheduleRtReconnect() {
     rtReconnectDelay = Math.min(rtReconnectDelay * 1.5, RT_MAX_DELAY);
 }
 
-// ─── Storage change listener ──────────────────────────────────────────────────
-
 let progressSyncDebounce = null;
 
 chrome.storage.onChanged.addListener((changes, namespace) => {
@@ -608,15 +569,6 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         }
 
         if (newCount > oldCount || coverChanged) {
-            if (newCount > oldCount) {
-                console.log(
-                    `%cAnime Tracker %c➕ New episode! (${oldCount}→${newCount})`,
-                    'color:rgb(255,107,107);font-weight:bold;font-size:12px',
-                    'color:rgb(148,163,184);font-size:11px'
-                );
-            } else {
-                console.log('[BG] Anime metadata changed (cover updated), scheduling sync');
-            }
             if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
             syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 2000);
         }
@@ -626,14 +578,11 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         const oldLen = Object.keys(changes.groupCoverImages.oldValue || {}).length;
         const newLen = Object.keys(changes.groupCoverImages.newValue || {}).length;
         if (newLen !== oldLen) {
-            console.log('[BG] Group cover images changed, scheduling sync');
             if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
             syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 2000);
         }
     }
 });
-
-// ─── AnimeFillerList slug discovery ──────────────────────────────────────────
 
 // Direct an1me.to slug → animefillerlist.com slug mappings for well-known series.
 // Avoids HEAD request discovery entirely for these entries.
@@ -719,7 +668,7 @@ function generateFillerSlugCandidates(an1meSlug, animeTitle) {
         'yakusoku-no-neverland':          'promised-neverland',
         'tensei-shitara-slime-datta-ken': 'that-time-i-got-reincarnated-slime',
         'kenpuu-denki':                   'berserk',
-        'naruto-shippuuden':              'naruto-shippuden',  // AnimeFillerList uses 'shippuden'
+        'naruto-shippuuden':              'naruto-shippuden',
     };
     for (const [jpBase, enBase] of Object.entries(JP_TO_EN)) {
         if (slug.startsWith(jpBase)) {
@@ -776,7 +725,6 @@ async function discoverFillerSlug(an1meSlug, animeTitle) {
         console.warn('[BG] discoverFillerSlug storage read failed:', e.message);
     }
 
-    // Try candidates in parallel (cap at 5 to avoid hammering the server)
     const candidates = generateFillerSlugCandidates(an1meSlug, animeTitle).slice(0, 5);
     const tryCandidate = async (candidate) => {
         const headCtrl = new AbortController();
@@ -795,7 +743,6 @@ async function discoverFillerSlug(an1meSlug, animeTitle) {
     if (found) {
         fillerSlugCache[cacheKey] = found;
         await bgStorageSet({ [storageKey]: found });
-        console.log(`[AnimeTracker] Filler slug discovered: ${an1meSlug} → ${found}`);
         return found;
     }
 
@@ -806,11 +753,8 @@ async function discoverFillerSlug(an1meSlug, animeTitle) {
     } catch (e) {
         console.warn('[BG] Failed to cache notFound filler slug:', e.message);
     }
-    console.log(`[AnimeTracker] No filler data for ${an1meSlug} (tried ${candidates.length} candidates)`);
     return null;
 }
-
-// ─── an1me.to anime info fetcher ─────────────────────────────────────────────
 
 async function fetchAnimePageInfo(slug) {
     const cleanSlug = slug.replace(/-\d+$/, '');
@@ -826,10 +770,6 @@ async function fetchAnimePageInfo(slug) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const html = await response.text();
 
-    // ── Episode count ────────────────────────────────────────────────────────
-    // Try multiple patterns: Greek label, English label, generic <dt> with number.
-    // After capturing the <dd> block, strip all HTML tags and grab the first
-    // 1-4 digit number so formats like "220 επεισόδια" or "220 Episodes" work.
     let totalEpisodes = null;
     const epDdMatch = html.match(
         /(?:Επεισόδια|Episodes?)<\/dt>\s*(<dd[^>]*>[\s\S]{0,300}?<\/dd>)/
@@ -840,7 +780,6 @@ async function fetchAnimePageInfo(slug) {
         if (numMatch) totalEpisodes = parseInt(numMatch[1], 10);
     }
 
-    // Fallback: scan episode links on the page for the highest episode number
     if (!totalEpisodes) {
         const epPattern = new RegExp(`/watch/${cleanSlug}-episode-(\\d+)`, 'gi');
         let m;
@@ -852,10 +791,6 @@ async function fetchAnimePageInfo(slug) {
         if (maxEp > 0) totalEpisodes = maxEp;
     }
 
-    // ── Status ───────────────────────────────────────────────────────────────
-    // Try Greek "Προβλήθηκε" and English "Aired" <dt> labels.
-    // A "?" in the date text means the end date is unknown → still airing.
-    // Also recognise explicit "Finished Airing" / "Currently Airing" text.
     let status = null;
     const dateMatch = html.match(
         /(?:Προβλήθηκε|Aired?)<\/dt>[\s\S]{0,300}?<time[^>]*>([\s\S]*?)<\/time>/
@@ -873,12 +808,9 @@ async function fetchAnimePageInfo(slug) {
     return { totalEpisodes, status };
 }
 
-// ─── Episode type fetcher ─────────────────────────────────────────────────────
-
 async function fetchEpisodeTypesFromAnimeFillerList(animeSlug) {
     try {
         const url      = `https://www.animefillerlist.com/shows/${animeSlug}`;
-        console.log(`[Anime Tracker] Fetching episode types from ${url}`);
         const ctrl     = new AbortController();
         const timer    = setTimeout(() => ctrl.abort(), 15000);
         let response;
@@ -929,21 +861,17 @@ async function fetchEpisodeTypesFromAnimeFillerList(animeSlug) {
         ];
         if (all.length > 0) episodeTypes.totalEpisodes = Math.max(...all);
 
-        // If nothing was parsed at all, treat as not-found rather than caching empty data
         if (all.length === 0) {
             console.warn(`[Anime Tracker] ⚠ No episodes parsed for ${animeSlug} — site structure may have changed`);
             return null;
         }
 
-        console.log(`[Anime Tracker] ✓ Fetched episode types for ${animeSlug}:`, episodeTypes);
         return episodeTypes;
     } catch (error) {
         console.error(`[Anime Tracker] ✗ Failed for ${animeSlug}:`, error);
         throw error;
     }
 }
-
-// ─── Migration ────────────────────────────────────────────────────────────────
 
 async function migrateFromSyncToLocal() {
     try {
@@ -971,14 +899,11 @@ async function migrateFromSyncToLocal() {
             await new Promise((resolve) => {
                 chrome.storage.sync.remove(['animeData', 'trackedEpisodes', 'videoProgress'], () => resolve());
             });
-            console.log('[Anime Tracker] Migration complete');
         }
     } catch (error) {
         console.error('[Anime Tracker] Migration error:', error);
     }
 }
-
-// ─── Message handler ──────────────────────────────────────────────────────────
 
 function normalizeTrackedDuration(duration) {
     const MAX_REASONABLE_DURATION_SECONDS = 6 * 60 * 60;
@@ -1177,8 +1102,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
 });
 
-// ─── Lifecycle ────────────────────────────────────────────────────────────────
-
 chrome.runtime.onInstalled.addListener((details) => {
     if (details.reason === 'install') {
         bgStorageSet({
@@ -1187,42 +1110,23 @@ chrome.runtime.onInstalled.addListener((details) => {
             settings:     { watchThreshold: 0.85, notifications: true }
         }).catch(e => console.error('[BG] Failed to init storage on install:', e));
     } else if (details.reason === 'update') {
-        const style = [
-            'color:rgb(255,107,107)',
-            'font-weight:bold',
-            'font-size:13px',
-            'padding:4px 8px',
-            'background:linear-gradient(135deg,rgba(255,107,107,0.2),rgba(255,142,83,0.2))',
-            'border-radius:4px'
-        ].join(';');
-        console.log(`%c🎬 Anime Tracker v${chrome.runtime.getManifest().version}`, style);
         migrateFromSyncToLocal();
     }
     setTimeout(startRealtimeListener, 2000);
 });
 
 chrome.runtime.onStartup.addListener(() => {
-    console.log('[Anime Tracker] Extension started');
     migrateFromSyncToLocal();
     setTimeout(startRealtimeListener, 2000);
 });
 
-// ─── Keep-alive port ──────────────────────────────────────────────────────────
 chrome.runtime.onConnect.addListener((port) => {
     if (port.name !== 'keepAlive') return;
     port.onDisconnect.addListener(() => {
-        const err = chrome.runtime.lastError;
-        if (err) {
-            const msg = err.message || '';
-            const isExpectedClose = msg.includes('back/forward cache') || msg.includes('message channel is closed');
-            if (!isExpectedClose) {
-                console.debug('[BG] keepAlive port disconnected:', msg);
-            }
-        }
+        chrome.runtime.lastError;
     });
 });
 
-// ─── Alarm: keep SW alive + health checks ────────────────────────────────────
 chrome.alarms.create('keepAlive', { periodInMinutes: 0.33 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -1230,7 +1134,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
     const streamDead = !rtListenAbort || rtListenAbort.signal.aborted;
     if (streamDead) {
-        console.debug('[BG] keepAlive: stream dead, restarting...');
         rtConsecutiveFailures = 0;
         startRealtimeListener();
     }
@@ -1238,7 +1141,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     checkStreamHealth();
 });
 
-// ─── Stream health watchdog ───────────────────────────────────────────────────
 let lastStreamMessageAt = Date.now();
 
 function markStreamAlive() {
@@ -1248,7 +1150,6 @@ function markStreamAlive() {
 function checkStreamHealth() {
     const elapsed = Date.now() - lastStreamMessageAt;
     if (elapsed > 90000) {
-        console.debug(`[BG] Stream silent for ${Math.round(elapsed / 1000)}s, reconnecting`);
         lastStreamMessageAt = Date.now();
         rtConsecutiveFailures = 0;
         if (rtListenAbort) rtListenAbort.abort();
@@ -1256,5 +1157,4 @@ function checkStreamHealth() {
     }
 }
 
-// ─── Boot ─────────────────────────────────────────────────────────────────────
 startRealtimeListener();

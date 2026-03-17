@@ -1,16 +1,8 @@
-/**
- * Anime Tracker - Progress Manager
- * Handles progress tracking, cleaning, and data management
- */
 
 const ProgressManager = {
     getCanonicalSlug(slug, title = '') {
         return window.AnimeTracker.SlugUtils.getCanonicalSlug(slug, title);
     },
-
-    /**
-     * Merge known slug aliases into canonical slugs (anime + progress + deleted markers).
-     */
     normalizeCanonicalSlugs(animeData, videoProgress = {}, deletedAnime = {}) {
         const normalizedAnime = { ...(animeData || {}) };
         const normalizedProgress = { ...(videoProgress || {}) };
@@ -129,10 +121,6 @@ const ProgressManager = {
             changed
         };
     },
-
-    /**
-     * Remove duplicate episodes from anime data
-     */
     removeDuplicateEpisodes(animeData) {
         if (!animeData || typeof animeData !== 'object') {
             console.warn('[Cleanup] Invalid animeData provided');
@@ -179,11 +167,6 @@ const ProgressManager = {
 
         return cleaned;
     },
-
-    /**
-     * Fill small tracking gaps (up to 2 consecutive missing episodes).
-     * Skips filler episodes so intentionally-skipped fillers are not auto-added.
-     */
     repairLikelyMissedEpisodes(animeData) {
         const { FillerService } = window.AnimeTracker;
         const repairedData = { ...animeData };
@@ -245,10 +228,6 @@ const ProgressManager = {
 
         return { repairedData, repairedCount };
     },
-
-    /**
-     * Clean progress for tracked/completed episodes
-     */
     cleanTrackedProgress(animeData, videoProgress) {
         const { UIHelpers } = window.AnimeTracker;
         const { CONFIG } = window.AnimeTracker;
@@ -284,7 +263,7 @@ const ProgressManager = {
                 continue;
             }
 
-            if (isTracked || isCompleted) {
+            if (isTracked || isCompleted || progress.deleted) {
                 removedCount++;
             } else {
                 cleaned[id] = progress;
@@ -293,10 +272,6 @@ const ProgressManager = {
 
         return { cleaned, removedCount };
     },
-
-    /**
-     * Get anime that have progress but no completed episodes
-     */
     getInProgressOnlyAnime(animeData, videoProgress) {
         const inProgressOnly = [];
         const trackedSlugs = new Set(Object.keys(animeData));
@@ -339,6 +314,5 @@ const ProgressManager = {
     }
 };
 
-// Export
 window.AnimeTracker = window.AnimeTracker || {};
 window.AnimeTracker.ProgressManager = ProgressManager;

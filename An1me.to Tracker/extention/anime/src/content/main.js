@@ -1,33 +1,21 @@
-/**
- * Anime Tracker - Content Script Main Entry Point
- * Monitors video playback and tracks episodes when 80% watched
- */
-
 (function() {
     'use strict';
 
-    // Only run on main watch pages, not in iframes
     if (window.self !== window.top) {
         return;
     }
 
-    // Wait for modules to load
     const AT = window.AnimeTrackerContent;
 
-    // State
     let animeInfo = null;
     let isTracked = false;
     let isTrackingInProgress = false;
-    let isTrackingImmediate = false; // guard against concurrent trackImmediately() calls
+    let isTrackingImmediate = false;
     let currentEpisodeId = null;
     let durationRefreshAttempted = false;
     let durationRefreshAttempts = 0;
     const MAX_DURATION_REFRESH_ATTEMPTS = 5;
 
-    /**
-     * Shared helper: write a completed episode into animeData synchronously.
-     * Used by trackImmediately() to avoid Chrome storage async limitations.
-     */
     function writeSyncEpisode(info, duration, animeData, logPrefix) {
         const { Logger } = AT;
 
@@ -91,11 +79,9 @@
                 animeData[info.animeSlug].totalWatchTime = animeData[info.animeSlug].episodes
                     .reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
                 animeData[info.animeSlug].lastWatched = new Date().toISOString();
-                Logger.info(`${logPrefix}: refreshed duration for already tracked episode (${validDuration}s)`);
                 return true;
             }
 
-            Logger.debug(`${logPrefix}: episode already tracked`);
             return false;
         }
 
@@ -127,10 +113,6 @@
         return true;
     }
 
-    /**
-     * Immediately track episode (no debounce, synchronous storage path).
-     * Used when we need to track RIGHT NOW before navigation.
-     */
     function trackImmediately() {
         const { Logger, ProgressTracker, VideoMonitor, Notifications } = AT;
         const videoElement = VideoMonitor.getVideoElement();
@@ -144,11 +126,13 @@
 
         isTrackingImmediate = true;
         isTracked = true;
+        currentEpisodeId = animeInfo.uniqueId;
 
         try {
             chrome.storage.local.get(['animeData'], (result) => {
                 if (chrome.runtime.lastError) {
                     isTrackingImmediate = false;
+                    isTracked = false; // allow retry
                     return;
                 }
 
@@ -158,18 +142,19 @@
                 if (written) {
                     chrome.storage.local.set({ animeData }, () => {
                         isTrackingImmediate = false;
-                        if (!chrome.runtime.lastError) {
-                            Logger.success('✓ Immediate track successful');
-                            Notifications.showCompletion(animeInfo);
-
-                            chrome.storage.local.get(['videoProgress'], (progressResult) => {
-                                if (!chrome.runtime.lastError) {
-                                    const videoProgress = progressResult.videoProgress || {};
-                                    delete videoProgress[animeInfo.uniqueId];
-                                    chrome.storage.local.set({ videoProgress });
-                                }
-                            });
+                        if (chrome.runtime.lastError) {
+                            isTracked = false; // storage.set failed — allow retry
+                            return;
                         }
+                        Notifications.showCompletion(animeInfo);
+
+                        chrome.storage.local.get(['videoProgress'], (progressResult) => {
+                            if (!chrome.runtime.lastError) {
+                                const videoProgress = progressResult.videoProgress || {};
+                                delete videoProgress[animeInfo.uniqueId];
+                                chrome.storage.local.set({ videoProgress });
+                            }
+                        });
                     });
                 } else {
                     isTrackingImmediate = false;
@@ -211,9 +196,7 @@
             if (refreshed) {
                 durationRefreshAttempted = true;
                 await ProgressTracker.clearSavedProgress(animeInfo.uniqueId);
-                Logger.info(`Refreshed tracked duration from ${reason}: ${Math.round(duration)}s`);
             } else {
-                Logger.debug(`Duration refresh check completed via ${reason}`);
                 if (durationRefreshAttempts >= MAX_DURATION_REFRESH_ATTEMPTS) {
                     durationRefreshAttempted = true;
                 }
@@ -223,9 +206,6 @@
         }
     }
 
-    /**
-     * Raw timeupdate handler — runs WITHOUT debounce to catch the threshold moment.
-     */
     const handleTimeUpdateRaw = async () => {
         const { ProgressTracker, VideoMonitor, Logger } = AT;
         const videoElement = VideoMonitor.getVideoElement();
@@ -241,7 +221,6 @@
 
         if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
             earlyTrackDone = true;
-            Logger.info('Threshold reached, tracking immediately (no debounce)');
             trackImmediately();
         }
     };
@@ -259,7 +238,6 @@
         if (!videoElement || isTracked || !animeInfo) return;
 
         if (currentEpisodeId && currentEpisodeId !== animeInfo.uniqueId) {
-            Logger.info('Episode changed, resetting isTracked');
             isTracked = false;
             currentEpisodeId = animeInfo.uniqueId;
         }
@@ -275,24 +253,14 @@
 
         if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
             if (isTrackingInProgress) {
-                Logger.debug('Tracking already in progress, skipping');
                 return;
             }
-
-            const remainingTime = Math.round(duration - currentTime);
-            const progress = Math.round((currentTime / duration) * 100);
-            const durationMins = Math.floor(duration / 60);
-            const durationSecs = Math.floor(duration % 60);
-            Logger.info(`Marking complete: ${progress}% watched (need ${CONFIG.COMPLETED_PERCENTAGE}%), ${remainingTime}s remaining of ${durationMins}:${String(durationSecs).padStart(2, '0')}`);
 
             const alreadyTracked = await ProgressTracker.isEpisodeTracked(animeInfo.uniqueId);
             if (alreadyTracked) {
                 const refreshed = await ProgressTracker.refreshTrackedEpisodeDuration(animeInfo, duration);
                 if (refreshed) {
                     await ProgressTracker.clearSavedProgress(animeInfo.uniqueId);
-                    Logger.info('Already tracked, refreshed duration from current video metadata');
-                } else {
-                    Logger.debug('Already tracked, skipping');
                 }
                 isTracked = true;
                 return;
@@ -313,7 +281,6 @@
 
             try {
                 await Promise.race([trackingOperation(), timeoutPromise]);
-                Logger.success('Auto-tracked on timeupdate');
             } catch (error) {
                 if (error.message === 'handleTimeUpdate timeout') {
                     Logger.warn('Tracking operation timed out, will retry');
@@ -346,36 +313,27 @@
     };
 
     const handleEnded = async () => {
-        const { Logger, ProgressTracker, VideoMonitor, Notifications } = AT;
+        const { Logger, ProgressTracker, VideoMonitor } = AT;
         const videoElement = VideoMonitor.getVideoElement();
 
-        if (animeInfo && videoElement) {
-            if (isTracked) {
-                Logger.info('Episode ended (already tracked), showing notification');
-                Notifications.showCompletion(animeInfo);
-                return;
-            }
+        if (!animeInfo || !videoElement) return;
+        if (isTracked) return;
 
-            isTracked = true;
-            const alreadyTracked = await ProgressTracker.isEpisodeTracked(animeInfo.uniqueId);
-            if (!alreadyTracked) {
-                try {
-                    await ProgressTracker.saveWatchedEpisode(animeInfo, videoElement.duration);
-                    await ProgressTracker.clearSavedProgress(animeInfo.uniqueId);
-                } catch (error) {
-                    Logger.error('End track failed', error);
-                }
-            } else {
-                try {
-                    const refreshed = await ProgressTracker.refreshTrackedEpisodeDuration(animeInfo, videoElement.duration);
-                    if (refreshed) {
-                        await ProgressTracker.clearSavedProgress(animeInfo.uniqueId);
-                    }
-                } catch (error) {
-                    Logger.warn('Failed to refresh duration on end:', error);
-                }
-                Logger.info('Episode ended (was tracked before), showing notification');
-                Notifications.showCompletion(animeInfo);
+        isTracked = true;
+        const alreadyTracked = await ProgressTracker.isEpisodeTracked(animeInfo.uniqueId);
+        if (!alreadyTracked) {
+            try {
+                await ProgressTracker.saveWatchedEpisode(animeInfo, videoElement.duration);
+                await ProgressTracker.clearSavedProgress(animeInfo.uniqueId);
+            } catch (error) {
+                Logger.error('End track failed', error);
+            }
+        } else {
+            try {
+                const refreshed = await ProgressTracker.refreshTrackedEpisodeDuration(animeInfo, videoElement.duration);
+                if (refreshed) await ProgressTracker.clearSavedProgress(animeInfo.uniqueId);
+            } catch (error) {
+                Logger.warn('Failed to refresh duration on end:', error);
             }
         }
     };
@@ -395,7 +353,6 @@
                     try {
                         await ProgressTracker.saveWatchedEpisode(animeInfo, duration);
                         await ProgressTracker.clearSavedProgress(animeInfo.uniqueId);
-                        Logger.success('Auto-tracked on visibility change');
                     } catch (error) {
                         Logger.error('Auto-track failed on visibility change', error);
                         isTracked = false;
@@ -484,8 +441,6 @@
     async function init() {
         const { Logger, AnimeParser, ProgressTracker, VideoMonitor, Notifications } = AT;
 
-        Logger.info('Init', window.location.pathname);
-
         VideoMonitor.cleanup();
         Notifications.cleanup();
         ProgressTracker.reset();
@@ -499,10 +454,7 @@
         durationRefreshAttempts = 0;
 
         animeInfo = AnimeParser.extractAnimeInfo();
-        if (!animeInfo) {
-            Logger.debug('No anime info found');
-            return;
-        }
+        if (!animeInfo) return;
 
         const hasDetectedTotal = Number.isFinite(animeInfo.totalEpisodes) &&
             animeInfo.totalEpisodes > 0 &&
@@ -547,7 +499,6 @@
                             groupCoverImages[baseSlug] = animeInfo.coverImage;
                         }
                     } catch {
-                        // Ignore baseSlug errors; group cover won't be set
                     }
 
                     chrome.storage.local.set({ animeData, groupCoverImages });
@@ -557,13 +508,9 @@
             }
         }
 
-        Logger.info(`Detected: ${animeInfo.animeTitle} Ep${animeInfo.episodeNumber}`);
-        Logger.debug(`ID: ${animeInfo.uniqueId}`);
-
         const alreadyTracked = await ProgressTracker.isEpisodeTracked(animeInfo.uniqueId);
         if (alreadyTracked) {
             isTracked = true;
-            Logger.debug('Already tracked (monitoring metadata for duration refresh)');
         }
 
         VideoMonitor.startWatching(animeInfo, eventHandlers);
@@ -580,7 +527,6 @@
                 const duration = videoElement.duration;
 
                 if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
-                    Logger.info('Periodic check: threshold reached, tracking');
                     clearInterval(periodicCheck);
                     trackImmediately();
                 }
@@ -595,7 +541,6 @@
         });
     }
 
-    // Start when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
             setTimeout(init, 1000);
@@ -604,7 +549,6 @@
         setTimeout(init, 1000);
     }
 
-    // Handle SPA navigation
     let lastUrl = location.href;
     let navigationObserver = null;
     let navigationDebounceTimeout = null;
@@ -630,7 +574,6 @@
                 target.closest('.episode-navigation');
 
             if (isAn1meNav) {
-                Logger.debug('An1me.to navigation detected, tracking immediately');
                 trackImmediately();
                 return;
             }
@@ -656,7 +599,6 @@
                 className.includes('episode');
 
             if (isNavigation) {
-                Logger.debug('Navigation click detected, tracking immediately');
                 trackImmediately();
             }
         }, { capture: true, passive: true });
@@ -673,10 +615,10 @@
             navigationDebounceTimeout = setTimeout(() => {
                 if (location.href !== lastUrl) {
                     lastUrl = location.href;
-                    Logger.info('URL changed, reinit...');
 
                     isTracked = false;
                     isTrackingInProgress = false;
+                    isTrackingImmediate = false;
                     currentEpisodeId = null;
                     earlyTrackDone = false;
                     durationRefreshAttempted = false;

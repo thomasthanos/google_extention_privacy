@@ -816,10 +816,43 @@ body {
 .unwatched-fillers-label { display: flex; align-items: center; gap: 4px; font-size: 9px; color: var(--purple); margin-bottom: 4px; font-weight: 600; }
 .filler-count { background: rgba(155,106,255,0.12); color: var(--purple); padding: 1px 4px; border-radius: var(--r-xs); font-size: 8px; font-weight: 600; }
 
-/* ─── In-progress-only card ─────────────────────────────────── */
-.anime-card.in-progress-only { border-color: rgba(240,192,64,0.18); background: rgba(240,192,64,0.02); }
-.anime-card.in-progress-only:hover { border-color: rgba(240,192,64,0.3); }
-.anime-card.in-progress-only .progress-container { max-height: 80px; opacity: 1; margin-bottom: 8px; }
+/* ─── Compact in-progress-only card ─────────────────────────── */
+.ip-card {
+  border: 1px solid rgba(240,192,64,0.2);
+  background: rgba(240,192,64,0.03);
+  border-radius: var(--r-md);
+  padding: 10px 12px 0;
+  display: flex; flex-direction: column; gap: 8px;
+  transition: border-color var(--tf), background var(--tf);
+  cursor: default;
+}
+.ip-card:hover { border-color: rgba(240,192,64,0.35); background: rgba(240,192,64,0.055); }
+.ip-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ip-icon { color: var(--amber); font-size: 8px; flex-shrink: 0; opacity: 0.85; }
+.ip-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.ip-title { font-size: 13px; font-weight: 600; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+.ip-sub { font-size: 10px; color: var(--amber); opacity: 0.8; line-height: 1.2; margin-top: 2px; display: flex; align-items: center; gap: 5px; }
+.ip-more { background: rgba(255,255,255,0.06); border: 1px solid var(--b1); border-radius: 6px; padding: 0 5px; font-size: 9px; color: var(--t2); }
+.ip-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.ip-pct { font-size: 10px; color: var(--t2); font-weight: 600; min-width: 24px; text-align: right; }
+.ip-delete-btn { width: 20px; height: 20px; background: none; border: none; color: var(--t3); cursor: pointer; font-size: 15px; line-height: 1; border-radius: 4px; display: flex; align-items: center; justify-content: center; padding: 0; transition: color var(--tf), background var(--tf); }
+.ip-delete-btn:hover { color: #f04545; background: rgba(240,69,69,0.12); }
+.ip-bar { height: 2px; background: rgba(255,255,255,0.05); border-radius: 0 0 var(--r-md) var(--r-md); overflow: hidden; margin: 0 -12px; }
+.ip-fill { height: 100%; background: linear-gradient(90deg, #d4a200, var(--amber)); border-radius: 1px; }
+
+/* ─── In-progress collapsible group ────────────────────────── */
+.ip-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; background: rgba(240,192,64,0.025); border: 1px solid rgba(240,192,64,0.08); border-radius: var(--r-md); padding: 4px 8px 6px; }
+.ip-group-header { display: flex; align-items: center; gap: 7px; padding: 4px 0; cursor: pointer; user-select: none; border-radius: var(--r-md); transition: opacity var(--tf); }
+.ip-group-header:hover { opacity: 0.75; }
+.ip-group-play { font-size: 7px; color: var(--amber); opacity: 0.8; flex-shrink: 0; }
+.ip-group-label { font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--t2); flex: 1; }
+.ip-group-count { font-size: 10px; color: var(--t3); background: rgba(255,255,255,0.06); border: 1px solid var(--b1); border-radius: var(--r-pill); padding: 1px 7px; }
+.ip-group-chevron { width: 13px; height: 13px; color: var(--t3); flex-shrink: 0; transition: transform var(--tf); transform: rotate(-90deg); }
+.ip-group-content { display: none; flex-direction: column; gap: 6px; }
+.ip-group-content.open { display: flex; }
+
+.anime-card.anime-card-watching { border-color: rgba(240,192,64,0.18); background: rgba(240,192,64,0.02); }
+.anime-card.anime-card-watching:hover { border-color: rgba(240,192,64,0.3); }
 
 /* ─── Empty state ───────────────────────────────────────────── */
 .empty-state { display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 48px 24px; flex: 1; }
@@ -1145,6 +1178,8 @@ body {
   background: var(--cyan); border-radius: 0 2px 2px 0; opacity: 0; transition: opacity var(--tn);
 }
 .anime-movie-group:hover { border-color: rgba(79,195,247,0.22); border-top-color: rgba(79,195,247,0.32); box-shadow: var(--s3); }
+.anime-movie-group.anime-card-watching { border-color: rgba(240,192,64,0.18); background: rgba(240,192,64,0.02); }
+.anime-movie-group.anime-card-watching:hover { border-color: rgba(240,192,64,0.3); }
 .anime-movie-group:hover::before { opacity: 0.6; }
 .movie-group-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; gap: 10px; }
 .movie-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

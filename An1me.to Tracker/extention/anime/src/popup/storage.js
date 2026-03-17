@@ -1,15 +1,9 @@
-/**
- * Anime Tracker - Storage Helper
- * Uses local storage with sync migration support
- */
 
-// Slug normalization for merging multi-part anime (migration)
 const STORAGE_SLUG_NORMALIZATION = {
     'bleach-sennen-kessen-hen-ketsubetsu-tan': 'bleach-sennen-kessen-hen',
     'bleach-sennen-kessen-hen-soukoku-tan': 'bleach-sennen-kessen-hen',
 };
 
-// Episode offsets for multi-part anime (migration)
 const STORAGE_EPISODE_OFFSET_MAPPING = {
     'bleach-sennen-kessen-hen-ketsubetsu-tan': 13,
     'bleach-sennen-kessen-hen-soukoku-tan': 26,
@@ -18,9 +12,6 @@ const STORAGE_EPISODE_OFFSET_MAPPING = {
 const CACHED_STATS_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days — invalidates stale stats after long installs
 
 const Storage = {
-    /**
-     * Get data from storage with sync migration
-     */
     async get(keys) {
         return new Promise((resolve) => {
             chrome.storage.local.get(keys, (localResult) => {
@@ -46,7 +37,6 @@ const Storage = {
                             (typeof syncResult[key] !== 'object' || Object.keys(syncResult[key]).length > 0));
 
                         if (hasSyncData) {
-                            console.log('[Storage] Migrating from sync to local');
                             chrome.storage.local.set(syncResult, () => {
                                 chrome.storage.sync.remove(['animeData', 'trackedEpisodes', 'videoProgress']);
                             });
@@ -58,10 +48,6 @@ const Storage = {
             });
         });
     },
-
-    /**
-     * Set data to storage
-     */
     async set(data) {
         return new Promise((resolve, reject) => {
             chrome.storage.local.set(data, () => {
@@ -73,10 +59,6 @@ const Storage = {
             });
         });
     },
-
-    /**
-     * Remove keys from storage
-     */
     async remove(keys) {
         return new Promise((resolve, reject) => {
             chrome.storage.local.remove(keys, () => {
@@ -106,7 +88,6 @@ const Storage = {
                     const reason = versionMismatch
                         ? `version changed (${stats._version} → ${currentVersion})`
                         : `cache too old (${Math.round(age / 86400000)}d)`;
-                    console.log(`[Storage] Clearing cachedStats: ${reason}`);
                     chrome.storage.local.remove(['cachedStats'], () => resolve(true));
                 } else {
                     resolve(false);
@@ -114,11 +95,6 @@ const Storage = {
             });
         });
     },
-
-    /**
-     * Migrate multi-part anime entries to merged format.
-     * Also fixes accidental slugs that end with -episode/-ep.
-     */
     async migrateMultiPartAnime() {
         return new Promise((resolve) => {
             chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime'], (result) => {
@@ -151,8 +127,6 @@ const Storage = {
 
                 const migrateSlug = (oldSlug, newSlug, offset = 0, titleTransform = null) => {
                     if (!animeData[oldSlug] || oldSlug === newSlug) return;
-
-                    console.log(`[Storage] Migrating ${oldSlug} -> ${newSlug}`);
                     migrated = true;
 
                     const oldEntry = animeData[oldSlug];
@@ -259,8 +233,6 @@ const Storage = {
                         (title) => title.replace(/ Ketsubetsu[ -]tan| Soukoku[ -]tan/gi, '').trim()
                     );
                 }
-
-                // Generic migration for accidentally saved slugs ending in -episode/-ep.
                 for (const oldSlug of Object.keys(animeData)) {
                     const cleanedSlug = oldSlug
                         .replace(/-(?:episodes?|ep)$/i, '')
@@ -274,8 +246,6 @@ const Storage = {
                         );
                     }
                 }
-
-                // Title-based canonical migration for known inconsistent slug families.
                 for (const oldSlug of Object.keys(animeData)) {
                     const oldEntry = animeData[oldSlug];
                     const canonicalSlug = getCanonicalSlugFromTitle(oldSlug, oldEntry?.title || '');
@@ -283,9 +253,6 @@ const Storage = {
                         migrateSlug(oldSlug, canonicalSlug, 0, (title) => title);
                     }
                 }
-
-                // Clean up titles that have a trailing " Episode" or " – Episode N" suffix
-                // caused by the DOM extractor picking up the page title verbatim.
                 const TITLE_CLEANUP_RE = /(?:\s*[-–—]\s*Episode\s*\d*.*|\s+Episode)\s*$/i;
                 for (const [slug, entry] of Object.entries(animeData)) {
                     if (!entry?.title) continue;
@@ -293,13 +260,11 @@ const Storage = {
                     if (cleaned && cleaned !== entry.title) {
                         entry.title = cleaned;
                         migrated = true;
-                        console.log(`[Storage] Cleaned title: "${entry.title}" → "${cleaned}" (${slug})`);
                     }
                 }
 
                 if (migrated) {
                     chrome.storage.local.set({ animeData, videoProgress, deletedAnime }, () => {
-                        console.log('[Storage] Anime slug migration complete');
                         resolve(true);
                     });
                 } else {
@@ -310,6 +275,5 @@ const Storage = {
     }
 };
 
-// Export
 window.AnimeTracker = window.AnimeTracker || {};
 window.AnimeTracker.Storage = Storage;

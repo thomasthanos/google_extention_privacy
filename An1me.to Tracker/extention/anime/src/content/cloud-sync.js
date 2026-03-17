@@ -1,12 +1,3 @@
-/**
- * Anime Tracker - Content Script Cloud Sync
- *
- * Chrome + SW: keeps the SW alive, wakes it on progress changes, falls back
- * to direct Firestore PATCH if the SW is unavailable.
- *
- * Orion / Safari (no SW): opens a Firestore SSE stream for real-time pull,
- * pushes changes directly, reconnects with exponential back-off.
- */
 (function () {
     'use strict';
 
@@ -26,7 +17,6 @@
     const MAX_RECONNECT  = 60000;
     let teardownSyncTriggered = false;
 
-    // ─── Sync pause guard ─────────────────────────────────────────────────────
     let csSyncPausedUntil = 0;
     function csPauseSync(ms = 4000) {
         csSyncPausedUntil = Math.max(csSyncPausedUntil, Date.now() + ms);
@@ -34,8 +24,6 @@
     function csIsSyncPaused() {
         return Date.now() < csSyncPausedUntil;
     }
-
-    // ─── Firestore codec ──────────────────────────────────────────────────────
 
     function toFSValue(v) {
         if (v === null || v === undefined) return { nullValue: null };
@@ -129,8 +117,6 @@
         return true;
     }
 
-    // ─── Token ────────────────────────────────────────────────────────────────
-
     async function signOutDueToTokenFailure() {
         Logger?.warn('Token refresh failed — signing out to force re-auth');
         try {
@@ -191,8 +177,6 @@
         } catch { return null; }
     }
 
-    // ─── Merge helpers ────────────────────────────────────────────────────────
-
     const {
         mergeAnimeData,
         mergeVideoProgress,
@@ -200,8 +184,6 @@
         applyDeletedAnime,
         mergeGroupCoverImages
     } = window.AnimeTrackerContent.MergeUtils;
-
-    // ─── Direct push to Firestore (fallback when SW unavailable) ─────────────
 
     let lastPushedProgress      = null;
     let isPushingProgressDirect = false;
@@ -233,7 +215,6 @@
             if (mergedCount > localCount) {
                 csPauseSync();
                 await chrome.storage.local.set({ videoProgress: mergedVP });
-                Logger?.info(`Pulled ${mergedCount - localCount} new progress entries from cloud`);
             }
 
             const updateMask = 'updateMask.fieldPaths=videoProgress&updateMask.fieldPaths=lastUpdated';
@@ -250,7 +231,6 @@
 
             if (res.ok) {
                 lastPushedProgress = JSON.stringify(mergedVP);
-                Logger?.info('videoProgress pushed (merged)');
             } else {
                 Logger?.warn(`Direct progress push failed: ${res.status}`);
             }
@@ -269,7 +249,10 @@
         if (fullPushInProgress) { fullPushPending = true; return; }
         const token = await getValidToken();
         const user  = currentUser || await getUser();
-        if (!token || !user) return;
+        if (!token || !user) {
+            fullPushPending = false;
+            return;
+        }
 
         fullPushInProgress = true;
         try {
@@ -317,7 +300,6 @@
 
             const uploadSnap = JSON.stringify({ mergedAnime, mergedProgress, mergedDeleted, mergedGroupCovers });
             if (uploadSnap === lastPushedFullSnap) {
-                Logger?.debug('Full push skipped (no changes since last push)');
                 return;
             }
 
@@ -338,7 +320,6 @@
 
             if (res.ok) {
                 lastPushedFullSnap = uploadSnap;
-                Logger?.info('Full push to Firestore complete');
             } else {
                 Logger?.warn(`Full push failed: ${res.status}`);
             }
@@ -349,8 +330,6 @@
             if (fullPushPending) { fullPushPending = false; setTimeout(pushFullDirect, 1000); }
         }
     }
-
-    // ─── Send message to background SW ───────────────────────────────────────
 
     async function wakeBackgroundSW(messageType = 'SYNC_PROGRESS_ONLY') {
         return new Promise((resolve) => {
@@ -382,8 +361,6 @@
         });
     }
 
-    // ─── Debounced progress push (Chrome path) ────────────────────────────────
-
     let progressDebounce = null;
 
     function scheduleProgressPush(delay = 3000) {
@@ -392,13 +369,10 @@
             progressDebounce = null;
             const swAlive = await wakeBackgroundSW('SYNC_PROGRESS_ONLY');
             if (!swAlive) {
-                Logger?.debug('SW unreachable, pushing progress directly');
                 await pushProgressDirect();
             }
         }, delay);
     }
-
-    // ─── Debounced full push (Orion path) ─────────────────────────────────────
 
     let fullPushDebounce = null;
 
@@ -426,8 +400,6 @@
     function resetTeardownSyncGuard() {
         teardownSyncTriggered = false;
     }
-
-    // ─── Apply incoming cloud update locally ──────────────────────────────────
 
     async function applyCloudUpdate(cloudDoc) {
         if (!cloudDoc) return;
@@ -463,14 +435,11 @@
                     deletedAnime:     mergedDeleted,
                     groupCoverImages: mergedGroupCovers
                 });
-                Logger?.info(`Cloud update applied (eps: ${localEps}→${mergedEps})`);
             }
         } catch (e) {
             Logger?.warn(`Apply cloud update failed: ${e.message}`);
         }
     }
-
-    // ─── Firestore SSE stream (Orion / no-SW mode) ────────────────────────────
 
     async function startListening() {
         if (listenAbortCtrl) listenAbortCtrl.abort();
@@ -497,7 +466,6 @@
             if (!res.ok) { scheduleReconnect(); return; }
 
             reconnectDelay = 5000;
-            Logger?.info('Firestore stream connected');
 
             tokenRefreshInterval = setInterval(async () => {
                 const fresh = await getValidToken();
@@ -571,8 +539,6 @@
         reconnectTimeout = setTimeout(startListening, d);
     }
 
-    // ─── Storage watcher ──────────────────────────────────────────────────────
-
     function watchStorage(isOrionMode) {
         chrome.storage.onChanged.addListener((changes, namespace) => {
             if (namespace !== 'local') return;
@@ -633,28 +599,21 @@
         }, { passive: true });
     }
 
-    // ─── Init ─────────────────────────────────────────────────────────────────
-
     async function init() {
         if (initialized) return;
 
         currentUser = await getUser();
-        if (!currentUser) {
-            Logger?.debug('No user, skipping sync');
-            return;
-        }
+        if (!currentUser) return;
 
         const swAvailable = await wakeBackgroundSW('GET_VERSION');
 
         if (swAvailable) {
-            Logger?.info('SW available — acting as wake-up agent');
             initialized = true;
             watchStorage(false);
             scheduleProgressPush(5000);
             return;
         }
 
-        Logger?.info('No SW — starting full sync mode (Orion)');
         initialized = true;
         watchStorage(true);
         startListening();
@@ -681,15 +640,13 @@
 
     setTimeout(init, 2000);
 
-    // ─── Keep-alive port ──────────────────────────────────────────────────────
-
     let keepAliveRetryDelay = 100;
     let keepAliveRetryTimer = null;
     let keepAlivePulseTimer = null;
     let keepAlivePort = null;
     let suppressKeepAliveReconnect = false;
     let keepAliveFailCount = 0;
-    const KEEPALIVE_MAX_FAILS = 8; // stop retrying after ~16s of backoff (no background SW)
+    const KEEPALIVE_MAX_FAILS = 8;
 
     function scheduleKeepaliveReconnect(delayMs) {
         if (keepAliveRetryTimer) clearTimeout(keepAliveRetryTimer);
@@ -736,13 +693,7 @@
                     return;
                 }
 
-                const err = chrome.runtime.lastError;
-                if (err) {
-                    const msg = err.message || '';
-                    const isExpectedClose = msg.includes('back/forward cache') || msg.includes('message channel is closed');
-                    if (!isExpectedClose) {
-                        Logger?.debug(`keepAlive port disconnected: ${msg}`);
-                    }
+                void chrome.runtime.lastError;
                 }
 
                 if (keepAlivePort === port) keepAlivePort = null;
@@ -757,8 +708,6 @@
         } catch {
             keepAliveFailCount++;
             if (keepAliveFailCount >= KEEPALIVE_MAX_FAILS) {
-                // No background service worker available (e.g. Orion/Safari) — stop retrying
-                Logger?.debug('keepAlive: no background SW detected, stopping retries');
                 return;
             }
             keepAliveRetryDelay = Math.min(keepAliveRetryDelay * 2, 5000);

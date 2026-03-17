@@ -1,10 +1,4 @@
-/**
- * Anime Tracker - Firebase Sync
- * Handles Firebase authentication and cloud synchronization
- */
-
 const FirebaseSync = {
-    // State
     currentUser: null,
     saveToCloudTimeout: null,
     isSavingToCloud: false,
@@ -34,16 +28,10 @@ const FirebaseSync = {
         }
     },
 
-    /**
-     * Get current user
-     */
     getUser() {
         return this.currentUser;
     },
 
-    /**
-     * Initialize Firebase and check auth state
-     */
     async init(callbacks) {
         const { onUserSignedIn, onUserSignedOut, onError } = callbacks;
         
@@ -53,39 +41,26 @@ const FirebaseSync = {
             FirebaseLib.onAuthStateChanged((user) => {
                 this.currentUser = user;
                 if (user) {
-                    console.log('[Firebase] User signed in:', user.email);
                     if (onUserSignedIn) onUserSignedIn(user);
                 } else {
-                    console.log('[Firebase] No user');
                     if (onUserSignedOut) onUserSignedOut();
                 }
             });
-
-            console.log('[Firebase] Initialized');
         } catch (error) {
             console.error('[Firebase] Init error:', error);
             if (onError) onError(error);
         }
     },
 
-    /**
-     * Sign in with Google
-     */
     async signInWithGoogle() {
         return await FirebaseLib.signInWithGoogle();
     },
 
-    /**
-     * Sign out
-     */
     async signOut() {
         await FirebaseLib.signOut();
         this.currentUser = null;
     },
 
-    /**
-     * Save data to cloud with debouncing
-     */
     async saveToCloud(data, immediate = false) {
         const { CONFIG } = window.AnimeTracker;
         
@@ -99,7 +74,6 @@ const FirebaseSync = {
         }
 
         if (immediate) {
-            console.log('[Firebase] Immediate save requested');
             return this.performCloudSave();
         }
 
@@ -111,14 +85,10 @@ const FirebaseSync = {
         });
     },
 
-    /**
-     * Perform the actual cloud save
-     */
     async performCloudSave(elements = null) {
         const { CONFIG } = window.AnimeTracker;
         
         if (this.isSavingToCloud) {
-            console.log('[Firebase] Save in progress, waiting...');
             if (this.currentSavePromise) {
                 try { await this.currentSavePromise; } catch {}
             }
@@ -139,6 +109,7 @@ const FirebaseSync = {
         this.isSavingToCloud = true;
 
         this.currentSavePromise = (async () => {
+            let retryScheduled = false;
             try {
                 if (!dataToSave.animeData || typeof dataToSave.animeData !== 'object') {
                     throw new Error('Invalid animeData for cloud save');
@@ -156,7 +127,6 @@ const FirebaseSync = {
                     lastUpdated: new Date().toISOString(),
                     email: this.currentUser.email
                 });
-                console.log('[Firebase] ✓ Data saved to cloud');
 
                 this.cloudSaveRetryCount = 0;
 
@@ -180,8 +150,7 @@ const FirebaseSync = {
                 }
 
                 const retryDelay = Math.min(2000 * Math.pow(2, this.cloudSaveRetryCount - 1), CONFIG.MAX_RETRY_DELAY_MS);
-                console.log('[Firebase] Will retry in', retryDelay, 'ms');
-
+                retryScheduled = true;
                 setTimeout(() => {
                     if (this.currentUser) {
                         this.pendingSave = this.cloneSyncData(dataToSave);
@@ -191,7 +160,8 @@ const FirebaseSync = {
             } finally {
                 this.isSavingToCloud = false;
 
-                if (this.pendingSave) {
+                // Only schedule the pending-save flush if no retry is already queued
+                if (!retryScheduled && this.pendingSave) {
                     setTimeout(() => this.performCloudSave(elements), 500);
                 }
             }
@@ -203,10 +173,6 @@ const FirebaseSync = {
             this.currentSavePromise = null;
         }
     },
-
-    /**
-     * Load and sync data with cloud
-     */
     async loadAndSyncData(elements) {
         const { Storage } = window.AnimeTracker;
         const { ProgressManager } = window.AnimeTracker;
@@ -222,8 +188,6 @@ const FirebaseSync = {
         }
 
         try {
-            // On Orion/mobile (no SW), push local videoProgress before fetching
-            // to avoid losing progress saved by content scripts.
             const localSnapshot = await Storage.get(['videoProgress', 'userId']);
             if (localSnapshot.userId === this.currentUser.uid && localSnapshot.videoProgress && Object.keys(localSnapshot.videoProgress).length > 0) {
                 try {
@@ -241,7 +205,6 @@ const FirebaseSync = {
                                 videoProgress: merged,
                                 lastUpdated: new Date().toISOString()
                             });
-                            console.log('[Sync] Pre-upload: pushed local videoProgress to cloud');
                         }
                     }
                 } catch (e) {
@@ -260,7 +223,6 @@ const FirebaseSync = {
                 } catch (e) {
                     retryCount++;
                     if (retryCount < maxRetries) {
-                        console.log(`[Sync] Cloud fetch failed, retrying (${retryCount}/${maxRetries})...`);
                         await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
                     } else {
                         throw e;
@@ -284,7 +246,6 @@ const FirebaseSync = {
                         animeData:     AnimeTracker.MergeUtils.mergeAnimeData(localData.animeData || {}, cloudData.animeData || {}),
                         videoProgress: AnimeTracker.MergeUtils.mergeVideoProgress(localData.videoProgress || {}, cloudData.videoProgress || {})
                     };
-                    console.log('[Sync] Merged episodes:', UIHelpers.countEpisodes(finalData.animeData));
                 } else {
                     finalData = {
                         animeData: cloudData.animeData || {},
@@ -292,8 +253,6 @@ const FirebaseSync = {
                     };
                     finalData.animeData = ProgressManager.removeDuplicateEpisodes(finalData.animeData);
                 }
-
-                // Prefer local covers to preserve user-set posters
                 const localGroupCovers = localData.groupCoverImages || {};
                 const cloudGroupCovers = cloudData.groupCoverImages || {};
                 const mergedGroupCovers = { ...cloudGroupCovers, ...localGroupCovers };
@@ -372,10 +331,6 @@ const FirebaseSync = {
             throw error;
         }
     },
-
-    /**
-     * Cleanup on popup close
-     */
     cleanup() {
         if (this.saveToCloudTimeout) {
             clearTimeout(this.saveToCloudTimeout);
@@ -391,6 +346,5 @@ const FirebaseSync = {
     }
 };
 
-// Export
 window.AnimeTracker = window.AnimeTracker || {};
 window.AnimeTracker.FirebaseSync = FirebaseSync;

@@ -1,10 +1,3 @@
-/**
- * Anime Tracker - Popup Merge Utils Adapter
- *
- * Binds shared merge utilities from src/common/merge-utils.js into the
- * popup namespace expected by firebase-sync.js and progress-manager.js.
- */
-
 (function () {
     'use strict';
 

@@ -1,10 +1,4 @@
-/**
- * Anime Tracker - Progress Tracker
- * Handles video progress saving and loading
- */
-
 const ProgressTracker = {
-    // State
     lastSavedProgress: new Map(),
     lastSaveTime: 0,
     saveInProgress: false,
@@ -27,9 +21,6 @@ const ProgressTracker = {
         const d = Number(duration) || 0;
         return d <= 0 || d === 1440 || d === 6000 || d === 7200;
     },
-
-    // Two signals: (A) progress >= threshold, or (B) within 120s of end AND >= 60% watched.
-    // The 60% guard on signal B prevents false positives on short clips.
     shouldMarkComplete(currentTime, duration) {
         const { CONFIG } = window.AnimeTrackerContent;
 
@@ -78,7 +69,6 @@ const ProgressTracker = {
                 const tombstoneAge = now - (progress.deletedAt ? new Date(progress.deletedAt).getTime() : 0);
                 const TOMBSTONE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
                 if (tombstoneAge > TOMBSTONE_MAX_AGE) {
-                    Logger.debug('Removing expired tombstone:', id);
                     return false;
                 }
                 return true;
@@ -86,14 +76,12 @@ const ProgressTracker = {
 
             if (progress.percentage >= CONFIG.COMPLETED_PERCENTAGE ||
                 (progress.duration && (progress.duration - progress.currentTime) <= CONFIG.REMAINING_TIME_THRESHOLD)) {
-                Logger.debug('Removing completed progress:', id);
                 return false;
             }
 
             if (progress.savedAt) {
                 const age = now - new Date(progress.savedAt).getTime();
                 if (age > maxAge) {
-                    Logger.debug('Removing old progress:', id);
                     return false;
                 }
             }
@@ -113,11 +101,6 @@ const ProgressTracker = {
         limited.forEach(([id, progress]) => {
             cleaned[id] = progress;
         });
-
-        const removedCount = entries.length - limited.length;
-        if (removedCount > 0) {
-            Logger.info('Cleaned', removedCount, 'old progress entries');
-        }
 
         return cleaned;
     },
@@ -202,7 +185,6 @@ const ProgressTracker = {
             const newCurrentTime = Math.floor(currentTime);
 
             if (existingProgress && existingProgress.currentTime > newCurrentTime) {
-                Logger.debug('Keeping higher existing progress:', existingProgress.currentTime, 'vs new:', newCurrentTime);
                 return;
             }
 
@@ -216,7 +198,6 @@ const ProgressTracker = {
             await Storage.set({ videoProgress });
         } catch (e) {
             if (e.message && e.message.includes('Extension context invalidated')) {
-                // silent — extension reloads
             } else {
                 Logger.error('Save progress exception:', e);
                 throw e;
@@ -266,10 +247,6 @@ const ProgressTracker = {
         this.lastSaveTime = now;
         this.cleanLastSavedProgress();
 
-        const pct = Math.floor((currentTime / duration) * 100);
-        Logger.debug(`Progress saved: ${pct}% (need ${CONFIG.COMPLETED_PERCENTAGE}%) @ ${Math.floor(currentTime)}s / ${Math.floor(duration)}s`);
-        Logger.progress(uniqueId, pct, Math.floor(currentTime));
-
         this.performSaveProgress(uniqueId, currentTime, duration).catch(e => {
             Logger.error('Save failed', e);
         });
@@ -304,7 +281,6 @@ const ProgressTracker = {
             const videoProgress = result.videoProgress || {};
             delete videoProgress[uniqueId];
             await Storage.set({ videoProgress });
-            Logger.debug('Cleared progress for:', uniqueId);
         } catch (e) {
             Logger.error('Error clearing progress:', e);
             throw e;
@@ -365,11 +341,11 @@ const ProgressTracker = {
                 if (!Number.isFinite(episodeNumber) || episodeNumber <= 0) return false;
 
                 const idx = anime.episodes.findIndex(ep => Number(ep?.number) === episodeNumber);
-                if (idx === -1) return;
+                if (idx === -1) return false;
 
                 const existing = anime.episodes[idx] || {};
                 const currentDuration = Number(existing.duration) || 0;
-                if (!this.isPlaceholderDuration(currentDuration) || currentDuration === validDuration) return;
+                if (!this.isPlaceholderDuration(currentDuration) || currentDuration === validDuration) return false;
 
                 anime.episodes[idx] = {
                     ...existing,
@@ -403,7 +379,6 @@ const ProgressTracker = {
             anime.totalWatchTime = anime.episodes.reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
             anime.lastWatched = new Date().toISOString();
             await Storage.set({ animeData });
-            Logger.info(`Refreshed tracked duration from player metadata: ${animeKey} (${validDuration}s)`);
             return true;
         } catch (e) {
             Logger.error('Failed to refresh tracked duration:', e);
@@ -481,11 +456,9 @@ const ProgressTracker = {
                         .reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
                     animeData[info.animeSlug].lastWatched = new Date().toISOString();
                     await Storage.set({ animeData });
-                    Logger.info(`Updated placeholder duration for tracked episode: ${info.uniqueId}`);
                     return true;
                 }
 
-                Logger.info('Episode already tracked:', info.uniqueId);
                 return false;
             }
 
@@ -512,15 +485,12 @@ const ProgressTracker = {
                         duration: validDuration,
                         durationSource: 'video'
                     });
-                    Logger.info(`Double episode: also tracked Ep${info.secondEpisodeNumber}`);
                 }
             }
 
             animeData[info.animeSlug].episodes.sort((a, b) => a.number - b.number);
 
             await Storage.set({ animeData });
-
-            Logger.success(`✓ Tracked: ${info.animeTitle} Ep${info.episodeNumber}${info.isDoubleEpisode ? '-' + info.secondEpisodeNumber : ''}`);
             Notifications.showCompletion(info);
             return true;
         } catch (e) {
@@ -543,6 +513,5 @@ const ProgressTracker = {
     }
 };
 
-// Export
 window.AnimeTrackerContent = window.AnimeTrackerContent || {};
 window.AnimeTrackerContent.ProgressTracker = ProgressTracker;

@@ -1,12 +1,4 @@
-/**
- * Anime Tracker - Anime Card Renderer
- * Handles rendering of anime cards in the popup
- */
-
 const AnimeCardRenderer = {
-    /**
-     * Create anime card HTML
-     */
     createAnimeCard(slug, anime, videoProgress = {}) {
         const { UIHelpers } = window.AnimeTracker;
         const { FillerService } = window.AnimeTracker;
@@ -234,7 +226,7 @@ const AnimeCardRenderer = {
         const metaRowHtml = `<div class="anime-meta-row">${progressBadge}${statusBadge}${airingBadge}<span class="meta-time">${timeAgoText}</span></div>`;
 
         return `
-            <div class="anime-card" data-slug="${slug}">
+            <div class="anime-card${statusTextCard === 'Watching' ? ' anime-card-watching' : ''}" data-slug="${slug}">
                 <div class="anime-card-header">
                     <div class="anime-cover-container" style="flex-shrink:0;">${coverHtml}</div>
                     <div class="anime-header-main" style="flex:1; display:flex; flex-direction:column; overflow:hidden; margin-left:8px;">
@@ -283,11 +275,6 @@ const AnimeCardRenderer = {
             </div>
         `;
     },
-
-    /**
-     * Create parts section for multi-part anime
-     * @param {boolean} startExpanded - if true, section starts expanded (for season group context)
-     */
     createPartsSection(slug, episodes = [], startExpanded = false) {
         const { ANIME_PARTS_CONFIG, CONFIG, FillerService, UIHelpers } = window.AnimeTracker;
 
@@ -377,76 +364,38 @@ const AnimeCardRenderer = {
             </div>
         `;
     },
-
-    /**
-     * Create "in progress only" anime card
-     */
     createInProgressOnlyCard(anime) {
         const { UIHelpers } = window.AnimeTracker;
         const { CONFIG } = window.AnimeTracker;
 
         const activeEpisodes = anime.episodes.filter(ep => ep.percentage < CONFIG.COMPLETED_PERCENTAGE);
-
         if (activeEpisodes.length === 0) return '';
 
-        const latestEp = activeEpisodes.sort((a, b) => b.number - a.number)[0];
-        const minutes = Math.floor(latestEp.currentTime / 60);
-        const seconds = Math.floor(latestEp.currentTime % 60);
+        const sorted = activeEpisodes.sort((a, b) => b.number - a.number);
+        const latest = sorted[0];
+        const minutes = Math.floor(latest.currentTime / 60);
+        const seconds = Math.floor(latest.currentTime % 60);
         const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-
-        const progressTags = activeEpisodes
-            .sort((a, b) => b.number - a.number)
-            .map(ep => {
-                const epMin = Math.floor(ep.currentTime / 60);
-                const epSec = Math.floor(ep.currentTime % 60);
-                return `<span class="episode-tag in-progress" title="Saved: ${ep.percentage}%">Ep ${ep.number} (${epMin}:${epSec.toString().padStart(2, '0')})</span>`;
-            }).join('');
+        const moreCount = sorted.length - 1;
+        const moreBadge = moreCount > 0 ? `<span class="ip-more">+${moreCount}</span>` : '';
 
         return `
-            <div class="anime-card in-progress-only" data-slug="${anime.slug}">
-                <div class="anime-card-header">
-                    <h3 class="anime-title">
-                        <span class="anime-title-text">${UIHelpers.escapeHtml(anime.title)}</span>
-                        <span class="badge badge-watching">Watching</span>
-                    </h3>
-                    <div class="anime-card-actions">
-                        <button class="anime-delete" data-slug="${anime.slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
-                        <div class="anime-expand-icon">${UIHelpers.createIcon('chevron')}</div>
+            <div class="ip-card" data-slug="${anime.slug}">
+                <div class="ip-row">
+                    <span class="ip-icon">▶</span>
+                    <div class="ip-body">
+                        <span class="ip-title">${UIHelpers.escapeHtml(anime.title)}</span>
+                        <span class="ip-sub">Ep ${latest.number} · ${timeStr}${moreBadge}</span>
+                    </div>
+                    <div class="ip-right">
+                        <span class="ip-pct">${latest.percentage}%</span>
+                        <button class="anime-delete ip-delete-btn" data-slug="${anime.slug}" title="Delete">×</button>
                     </div>
                 </div>
-                <div class="progress-container">
-                    <div class="progress-info">
-                        <span>Ep ${latestEp.number} at ${timeStr}</span>
-                        <span>${latestEp.percentage}%</span>
-                    </div>
-                    <div class="progress-bar size-small">
-                        <div class="progress-fill" style="width: ${latestEp.percentage}%"></div>
-                    </div>
-                </div>
-                <div class="anime-in-progress collapsible collapsed">
-                    <div class="in-progress-header">
-                        <svg class="in-progress-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                        </svg>
-                        <span class="in-progress-title">In Progress (${activeEpisodes.length})</span>
-                        <svg class="collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="6 9 12 15 18 9"/>
-                        </svg>
-                    </div>
-                    <div class="in-progress-content">
-                        <div class="episode-list">${progressTags}</div>
-                    </div>
-                </div>
-                <div class="anime-last-watched">
-                    ${UIHelpers.createIcon('calendar')} ${UIHelpers.formatDate(anime.lastProgress)}
-                </div>
+                <div class="ip-bar"><div class="ip-fill" style="width:${latest.percentage}%"></div></div>
             </div>
         `;
     },
-
-    /**
-     * Create a season group box containing multiple seasons of the same anime
-     */
     createSeasonGroup(baseSlug, seasons, videoProgress = {}) {
         const { UIHelpers, SeasonGrouping, FillerService } = window.AnimeTracker;
 
@@ -857,10 +806,6 @@ const AnimeCardRenderer = {
             </div>
         `;
     },
-
-    /**
-     * Extract base title by removing season indicators
-     */
     extractBaseTitle(title) {
         return title
             // Remove "Season X" patterns
@@ -875,10 +820,6 @@ const AnimeCardRenderer = {
             .replace(/\s*[-:]\s*$/, '')
             .trim();
     },
-
-    /**
-     * Extract base title for movies
-     */
     extractMovieBaseTitle(title) {
         return title
             // Remove "Movie X" patterns
@@ -889,10 +830,6 @@ const AnimeCardRenderer = {
             .replace(/\s*[-:]\s*$/, '')
             .trim();
     },
-
-    /**
-     * Create a movie group box containing multiple movies of the same series
-     */
     createMovieGroup(baseSlug, movies) {
         const { UIHelpers, SeasonGrouping } = window.AnimeTracker;
 
@@ -988,10 +925,6 @@ const AnimeCardRenderer = {
             </div>
         `;
     },
-
-    /**
-     * Create a single movie card (collapsible like movie groups)
-     */
     createSingleMovieCard(slug, anime) {
         const { UIHelpers } = window.AnimeTracker;
 
@@ -999,7 +932,9 @@ const AnimeCardRenderer = {
         const watchTime = anime.totalWatchTime || 0;
         const formattedTime = UIHelpers.formatDuration(watchTime);
         const lastWatched = anime.lastWatched ? UIHelpers.formatDate(anime.lastWatched) : 'Never';
-        const isWatched = anime.episodes?.length > 0 || watchTime > 0;
+        const isFullyWatched = anime.episodes?.length > 0;
+        const isWatching = !isFullyWatched && watchTime > 0;
+        const isWatched = isFullyWatched;
 
         // Determine a cover image for single movie
         const coverImg = anime.coverImage || null;
@@ -1012,13 +947,14 @@ const AnimeCardRenderer = {
                </div>`;
 
         // Meta row for single movie: new badge design
-        const singleStatusClass = isWatched ? 'meta-badge-complete' : 'meta-badge-notstarted';
+        const singleStatusClass = isWatched ? 'meta-badge-complete' : (isWatching ? 'meta-badge-watching' : 'meta-badge-notstarted');
         const singleStatusIcon = isWatched ? '✓' : '⊙';
-        const singleStatusText = isWatched ? 'Watched' : 'Not watched';
+        const singleStatusText = isWatched ? 'Watched' : (isWatching ? 'Watching' : 'Not watched');
+        const singleMovieCardClass = isWatching ? ' anime-card-watching' : '';
         const metaRowHtml = `<div class="single-movie-meta-row"><span class="meta-badge" style="color:#f4a261;background:rgba(244,162,97,0.12);border:1px solid rgba(244,162,97,0.35);">Movie</span><span class="meta-badge ${singleStatusClass}">${singleStatusIcon} ${singleStatusText}</span><span class="meta-time">${lastWatched}</span></div>`;
 
         return `
-            <div class="anime-movie-group single-movie" data-base-slug="${slug}">
+            <div class="anime-movie-group single-movie${singleMovieCardClass}" data-base-slug="${slug}">
                 <div class="movie-group-header">
                     <div class="movie-group-logo" style="flex-shrink:0;">
                         ${coverHtml}
@@ -1055,6 +991,5 @@ const AnimeCardRenderer = {
     }
 };
 
-// Export
 window.AnimeTracker = window.AnimeTracker || {};
 window.AnimeTracker.AnimeCardRenderer = AnimeCardRenderer;
