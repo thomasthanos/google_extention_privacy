@@ -96,9 +96,24 @@ const Storage = {
         });
     },
     async migrateMultiPartAnime() {
+        // Guard: skip the migration entirely if it already ran for the current
+        // data set. We persist a lightweight fingerprint (slug count + a sorted
+        // hash of all slug keys) so that the guard survives popup restarts while
+        // still re-running when new slugs that need migration appear.
+        const MIGRATION_DONE_KEY = 'migrateMultiPart_done_v2';
+
         return new Promise((resolve) => {
-            chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime'], (result) => {
+            chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', MIGRATION_DONE_KEY], (result) => {
                 if (chrome.runtime.lastError || !result.animeData) {
+                    resolve(false);
+                    return;
+                }
+
+                // Build a cheap fingerprint of the current slug set.
+                const currentSlugs = Object.keys(result.animeData || {}).sort();
+                const currentFingerprint = currentSlugs.length + ':' + currentSlugs.join(',');
+                if (result[MIGRATION_DONE_KEY] === currentFingerprint) {
+                    // Nothing to migrate for this exact slug set.
                     resolve(false);
                     return;
                 }
@@ -263,12 +278,16 @@ const Storage = {
                     }
                 }
 
+                // Always persist the fingerprint so subsequent calls skip the
+                // full iteration when the slug set has not changed.
                 if (migrated) {
-                    chrome.storage.local.set({ animeData, videoProgress, deletedAnime }, () => {
+                    chrome.storage.local.set({ animeData, videoProgress, deletedAnime, [MIGRATION_DONE_KEY]: currentFingerprint }, () => {
                         resolve(true);
                     });
                 } else {
-                    resolve(false);
+                    chrome.storage.local.set({ [MIGRATION_DONE_KEY]: currentFingerprint }, () => {
+                        resolve(false);
+                    });
                 }
             });
         });

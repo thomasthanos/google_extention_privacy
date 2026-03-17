@@ -247,8 +247,15 @@ const ProgressTracker = {
         this.lastSaveTime = now;
         this.cleanLastSavedProgress();
 
+        // performSaveProgress is async but we intentionally don't await here
+        // (fire-and-forget from sync callers). Attach a catch so the rejection
+        // is always handled and never leaks as an unhandled promise rejection.
         this.performSaveProgress(uniqueId, currentTime, duration).catch(e => {
-            Logger.error('Save failed', e);
+            // Extension context invalidated errors are expected during unload;
+            // suppress them to avoid noise in the console.
+            if (!e?.message?.includes('Extension context invalidated')) {
+                Logger.error('Save progress failed:', e);
+            }
         });
     },
 

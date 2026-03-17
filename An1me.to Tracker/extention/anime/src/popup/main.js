@@ -479,26 +479,24 @@
     }
 
     function setupCardEventListeners() {
-        elements.animeList.querySelectorAll('.in-progress-header').forEach(header => {
-            const toggleCollapse = (e) => {
-                e.stopPropagation();
-                const card = header.closest('.anime-card');
-                if (card && !card.classList.contains('expanded')) card.classList.add('expanded');
-                header.parentElement.classList.toggle('collapsed');
-            };
-            header.addEventListener('click', toggleCollapse);
-            const title = header.querySelector('.in-progress-title');
-            if (title) title.addEventListener('click', toggleCollapse);
-        });
-
-        elements.animeList.querySelectorAll('.episodes-header').forEach(header => {
-            header.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const card = header.closest('.anime-card');
-                if (card && !card.classList.contains('expanded')) card.classList.add('expanded');
-                header.parentElement.classList.toggle('collapsed');
-            });
-        });
+        // NOTE: This function ONLY handles interactions NOT covered by the global
+        // animeList click-delegation listener below. Anything handled there must
+        // NOT be duplicated here to avoid double-execution.
+        //
+        // Handled here (require direct listeners because stopPropagation or
+        // per-element logic is needed before the event bubbles to animeList):
+        //   • .anime-card-header toggle (needs to ignore action buttons)
+        //   • .season-group-header / .season-item-header / .anime-movie-group header
+        //   • .show-more-episodes / .show-more-fillers (text swap)
+        //   • .part-item-header (inside collapsed sections)
+        //   • #ipGroupToggle / #completedListToggle
+        //   • .movie-edit-btn / .movie-delete-btn
+        //
+        // Handled by global delegation (DO NOT re-add here):
+        //   • .in-progress-header, .episodes-header  (animeList click handler)
+        //   • action buttons: .anime-delete, .anime-edit-title, .anime-fetch-filler,
+        //     .anime-complete-toggle, .season-edit-btn, .season-delete-btn,
+        //     .progress-delete-btn, .ip-delete-btn
 
         elements.animeList.querySelectorAll('.parts-header').forEach(header => {
             header.addEventListener('click', (e) => {
@@ -585,6 +583,7 @@
                 const content = ipGroupToggle.nextElementSibling;
                 const chevron = ipGroupToggle.querySelector('.ip-group-chevron');
                 const isOpen = content.classList.toggle('open');
+                ipGroupToggle.closest('.ip-group')?.classList.toggle('open', isOpen);
                 if (chevron) chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
             });
             const chevron = ipGroupToggle.querySelector('.ip-group-chevron');
@@ -1802,14 +1801,13 @@
                     return;
                 }
 
-                const card = target.closest('.anime-card');
-                if (card && !target.closest('button') && !target.closest('.anime-card-actions')) {
-                    card.classList.toggle('expanded');
-                    return;
-                }
+                // .anime-card-header toggle is handled by setupCardEventListeners
+                // (needs button-exclusion logic), so we skip it here.
 
                 const inProgressHeader = target.closest('.in-progress-header');
                 if (inProgressHeader) {
+                    const card = inProgressHeader.closest('.anime-card');
+                    if (card && !card.classList.contains('expanded')) card.classList.add('expanded');
                     const section = inProgressHeader.closest('.anime-in-progress');
                     if (section) section.classList.toggle('collapsed');
                     return;
@@ -1817,6 +1815,8 @@
 
                 const episodesHeader = target.closest('.episodes-header');
                 if (episodesHeader) {
+                    const card = episodesHeader.closest('.anime-card');
+                    if (card && !card.classList.contains('expanded')) card.classList.add('expanded');
                     const section = episodesHeader.closest('.anime-episodes');
                     if (section) section.classList.toggle('collapsed');
                     return;

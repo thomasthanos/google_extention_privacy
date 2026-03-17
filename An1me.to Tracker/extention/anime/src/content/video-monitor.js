@@ -1,4 +1,15 @@
+// Injection guard: if the content script is loaded a second time in the same
+// page context (e.g. extension reload without full navigation), reuse the
+// existing singleton and skip re-creating it. This prevents duplicate observers
+// and dangling event listeners from the previous injection.
+if (window.AnimeTrackerContent?.VideoMonitor?._initialized) {
+    // Already running — clean up the stale instance so the new init() call
+    // in main.js gets a fresh slate.
+    window.AnimeTrackerContent.VideoMonitor.cleanup();
+}
+
 const VideoMonitor = {
+    _initialized: true,
     videoElement: null,
     checkInterval: null,
     progressSaveInterval: null,
@@ -121,7 +132,12 @@ const VideoMonitor = {
             video.addEventListener('loadedmetadata', eventHandlers.handleVideoMetadata, { passive: true });
             video.addEventListener('durationchange', eventHandlers.handleVideoMetadata, { passive: true });
             video.addEventListener('loadeddata', eventHandlers.handleVideoMetadata, { passive: true });
-            Promise.resolve().then(() => eventHandlers.handleVideoMetadata());
+            // Fire once immediately (microtask) to catch already-loaded metadata.
+            // Attach a catch so any rejection from the async handler is handled
+            // here rather than becoming an unhandled promise rejection.
+            Promise.resolve()
+                .then(() => eventHandlers.handleVideoMetadata())
+                .catch(e => Logger.error('Initial metadata handler failed:', e));
         }
 
         video.addEventListener('pause', eventHandlers.handlePause, { passive: true });
@@ -190,6 +206,8 @@ const VideoMonitor = {
                 const currentTime = this.videoElement.currentTime;
                 const duration = this.videoElement.duration;
                 if (currentTime > 0 && duration > 0) {
+                    // saveVideoProgress is sync-entry but dispatches an async
+                    // performSaveProgress internally (handled with .catch there).
                     ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration);
                 }
             }

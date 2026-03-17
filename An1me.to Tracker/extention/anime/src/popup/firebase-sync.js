@@ -326,7 +326,31 @@ const FirebaseSync = {
             console.error('[Firebase] Sync error:', error);
             if (elements?.syncStatus) {
                 elements.syncStatus.classList.remove('syncing');
-                elements.syncText.textContent = 'Sync Error';
+                // Classify the error so the user gets an actionable hint
+                // instead of a generic "Sync Error" with no next step.
+                const msg = (error?.message || '').toLowerCase();
+                const isOffline = !navigator.onLine ||
+                    msg.includes('failed to fetch') ||
+                    msg.includes('networkerror') ||
+                    msg.includes('network request failed');
+                const isAuth = msg.includes('permission') ||
+                    msg.includes('unauthenticated') ||
+                    msg.includes('unauthorized') ||
+                    (error?.code && String(error.code).startsWith('auth/'));
+
+                if (isOffline) {
+                    elements.syncText.textContent = 'Offline — retry later';
+                } else if (isAuth) {
+                    elements.syncText.textContent = 'Auth error — sign out & in';
+                } else {
+                    elements.syncText.textContent = 'Sync failed — try refresh';
+                }
+
+                // Auto-revert the status label after 6 s so it doesn't stay red forever
+                setTimeout(() => {
+                    if (elements.syncText) elements.syncText.textContent = 'Cloud Synced';
+                    if (elements.syncStatus) elements.syncStatus.classList.add('synced');
+                }, 6000);
             }
             throw error;
         }

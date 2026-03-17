@@ -64,10 +64,12 @@ function isSyncPaused() {
     return Date.now() < syncPausedUntil;
 }
 
-let rtListenAbort    = null;
-let rtReconnectTimer = null;
-let rtReconnectDelay = 5000;
-const RT_MAX_DELAY   = 60000;
+let rtListenAbort     = null;
+let rtReconnectTimer  = null;
+// Start at 2 s so the very first retry is fast; doubles each time up to RT_MAX_DELAY.
+let rtReconnectDelay  = 2000;
+const RT_INITIAL_DELAY = 2000;
+const RT_MAX_DELAY     = 60000;
 
 // Max consecutive failures before the SSE listener pauses itself.
 // The alarm-based health check restarts it, preventing a tight reconnect loop.
@@ -94,6 +96,13 @@ async function getFirebaseToken() {
         if (tokens.expiresAt < Date.now() + 120000) {
             const refreshed = await refreshFirebaseToken(tokens.refreshToken);
             if (!refreshed) {
+                // null means transient failure — keep the current token if still valid,
+                // or return null to let the caller retry later without signing out.
+                if (tokens.expiresAt > Date.now()) return tokens.idToken;
+                return null;
+            }
+            if (refreshed.hardFailure) {
+                // Token is genuinely invalid — sign the user out.
                 await signOutDueToTokenFailure();
                 return null;
             }
@@ -104,6 +113,16 @@ async function getFirebaseToken() {
         console.error('[BG] Failed to get token:', e);
         return null;
     }
+}
+
+// Distinguish a hard auth failure (token truly invalid / revoked) from a
+// transient network error so we don't sign the user out on a glitch.
+function isHardAuthFailure(status) {
+    // 400 Bad Request  → malformed / expired refresh token (hard failure)
+    // 401 Unauthorized → token rejected by Google (hard failure)
+    // 403 Forbidden    → account disabled / revoked (hard failure)
+    // Anything else (5xx, network error, etc.) is treated as transient.
+    return status === 400 || status === 401 || status === 403;
 }
 
 async function refreshFirebaseToken(refreshToken) {
@@ -117,9 +136,21 @@ async function refreshFirebaseToken(refreshToken) {
                 body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: refreshToken })
             }
         );
-        if (!response.ok) return null;
+        if (!response.ok) {
+            if (isHardAuthFailure(response.status)) {
+                console.warn('[BG] Token refresh: hard auth failure (status', response.status, ')— will sign out');
+                return { hardFailure: true };
+            }
+            // Transient server/network error — let the caller retry later
+            console.warn('[BG] Token refresh: transient failure (status', response.status, ')');
+            return null;
+        }
         const data = await response.json();
-        if (data.error) return null;
+        if (data.error) {
+            // Google returned a JSON error body — treat as hard failure
+            console.warn('[BG] Token refresh: Google error:', data.error);
+            return { hardFailure: true };
+        }
         const tokens = {
             idToken:      data.id_token,
             refreshToken: data.refresh_token,
@@ -128,7 +159,8 @@ async function refreshFirebaseToken(refreshToken) {
         await bgStorageSet({ firebase_tokens: tokens });
         return tokens;
     } catch (e) {
-        console.error('[BG] Token refresh failed:', e);
+        // fetch() threw — almost certainly a network error, not a bad token
+        console.warn('[BG] Token refresh: network error —', e.message);
         return null;
     }
 }
@@ -476,7 +508,7 @@ async function startRealtimeListener() {
 
         rtConsecutiveFailures = 0;
         streamSucceeded = true;
-        rtReconnectDelay = 5000;
+        rtReconnectDelay = RT_INITIAL_DELAY;
         markStreamAlive();
 
         const reader  = res.body.getReader();
@@ -534,8 +566,10 @@ async function startRealtimeListener() {
 }
 
 function scheduleRtReconnect() {
-    const delay = rtReconnectDelay === 5000 ? 2000 : rtReconnectDelay;
-    rtReconnectTimer = setTimeout(startRealtimeListener, delay);
+    // rtReconnectDelay starts at RT_INITIAL_DELAY (2 s) and grows with each
+    // consecutive failure; it is reset to RT_INITIAL_DELAY on a successful
+    // stream connection inside startRealtimeListener.
+    rtReconnectTimer = setTimeout(startRealtimeListener, rtReconnectDelay);
     rtReconnectDelay = Math.min(rtReconnectDelay * 1.5, RT_MAX_DELAY);
 }
 

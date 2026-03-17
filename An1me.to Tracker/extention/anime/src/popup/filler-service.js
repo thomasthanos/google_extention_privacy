@@ -173,8 +173,21 @@ const FillerService = {
             const slugsToFetch = [];
 
             for (const slug of animeSlugs) {
-                if (this.episodeTypesCache[slug]) continue;
                 if (this.isLikelyMovie(slug)) continue;
+
+                const cached = this.episodeTypesCache[slug];
+                if (cached) {
+                    // Treat notFound entries as handled (they have their own TTL
+                    // checked inside fetchEpisodeTypes).
+                    if (cached.notFound) continue;
+                    // Skip only if the cached entry is still fresh.
+                    const age = cached.cachedAt ? Date.now() - cached.cachedAt : Infinity;
+                    if (age < CONFIG.EPISODE_TYPES_CACHE_TTL) continue;
+                    // Stale — delete from in-memory cache so fetchEpisodeTypes
+                    // will actually hit the network.
+                    delete this.episodeTypesCache[slug];
+                }
+
                 slugsToFetch.push(slug);
             }
 
