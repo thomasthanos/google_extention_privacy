@@ -354,6 +354,8 @@ body {
 .btn-icon:active { background: var(--bg-0); }
 
 /* ─── Stats Bar ─────────────────────────────────────────────── */
+/* ID override — υψηλότερη specificity από οποιοδήποτε class rule */
+/* Stats Bar - Perfect Centering */
 #statsBar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(0, 1fr);
@@ -385,10 +387,10 @@ body {
   text-shadow: 0 0 20px rgba(79,195,247,0.4), 0 0 40px rgba(79,195,247,0.15);
   white-space: nowrap;
   width: 100%;
-  text-align: center !important;
+  text-align: center !important; /* Force center alignment */
   overflow: hidden;
   text-overflow: ellipsis;
-  display: block;
+  display: block; /* Ensure it's block level */
 }
 
 #statsBar .stat-label {
@@ -399,10 +401,10 @@ body {
   font-weight: 600;
   white-space: nowrap;
   width: 100%;
-  text-align: center !important;
+  text-align: center !important; /* Force center alignment */
   overflow: hidden;
   text-overflow: ellipsis;
-  display: block;
+  display: block; /* Ensure it's block level */
 }
 
 #statsBar .stat-divider {
@@ -425,8 +427,10 @@ body {
 .settings-dropdown.visible { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
 .settings-dropdown-content { display: flex; flex-direction: column; }
 
+/* settings-section: generic column layout for menu items */
 .settings-section { padding: 6px 7px; display: flex; flex-direction: column; gap: 2px; }
 
+/* profile-section: row layout with avatar left */
 .settings-section.profile-section {
   display: flex;
   flex-direction: row;
@@ -606,17 +610,39 @@ body {
   background: rgba(76,175,130,0.04);
   transition: background var(--tf);
 }
-.completed-list-label:hover { background: rgba(76,175,130,0.1); }
-.completed-list-label:hover .completed-list-label-title { color: var(--cyan); }
-.completed-list-label-left { display: flex; align-items: baseline; gap: 8px; }
-.completed-list-label-title {
-  font-size: 10px; font-weight: 700; color: var(--green);
-  letter-spacing: 0.08em; transition: color var(--tf);
+.completed-list-label:hover {
+  background: rgba(76,175,130,0.1);
 }
-.completed-list-label-sub { font-size: 10px; color: var(--t3); }
-.completed-chevron { width: 12px; height: 12px; color: var(--t3); flex-shrink: 0; transition: transform var(--tn); }
+.completed-list-label:hover .completed-list-label-title {
+  color: var(--cyan);
+}
+.completed-list-label-left {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.completed-list-label-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--green);
+  letter-spacing: 0.08em;
+  transition: color var(--tf);
+}
+.completed-list-label-sub {
+  font-size: 10px;
+  color: var(--t3);
+}
+.completed-chevron {
+  width: 12px;
+  height: 12px;
+  color: var(--t3);
+  flex-shrink: 0;
+  transition: transform var(--tn);
+}
 .completed-list-cards {
-  flex-direction: column; gap: 8px; padding: 10px 10px 10px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 10px 10px;
   border-top: 1px solid rgba(76,175,130,0.12);
 }
 
@@ -726,54 +752,23 @@ body {
 .badge-watching { color: var(--amber);  background: rgba(240,192,64,0.08);  border-color: rgba(240,192,64,0.2); font-size: 9px; padding: 2px 8px; }
 .skipped-fillers-badge { display: inline-flex; align-items: center; gap: 4px; margin-left: 5px; padding: 2px 7px; background: rgba(155,106,255,0.1); border: 1px solid rgba(155,106,255,0.24); border-radius: 9px; font-size: 9px; font-weight: 650; color: #c2a2f8; white-space: nowrap; }
 
-/* ─── In-progress section — iOS 26 / 3D border style ────────── */
-.anime-in-progress {
-  margin-bottom: 0; padding: 0;
-  background: rgba(240,192,64,0.03);
-  border: none;
-  border-radius: var(--r-sm);
-  box-shadow:
-    0 0 0 0.5px rgba(0,0,0,0.55),
-    inset 0 1px 0 rgba(255,255,255,0.08);
-  max-height: 0; overflow: hidden; opacity: 0;
-  transition: max-height var(--tn), opacity var(--tn), margin var(--tn), padding var(--tn);
-}
-.anime-card.expanded .anime-in-progress { max-height: 240px; opacity: 1; margin-bottom: 7px; padding: 0; }
-.anime-card.expanded .anime-in-progress.collapsed { max-height: 30px; }
-.anime-card.in-progress-only .anime-in-progress { max-height: 240px; opacity: 1; margin-bottom: 7px; padding: 0; }
-.anime-card.in-progress-only .anime-in-progress.collapsed { max-height: 30px; }
-
-.in-progress-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 7px 10px;
-  background: linear-gradient(180deg, rgba(240,192,64,0.08) 0%, rgba(240,192,64,0.03) 100%);
-  border-bottom: 0.5px solid rgba(240,192,64,0.12);
-  border-radius: var(--r-sm) var(--r-sm) 0 0;
-  font-size: 10px; color: rgba(240,192,64,0.85); font-weight: 600; cursor: pointer;
-  transition: background var(--tf);
-}
-.in-progress-header:hover {
-  background: linear-gradient(180deg, rgba(240,192,64,0.13) 0%, rgba(240,192,64,0.06) 100%);
-}
-.in-progress-title { flex: 1; font-size: 10px; display: flex; align-items: center; gap: 6px; }
-.in-progress-title::before {
-  content: '';
-  width: 6px; height: 6px; border-radius: 50%;
-  background: rgba(240,192,64,0.9);
-  box-shadow: 0 0 0 2px rgba(240,192,64,0.18);
-  flex-shrink: 0;
-}
+/* ─── In-progress section ───────────────────────────────────── */
+.anime-in-progress { margin-bottom: 0; padding: 0; background: rgba(240,192,64,0.04); border: 1px solid rgba(240,192,64,0.14); border-radius: var(--r-xs); max-height: 0; overflow: hidden; opacity: 0; transition: max-height var(--tn), opacity var(--tn), margin var(--tn), padding var(--tn); }
+.anime-card.expanded .anime-in-progress { max-height: 200px; opacity: 1; margin-bottom: 7px; padding: 7px 9px; }
+.anime-card.expanded .anime-in-progress.collapsed { max-height: 30px; padding: 6px 9px; border-color: rgba(240,192,64,0.22); }
+.anime-card.in-progress-only .anime-in-progress { max-height: 200px; opacity: 1; margin-bottom: 7px; padding: 7px 9px; }
+.anime-card.in-progress-only .anime-in-progress.collapsed { max-height: 30px; padding: 6px 9px; border-color: rgba(240,192,64,0.22); }
+.in-progress-header { display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: var(--amber); font-weight: 600; cursor: pointer; user-select: none; }
+.in-progress-header:hover { color: #fcd34d; }
+.in-progress-title { flex: 1; font-size: 10px; }
 .in-progress-icon { display: none; }
-.collapse-icon { width: 12px; height: 12px; color: rgba(240,192,64,0.55); transition: transform var(--tf); }
+.collapse-icon { width: 12px; height: 12px; color: var(--amber); transition: transform var(--tf); opacity: 0.7; }
 .anime-in-progress.collapsed .collapse-icon { transform: rotate(-90deg); }
-.in-progress-content {
-  padding: 6px 8px 8px;
-  max-height: 180px; overflow-y: auto; opacity: 1;
-  transition: max-height var(--tn), padding var(--tn), opacity var(--tn);
-}
-.anime-in-progress.collapsed .in-progress-content { max-height: 0; padding: 0 8px; opacity: 0; }
+.in-progress-content { margin-top: 6px; max-height: 130px; overflow-y: auto; opacity: 1; transition: max-height var(--tn), margin var(--tn), opacity var(--tn); }
 .in-progress-content::-webkit-scrollbar { width: 3px; }
-.in-progress-content::-webkit-scrollbar-thumb { background: rgba(240,192,64,0.2); border-radius: 3px; }
+.in-progress-content::-webkit-scrollbar-track { background: transparent; }
+.in-progress-content::-webkit-scrollbar-thumb { background: rgba(240,192,64,0.35); border-radius: 3px; }
+.anime-in-progress.collapsed .in-progress-content { max-height: 0; margin-top: 0; opacity: 0; }
 
 /* ─── Meta ─────────────────────────────────────────────────── */
 .anime-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; max-height: 0; overflow: hidden; opacity: 0; transition: max-height var(--tn), opacity var(--tn), margin var(--tn); }
@@ -808,94 +803,10 @@ body {
 /* ─── Episode tags ──────────────────────────────────────────── */
 .episode-list { display: flex; flex-wrap: wrap; gap: 4px; }
 .episode-tag { padding: 2px 7px; background: var(--bg-3); border: 1px solid var(--b1); border-radius: var(--r-xs); font-size: 10px; color: var(--t2); font-weight: 500; }
-
-/* ── in-progress episode tag — iOS 26 3D style ── */
-.episode-tag.in-progress {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  width: 100%;
-  padding: 7px 8px 7px 12px;
-  background: rgba(26,28,42,0.9);
-  border: none;
-  border-left: 2.5px solid rgba(240,192,64,0.8);
-  border-radius: 8px;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.08),
-    inset 0 -1px 0 rgba(0,0,0,0.4),
-    0 0 0 0.5px rgba(240,192,64,0.18),
-    0 1px 3px rgba(0,0,0,0.4);
-  color: var(--t1);
-  font-weight: 500;
-  transition: box-shadow var(--tf), background var(--tf);
-  position: relative;
-  overflow: hidden;
-}
-.episode-tag.in-progress::after {
-  content: '';
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  height: 1.5px;
-  background: linear-gradient(90deg, rgba(240,192,64,0.5), rgba(240,192,64,0.9));
-  transform: scaleX(var(--ep-pct, 0));
-  transform-origin: left;
-}
-.episode-tag.in-progress:hover {
-  background: rgba(32,34,50,0.95);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.11),
-    inset 0 -1px 0 rgba(0,0,0,0.45),
-    0 0 0 0.5px rgba(240,192,64,0.3),
-    0 2px 5px rgba(0,0,0,0.5);
-}
-
-.ep-tag-info {
-  display: flex; flex-direction: column; gap: 1px;
-  min-width: 0; flex: 1;
-}
-.ep-tag-num { font-size: 12px; font-weight: 600; color: var(--t1); line-height: 1.3; }
-.ep-tag-time { font-size: 10px; color: rgba(240,192,64,0.65); font-variant-numeric: tabular-nums; }
-
-.ep-tag-right {
-  display: flex; align-items: center; gap: 5px; flex-shrink: 0;
-}
-.ep-tag-pct {
-  font-size: 9px; font-weight: 700;
-  color: rgba(240,192,64,0.75);
-  padding: 1px 5px;
-  border-radius: var(--r-pill);
-  background: rgba(240,192,64,0.09);
-  border: 0.5px solid rgba(240,192,64,0.2);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-
-/* delete button inside in-progress tag */
-.progress-delete-btn {
-  width: 18px; height: 18px;
-  display: flex; align-items: center; justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 50%;
-  color: rgba(255,255,255,0.2);
-  cursor: pointer;
-  font-size: 0;
-  padding: 0;
-  flex-shrink: 0;
-  box-shadow: 0 0 0 0.5px rgba(255,255,255,0.06);
-  transition: color var(--tf), background var(--tf), box-shadow var(--tf);
-}
-.progress-delete-btn svg { width: 9px; height: 9px; stroke-width: 2.5; }
-.episode-tag.in-progress:hover .progress-delete-btn { color: rgba(255,255,255,0.35); }
-.progress-delete-btn:hover {
-  color: #ff453a !important;
-  background: rgba(255,69,58,0.14);
-  box-shadow: 0 0 0 0.5px rgba(255,69,58,0.35);
-}
-.progress-delete-btn:active { transform: scale(0.88); }
-
+.episode-tag.in-progress { padding: 3px 22px 3px 8px; background: rgba(240,192,64,0.08); border-color: rgba(240,192,64,0.25); color: var(--amber); font-weight: 600; border-radius: 10px; position: relative; display: inline-flex; align-items: center; }
+.progress-delete-btn { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; background: rgba(240,69,69,0.65); border: none; border-radius: 50%; color: #fff; cursor: pointer; font-size: 10px; opacity: 0.45; transition: opacity var(--tf), background var(--tf); padding: 0; }
+.episode-tag.in-progress:hover .progress-delete-btn { opacity: 1; }
+.progress-delete-btn:hover { background: #f04545; opacity: 1; }
 .episode-tag.filler { background: rgba(155,106,255,0.08); border-color: rgba(155,106,255,0.2); color: var(--purple); }
 .episode-tag.filler.unwatched-filler { background: transparent; border: 1px dashed rgba(155,106,255,0.2); color: rgba(155,106,255,0.45); opacity: 0.65; }
 .episode-tag.filler.show-more-fillers { cursor: pointer; background: rgba(155,106,255,0.07); border: 1px solid rgba(155,106,255,0.18); transition: all var(--tf); }
@@ -908,226 +819,36 @@ body {
 .unwatched-fillers-label { display: flex; align-items: center; gap: 4px; font-size: 9px; color: var(--purple); margin-bottom: 4px; font-weight: 600; }
 .filler-count { background: rgba(155,106,255,0.12); color: var(--purple); padding: 1px 4px; border-radius: var(--r-xs); font-size: 8px; font-weight: 600; }
 
-/* ─── Compact in-progress-only card ─────────────────────────── */
-.ip-card {
-  border: none;
-  box-shadow:
-    0 0 0 0.5px rgba(240,192,64,0.22),
-    inset 0 1px 0 rgba(255,255,255,0.07),
-    inset 0 -1px 0 rgba(0,0,0,0.35);
-  background: rgba(22,24,36,0.88);
-  border-radius: var(--r-md);
-  padding: 9px 11px 0;
-  display: flex; flex-direction: column; gap: 7px;
-  transition: box-shadow var(--tf), background var(--tf);
-  cursor: default;
-  position: relative; overflow: hidden;
-}
-.ip-card::before {
-  content: '';
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 2.5px;
-  background: linear-gradient(180deg, rgba(240,192,64,0.9) 0%, rgba(240,192,64,0.35) 100%);
-  border-radius: var(--r-md) 0 0 var(--r-md);
-}
-.ip-card:hover {
-  background: rgba(28,30,44,0.95);
-  box-shadow:
-    0 0 0 0.5px rgba(240,192,64,0.35),
-    inset 0 1px 0 rgba(255,255,255,0.09),
-    inset 0 -1px 0 rgba(0,0,0,0.4);
-}
-.ip-row { display: flex; align-items: center; gap: 8px; min-width: 0; padding-left: 6px; }
-.ip-icon { color: var(--amber); font-size: 7px; flex-shrink: 0; opacity: 0.8; }
-.ip-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-.ip-title { font-size: 13px; font-weight: 600; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
-.ip-sub { font-size: 10px; color: rgba(240,192,64,0.65); line-height: 1.2; margin-top: 1px; display: flex; align-items: center; gap: 5px; }
-.ip-more { background: rgba(255,255,255,0.06); border: 0.5px solid var(--b1); border-radius: 5px; padding: 0 5px; font-size: 9px; color: var(--t2); }
-.ip-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.ip-pct {
-  font-size: 9px; font-weight: 700;
-  color: rgba(240,192,64,0.7);
-  padding: 1px 5px;
-  border-radius: var(--r-pill);
-  background: rgba(240,192,64,0.08);
-  border: 0.5px solid rgba(240,192,64,0.18);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.ip-delete-btn {
-  width: 18px; height: 18px;
-  background: none; border: none;
-  color: rgba(255,255,255,0.18);
-  cursor: pointer; font-size: 0; line-height: 1;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  padding: 0;
-  box-shadow: 0 0 0 0.5px rgba(255,255,255,0.06);
-  transition: color var(--tf), background var(--tf), box-shadow var(--tf);
-}
-.ip-delete-btn svg { width: 9px; height: 9px; stroke-width: 2.5; }
-.ip-card:hover .ip-delete-btn { color: rgba(255,255,255,0.32); }
-.ip-delete-btn:hover {
-  color: #ff453a !important;
-  background: rgba(255,69,58,0.14);
-  box-shadow: 0 0 0 0.5px rgba(255,69,58,0.35);
-}
-.ip-delete-btn:active { transform: scale(0.88); }
-.ip-bar { height: 2px; background: rgba(255,255,255,0.04); border-radius: 0 0 var(--r-md) var(--r-md); overflow: hidden; margin: 0 -11px; }
-.ip-fill { height: 100%; background: linear-gradient(90deg, rgba(212,162,0,0.6), rgba(240,192,64,0.9)); border-radius: 1px; }
+/* ─── In-progress group (ip-*) ──────────────────────────────── */
+.ip-group { margin-bottom: 8px; }
+.ip-group-header { display: flex; align-items: center; gap: 7px; padding: 8px 11px; background: rgba(240,192,64,0.06); border: 1px solid rgba(240,192,64,0.2); border-radius: var(--r-sm); cursor: pointer; user-select: none; transition: background var(--tf), border-color var(--tf), border-radius var(--tf); }
+.ip-group:has(.ip-group-content.open) .ip-group-header { border-radius: var(--r-sm) var(--r-sm) 0 0; border-bottom-color: transparent; }
+.ip-group-header:hover { background: rgba(240,192,64,0.11); border-color: rgba(240,192,64,0.32); }
+.ip-group-play { font-size: 8px; color: var(--amber); opacity: 0.85; flex-shrink: 0; }
+.ip-group-label { font-size: 11px; font-weight: 700; color: var(--amber); letter-spacing: 0.25px; flex: 1; }
+.ip-group-count { font-size: 10px; font-weight: 650; color: var(--amber); background: rgba(240,192,64,0.13); border: 1px solid rgba(240,192,64,0.28); border-radius: var(--r-pill); padding: 1px 8px; }
+.ip-group-chevron { width: 14px; height: 14px; color: var(--amber); opacity: 0.75; transition: transform var(--tf); flex-shrink: 0; }
+.ip-group-content { overflow: hidden; max-height: 0; padding: 0 7px; background: rgba(240,150,30,0.045); border-left: 1px solid rgba(240,192,64,0.13); border-right: 1px solid rgba(240,192,64,0.13); border-bottom: 1px solid rgba(240,192,64,0.13); border-radius: 0 0 var(--r-sm) var(--r-sm); transition: max-height 0.28s ease, padding 0.28s ease; }
+.ip-group-content.open { max-height: 800px; padding: 5px 7px 7px; }
+.ip-card { padding: 7px 10px 6px; margin-top: 4px; background: rgba(20,25,38,0.8); border: 1px solid var(--b1); border-radius: var(--r-sm); transition: border-color var(--tf); }
+.ip-card:hover { border-color: rgba(240,192,64,0.22); }
+.ip-row { display: flex; align-items: center; gap: 8px; }
+.ip-icon { font-size: 8px; color: var(--amber); opacity: 0.6; flex-shrink: 0; }
+.ip-body { flex: 1; min-width: 0; }
+.ip-title { display: block; font-size: 11px; font-weight: 600; color: var(--t1); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ip-sub { display: block; font-size: 10px; color: var(--t3); margin-top: 1px; }
+.ip-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.ip-pct { font-size: 10px; font-weight: 650; color: var(--amber); min-width: 26px; text-align: right; }
+.ip-delete-btn { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; border-radius: 50%; color: var(--t3); cursor: pointer; padding: 0; transition: background var(--tf), color var(--tf); flex-shrink: 0; }
+.ip-delete-btn svg { width: 11px; height: 11px; }
+.ip-delete-btn:hover { background: rgba(240,69,69,0.8); color: #fff; }
+.ip-bar { height: 2px; background: var(--b1); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+.ip-fill { height: 100%; background: var(--amber); border-radius: 2px; }
 
-/* ─── In-progress collapsible group — iOS 26 / 3D card ─────── */
-.ip-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  margin-bottom: 4px;
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  position: relative;
-  /* 3D card shell — same language as ip-card */
-  background: rgba(22, 24, 36, 0.90);
-  box-shadow:
-    0 0 0 0.5px rgba(240,192,64,0.28),
-    inset 0 1px 0 rgba(255,255,255,0.08),
-    inset 0 -1px 0 rgba(0,0,0,0.38),
-    0 4px 16px rgba(0,0,0,0.45),
-    0 1px 4px rgba(0,0,0,0.3);
-  transition: box-shadow var(--tf), background var(--tf);
-}
-/* Amber left accent stripe */
-.ip-group::before {
-  content: '';
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 2.5px;
-  background: linear-gradient(180deg,
-    rgba(240,192,64,0.95) 0%,
-    rgba(240,192,64,0.55) 60%,
-    rgba(240,192,64,0.15) 100%);
-  border-radius: var(--r-lg) 0 0 var(--r-lg);
-  z-index: 1;
-}
-/* Top gloss sheen */
-.ip-group::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 40%;
-  background: linear-gradient(180deg,
-    rgba(255,255,255,0.055) 0%,
-    rgba(255,255,255,0.01) 100%);
-  border-radius: var(--r-lg) var(--r-lg) 60% 60% / var(--r-lg) var(--r-lg) 30% 30%;
-  pointer-events: none;
-  z-index: 2;
-}
-.ip-group:hover {
-  background: rgba(28, 30, 44, 0.95);
-  box-shadow:
-    0 0 0 0.5px rgba(240,192,64,0.42),
-    inset 0 1px 0 rgba(255,255,255,0.10),
-    inset 0 -1px 0 rgba(0,0,0,0.42),
-    0 6px 22px rgba(0,0,0,0.52),
-    0 2px 6px rgba(240,192,64,0.08);
-}
-
-.ip-group-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 11px 9px 14px;
-  cursor: pointer;
-  user-select: none;
-  position: relative;
-  z-index: 3;
-  /* subtle amber tint on header bg */
-  background: linear-gradient(180deg,
-    rgba(240,192,64,0.07) 0%,
-    rgba(240,192,64,0.02) 100%);
-  border-bottom: 0.5px solid rgba(240,192,64,0.10);
-  transition: background var(--tf);
-}
-.ip-group-header:hover {
-  background: linear-gradient(180deg,
-    rgba(240,192,64,0.12) 0%,
-    rgba(240,192,64,0.05) 100%);
-}
-/* When group is open, header bottom border stays visible */
-.ip-group-content.open ~ .ip-group-header,
-.ip-group.open .ip-group-header {
-  border-bottom-color: rgba(240,192,64,0.14);
-}
-
-.ip-group-play {
-  font-size: 7px;
-  color: rgba(240,192,64,0.9);
-  flex-shrink: 0;
-  filter: drop-shadow(0 0 4px rgba(240,192,64,0.55));
-}
-.ip-group-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(240,192,64,0.8);
-  flex: 1;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
-}
-.ip-group-count {
-  font-size: 9px;
-  font-weight: 700;
-  color: rgba(240,192,64,0.65);
-  background: rgba(240,192,64,0.09);
-  border: 0.5px solid rgba(240,192,64,0.22);
-  border-radius: var(--r-pill);
-  padding: 1px 7px;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-}
-.ip-group-chevron {
-  width: 12px;
-  height: 12px;
-  color: rgba(240,192,64,0.45);
-  flex-shrink: 0;
-  transition: transform var(--tf), color var(--tf);
-  transform: rotate(-90deg);
-}
-.ip-group-header:hover .ip-group-chevron {
-  color: rgba(240,192,64,0.7);
-}
-/* Rotate when open */
-.ip-group.open .ip-group-chevron,
-.ip-group-content.open + * .ip-group-chevron {
-  transform: rotate(0deg);
-}
-
-.ip-group-content {
-  display: none;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px 10px 10px;
-  position: relative;
-  z-index: 3;
-  background: rgba(14,16,26,0.55);
-}
-.ip-group-content.open { display: flex; }
-/* Bottom progress bar — matches ip-card's ip-bar */
-.ip-group-content.open::after {
-  content: '';
-  display: block;
-  height: 2px;
-  margin: 4px -10px -10px;
-  background: linear-gradient(90deg,
-    rgba(212,162,0,0.0) 0%,
-    rgba(212,162,0,0.35) 20%,
-    rgba(240,192,64,0.6) 60%,
-    rgba(240,192,64,0.15) 100%);
-  border-radius: 0 0 var(--r-lg) var(--r-lg);
-}
-
-.anime-card.anime-card-watching { border-color: rgba(240,192,64,0.18); background: rgba(240,192,64,0.02); }
-.anime-card.anime-card-watching:hover { border-color: rgba(240,192,64,0.3); }
+/* ─── In-progress-only card (legacy, kept for compat) ───────── */
+.anime-card.in-progress-only { border-color: rgba(240,192,64,0.18); background: rgba(240,192,64,0.02); }
+.anime-card.in-progress-only:hover { border-color: rgba(240,192,64,0.3); }
+.anime-card.in-progress-only .progress-container { max-height: 80px; opacity: 1; margin-bottom: 8px; }
 
 /* ─── Empty state ───────────────────────────────────────────── */
 .empty-state { display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 48px 24px; flex: 1; }
@@ -1453,8 +1174,6 @@ body {
   background: var(--cyan); border-radius: 0 2px 2px 0; opacity: 0; transition: opacity var(--tn);
 }
 .anime-movie-group:hover { border-color: rgba(79,195,247,0.22); border-top-color: rgba(79,195,247,0.32); box-shadow: var(--s3); }
-.anime-movie-group.anime-card-watching { border-color: rgba(240,192,64,0.18); background: rgba(240,192,64,0.02); }
-.anime-movie-group.anime-card-watching:hover { border-color: rgba(240,192,64,0.3); }
 .anime-movie-group:hover::before { opacity: 0.6; }
 .movie-group-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; gap: 10px; }
 .movie-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1471,11 +1190,14 @@ body {
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge legacy */
     padding-right: 2px;
 }
-.anime-movie-group.expanded .movie-group-content::-webkit-scrollbar { width: 0; height: 0; }
+.anime-movie-group.expanded .movie-group-content::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}
 .anime-movie-group.single-movie .movie-group-content { display: none; }
 .anime-movie-group.single-movie.expanded .movie-group-content { display: flex; }
 .movie-item { display: flex; flex-direction: column; padding: 7px 9px; background: var(--bg-3); border: 1px solid var(--b1); border-radius: var(--r-sm); transition: all var(--tf); }
@@ -1572,6 +1294,7 @@ body {
   line-height: 1.5;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  /* custom scrollbar */
   scrollbar-width: thin;
   scrollbar-color: rgba(79,195,247,0.2) transparent;
 }
@@ -1581,9 +1304,13 @@ body {
 }
 .export-token-text::-webkit-scrollbar { width: 4px; }
 .export-token-text::-webkit-scrollbar-track { background: transparent; }
-.export-token-text::-webkit-scrollbar-thumb { background: rgba(79,195,247,0.2); border-radius: 4px; }
+.export-token-text::-webkit-scrollbar-thumb {
+  background: rgba(79,195,247,0.2);
+  border-radius: 4px;
+}
 .export-token-text::-webkit-scrollbar-thumb:hover { background: rgba(79,195,247,0.38); }
 .export-token-actions { display: flex; gap: 7px; }
+/* Copy — 3D cyan */
 .btn-copy-token {
   flex: 1; height: 36px; padding: 0;
   background: linear-gradient(160deg, #3db8e8 0%, #1a96c8 45%, #0e79a8 100%);
@@ -1617,6 +1344,7 @@ body {
     0 1px 0 rgba(255,255,255,0.12) inset,
     0 2px 6px rgba(14,121,168,0.35);
 }
+/* Close — ghost */
 .btn-close-token {
   height: 36px; padding: 0 16px;
   background: rgba(255,255,255,0.04);

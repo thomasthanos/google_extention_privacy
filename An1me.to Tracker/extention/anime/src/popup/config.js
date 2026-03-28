@@ -1,3 +1,6 @@
+/**
+ * Anime Tracker - Configuration Constants
+ */
 
 const CONFIG = {
     // Cache settings
@@ -36,6 +39,17 @@ const ANIME_PARTS_CONFIG = {
         { name: 'Part 3: Soukoku-tan', start: 27, end: 40 }
     ],
 };
+
+
+// Base series slugs whose movie entries should be merged INTO the series season group
+// instead of shown in a separate movie group.
+const SERIES_MOVIE_MERGE_SLUGS = new Set([
+    'trinity-seven',
+]);
+
+/**
+ * Season Grouping Utility
+ */
 const SeasonGrouping = {
     isMovie(slug, anime = null) {
         const lowerSlug = String(slug || '').toLowerCase();
@@ -45,6 +59,8 @@ const SeasonGrouping = {
         if (lowerSlug.includes('initial-d') && (lowerSlug.includes('third-stage') || lowerSlug.includes('3rd-stage'))) {
             return false;
         }
+
+        if (lowerSlug === 'trinity-seven-nanatsu-no-taizai-to-nana-madoushi') return true;
 
         const anilistTotal = window.AnimeTracker?.AnilistService?.getTotalEpisodes(lowerSlug);
         if (anilistTotal === 1) return true;
@@ -148,6 +164,7 @@ const SeasonGrouping = {
     },
 
     getMovieBaseSlug(slug) {
+        if (slug.startsWith('trinity-seven-nanatsu')) return 'trinity-seven';
         if (slug.startsWith('kimetsu-no-yaiba')) return 'kimetsu-no-yaiba';
         if (slug.startsWith('higashi-no-eden')) return 'higashi-no-eden';
         if (slug.startsWith('one-piece')) return 'one-piece';
@@ -258,6 +275,8 @@ const SeasonGrouping = {
             return 1;
         }
 
+        if (slug === 'trinity-seven-nanatsu-no-taizai-to-nana-madoushi') return 2;
+
         return 1;
     },
 
@@ -324,6 +343,8 @@ const SeasonGrouping = {
             if (slug.includes('ketsubetsu-tan')) return 'TYBW Part 2';
             return 'Thousand-Year Blood War';
         }
+
+        if (slug === 'trinity-seven-nanatsu-no-taizai-to-nana-madoushi') return 'Movie: Nanatsu no Taizai to Nana Madoushi';
 
         const seasonNum = this.getSeasonNumber(slug);
         return `Season ${seasonNum}`;
@@ -423,7 +444,23 @@ const SeasonGrouping = {
         }
 
         for (const [groupKey, entries] of movieGroups) {
-            groups.set(groupKey, entries);
+            const baseSlug = groupKey.replace(/__movies$/, '');
+            if (groups.has(baseSlug) && SERIES_MOVIE_MERGE_SLUGS.has(baseSlug)) {
+                // Merge movie entries into the series season group
+                const seriesGroup = groups.get(baseSlug);
+                const maxSeasonNum = seriesGroup.reduce((m, e) => Math.max(m, e.seasonNum || 0), 0);
+                entries.forEach((entry, i) => {
+                    seriesGroup.push({
+                        slug: entry.slug,
+                        anime: entry.anime,
+                        seasonNum: maxSeasonNum + 1 + i,
+                        isMovie: true
+                    });
+                });
+                seriesGroup.sort((a, b) => (a.seasonNum || 0) - (b.seasonNum || 0));
+            } else {
+                groups.set(groupKey, entries);
+            }
         }
 
         return groups;
@@ -474,4 +511,5 @@ window.AnimeTracker = window.AnimeTracker || {};
 window.AnimeTracker.CONFIG = CONFIG;
 window.AnimeTracker.DONATE_LINKS = DONATE_LINKS;
 window.AnimeTracker.ANIME_PARTS_CONFIG = ANIME_PARTS_CONFIG;
+window.AnimeTracker.SERIES_MOVIE_MERGE_SLUGS = SERIES_MOVIE_MERGE_SLUGS;
 window.AnimeTracker.SeasonGrouping = SeasonGrouping;

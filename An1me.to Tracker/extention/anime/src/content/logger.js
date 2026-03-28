@@ -1,3 +1,8 @@
+/**
+ * Anime Tracker - Content Script Logger
+ * Beautiful styled console logging
+ */
+
 const ContentLogger = {
     levels: { DEBUG: 0, INFO: 1, SUCCESS: 1, WARN: 2, ERROR: 3 },
     prefix: '🎬 Anime Tracker',
@@ -57,6 +62,7 @@ const ContentLogger = {
         }
     },
     
+    // Compact progress save log
     progress(uniqueId, pct, time) {
         if (!this.shouldLog('DEBUG')) return;
         const ts = this.getTimestamp();
@@ -77,5 +83,6 @@ const ContentLogger = {
     error(msg, data) { this.log('ERROR', msg, data); }
 };
 
+// Export
 window.AnimeTrackerContent = window.AnimeTrackerContent || {};
 window.AnimeTrackerContent.Logger = ContentLogger;

@@ -1,17 +1,27 @@
+/**
+ * Anime Tracker - Main Entry Point
+ * Orchestrates all modules and handles UI interactions
+ */
+
 (function () {
     'use strict';
 
+    // Wait for all modules to load
     const AT = window.AnimeTracker;
 
+    // State
     let animeData = {};
     let videoProgress = {};
     let currentSort = 'date';
-    let currentCategory = 'all';
+    let currentCategory = 'all'; // 'all', 'series', 'movies'
 
+    // DOM Elements
     const elements = {
+        // Auth
         authSection: document.getElementById('authSection'),
         mainApp: document.getElementById('mainApp'),
         googleSignIn: document.getElementById('googleSignIn'),
+        // Settings Menu
         settingsBtn: document.getElementById('settingsBtn'),
         settingsDropdown: document.getElementById('settingsDropdown'),
         settingsAvatar: document.getElementById('settingsAvatar'),
@@ -22,6 +32,7 @@
         settingsRefreshInfo: document.getElementById('settingsRefreshInfo'),
         settingsClear: document.getElementById('settingsClear'),
         settingsSignOut: document.getElementById('settingsSignOut'),
+        // Main
         animeList: document.getElementById('animeList'),
         emptyState: document.getElementById('emptyState'),
         searchInput: document.getElementById('searchInput'),
@@ -41,6 +52,7 @@
         sortBtn: document.getElementById('sortBtn'),
         sortDropdown: document.getElementById('sortDropdown'),
         settingsFetchFillers: document.getElementById('settingsFetchFillers'),
+        // Add Anime Dialog
         addAnimeBtn: document.getElementById('addAnimeBtn'),
         addAnimeDialog: document.getElementById('addAnimeDialog'),
         closeAddAnime: document.getElementById('closeAddAnime'),
@@ -49,14 +61,17 @@
         animeSlugInput: document.getElementById('animeSlug'),
         animeTitleInput: document.getElementById('animeTitle'),
         episodesWatchedInput: document.getElementById('episodesWatched'),
+        // Edit Title Dialog
         editTitleDialog: document.getElementById('editTitleDialog'),
         editTitleInput: document.getElementById('editTitleInput'),
         closeEditTitle: document.getElementById('closeEditTitle'),
         cancelEditTitle: document.getElementById('cancelEditTitle'),
         confirmEditTitle: document.getElementById('confirmEditTitle'),
+        // Category Tabs
         categoryTabs: document.getElementById('categoryTabs')
     };
 
+    // State for edit title
     let editingSlug = null;
     let loadAndSyncInProgress = false;
 
@@ -124,9 +139,11 @@
     }
 
     function isAgedCompleted(slug, anime) {
-        const { CONFIG, AnilistService } = AT;
+        const { CONFIG, AnilistService, SeasonGrouping } = AT;
         if (!isAnimeCompleted(slug, anime)) return false;
         if (anime.completedAt) return true;
+        // Movies are always immediately completed — no waiting period needed
+        if (SeasonGrouping.isMovie(slug, anime)) return true;
         // For definitively finished series, move to completed section immediately
         const anilistStatus = AnilistService?.getStatus(slug.toLowerCase());
         if (anilistStatus === 'FINISHED') return true;
@@ -137,8 +154,8 @@
 
     function normalizeMovieDurations(data, progress = {}) {
         const { SeasonGrouping } = AT;
-        const MIN_RELIABLE_DURATION_SECONDS = 30 * 60;
-        const MAX_RELIABLE_DURATION_SECONDS = 4 * 60 * 60;
+        const MIN_RELIABLE_DURATION_SECONDS = 30 * 60;     // 30 min
+        const MAX_RELIABLE_DURATION_SECONDS = 4 * 60 * 60; // 4 h — safe ceiling for any anime film
         const LEGACY_DEFAULT_MOVIE_DURATION_SECONDS = 100 * 60;
         let changed = false;
         let updatedEntries = 0;
@@ -256,9 +273,13 @@
         }
     }
 
+    /**
+     * Render anime list
+     */
     function renderAnimeList(filter = '') {
         const { AnimeCardRenderer, ProgressManager, SeasonGrouping } = AT;
 
+        // Save expanded state
         const expandedCards = new Set();
         elements.animeList.querySelectorAll('.anime-card.expanded').forEach(card => {
             const slug = card.querySelector('.anime-delete')?.dataset?.slug;
@@ -280,9 +301,9 @@
         const completedWasOpen = completedSection
             ? (completedSection.querySelector('.completed-list-cards')?.style.display !== 'none')
             : false;
-        const ipGroupContent = elements.animeList.querySelector('.ip-group-content');
-        const ipGroupWasOpen = ipGroupContent ? ipGroupContent.classList.contains('open') : false;
+        const ipGroupWasOpen = elements.animeList.querySelector('.ip-group-content')?.classList.contains('open') ?? false;
 
+        // Filter by category
         const categoryFilter = (slug, anime) => {
             if (currentCategory === 'all') return true;
             const isMovie = SeasonGrouping.isMovie(slug, anime);
@@ -319,6 +340,7 @@
 
         elements.emptyState.classList.remove('visible');
 
+        // Sort all entries according to the active sort mode
         const sortedEntries = entries.sort((a, b) => {
             const [slugA, animeA] = a;
             const [slugB, animeB] = b;
@@ -414,19 +436,7 @@
 
         const trackedHtml        = renderGroupedEntries(normalEntries);
         const completedCardsHtml = renderCompletedGroupedEntries(completedEntries);
-        const ipCards            = inProgressOnly.map(anime => AnimeCardRenderer.createInProgressOnlyCard(anime)).join('');
-        const inProgressHtml     = inProgressOnly.length > 0 ? `
-            <div class="ip-group">
-                <div class="ip-group-header" id="ipGroupToggle">
-                    <span class="ip-group-play">▶</span>
-                    <span class="ip-group-label">In Progress</span>
-                    <span class="ip-group-count">${inProgressOnly.length}</span>
-                    <svg class="ip-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                </div>
-                <div class="ip-group-content">${ipCards}</div>
-            </div>` : '';
+        const inProgressHtml     = AnimeCardRenderer.createInProgressGroup(inProgressOnly);
 
         const completedGroupHtml = completedEntries.length > 0
             ? `
@@ -449,6 +459,7 @@
 
         elements.animeList.innerHTML = inProgressHtml + trackedHtml + completedGroupHtml;
 
+        // Restore expanded state
         elements.animeList.querySelectorAll('.anime-card').forEach(card => {
             const slug = card.querySelector('.anime-delete')?.dataset?.slug;
             if (slug && expandedCards.has(slug)) card.classList.add('expanded');
@@ -465,6 +476,13 @@
             if (g.dataset.baseSlug && expandedMovieGroups.has(g.dataset.baseSlug))
                 g.classList.add('expanded');
         });
+        if (ipGroupWasOpen) {
+            const ipContent = elements.animeList.querySelector('.ip-group-content');
+            const ipChevron = elements.animeList.querySelector('.ip-group-chevron');
+            if (ipContent) ipContent.classList.add('open');
+            if (ipChevron) ipChevron.style.transform = 'rotate(0deg)';
+        }
+
         const newCompletedToggle = elements.animeList.querySelector('#completedListToggle');
         if (newCompletedToggle && completedWasOpen) {
             const cards = newCompletedToggle.nextElementSibling;
@@ -472,31 +490,34 @@
             if (cards) cards.style.display = 'flex';
             if (chevron) chevron.style.transform = 'rotate(0deg)';
         }
-        const newIpGroupContent = elements.animeList.querySelector('.ip-group-content');
-        if (newIpGroupContent && ipGroupWasOpen) newIpGroupContent.classList.add('open');
 
         setupCardEventListeners();
     }
 
+    /**
+     * Setup card event listeners
+     */
     function setupCardEventListeners() {
-        // NOTE: This function ONLY handles interactions NOT covered by the global
-        // animeList click-delegation listener below. Anything handled there must
-        // NOT be duplicated here to avoid double-execution.
-        //
-        // Handled here (require direct listeners because stopPropagation or
-        // per-element logic is needed before the event bubbles to animeList):
-        //   • .anime-card-header toggle (needs to ignore action buttons)
-        //   • .season-group-header / .season-item-header / .anime-movie-group header
-        //   • .show-more-episodes / .show-more-fillers (text swap)
-        //   • .part-item-header (inside collapsed sections)
-        //   • #ipGroupToggle / #completedListToggle
-        //   • .movie-edit-btn / .movie-delete-btn
-        //
-        // Handled by global delegation (DO NOT re-add here):
-        //   • .in-progress-header, .episodes-header  (animeList click handler)
-        //   • action buttons: .anime-delete, .anime-edit-title, .anime-fetch-filler,
-        //     .anime-complete-toggle, .season-edit-btn, .season-delete-btn,
-        //     .progress-delete-btn, .ip-delete-btn
+        elements.animeList.querySelectorAll('.in-progress-header').forEach(header => {
+            const toggleCollapse = (e) => {
+                e.stopPropagation();
+                const card = header.closest('.anime-card');
+                if (card && !card.classList.contains('expanded')) card.classList.add('expanded');
+                header.parentElement.classList.toggle('collapsed');
+            };
+            header.addEventListener('click', toggleCollapse);
+            const title = header.querySelector('.in-progress-title');
+            if (title) title.addEventListener('click', toggleCollapse);
+        });
+
+        elements.animeList.querySelectorAll('.episodes-header').forEach(header => {
+            header.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const card = header.closest('.anime-card');
+                if (card && !card.classList.contains('expanded')) card.classList.add('expanded');
+                header.parentElement.classList.toggle('collapsed');
+            });
+        });
 
         elements.animeList.querySelectorAll('.parts-header').forEach(header => {
             header.addEventListener('click', (e) => {
@@ -576,21 +597,6 @@
             if (header) header.addEventListener('click', () => group.classList.toggle('expanded'));
         });
 
-        const ipGroupToggle = elements.animeList.querySelector('#ipGroupToggle');
-        if (ipGroupToggle) {
-            ipGroupToggle.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const content = ipGroupToggle.nextElementSibling;
-                const chevron = ipGroupToggle.querySelector('.ip-group-chevron');
-                const isOpen = content.classList.toggle('open');
-                ipGroupToggle.closest('.ip-group')?.classList.toggle('open', isOpen);
-                if (chevron) chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
-            });
-            const chevron = ipGroupToggle.querySelector('.ip-group-chevron');
-            const content = ipGroupToggle.nextElementSibling;
-            if (chevron) chevron.style.transform = content?.classList.contains('open') ? 'rotate(0deg)' : 'rotate(-90deg)';
-        }
-
         const completedToggle = elements.animeList.querySelector('#completedListToggle');
         if (completedToggle) {
             completedToggle.addEventListener('click', (e) => {
@@ -614,6 +620,9 @@
         });
     }
 
+    /**
+     * Update stats
+     */
     async function updateStats() {
         const { UIHelpers, SeasonGrouping, Storage } = AT;
         const animeEntries = Object.entries(animeData);
@@ -654,6 +663,9 @@
         }
     }
 
+    /**
+     * Helper: check if all anime slugs have cached filler + anilist data.
+     */
     function checkAllCached(slugs) {
         const { FillerService } = AT;
         const allFillersCached = slugs.every(slug =>
@@ -663,6 +675,9 @@
         return { allFillersCached, allAnilistCached };
     }
 
+    /**
+     * Load local data
+     */
     async function loadData() {
         const { Storage, ProgressManager, FillerService, UIHelpers } = AT;
 
@@ -745,6 +760,9 @@
         }
     }
 
+    /**
+     * Load and sync with cloud
+     */
     async function loadAndSyncData() {
         if (loadAndSyncInProgress) return;
         loadAndSyncInProgress = true;
@@ -776,6 +794,10 @@
             }
 
             await Storage.migrateMultiPartAnime();
+
+            // Fast path: render from local storage immediately so the popup
+            // doesn't show a blank list while waiting for Firebase round-trips.
+            await loadData();
 
             const data = await FirebaseSync.loadAndSyncData(elements);
             if (data) {
@@ -882,20 +904,26 @@
         }
     }
 
+    /**
+     * Delete anime
+     */
     async function deleteAnime(slug) {
         const { Storage, FirebaseSync } = AT;
-        const savedEntry = animeData[slug];
-        if (!savedEntry) return;
-
-        // Optimistic in-memory update
-        delete animeData[slug];
+        const wasInAnimeData = !!animeData[slug];
+        if (wasInAnimeData) delete animeData[slug];
 
         try {
             const result = await Storage.get(['videoProgress', 'deletedAnime', 'groupCoverImages']);
             const currentVideoProgress = result.videoProgress || {};
+            let progressDeleted = 0;
             const progressPrefix = slug + '__episode-';
             for (const id of Object.keys(currentVideoProgress)) {
-                if (id.startsWith(progressPrefix)) delete currentVideoProgress[id];
+                if (id.startsWith(progressPrefix)) { delete currentVideoProgress[id]; progressDeleted++; }
+            }
+
+            if (progressDeleted === 0 && !wasInAnimeData) {
+                console.warn('[Delete] No data found to delete for:', slug);
+                return;
             }
 
             videoProgress = currentVideoProgress;
@@ -919,74 +947,25 @@
             renderAnimeList(elements.searchInput?.value || '');
             updateStats();
         } catch (e) {
-            // Rollback optimistic delete so state stays consistent with storage
-            animeData[slug] = savedEntry;
             console.error('[Delete] Error:', e);
             alert('Failed to delete anime. Please try again.');
         }
     }
 
-    // Delete an "in-progress only" anime — one that exists only in videoProgress, not animeData.
-    async function deleteInProgressOnly(slug) {
-        const { Storage, FirebaseSync } = AT;
-        try {
-            const result = await Storage.get(['videoProgress']);
-            const currentVideoProgress = result.videoProgress || {};
-            const prefix = slug + '__episode-';
-            const now = Date.now();
-            let changed = false;
-
-            for (const id of Object.keys(currentVideoProgress)) {
-                if (!id.startsWith(prefix)) continue;
-                const entry = currentVideoProgress[id];
-                const savedAt = entry.savedAt ? new Date(entry.savedAt).getTime() : now;
-                const deletedAt = new Date(Math.max(now, savedAt + 5001)).toISOString();
-                currentVideoProgress[id] = { ...entry, deleted: true, deletedAt };
-                changed = true;
-            }
-
-            if (!changed) return;
-
-            videoProgress = currentVideoProgress;
-            const dataToSave = { videoProgress: currentVideoProgress };
-            const user = FirebaseSync.getUser();
-            if (user) dataToSave.userId = user.uid;
-            markInternalSave(dataToSave);
-            await Storage.set(dataToSave);
-
-            if (user) {
-                try {
-                    const gcResult = await Storage.get(['groupCoverImages']);
-                    await FirebaseSync.saveToCloud({
-                        animeData, videoProgress: currentVideoProgress,
-                        groupCoverImages: gcResult.groupCoverImages || {}
-                    }, true);
-                } catch (syncErr) {
-                    console.error('[DeleteInProgressOnly] Cloud sync failed:', syncErr);
-                }
-            }
-
-            renderAnimeList(elements.searchInput?.value || '');
-        } catch (e) {
-            console.error('[DeleteInProgressOnly] Error:', e);
-            alert('Failed to delete. Please try again.');
-        }
-    }
-
+    /**
+     * Toggle manual completed status
+     */
     async function toggleAnimeCompleted(slug) {
         const { Storage, FirebaseSync } = AT;
         if (!animeData[slug]) return;
 
-        const prevCompletedAt = animeData[slug].completedAt;
-
-        // Optimistic in-memory update
-        if (animeData[slug].completedAt) {
-            delete animeData[slug].completedAt;
-        } else {
-            animeData[slug].completedAt = new Date().toISOString();
-        }
-
         try {
+            if (animeData[slug].completedAt) {
+                delete animeData[slug].completedAt;
+            } else {
+                animeData[slug].completedAt = new Date().toISOString();
+            }
+
             const result = await Storage.get(['videoProgress', 'deletedAnime', 'groupCoverImages']);
             const currentVideoProgress = result.videoProgress || {};
             const deletedAnime = result.deletedAnime || {};
@@ -1007,16 +986,13 @@
             renderAnimeList(elements.searchInput?.value || '');
             updateStats();
         } catch (e) {
-            // Rollback optimistic toggle
-            if (prevCompletedAt === undefined) {
-                delete animeData[slug].completedAt;
-            } else {
-                animeData[slug].completedAt = prevCompletedAt;
-            }
             console.error('[Complete] Error:', e);
         }
     }
 
+    /**
+     * Clear all data
+     */
     async function clearAllData() {
         const { Storage, FirebaseSync } = AT;
         const dataToSave = { animeData: {}, videoProgress: {}, groupCoverImages: {} };
@@ -1568,7 +1544,9 @@
                     const allKeys = await new Promise(resolve => chrome.storage.local.get(null, resolve));
                     const infoKeys = Object.keys(allKeys).filter(k => k.startsWith('animeinfo_'));
                     if (infoKeys.length > 0) await Storage.remove(infoKeys);
+                    // Clear in-memory cache too
                     AnilistService.cache = {};
+                    // Re-fetch for all tracked anime
                     await AnilistService.autoFetchMissing(animeData, () => {
                         renderAnimeList(elements.searchInput?.value || '');
                         updateStats();
@@ -1758,10 +1736,23 @@
                     return;
                 }
 
-                // ── ip-delete-btn: delete an in-progress-only entry (not in animeData) ──
                 if (target.classList.contains('ip-delete-btn') || target.closest('.ip-delete-btn')) {
                     const btn = target.classList.contains('ip-delete-btn') ? target : target.closest('.ip-delete-btn');
-                    if (btn.dataset.slug) await deleteInProgressOnly(btn.dataset.slug);
+                    const slug = btn.dataset.slug;
+                    const episodeNum = parseInt(btn.dataset.episode, 10);
+                    if (slug && episodeNum) await deleteProgress(slug, episodeNum);
+                    return;
+                }
+
+                const ipGroupHeader = target.closest('.ip-group-header');
+                if (ipGroupHeader) {
+                    const group = ipGroupHeader.closest('.ip-group');
+                    const content = group?.querySelector('.ip-group-content');
+                    const chevron = ipGroupHeader.querySelector('.ip-group-chevron');
+                    if (content) {
+                        const isOpen = content.classList.toggle('open');
+                        if (chevron) chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
+                    }
                     return;
                 }
 
@@ -1801,13 +1792,14 @@
                     return;
                 }
 
-                // .anime-card-header toggle is handled by setupCardEventListeners
-                // (needs button-exclusion logic), so we skip it here.
+                const card = target.closest('.anime-card');
+                if (card && !target.closest('button') && !target.closest('.anime-card-actions')) {
+                    card.classList.toggle('expanded');
+                    return;
+                }
 
                 const inProgressHeader = target.closest('.in-progress-header');
                 if (inProgressHeader) {
-                    const card = inProgressHeader.closest('.anime-card');
-                    if (card && !card.classList.contains('expanded')) card.classList.add('expanded');
                     const section = inProgressHeader.closest('.anime-in-progress');
                     if (section) section.classList.toggle('collapsed');
                     return;
@@ -1815,8 +1807,6 @@
 
                 const episodesHeader = target.closest('.episodes-header');
                 if (episodesHeader) {
-                    const card = episodesHeader.closest('.anime-card');
-                    if (card && !card.classList.contains('expanded')) card.classList.add('expanded');
                     const section = episodesHeader.closest('.anime-episodes');
                     if (section) section.classList.toggle('collapsed');
                     return;
@@ -1881,6 +1871,7 @@
                 showMainApp(user);
                 const bgAlive = await checkBackgroundAlive();
                 if (!bgAlive) {
+                    console.log('[Popup] SW was asleep, sending wake-up sync signal');
                     try { chrome.runtime.sendMessage({ type: 'SYNC_TO_FIREBASE' }); } catch {}
                 }
                 loadAndSyncData();

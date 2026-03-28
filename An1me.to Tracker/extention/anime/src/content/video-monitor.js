@@ -1,15 +1,10 @@
-// Injection guard: if the content script is loaded a second time in the same
-// page context (e.g. extension reload without full navigation), reuse the
-// existing singleton and skip re-creating it. This prevents duplicate observers
-// and dangling event listeners from the previous injection.
-if (window.AnimeTrackerContent?.VideoMonitor?._initialized) {
-    // Already running — clean up the stale instance so the new init() call
-    // in main.js gets a fresh slate.
-    window.AnimeTrackerContent.VideoMonitor.cleanup();
-}
+/**
+ * Anime Tracker - Video Monitor
+ * Handles video element detection and monitoring
+ */
 
 const VideoMonitor = {
-    _initialized: true,
+    // State
     videoElement: null,
     checkInterval: null,
     progressSaveInterval: null,
@@ -48,6 +43,10 @@ const VideoMonitor = {
 
         this.retryCount = 0;
     },
+
+    /**
+     * Check if video element is active and visible
+     */
     isVideoActive(video) {
         const { Logger } = window.AnimeTrackerContent;
 
@@ -73,6 +72,7 @@ const VideoMonitor = {
 
         const artVideo = document.querySelector('video.art-video');
         if (this.isVideoActive(artVideo)) {
+            Logger.debug('Found: art-video (main page)');
             return artVideo;
         }
 
@@ -80,7 +80,8 @@ const VideoMonitor = {
         for (const video of videos) {
             if (this.isVideoActive(video)) return video;
         }
-        // Cross-origin iframes throw SecurityError — caught silently.
+
+        // Same-origin iframes only (cross-origin throws SecurityError — caught)
         const iframes = document.querySelectorAll('iframe');
         for (const iframe of iframes) {
             try {
@@ -91,22 +92,28 @@ const VideoMonitor = {
                 if (plyrWrapper) {
                     const video = plyrWrapper.querySelector('video');
                     if (this.isVideoActive(video)) {
+                        Logger.debug('Found: Plyr iframe');
                         return video;
                     }
                 }
 
                 const iframeArtVideo = iframeDoc.querySelector('video.art-video');
                 if (this.isVideoActive(iframeArtVideo)) {
+                    Logger.debug('Found: art-video iframe');
                     return iframeArtVideo;
                 }
 
                 const iframeVideos = iframeDoc.querySelectorAll('video');
                 for (const video of iframeVideos) {
                     if (this.isVideoActive(video)) {
+                        Logger.debug('Found: iframe video');
                         return video;
                     }
                 }
-            } catch {            }
+            } catch {
+                // Cross-origin iframe — SecurityError is expected, skip silently.
+                Logger.debug('Cross-origin iframe, skipping');
+            }
         }
 
         return null;
@@ -119,7 +126,10 @@ const VideoMonitor = {
 
         this.cleanup();
 
-        if (!this.isVideoActive(video)) return;
+        if (!this.isVideoActive(video)) {
+            Logger.debug('Video not ready');
+            return;
+        }
 
         this.videoElement = video;
 
@@ -132,12 +142,7 @@ const VideoMonitor = {
             video.addEventListener('loadedmetadata', eventHandlers.handleVideoMetadata, { passive: true });
             video.addEventListener('durationchange', eventHandlers.handleVideoMetadata, { passive: true });
             video.addEventListener('loadeddata', eventHandlers.handleVideoMetadata, { passive: true });
-            // Fire once immediately (microtask) to catch already-loaded metadata.
-            // Attach a catch so any rejection from the async handler is handled
-            // here rather than becoming an unhandled promise rejection.
-            Promise.resolve()
-                .then(() => eventHandlers.handleVideoMetadata())
-                .catch(e => Logger.error('Initial metadata handler failed:', e));
+            Promise.resolve().then(() => eventHandlers.handleVideoMetadata());
         }
 
         video.addEventListener('pause', eventHandlers.handlePause, { passive: true });
@@ -169,6 +174,7 @@ const VideoMonitor = {
             window.removeEventListener('pagehide', eventHandlers.handleBeforeUnload);
         });
 
+        // Check for saved progress
         if (animeInfo) {
             const savedProgress = await ProgressTracker.getSavedProgress(animeInfo.uniqueId);
             if (savedProgress && savedProgress.currentTime > CONFIG.MIN_PROGRESS_TO_SAVE) {
@@ -184,6 +190,7 @@ const VideoMonitor = {
                             () => {
                                 video.currentTime = savedProgress.currentTime;
                                 video.play().catch(() => {});
+                                Logger.success(`Resumed @ ${savedProgress.currentTime}s`);
                             },
                             () => {
                                 video.currentTime = 0;
@@ -194,6 +201,8 @@ const VideoMonitor = {
                         retryCount++;
                         if (retryCount < MAX_RETRIES) {
                             setTimeout(checkReady, 500);
+                        } else {
+                            Logger.warn('Video not ready after', MAX_RETRIES, 'retries');
                         }
                     }
                 };
@@ -206,8 +215,6 @@ const VideoMonitor = {
                 const currentTime = this.videoElement.currentTime;
                 const duration = this.videoElement.duration;
                 if (currentTime > 0 && duration > 0) {
-                    // saveVideoProgress is sync-entry but dispatches an async
-                    // performSaveProgress internally (handled with .catch there).
                     ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration);
                 }
             }
@@ -220,6 +227,7 @@ const VideoMonitor = {
             }
         });
 
+        Logger.success('Video monitoring active');
     },
 
     findAndMonitorVideo(animeInfo, eventHandlers) {
@@ -230,12 +238,19 @@ const VideoMonitor = {
         }
         return false;
     },
+
+    /**
+     * Start watching for video with retries
+     */
     startWatching(animeInfo, eventHandlers) {
         const { CONFIG, Logger } = window.AnimeTrackerContent;
 
+        Logger.debug('Looking for video...');
         const videoFound = this.findAndMonitorVideo(animeInfo, eventHandlers);
 
         if (!videoFound) {
+            Logger.debug('Video not found, waiting...');
+
             this.checkInterval = setInterval(() => {
                 if (this.retryCount >= CONFIG.MAX_RETRIES) {
                     clearInterval(this.checkInterval);
@@ -245,6 +260,7 @@ const VideoMonitor = {
 
                 if (this.findAndMonitorVideo(animeInfo, eventHandlers)) {
                     clearInterval(this.checkInterval);
+                    Logger.debug(`Video found after ${this.retryCount} retries`);
                 }
 
                 this.retryCount++;
@@ -255,13 +271,17 @@ const VideoMonitor = {
                     clearInterval(this.checkInterval);
                     this.checkInterval = null;
                 }
-            });            let observerTimeout;
+            });
+
+            // MutationObserver for dynamic content
+            let observerTimeout;
             const observer = new MutationObserver(() => {
                 clearTimeout(observerTimeout);
                 observerTimeout = setTimeout(() => {
                     if (this.findAndMonitorVideo(animeInfo, eventHandlers)) {
                         observer.disconnect();
                         if (this.checkInterval) clearInterval(this.checkInterval);
+                        Logger.debug('Video found via observer');
                     }
                 }, 100);
             });
@@ -271,10 +291,7 @@ const VideoMonitor = {
                 subtree: true
             });
 
-            this.addCleanup(() => {
-                observer.disconnect();
-                if (observerTimeout) { clearTimeout(observerTimeout); observerTimeout = null; }
-            });
+            this.addCleanup(() => observer.disconnect());
         }
     },
 
@@ -283,5 +300,6 @@ const VideoMonitor = {
     }
 };
 
+// Export
 window.AnimeTrackerContent = window.AnimeTrackerContent || {};
 window.AnimeTrackerContent.VideoMonitor = VideoMonitor;

@@ -1,4 +1,12 @@
+/**
+ * Anime Tracker - Content Script Storage
+ * Chrome storage wrapper with sync fallback
+ */
+
 const ContentStorage = {
+    /**
+     * Check if extension context is still valid
+     */
     isContextValid() {
         try {
             return chrome.runtime && chrome.runtime.id;
@@ -7,6 +15,9 @@ const ContentStorage = {
         }
     },
 
+    /**
+     * Get data from storage
+     */
     async get(keys) {
         const { Logger } = window.AnimeTrackerContent;
         
@@ -53,6 +64,7 @@ const ContentStorage = {
 
                         const hasSyncData = keys.some(key => syncResult[key] !== undefined);
                         if (hasSyncData) {
+                            Logger.info('Migrating data from sync to local storage');
                             chrome.storage.local.set(syncResult, () => {
                                 chrome.storage.sync.remove(keys);
                             });
@@ -65,6 +77,9 @@ const ContentStorage = {
         });
     },
 
+    /**
+     * Set data to storage
+     */
     async set(data) {
         return new Promise((resolve, reject) => {
             if (!this.isContextValid()) {
@@ -98,5 +113,6 @@ const ContentStorage = {
 
 };
 
+// Export
 window.AnimeTrackerContent = window.AnimeTrackerContent || {};
 window.AnimeTrackerContent.Storage = ContentStorage;

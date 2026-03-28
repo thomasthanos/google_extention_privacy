@@ -1,3 +1,10 @@
+/**
+ * Anime Tracker - Content Merge Utils Adapter
+ *
+ * Binds shared merge utilities from src/common/merge-utils.js into the
+ * content-script namespace expected by cloud-sync.js.
+ */
+
 (function () {
     'use strict';
 

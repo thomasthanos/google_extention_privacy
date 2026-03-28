@@ -1,3 +1,10 @@
+/**
+ * Anime Tracker - UI Notifications (Enhanced)
+ * Resume prompt and completion notifications
+ * 
+ * Premium glass morphism with 3D depth, gradient SVG icons, and cinematic animations
+ */
+
 const Notifications = {
     cleanupFunctions: [],
 
@@ -144,7 +151,8 @@ const Notifications = {
         (doc.head || doc.documentElement).appendChild(style);
     },
 
-        _svgDefs(id, color1, color2) {
+    // ── SVG Icons with gradients ─────────────────────────────────────────────
+    _svgDefs(id, color1, color2) {
         return `<defs>
             <linearGradient id="${id}" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stop-color="${color1}"/>
@@ -553,9 +561,11 @@ const Notifications = {
     }
 };
 
+// Export
 window.AnimeTrackerContent = window.AnimeTrackerContent || {};
 window.AnimeTrackerContent.Notifications = Notifications;
 
+// ── DEV TEST BRIDGE ──────────────────────────────────────────────────────────
 document.addEventListener('__at_test_complete', (e) => {
     Notifications.showCompletion(e.detail);
 });

@@ -1,3 +1,9 @@
+/**
+ * Filler Fetch UI
+ * Handles the "Fetch Filler Data" modal — correctly distinguishes
+ * fresh fetches, valid cache hits, notFound entries, movies, and errors.
+ */
+
 const FillerFetchUI = {
     IDS: {
         overlay:      'filler-fetch-ui-overlay',
@@ -404,6 +410,13 @@ const FillerFetchUI = {
         const el = document.querySelector(`[data-stat="${name}"]`);
         if (el) el.textContent = value;
     },
+
+    /**
+     * Append a row to the live log.
+     * @param {'fetch'|'cached'|'skip'|'error'|'movie'} type
+     * @param {string} name  - anime title
+     * @param {string} [detail] - short right-aligned note
+     */
     _log(type, name, detail = '') {
         const log = document.getElementById(this.IDS.logFeed);
         if (log.style.display === 'none') log.style.display = 'flex';
@@ -544,7 +557,7 @@ const FillerFetchUI = {
 
         // Re-enable start button so user can close manually or run again
         startBtn.disabled = false;
-        startBtn.textContent = 'Close';
+        startBtn.textContent = this.state.isCancelled ? 'Close' : 'Close';
         startBtn.addEventListener('click', () => this.close(), { once: true });
     },
 
