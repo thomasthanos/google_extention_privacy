@@ -210,11 +210,14 @@ const VideoMonitor = {
             }
         }
 
+        let _lastSavedTime = -1;
         this.progressSaveInterval = setInterval(() => {
             if (this.videoElement && animeInfo && !video.paused) {
                 const currentTime = this.videoElement.currentTime;
                 const duration = this.videoElement.duration;
-                if (currentTime > 0 && duration > 0) {
+                // Skip write if playhead hasn't moved since last interval tick.
+                if (currentTime > 0 && duration > 0 && Math.floor(currentTime) !== _lastSavedTime) {
+                    _lastSavedTime = Math.floor(currentTime);
                     ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration);
                 }
             }

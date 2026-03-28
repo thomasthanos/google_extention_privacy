@@ -22,7 +22,12 @@ const CONFIG = {
     COMPLETED_LIST_MIN_DAYS: 4,
 
     // Progress thresholds
-    COMPLETED_PERCENTAGE: 85 // must match ContentConfig.COMPLETED_PERCENTAGE in src/content/config.js
+    COMPLETED_PERCENTAGE: 85, // must match ContentConfig.COMPLETED_PERCENTAGE in src/content/config.js
+
+    // Cloud save
+    CLOUD_SAVE_DEBOUNCE_MS:  2000,
+    MAX_CLOUD_SAVE_RETRIES:  3,
+    MAX_RETRY_DELAY_MS:      30000
 };
 
 // Donate links
@@ -388,9 +393,6 @@ const SeasonGrouping = {
             const filmTitleMatch = title.match(/Film[:\s]+([A-Za-z]+)/i);
             if (filmTitleMatch) return `Film: ${filmTitleMatch[1]}`;
         }
-
-        const explicitMovieNum = slug.match(/-movie-0?(\d+)/i);
-        if (explicitMovieNum) return `Movie ${parseInt(explicitMovieNum[1], 10)}`;
 
         if (title) {
             const baseSlug = this.getMovieBaseSlug(slug);

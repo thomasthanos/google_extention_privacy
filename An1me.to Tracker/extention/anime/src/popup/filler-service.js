@@ -7,6 +7,9 @@ const FillerService = {
     // Known filler episodes - populated dynamically from animefillerlist.com
     KNOWN_FILLERS: {},
 
+    // Cached sorted keys for getNormalizedFillerSlug (invalidated on KNOWN_FILLERS mutation)
+    _sortedFillerKeys: null,
+
     // Episode types cache
     episodeTypesCache: {},
 
@@ -27,9 +30,11 @@ const FillerService = {
 
         if (this.KNOWN_FILLERS[cleanSlug]) return cleanSlug;
 
-        // Sort keys longest-first so more specific slugs (e.g. "naruto-shippuden")
-        // are matched before shorter prefixes (e.g. "naruto").
-        const sortedKeys = Object.keys(this.KNOWN_FILLERS).sort((a, b) => b.length - a.length);
+        // Sort keys longest-first (cached; invalidated when KNOWN_FILLERS is mutated).
+        if (!this._sortedFillerKeys) {
+            this._sortedFillerKeys = Object.keys(this.KNOWN_FILLERS).sort((a, b) => b.length - a.length);
+        }
+        const sortedKeys = this._sortedFillerKeys;
 
         for (const key of sortedKeys) {
             if (lowerSlug === key || cleanSlug === key) {
@@ -180,6 +185,7 @@ const FillerService = {
         slugVariations.forEach(slug => {
             this.KNOWN_FILLERS[slug] = fillerRanges;
         });
+        this._sortedFillerKeys = null; // invalidate sorted-keys cache
     },
 
     /**
@@ -323,9 +329,8 @@ const FillerService = {
 
         const totalFillers = fillers.reduce((sum, [start, end]) => sum + (end - start + 1), 0);
         const watchedFillers = this.countFillerEpisodes(slug, episodes);
-        const skippedFillers = totalFillers - watchedFillers;
 
-        return { total: totalFillers, watched: watchedFillers, skipped: skippedFillers };
+        return { total: totalFillers, watched: watchedFillers };
     },
 
     /**

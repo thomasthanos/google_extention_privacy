@@ -204,7 +204,7 @@ function shallowEqualDeletedAnime(a, b) {
     if (aKeys.length !== bKeys.length) return false;
     for (const slug of aKeys) {
         if (!b[slug]) return false;
-        if (a[slug].deletedAt !== b[slug].deletedAt) return false;
+        if (a[slug]?.deletedAt !== b[slug]?.deletedAt) return false;
     }
     return true;
 }
@@ -281,7 +281,8 @@ async function syncProgressOnly() {
 
         let cloudVP = {};
         try {
-            const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
+            // Fetch only the videoProgress field to avoid downloading the full document.
+            const url = `${FIRESTORE_BASE}/documents/users/${user.uid}?fields=videoProgress`;
             const r   = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
             if (r.ok) cloudVP = fromFSDoc(await r.json())?.videoProgress || {};
         } catch {}

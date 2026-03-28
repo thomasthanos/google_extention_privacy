@@ -350,7 +350,10 @@ const FillerFetchUI = {
             });
 
         document.getElementById(this.IDS.startBtn)
-            .addEventListener('click', () => this.startFetch());
+            .addEventListener('click', () => {
+                if (this.state.fetchDone) { this.close(); return; }
+                this.startFetch();
+            });
 
         document.getElementById(this.IDS.cancelBtn)
             .addEventListener('click', () => this.cancel());
@@ -381,7 +384,7 @@ const FillerFetchUI = {
 
     resetUI() {
         Object.assign(this.state, {
-            isRunning: false, isCancelled: false,
+            isRunning: false, isCancelled: false, fetchDone: false,
             fetched: 0, cached: 0, skipped: 0, failed: 0,
         });
 
@@ -424,12 +427,15 @@ const FillerFetchUI = {
         const icons   = { fetch: '●', cached: '◌', skip: '□', nofill: '□', error: '×', movie: '▷' };
         const classes = { fetch: 'is-fetch', cached: 'is-cached', skip: 'is-nofill', nofill: 'is-nofill', error: 'is-error', movie: 'is-movie' };
 
+        const { UIHelpers } = window.AnimeTracker;
+        const safeName   = UIHelpers.escapeHtml(name);
+        const safeDetail = UIHelpers.escapeHtml(detail);
         const row = document.createElement('div');
         row.className = `ffui-log-row ${classes[type] || ''}`;
         row.innerHTML = `
             <span class="ffui-log-icon">${icons[type] || '□'}</span>
-            <span class="ffui-log-name" title="${name}">${name}</span>
-            ${detail ? `<span class="ffui-log-detail">${detail}</span>` : ''}`;
+            <span class="ffui-log-name" title="${safeName}">${safeName}</span>
+            ${safeDetail ? `<span class="ffui-log-detail">${safeDetail}</span>` : ''}`;
         log.appendChild(row);
         log.scrollTop = log.scrollHeight;
     },
@@ -555,10 +561,10 @@ const FillerFetchUI = {
             this.onComplete = null;
         }
 
-        // Re-enable start button so user can close manually or run again
+        // Signal fetch is done so the button's delegated handler calls close()
         startBtn.disabled = false;
-        startBtn.textContent = this.state.isCancelled ? 'Close' : 'Close';
-        startBtn.addEventListener('click', () => this.close(), { once: true });
+        startBtn.textContent = 'Close';
+        this.state.fetchDone = true;
     },
 
     cancel() {

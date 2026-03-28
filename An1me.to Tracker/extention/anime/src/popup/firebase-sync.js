@@ -220,36 +220,12 @@ const FirebaseSync = {
         }
 
         try {
-            // On Orion/mobile (no SW), push local videoProgress before fetching
-            // to avoid losing progress saved by content scripts.
-            const localSnapshot = await Storage.get(['videoProgress', 'userId']);
-            if (localSnapshot.userId === this.currentUser.uid && localSnapshot.videoProgress && Object.keys(localSnapshot.videoProgress).length > 0) {
-                try {
-                    const currentCloud = await FirebaseLib.getDocument('users', this.currentUser.uid);
-                    if (currentCloud) {
-                        const cloudVP = currentCloud.videoProgress || {};
-                        const localVP = localSnapshot.videoProgress;
-                        const merged = AnimeTracker.MergeUtils.mergeVideoProgress(localVP, cloudVP);
-                        const hasChanges = Object.entries(merged).some(([id, val]) => {
-                            return !cloudVP[id] || val.currentTime !== cloudVP[id].currentTime;
-                        });
-                        if (hasChanges) {
-                            await FirebaseLib.setDocument('users', this.currentUser.uid, {
-                                ...currentCloud,
-                                videoProgress: merged,
-                                lastUpdated: new Date().toISOString()
-                            });
-                        }
-                    }
-                } catch (e) {
-                    console.warn('[Sync] Pre-upload failed (non-critical):', e.message);
-                }
-            }
-
+            // Fetch cloud document once — reuse for both the pre-upload VP merge and
+            // the authoritative data merge, eliminating the second GET.
             let cloudData = null;
             let retryCount = 0;
             const maxRetries = 3;
-            
+
             while (retryCount < maxRetries) {
                 try {
                     cloudData = await FirebaseLib.getDocument('users', this.currentUser.uid);
@@ -262,6 +238,31 @@ const FirebaseSync = {
                     } else {
                         throw e;
                     }
+                }
+            }
+
+            // On Orion/mobile (no SW), merge local videoProgress into the cloud doc
+            // before proceeding, to avoid losing progress saved by content scripts.
+            const localSnapshot = await Storage.get(['videoProgress', 'userId']);
+            if (cloudData && localSnapshot.userId === this.currentUser.uid &&
+                    localSnapshot.videoProgress && Object.keys(localSnapshot.videoProgress).length > 0) {
+                try {
+                    const cloudVP = cloudData.videoProgress || {};
+                    const localVP = localSnapshot.videoProgress;
+                    const merged = AnimeTracker.MergeUtils.mergeVideoProgress(localVP, cloudVP);
+                    const hasChanges = Object.entries(merged).some(([id, val]) =>
+                        !cloudVP[id] || val.currentTime !== cloudVP[id].currentTime
+                    );
+                    if (hasChanges) {
+                        // Patch the in-memory cloudData so the merge below sees the latest VP.
+                        cloudData = { ...cloudData, videoProgress: merged };
+                        await FirebaseLib.setDocument('users', this.currentUser.uid, {
+                            ...cloudData,
+                            lastUpdated: new Date().toISOString()
+                        });
+                    }
+                } catch (e) {
+                    console.warn('[Sync] Pre-upload failed (non-critical):', e.message);
                 }
             }
             
@@ -312,12 +313,29 @@ const FirebaseSync = {
                 });
 
                 if (shouldMerge) {
-                    if (this.saveToCloudTimeout) {
-                        clearTimeout(this.saveToCloudTimeout);
-                        this.saveToCloudTimeout = null;
+                    // Only push back to cloud if the merged result actually differs
+                    // from what we just fetched — avoids a redundant full write.
+                    const cloudEpCount = Object.values(cloudData.animeData || {})
+                        .reduce((s, a) => s + (a.episodes?.length || 0), 0);
+                    const mergedEpCount = Object.values(finalData.animeData || {})
+                        .reduce((s, a) => s + (a.episodes?.length || 0), 0);
+                    const vpChanged = JSON.stringify(finalData.videoProgress) !==
+                        JSON.stringify(cloudData.videoProgress || {});
+                    const needsCloudWrite = mergedEpCount !== cloudEpCount || vpChanged;
+
+                    if (needsCloudWrite) {
+                        if (this.saveToCloudTimeout) {
+                            clearTimeout(this.saveToCloudTimeout);
+                            this.saveToCloudTimeout = null;
+                        }
+                        this.pendingSave = this.cloneSyncData(finalData);
+                        await this.performCloudSave(elements);
+                    } else {
+                        if (elements?.syncStatus) {
+                            elements.syncStatus.classList.add('synced');
+                            elements.syncText.textContent = 'Cloud Synced';
+                        }
                     }
-                    this.pendingSave = this.cloneSyncData(finalData);
-                    await this.performCloudSave(elements);
                 }
             } else {
                 if (localData.userId === this.currentUser.uid && localData.animeData && Object.keys(localData.animeData).length > 0) {

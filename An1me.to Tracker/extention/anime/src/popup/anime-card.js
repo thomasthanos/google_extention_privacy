@@ -145,10 +145,10 @@ const AnimeCardRenderer = {
         const currentEpText = currentEpisode > 0 ? `Ep ${currentEpisode}` : '';
         const unknownTotal = progressData.total == null;
         const canonProgressPercent = unknownTotal ? null
-            : hasFillerData ? Math.round((canonWatched / totalCanon) * 100)
+            : hasFillerData ? (totalCanon > 0 ? Math.round((canonWatched / totalCanon) * 100) : 0)
             : Math.round(progressData.progress);
         const canonProgressWidth = unknownTotal ? 0
-            : hasFillerData ? (canonWatched / totalCanon) * 100
+            : hasFillerData ? (totalCanon > 0 ? (canonWatched / totalCanon) * 100 : 0)
             : progressData.progress;
 
         const totalDisplay = unknownTotal ? null : progressData.total;
@@ -721,9 +721,9 @@ const AnimeCardRenderer = {
                 const totalDisplay = unknownTotalSeason ? null : progressData.total;
                 const totalCanonDisplay = unknownTotalSeason ? null : totalCanon;
                 const canonProgressPercent = unknownTotalSeason ? (isComplete ? 100 : 0)
-                    : hasFillerData ? Math.round((canonWatched / totalCanon) * 100) : progressPercent;
+                    : hasFillerData ? (totalCanon > 0 ? Math.round((canonWatched / totalCanon) * 100) : 0) : progressPercent;
                 const canonProgressWidth = unknownTotalSeason ? (isComplete ? 100 : 0)
-                    : hasFillerData ? (canonWatched / totalCanon) * 100 : progressData.progress;
+                    : hasFillerData ? (totalCanon > 0 ? (canonWatched / totalCanon) * 100 : 0) : progressData.progress;
 
                 const progressInfoText = unknownTotalSeason
                     ? (anilistSt === 'FINISHED'

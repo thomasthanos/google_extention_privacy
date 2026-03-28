@@ -285,7 +285,13 @@ const ProgressManager = {
             }
 
             if (isTracked || isCompleted) {
-                removedCount++;
+                // Keep the resume entry if the episode is tracked but the in-progress
+                // percentage hasn't reached the completion threshold yet (user still watching).
+                if (isTracked && !isCompleted && !progress.deleted) {
+                    cleaned[id] = progress;
+                } else {
+                    removedCount++;
+                }
             } else {
                 cleaned[id] = progress;
             }

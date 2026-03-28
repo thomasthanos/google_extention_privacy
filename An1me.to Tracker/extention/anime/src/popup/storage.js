@@ -15,8 +15,6 @@ const STORAGE_EPISODE_OFFSET_MAPPING = {
     'bleach-sennen-kessen-hen-soukoku-tan': 26,
 };
 
-const CACHED_STATS_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days — invalidates stale stats after long installs
-
 const Storage = {
     /**
      * Get data from storage with sync migration
@@ -30,7 +28,10 @@ const Storage = {
                     return;
                 }
 
-                const hasLocalData = keys.some(key => localResult[key] !== undefined &&
+                // Only skip the sync fallback when ALL requested keys are present locally.
+                // If even one key is missing, check sync storage so we don't silently drop
+                // data that was written there (e.g. during cross-key migration).
+                const hasLocalData = keys.every(key => localResult[key] !== undefined &&
                     (typeof localResult[key] !== 'object' || Object.keys(localResult[key]).length > 0));
 
                 if (hasLocalData) {
@@ -84,31 +85,6 @@ const Storage = {
                     reject(new Error(chrome.runtime.lastError.message));
                 } else {
                     resolve();
-                }
-            });
-        });
-    },
-
-    async invalidateCachedStats(currentVersion) {
-        return new Promise((resolve) => {
-            chrome.storage.local.get(['cachedStats'], (result) => {
-                if (chrome.runtime.lastError || !result.cachedStats) {
-                    resolve(false);
-                    return;
-                }
-
-                const stats = result.cachedStats;
-                const versionMismatch = stats._version && stats._version !== currentVersion;
-                const age = stats._savedAt ? Date.now() - stats._savedAt : Infinity;
-                const tooOld = age > CACHED_STATS_MAX_AGE_MS;
-
-                if (versionMismatch || tooOld) {
-                    const reason = versionMismatch
-                        ? `version changed (${stats._version} → ${currentVersion})`
-                        : `cache too old (${Math.round(age / 86400000)}d)`;
-                    chrome.storage.local.remove(['cachedStats'], () => resolve(true));
-                } else {
-                    resolve(false);
                 }
             });
         });

@@ -340,24 +340,26 @@
 
         elements.emptyState.classList.remove('visible');
 
+        // Precompute latest-activity timestamps once (O(N+M)) before sorting.
+        const latestMap = new Map();
+        for (const [slug, anime] of entries) {
+            let latest = new Date(anime.lastWatched || 0).getTime();
+            const prefix = slug + '__';
+            for (const [id, progress] of Object.entries(videoProgress)) {
+                if (id.startsWith(prefix) && !progress.deleted) {
+                    const t = progress.savedAt ? new Date(progress.savedAt).getTime() : 0;
+                    if (t > latest) latest = t;
+                }
+            }
+            latestMap.set(slug, latest);
+        }
+
         // Sort all entries according to the active sort mode
         const sortedEntries = entries.sort((a, b) => {
             const [slugA, animeA] = a;
             const [slugB, animeB] = b;
-
-            const getLatest = (slug, anime) => {
-                let latest = new Date(anime.lastWatched || 0).getTime();
-                Object.entries(videoProgress).forEach(([id, progress]) => {
-                    if (id.startsWith(slug + '__') && !progress.deleted) {
-                        const progressTime = progress.savedAt ? new Date(progress.savedAt).getTime() : 0;
-                        if (progressTime > latest) latest = progressTime;
-                    }
-                });
-                return latest;
-            };
-
             switch (currentSort) {
-                case 'date':     return getLatest(slugB, animeB) - getLatest(slugA, animeA);
+                case 'date':     return latestMap.get(slugB) - latestMap.get(slugA);
                 case 'name':     return animeA.title.localeCompare(animeB.title, 'en');
                 case 'episodes': return (animeB.episodes?.length || 0) - (animeA.episodes?.length || 0);
                 default:         return 0;
@@ -398,12 +400,19 @@
             return html;
         };
 
-        const normalEntries = sortedEntries.filter(([slug, anime]) => !isAgedCompleted(slug, anime));
-        const completedEntries = sortedEntries
-            .filter(([slug, anime]) => isAgedCompleted(slug, anime))
-            .sort(([, a], [, b]) =>
-                new Date(b.lastWatched || 0).getTime() - new Date(a.lastWatched || 0).getTime()
-            );
+        // Single pass — avoids calling isAgedCompleted twice per entry.
+        const normalEntries = [];
+        const completedEntries = [];
+        for (const entry of sortedEntries) {
+            if (isAgedCompleted(entry[0], entry[1])) {
+                completedEntries.push(entry);
+            } else {
+                normalEntries.push(entry);
+            }
+        }
+        completedEntries.sort(([, a], [, b]) =>
+            new Date(b.lastWatched || 0).getTime() - new Date(a.lastWatched || 0).getTime()
+        );
 
         const completedOrderMap = new Map(completedEntries.map(([slug], index) => [slug, index]));
         const renderCompletedGroupedEntries = (entriesToRender) => {
@@ -727,6 +736,7 @@
                 await Storage.set(payload);
             } else {
                 animeData = repairedData;
+                videoProgress = cleanedProgress;
             }
 
             await FillerService.loadCachedEpisodeTypes(animeData);
