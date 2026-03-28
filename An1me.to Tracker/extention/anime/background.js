@@ -57,7 +57,7 @@ let pendingSync         = false;
 let syncDebounceTimeout = null;
 let syncPausedUntil     = 0;
 
-function pauseSync(ms = 5000) {
+function pauseSync(ms = 3000) {
     syncPausedUntil = Math.max(syncPausedUntil, Date.now() + ms);
 }
 function isSyncPaused() {
@@ -214,14 +214,12 @@ function fromFSDoc(doc) {
 }
 
 function shallowEqualDeletedAnime(a, b) {
-    const aObj = a || {};
-    const bObj = b || {};
-    const aKeys = Object.keys(aObj);
-    const bKeys = Object.keys(bObj);
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
     if (aKeys.length !== bKeys.length) return false;
     for (const slug of aKeys) {
-        if (!bObj[slug]) return false;
-        if ((aObj[slug]?.deletedAt || '') !== (bObj[slug]?.deletedAt || '')) return false;
+        if (!b[slug]) return false;
+        if (a[slug].deletedAt !== b[slug].deletedAt) return false;
     }
     return true;
 }
@@ -263,7 +261,7 @@ function shallowEqualStringMap(a, b) {
 
 async function fetchCloudData(user, token) {
     try {
-        const url      = `${FIRESTORE_BASE}/documents/users/${encodeURIComponent(user.uid)}`;
+        const url      = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
         if (!response.ok) return null;
         return fromFSDoc(await response.json());
@@ -294,7 +292,7 @@ async function syncProgressOnly() {
 
         let cloudVP = {};
         try {
-            const url = `${FIRESTORE_BASE}/documents/users/${encodeURIComponent(user.uid)}`;
+            const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
             const r   = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
             if (r.ok) cloudVP = fromFSDoc(await r.json())?.videoProgress || {};
         } catch {}
@@ -306,7 +304,7 @@ async function syncProgressOnly() {
             await bgStorageSet({ videoProgress: mergedVP });
         }
 
-        const url       = `${FIRESTORE_BASE}/documents/users/${encodeURIComponent(user.uid)}`;
+        const url       = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         const fieldMask = 'updateMask.fieldPaths=videoProgress&updateMask.fieldPaths=lastUpdated';
         const response  = await fetch(`${url}?${fieldMask}`, {
             method:  'PATCH',
@@ -386,7 +384,7 @@ async function syncToFirebase() {
             });
         }
 
-        const url       = `${FIRESTORE_BASE}/documents/users/${encodeURIComponent(user.uid)}`;
+        const url       = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         const fieldMask = [
             'animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'lastUpdated', 'email'
         ].map(f => `updateMask.fieldPaths=${f}`).join('&');
@@ -420,14 +418,7 @@ async function syncToFirebase() {
 async function applyCloudUpdate(cloudDoc) {
     if (!cloudDoc) return;
     try {
-        // Pause sync BEFORE reading to prevent storage.onChanged from
-        // triggering a sync loop while we're merging cloud data.
-        pauseSync();
-
-        // Cancel any pending sync debounces to prevent races
-        if (progressSyncDebounce) { clearTimeout(progressSyncDebounce); progressSyncDebounce = null; }
-        if (syncDebounceTimeout)  { clearTimeout(syncDebounceTimeout);  syncDebounceTimeout = null; }
-
+        // First read: baseline local state
         const local = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
 
         const mergedDeleted = cloudDoc.deletedAnime
@@ -499,7 +490,7 @@ async function startRealtimeListener() {
     }
 
     rtListenAbort = new AbortController();
-    const docPath = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${encodeURIComponent(user.uid)}`;
+    const docPath = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${user.uid}`;
 
     let streamSucceeded = false;
     try {

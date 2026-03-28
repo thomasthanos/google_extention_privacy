@@ -18,7 +18,7 @@
     let teardownSyncTriggered = false;
 
     let csSyncPausedUntil = 0;
-    function csPauseSync(ms = 5000) {
+    function csPauseSync(ms = 4000) {
         csSyncPausedUntil = Math.max(csSyncPausedUntil, Date.now() + ms);
     }
     function csIsSyncPaused() {
@@ -201,7 +201,7 @@
             const snapshot = JSON.stringify(localVP);
             if (snapshot === lastPushedProgress) return;
 
-            const url = `${FIRESTORE_BASE}/documents/users/${encodeURIComponent(user.uid)}`;
+            const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
             let cloudVP = {};
             try {
                 const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -258,7 +258,7 @@
         try {
             const local = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
 
-            const url     = `${FIRESTORE_BASE}/documents/users/${encodeURIComponent(user.uid)}`;
+            const url     = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
             let cloudData = null;
             try {
                 const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -344,7 +344,7 @@
                 return;
             }
 
-            const timeout = setTimeout(() => resolve(false), 3000);
+            const timeout = setTimeout(() => resolve(false), 1500);
             try {
                 chrome.runtime.sendMessage({ type: messageType }, (response) => {
                     clearTimeout(timeout);
@@ -404,14 +404,6 @@
     async function applyCloudUpdate(cloudDoc) {
         if (!cloudDoc) return;
         try {
-            // Pause sync BEFORE reading to prevent storage.onChanged from
-            // triggering a sync loop while we're merging cloud data.
-            csPauseSync();
-
-            // Cancel any pending sync debounces
-            if (progressDebounce) { clearTimeout(progressDebounce); progressDebounce = null; }
-            if (fullPushDebounce)  { clearTimeout(fullPushDebounce);  fullPushDebounce = null; }
-
             const local = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
 
             const mergedDeleted = cloudDoc.deletedAnime
@@ -460,7 +452,7 @@
         currentToken = token;
         currentUser  = user;
 
-        const docPath = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${encodeURIComponent(user.uid)}`;
+        const docPath = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${user.uid}`;
         let tokenRefreshInterval = null;
 
         try {
@@ -702,6 +694,7 @@
                 }
 
                 void chrome.runtime.lastError;
+                }
 
                 if (keepAlivePort === port) keepAlivePort = null;
                 if (keepAlivePulseTimer) {

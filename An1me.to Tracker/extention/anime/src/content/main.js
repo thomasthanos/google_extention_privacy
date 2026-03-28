@@ -15,8 +15,6 @@
     let durationRefreshAttempted = false;
     let durationRefreshAttempts = 0;
     const MAX_DURATION_REFRESH_ATTEMPTS = 5;
-    let accumulatedWatchTime = 0;
-    let lastTimeUpdateTimestamp = 0;
 
     function writeSyncEpisode(info, duration, animeData, logPrefix) {
         const { Logger } = AT;
@@ -115,11 +113,6 @@
         return true;
     }
 
-    function hasEnoughWatchTime() {
-        const { CONFIG } = AT;
-        return accumulatedWatchTime >= (CONFIG.MIN_WATCH_TIME_FOR_COMPLETE || 120);
-    }
-
     function trackImmediately() {
         const { Logger, ProgressTracker, VideoMonitor, Notifications } = AT;
         const videoElement = VideoMonitor.getVideoElement();
@@ -130,7 +123,6 @@
         const currentTime = videoElement.currentTime;
 
         if (!duration || !ProgressTracker.shouldMarkComplete(currentTime, duration)) return;
-        if (!hasEnoughWatchTime()) return;
 
         isTrackingImmediate = true;
         isTracked = true;
@@ -225,20 +217,9 @@
 
         if (!duration || duration === 0 || isNaN(duration)) return;
 
-        // Track accumulated real watch time
-        const now = Date.now();
-        if (lastTimeUpdateTimestamp > 0 && !videoElement.paused) {
-            const delta = (now - lastTimeUpdateTimestamp) / 1000;
-            // Only count reasonable deltas (< 2s) to avoid counting pauses/seeks
-            if (delta > 0 && delta < 2) {
-                accumulatedWatchTime += delta;
-            }
-        }
-        lastTimeUpdateTimestamp = now;
-
         await tryRefreshTrackedDuration(videoElement, 'timeupdate');
 
-        if (ProgressTracker.shouldMarkComplete(currentTime, duration) && hasEnoughWatchTime()) {
+        if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
             earlyTrackDone = true;
             trackImmediately();
         }
@@ -270,7 +251,7 @@
             ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration);
         }
 
-        if (ProgressTracker.shouldMarkComplete(currentTime, duration) && hasEnoughWatchTime()) {
+        if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
             if (isTrackingInProgress) {
                 return;
             }
@@ -337,7 +318,6 @@
 
         if (!animeInfo || !videoElement) return;
         if (isTracked) return;
-        if (!hasEnoughWatchTime()) return;
 
         isTracked = true;
         const alreadyTracked = await ProgressTracker.isEpisodeTracked(animeInfo.uniqueId);
@@ -366,7 +346,7 @@
             const duration = videoElement.duration;
             const currentTime = videoElement.currentTime;
 
-            if (ProgressTracker.shouldMarkComplete(currentTime, duration) && hasEnoughWatchTime()) {
+            if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
                 isTracked = true;
                 const alreadyTracked = await ProgressTracker.isEpisodeTracked(animeInfo.uniqueId);
                 if (!alreadyTracked) {
@@ -402,7 +382,7 @@
         const duration = videoElement.duration;
         const currentTime = videoElement.currentTime;
 
-        if (ProgressTracker.shouldMarkComplete(currentTime, duration) && hasEnoughWatchTime()) {
+        if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
             if (isTracked) return;
 
             isTracked = true;
@@ -472,8 +452,6 @@
         earlyTrackDone = false;
         durationRefreshAttempted = false;
         durationRefreshAttempts = 0;
-        accumulatedWatchTime = 0;
-        lastTimeUpdateTimestamp = 0;
 
         animeInfo = AnimeParser.extractAnimeInfo();
         if (!animeInfo) return;
@@ -490,13 +468,9 @@
                     const groupCoverImages = result.groupCoverImages || {};
                     const slug = animeInfo.animeSlug;
 
-                    // Only update existing entries - don't create new empty ones
-                    // to avoid polluting the list with anime the user just briefly clicked on
-                    let changed = false;
                     if (animeData[slug]) {
-                        if (!animeData[slug].coverImage && animeInfo.coverImage) {
+                        if (!animeData[slug].coverImage) {
                             animeData[slug].coverImage = animeInfo.coverImage;
-                            changed = true;
                         }
                         if (hasDetectedTotal) {
                             const existingMaxEpisode = Math.max(
@@ -505,23 +479,29 @@
                             );
                             if (animeInfo.totalEpisodes >= existingMaxEpisode) {
                                 animeData[slug].totalEpisodes = animeInfo.totalEpisodes;
-                                changed = true;
                             }
                         }
+                    } else {
+                        animeData[slug] = {
+                            title: animeInfo.animeTitle,
+                            slug: slug,
+                            episodes: [],
+                            totalWatchTime: 0,
+                            lastWatched: null,
+                            totalEpisodes: hasDetectedTotal ? animeInfo.totalEpisodes : null,
+                            coverImage: animeInfo.coverImage || null
+                        };
                     }
 
                     try {
                         const baseSlug = getBaseSlug(slug);
                         if (animeInfo.coverImage && !groupCoverImages[baseSlug]) {
                             groupCoverImages[baseSlug] = animeInfo.coverImage;
-                            changed = true;
                         }
                     } catch {
                     }
 
-                    if (changed) {
-                        chrome.storage.local.set({ animeData, groupCoverImages });
-                    }
+                    chrome.storage.local.set({ animeData, groupCoverImages });
                 });
             } catch (e) {
                 Logger.warn('Cover image update failed:', e);
@@ -531,13 +511,6 @@
         const alreadyTracked = await ProgressTracker.isEpisodeTracked(animeInfo.uniqueId);
         if (alreadyTracked) {
             isTracked = true;
-            // Clean up any stale progress for this already-completed episode
-            // This handles the case where episode was completed on another device
-            try {
-                await ProgressTracker.clearSavedProgress(animeInfo.uniqueId);
-            } catch (e) {
-                Logger.warn('Failed to clear stale progress for tracked episode:', e);
-            }
         }
 
         VideoMonitor.startWatching(animeInfo, eventHandlers);
@@ -553,7 +526,7 @@
                 const currentTime = videoElement.currentTime;
                 const duration = videoElement.duration;
 
-                if (ProgressTracker.shouldMarkComplete(currentTime, duration) && hasEnoughWatchTime()) {
+                if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
                     clearInterval(periodicCheck);
                     trackImmediately();
                 }
@@ -587,7 +560,7 @@
             navigationObserver.disconnect();
         }
 
-        const navigationClickHandler = (e) => {
+        document.addEventListener('click', (e) => {
             const target = e.target.closest('[data-open-nav-episode], .episode-navigation, .next-episode, .prev-episode, .episode-list-item, a, button');
             if (!target) return;
 
@@ -628,8 +601,7 @@
             if (isNavigation) {
                 trackImmediately();
             }
-        };
-        document.addEventListener('click', navigationClickHandler, { capture: true, passive: true });
+        }, { capture: true, passive: true });
 
         navigationObserver = new MutationObserver(() => {
             if (location.href === lastUrl) return;
@@ -651,8 +623,6 @@
                     earlyTrackDone = false;
                     durationRefreshAttempted = false;
                     durationRefreshAttempts = 0;
-                    accumulatedWatchTime = 0;
-                    lastTimeUpdateTimestamp = 0;
 
                     ProgressTracker.reset();
 
@@ -671,7 +641,6 @@
         }
 
         VideoMonitor.addCleanup(() => {
-            document.removeEventListener('click', navigationClickHandler, { capture: true });
             if (navigationDebounceTimeout) {
                 clearTimeout(navigationDebounceTimeout);
                 navigationDebounceTimeout = null;

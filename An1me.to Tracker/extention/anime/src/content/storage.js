@@ -9,54 +9,45 @@ const ContentStorage = {
 
     async get(keys) {
         const { Logger } = window.AnimeTrackerContent;
-
+        
         return new Promise((resolve) => {
             if (!this.isContextValid()) {
                 resolve({});
                 return;
             }
 
-            let resolved = false;
-            const safeResolve = (value) => {
-                if (resolved) return;
-                resolved = true;
-                clearTimeout(timeoutId);
-                resolve(value);
-            };
-
             const timeoutId = setTimeout(() => {
                 Logger.warn('Storage.get() timeout after 5s');
-                safeResolve({});
+                resolve({});
             }, 5000);
 
             chrome.storage.local.get(keys, (localResult) => {
-                if (resolved) return;
-
                 if (chrome.runtime.lastError) {
+                    clearTimeout(timeoutId);
                     const errorMsg = chrome.runtime.lastError.message;
 
                     if (errorMsg.includes('Extension context invalidated') ||
                         errorMsg.includes('Cannot access') ||
                         !this.isContextValid()) {
-                        safeResolve({});
+                        resolve({});
                         return;
                     }
 
                     Logger.error('Local storage get error:', errorMsg);
-                    safeResolve({});
+                    resolve({});
                     return;
                 }
 
                 const hasLocalData = keys.some(key => localResult[key] !== undefined);
 
                 if (hasLocalData) {
-                    safeResolve(localResult);
+                    clearTimeout(timeoutId);
+                    resolve(localResult);
                 } else {
                     chrome.storage.sync.get(keys, (syncResult) => {
-                        if (resolved) return;
-
+                        clearTimeout(timeoutId);
                         if (chrome.runtime.lastError) {
-                            safeResolve(localResult);
+                            resolve(localResult);
                             return;
                         }
 
@@ -67,7 +58,7 @@ const ContentStorage = {
                             });
                         }
 
-                        safeResolve({ ...localResult, ...syncResult });
+                        resolve({ ...localResult, ...syncResult });
                     });
                 }
             });

@@ -39,7 +39,7 @@ const AnimeParser = {
             const doubleEpMatch = animeSlug.match(/^(.+?)[-_]ep(?:isode)?[-_]?(\d+)[-_](\d+)$/i);
             if (doubleEpMatch) {
                 const ep1 = parseInt(doubleEpMatch[2], 10);
-                const ep2 = parseInt(doubleEpMatch[3], 10);                const looksLikeDoubleEp = ep2 > ep1 && ep2 - ep1 <= 2;
+                const ep2 = parseInt(doubleEpMatch[3], 10);                const looksLikeDoubleEp = ep2 > ep1 && ep2 - ep1 <= 4;
                 if (looksLikeDoubleEp) {
                     animeSlug = doubleEpMatch[1];
                     episodeNumber = ep1;

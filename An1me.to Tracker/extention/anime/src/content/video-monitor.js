@@ -170,13 +170,7 @@ const VideoMonitor = {
         });
 
         if (animeInfo) {
-            // Don't show resume prompt if episode is already completed
-            const episodeAlreadyTracked = await ProgressTracker.isEpisodeTracked(animeInfo.uniqueId);
-            if (episodeAlreadyTracked) {
-                // Clean up stale progress silently
-                try { await ProgressTracker.clearSavedProgress(animeInfo.uniqueId); } catch {}
-            }
-            const savedProgress = episodeAlreadyTracked ? null : await ProgressTracker.getSavedProgress(animeInfo.uniqueId);
+            const savedProgress = await ProgressTracker.getSavedProgress(animeInfo.uniqueId);
             if (savedProgress && savedProgress.currentTime > CONFIG.MIN_PROGRESS_TO_SAVE) {
                 savedProgress.uniqueId = animeInfo.uniqueId;
 

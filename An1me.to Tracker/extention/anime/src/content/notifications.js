@@ -265,8 +265,8 @@ const Notifications = {
         yes.addEventListener('click', onYes);
         no.addEventListener('click', onNo);
         
-        const autoRemoveTimer = setTimeout(remove, 10000);
-        this.addCleanup(() => { clearTimeout(autoRemoveTimer); yes?.removeEventListener('click', onYes); no?.removeEventListener('click', onNo); remove(); });
+        this.addCleanup(() => { yes?.removeEventListener('click', onYes); no?.removeEventListener('click', onNo); remove(); });
+        setTimeout(remove, 10000);
     },
 
     injectResumeStyles(doc = document) {
@@ -434,8 +434,8 @@ const Notifications = {
         this.injectNotificationStyles(doc);
         container.appendChild(notification);
 
-        const autoRemoveTimer = setTimeout(() => notification.remove(), 4500);
-        this.addCleanup(() => { clearTimeout(autoRemoveTimer); notification.remove(); });
+        this.addCleanup(() => notification.remove());
+        setTimeout(() => notification.remove(), 4500);
     },
 
     injectNotificationStyles(doc = document) {
