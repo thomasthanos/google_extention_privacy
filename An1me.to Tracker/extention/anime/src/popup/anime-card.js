@@ -418,11 +418,11 @@ const AnimeCardRenderer = {
         const pct = Math.round(latestEp.percentage);
         const safeSlug = UIHelpers.escapeHtml(anime.slug);
 
-        // Cover image thumbnail
+        // Cover image thumbnail (44x58)
         const safeCoverImage = UIHelpers.sanitizeImageUrl(anime.coverImage);
         const coverHtml = safeCoverImage
-            ? `<img src="${UIHelpers.escapeHtml(safeCoverImage)}" alt="" style="width:32px;height:42px;border-radius:3px;object-fit:cover;flex-shrink:0;">`
-            : `<div style="width:32px;height:42px;border-radius:3px;border:1px solid var(--b1);background:rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--t3);flex-shrink:0;">▶</div>`;
+            ? `<img class="ip-cover" src="${UIHelpers.escapeHtml(safeCoverImage)}" alt="">`
+            : `<div class="ip-cover-placeholder">▶</div>`;
 
         // Format last saved time
         const savedDate = latestEp.savedAt ? new Date(latestEp.savedAt) : null;
@@ -452,10 +452,13 @@ const AnimeCardRenderer = {
             <div class="ip-card" data-slug="${safeSlug}">
                 <div class="ip-header">
                     ${coverHtml}
-                    <div class="ip-info">
+                    <div class="ip-body">
                         <div class="ip-title-row">
                             <span class="ip-title">${UIHelpers.escapeHtml(anime.title)}</span>
                             <span class="ip-pct-badge">${pct}%</span>
+                            <button class="ip-delete-btn" data-slug="${safeSlug}" data-episode="${latestEp.number}" title="Delete progress">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
                         </div>
                         <div class="ip-meta">
                             <span class="ip-meta-item">Ep ${latestEp.number}</span>
@@ -464,14 +467,11 @@ const AnimeCardRenderer = {
                             <span class="ip-meta-sep">·</span>
                             <span class="ip-meta-time">${watchedDateStr ? `Started ${watchedDateStr}` : savedTimeStr}</span>
                         </div>
+                        <div class="ip-progress">
+                            <div class="ip-bar"><div class="ip-fill" style="width:${pct}%"></div></div>
+                            <span class="ip-remaining">${remainingStr}</span>
+                        </div>
                     </div>
-                    <button class="ip-delete-btn" data-slug="${safeSlug}" data-episode="${latestEp.number}" title="Delete progress">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                    </button>
-                </div>
-                <div class="ip-progress">
-                    <div class="ip-bar"><div class="ip-fill" style="width:${pct}%"></div></div>
-                    <span class="ip-remaining">${remainingStr}</span>
                 </div>
             </div>`;
     },

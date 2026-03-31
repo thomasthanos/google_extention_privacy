@@ -848,8 +848,9 @@ async function fetchAnimePageInfo(slug) {
         if (numMatch) totalEpisodes = parseInt(numMatch[1], 10);
     }
 
-    // Fallback: scan episode links on the page for the highest episode number
-    if (!totalEpisodes) {
+    // Always scan episode links on the page for the highest actually available episode
+    let latestEpisode = null;
+    {
         const epPattern = new RegExp(`/watch/${cleanSlug}-episode-(\\d+)`, 'gi');
         let m;
         let maxEp = 0;
@@ -857,7 +858,12 @@ async function fetchAnimePageInfo(slug) {
             const n = parseInt(m[1], 10);
             if (n > maxEp) maxEp = n;
         }
-        if (maxEp > 0) totalEpisodes = maxEp;
+        if (maxEp > 0) latestEpisode = maxEp;
+    }
+
+    // Fallback: if metadata didn't give totalEpisodes, use episode links
+    if (!totalEpisodes && latestEpisode) {
+        totalEpisodes = latestEpisode;
     }
 
     // ── Status ───────────────────────────────────────────────────────────────
@@ -878,7 +884,7 @@ async function fetchAnimePageInfo(slug) {
         else if (/Currently\s+Airing|Προβάλλεται\s+τώρα/i.test(html)) status = 'RELEASING';
     }
 
-    return { totalEpisodes, status };
+    return { totalEpisodes, status, latestEpisode };
 }
 
 // ─── Episode type fetcher ─────────────────────────────────────────────────────

@@ -152,6 +152,31 @@
         return daysSinceLastWatch >= CONFIG.COMPLETED_LIST_MIN_DAYS;
     }
 
+    /**
+     * Check if an anime is airing and the user has caught up with all available episodes.
+     * These get moved to the collapsible "Airing List" section.
+     */
+    function isCaughtUpAiring(slug, anime) {
+        const { AnilistService } = AT;
+        if (!anime || !anime.episodes || anime.episodes.length === 0) return false;
+        if (anime.droppedAt) return false;
+        if (anime.completedAt) return false;
+
+        const lowerSlug = slug.toLowerCase();
+        const anilistStatus = AnilistService?.getStatus(lowerSlug);
+        if (anilistStatus !== 'RELEASING') return false;
+
+        // Get the latest actually available episode on an1me.to (not the planned total)
+        const latestAvailable = AnilistService?.getLatestEpisode(lowerSlug);
+        if (!latestAvailable || latestAvailable <= 0) return false;
+
+        // Get highest watched episode
+        const highestWatched = Math.max(0, ...(anime.episodes || []).map(ep => Number(ep.number) || 0));
+
+        // User is caught up if their highest watched episode >= latest available on site
+        return highestWatched >= latestAvailable;
+    }
+
     function normalizeMovieDurations(data, progress = {}) {
         const { SeasonGrouping } = AT;
         const MIN_RELIABLE_DURATION_SECONDS = 30 * 60;     // 30 min
@@ -305,6 +330,10 @@
         const droppedWasOpen = droppedSection
             ? (droppedSection.querySelector('.dropped-list-cards')?.style.display !== 'none')
             : false;
+        const airingSection = elements.animeList.querySelector('.airing-list-section');
+        const airingWasOpen = airingSection
+            ? (airingSection.querySelector('.airing-list-cards')?.style.display !== 'none')
+            : false;
         const ipGroupWasOpen = elements.animeList.querySelector('.ip-group-content')?.classList.contains('open') ?? false;
 
         // Filter by category
@@ -404,15 +433,18 @@
             return html;
         };
 
-        // Single pass — partition into normal, completed, and dropped entries.
+        // Single pass — partition into normal, completed, dropped, and airing entries.
         const normalEntries = [];
         const completedEntries = [];
         const droppedEntries = [];
+        const airingEntries = [];
         for (const entry of sortedEntries) {
             if (entry[1].droppedAt) {
                 droppedEntries.push(entry);
             } else if (isAgedCompleted(entry[0], entry[1])) {
                 completedEntries.push(entry);
+            } else if (isCaughtUpAiring(entry[0], entry[1])) {
+                airingEntries.push(entry);
             } else {
                 normalEntries.push(entry);
             }
@@ -453,6 +485,7 @@
         const trackedHtml        = renderGroupedEntries(normalEntries);
         const completedCardsHtml = renderCompletedGroupedEntries(completedEntries);
         const droppedCardsHtml   = renderCompletedGroupedEntries(droppedEntries);
+        const airingCardsHtml    = renderCompletedGroupedEntries(airingEntries);
         const inProgressHtml     = AnimeCardRenderer.createInProgressGroup(inProgressOnly);
 
         const completedGroupHtml = completedEntries.length > 0
@@ -493,7 +526,26 @@
             `
             : '';
 
-        elements.animeList.innerHTML = inProgressHtml + trackedHtml + completedGroupHtml + droppedGroupHtml;
+        const airingGroupHtml = airingEntries.length > 0
+            ? `
+                <div class="airing-list-section">
+                    <div class="airing-list-label" id="airingListToggle">
+                        <div class="airing-list-label-left">
+                            <span class="airing-list-label-title">⬤ AIRING LIST</span>
+                            <span class="airing-list-label-sub">${airingEntries.length} anime · Caught up</span>
+                        </div>
+                        <svg class="airing-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="airing-list-cards" style="display:none;">
+                        ${airingCardsHtml}
+                    </div>
+                </div>
+            `
+            : '';
+
+        elements.animeList.innerHTML = inProgressHtml + trackedHtml + airingGroupHtml + completedGroupHtml + droppedGroupHtml;
 
         // Restore expanded state
         elements.animeList.querySelectorAll('.anime-card').forEach(card => {
@@ -535,7 +587,19 @@
             if (chevron) chevron.style.transform = 'rotate(0deg)';
         }
 
+        const newAiringToggle = elements.animeList.querySelector('#airingListToggle');
+        if (newAiringToggle && airingWasOpen) {
+            const cards = newAiringToggle.nextElementSibling;
+            const chevron = newAiringToggle.querySelector('.airing-chevron');
+            if (cards) cards.style.display = 'flex';
+            if (chevron) chevron.style.transform = 'rotate(0deg)';
+        }
+
         setupCardEventListeners();
+
+        // Start/stop live polling for ip-cards
+        if (elements.animeList.querySelector('.ip-card')) _ipPollStart();
+        else _ipPollStop();
     }
 
     /**
@@ -666,6 +730,20 @@
                 chevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
             });
             const chevron = droppedToggle.querySelector('.dropped-chevron');
+            chevron.style.transform = 'rotate(-90deg)';
+        }
+
+        const airingToggle = elements.animeList.querySelector('#airingListToggle');
+        if (airingToggle) {
+            airingToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const cards = airingToggle.nextElementSibling;
+                const chevron = airingToggle.querySelector('.airing-chevron');
+                const isHidden = cards.style.display === 'none';
+                cards.style.display = isHidden ? 'flex' : 'none';
+                chevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
+            });
+            const chevron = airingToggle.querySelector('.airing-chevron');
             chevron.style.transform = 'rotate(-90deg)';
         }
 
@@ -1988,9 +2066,92 @@
         });
     }
 
-    window.addEventListener('beforeunload', () => AT.FirebaseSync.cleanup());
-    document.addEventListener('visibilitychange', async () => {
-        if (document.hidden) AT.FirebaseSync.cleanup();
+    // ── In-Progress live refresh ──────────────────────────────────────────────
+    // Raw polling: read directly from chrome.storage.local every 3s and patch DOM.
+    // Also listens to storage.onChanged for instant updates.
+
+    let _ipPollId = null;
+
+    function _ipPollStart() {
+        if (_ipPollId) return;
+        _ipPollId = setInterval(_ipPollTick, 3000);
+        _ipPollTick(); // run once immediately
+    }
+
+    function _ipPollStop() {
+        if (_ipPollId) { clearInterval(_ipPollId); _ipPollId = null; }
+    }
+
+    function _ipPollTick() {
+        const cards = document.querySelectorAll('.ip-card[data-slug]');
+        if (!cards.length) { _ipPollStop(); return; }
+
+        chrome.storage.local.get(['videoProgress'], (result) => {
+            if (chrome.runtime.lastError) return;
+            _ipPatch(result.videoProgress || {});
+        });
+    }
+
+    function _ipPatch(vp) {
+        const completedPct = AT.CONFIG?.COMPLETED_PERCENTAGE || 85;
+        const cards = document.querySelectorAll('.ip-card[data-slug]');
+
+        cards.forEach(card => {
+            const slug = card.dataset.slug;
+            if (!slug) return;
+
+            let best = null;
+            let bestNum = 0;
+            const prefix = slug + '__episode-';
+            for (const key in vp) {
+                if (!key.startsWith(prefix)) continue;
+                const p = vp[key];
+                if (!p || p.deleted) continue;
+                if (p.percentage >= completedPct) continue;
+                const num = parseInt(key.slice(prefix.length), 10);
+                if (num > bestNum) { bestNum = num; best = p; }
+            }
+            if (!best) return;
+
+            const pct = Math.floor(best.percentage);
+            const ct  = best.currentTime || 0;
+            const dur = best.duration || 0;
+            const mins = Math.floor(ct / 60);
+            const secs = Math.floor(ct % 60);
+            const timeStr = `${mins}:${String(secs).padStart(2, '0')}`;
+            const durStr  = dur > 0 ? `${Math.floor(dur / 60)}m` : '?';
+            const remMin  = Math.ceil(Math.max(0, dur - ct) / 60);
+            const remStr  = remMin > 0 ? `${remMin}m left` : 'Done';
+
+            const fill = card.querySelector('.ip-fill');
+            if (fill && fill.style.width !== pct + '%') {
+                fill.style.width = pct + '%';
+                console.log(`[IP-Refresh] ${slug}: ${pct}% (${timeStr}/${durStr})`);
+            }
+
+            const badge = card.querySelector('.ip-pct-badge');
+            if (badge) badge.textContent = pct + '%';
+
+            const items = card.querySelectorAll('.ip-meta-item');
+            if (items[0]) items[0].textContent = `Ep ${bestNum}`;
+            if (items[1]) items[1].textContent = `${timeStr} / ${durStr}`;
+
+            const rem = card.querySelector('.ip-remaining');
+            if (rem) rem.textContent = remStr;
+        });
+    }
+
+    // Also patch instantly on storage changes
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'local' && changes.videoProgress) {
+            _ipPatch(changes.videoProgress.newValue || {});
+        }
+    });
+
+    window.addEventListener('beforeunload', () => { _ipPollStop(); AT.FirebaseSync.cleanup(); });
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) { _ipPollStop(); AT.FirebaseSync.cleanup(); }
+        else { _ipPollStart(); }
     });
 
     init();

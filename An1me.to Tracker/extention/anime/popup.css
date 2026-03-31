@@ -23,6 +23,7 @@
 
   /* Gradients */
   --grad-cyan: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
+  --grad-amber: linear-gradient(135deg, #f0c040 0%, #e6a817 100%);
 
   /* Text */
   --t1: #e8edf8;
@@ -704,6 +705,64 @@ body {
   border-top: 1px solid rgba(229,115,115,0.12);
 }
 
+/* ─── Airing List Section ─────────────────────────────────── */
+.airing-list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 4px;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(100,181,246,0.18);
+  background: linear-gradient(180deg, rgba(100,181,246,0.06) 0%, rgba(100,181,246,0.02) 100%);
+  overflow: hidden;
+}
+.airing-list-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  cursor: pointer;
+  user-select: none;
+  background: rgba(100,181,246,0.04);
+  transition: background var(--tf);
+}
+.airing-list-label:hover {
+  background: rgba(100,181,246,0.1);
+}
+.airing-list-label:hover .airing-list-label-title {
+  color: var(--cyan);
+}
+.airing-list-label-left {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.airing-list-label-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #64b5f6;
+  letter-spacing: 0.08em;
+  transition: color var(--tf);
+}
+.airing-list-label-sub {
+  font-size: 10px;
+  color: var(--t3);
+}
+.airing-chevron {
+  width: 12px;
+  height: 12px;
+  color: var(--t3);
+  flex-shrink: 0;
+  transition: transform var(--tn);
+}
+.airing-list-cards {
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 10px 10px;
+  border-top: 1px solid rgba(100,181,246,0.12);
+}
+
 /* ═══════════════════════════════════════════════════════════════
    ANIME CARD
 ═══════════════════════════════════════════════════════════════ */
@@ -895,7 +954,9 @@ body {
 .ip-card:hover { border-color: rgba(240,192,64,0.28); background: linear-gradient(180deg, rgba(240,192,64,0.08) 0%, rgba(240,192,64,0.03) 100%); }
 
 .ip-header { display: flex; align-items: flex-start; gap: 8px; }
-.ip-info { flex: 1; min-width: 0; }
+.ip-cover { width: 44px; height: 58px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+.ip-cover-placeholder { width: 44px; height: 58px; border-radius: 4px; border: 1px solid var(--b1); background: rgba(255,255,255,0.03); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--t3); flex-shrink: 0; }
+.ip-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .ip-title-row { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
 .ip-title { font-size: 12px; font-weight: 600; color: var(--t1); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex: 1; }
 .ip-pct-badge { font-size: 9px; font-weight: 700; color: var(--amber); background: rgba(240,192,64,0.18); padding: 2px 6px; border-radius: var(--r-xs); white-space: nowrap; flex-shrink: 0; }
@@ -908,9 +969,9 @@ body {
 .ip-delete-btn svg { width: 11px; height: 11px; }
 .ip-delete-btn:hover { background: rgba(240,69,69,0.75); color: #fff; }
 
-.ip-progress { margin-top: 6px; display: flex; align-items: center; gap: 6px; }
-.ip-bar { height: 3px; background: rgba(240,192,64,0.12); border-radius: 2px; overflow: hidden; flex: 1; }
-.ip-fill { height: 100%; background: var(--grad-amber); border-radius: 2px; transition: width 0.3s ease; }
+.ip-progress { margin-top: 4px; display: flex; align-items: center; gap: 6px; }
+.ip-bar { height: 4px; background: rgba(240,192,64,0.15); border-radius: 2px; overflow: hidden; flex: 1; }
+.ip-fill { height: 100%; background: var(--grad-amber); border-radius: 2px; transition: width 0.3s ease; min-width: 4px; }
 .ip-remaining { font-size: 8px; color: var(--amber); font-weight: 600; white-space: nowrap; min-width: 40px; text-align: right; opacity: 0.9; }
 
 /* ─── In-progress-only card (legacy, kept for compat) ───────── */

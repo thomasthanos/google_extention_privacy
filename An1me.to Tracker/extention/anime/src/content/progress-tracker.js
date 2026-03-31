@@ -227,6 +227,7 @@ const ProgressTracker = {
             };
 
             await Storage.set({ videoProgress });
+            Logger.debug(`Progress saved: ${uniqueId} → ${videoProgress[uniqueId].percentage}% (${newCurrentTime}s/${Math.floor(duration)}s)`);
         } catch (e) {
             if (e.message && e.message.includes('Extension context invalidated')) {
                 // silent — extension reloads
@@ -249,7 +250,7 @@ const ProgressTracker = {
         if (this.shouldMarkComplete(currentTime, duration)) return;
 
         const now = Date.now();
-        const throttleMs = force ? 2000 : 10000;
+        const throttleMs = force ? 2000 : 5000;
 
         if ((now - this.lastSaveTime) < throttleMs && !force) {
             this.pendingSeekSave = { uniqueId, currentTime, duration };

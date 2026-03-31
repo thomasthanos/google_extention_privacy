@@ -25,6 +25,13 @@ const AnilistService = {
         return this.cache[slug]?.status || null;
     },
 
+    /** Returns the highest episode number actually available on an1me.to, or null. */
+    getLatestEpisode(slug) {
+        const data = this.cache[slug];
+        if (!data || data.latestEpisode == null) return null;
+        return data.latestEpisode;
+    },
+
     // ── Fetch ───────────────────────────────────────────────────────────────────
 
     /** Fetch anime info via the background service worker. */
