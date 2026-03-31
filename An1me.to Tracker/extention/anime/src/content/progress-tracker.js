@@ -434,7 +434,8 @@ const ProgressTracker = {
                     episodes: [],
                     totalWatchTime: 0,
                     lastWatched: null,
-                    totalEpisodes: Number.isFinite(info.totalEpisodes) ? info.totalEpisodes : null
+                    totalEpisodes: Number.isFinite(info.totalEpisodes) ? info.totalEpisodes : null,
+                    coverImage: info.coverImage || null
                 };
             }
 
@@ -460,6 +461,12 @@ const ProgressTracker = {
             if (!validDuration) {
                 Logger.error('Invalid normalized video duration:', videoDuration);
                 throw new Error('Invalid normalized video duration');
+            }
+
+            // Auto-undrop: if user watches a new episode of a dropped anime, undrop it
+            if (animeData[info.animeSlug].droppedAt) {
+                delete animeData[info.animeSlug].droppedAt;
+                Logger.info('Auto-undropped anime (new episode tracked):', info.animeSlug);
             }
 
             const existingIndex = animeData[info.animeSlug].episodes

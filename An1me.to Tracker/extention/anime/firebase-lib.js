@@ -511,6 +511,10 @@ const FirebaseLib = (function() {
         if (!tokenData.tokens.refreshToken || typeof tokenData.tokens.refreshToken !== 'string') {
             throw new Error('Invalid or missing refresh token in exported data.');
         }
+        // Check 20-minute expiry
+        if (tokenData.expiresAt && Date.now() > tokenData.expiresAt) {
+            throw new Error('Token has expired (valid for 20 minutes). Please export a new token from Chrome.');
+        }
         // Verify token is still valid by refreshing it
         let response, data;
         try {
@@ -560,7 +564,8 @@ const FirebaseLib = (function() {
         }
         return {
             user: stored[STORAGE_KEYS.USER],
-            tokens: { refreshToken: stored[STORAGE_KEYS.TOKENS].refreshToken }
+            tokens: { refreshToken: stored[STORAGE_KEYS.TOKENS].refreshToken },
+            expiresAt: Date.now() + 20 * 60 * 1000 // 20 minutes
         };
     }
 

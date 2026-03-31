@@ -211,20 +211,34 @@ const AnimeCardRenderer = {
             || (window.AnimeTracker.SeasonGrouping.isMovie(slug, anime) && totalWatchedEpisodes > 0);
         const totalProgressText = totalEpisodesPossible > 0 ? `${currentEpisode}/${totalEpisodesPossible}` : `${currentEpisode}`;
         const episodeProgressText = currentEpisode > 0 ? `Ep ${totalProgressText}` : '';
+        const isDropped = !!anime.droppedAt;
         let statusTextCard = '';
-        if (totalWatchedEpisodes === 0) {
+        if (isDropped) {
+            statusTextCard = 'Dropped';
+        } else if (totalWatchedEpisodes === 0) {
             statusTextCard = 'Not started';
         } else if (!isCardComplete) {
             statusTextCard = 'Watching';
         } else {
             statusTextCard = 'Completed';
         }
-        const timeAgoText = anime.lastWatched ? UIHelpers.formatDate(anime.lastWatched) : 'Never';
-        const progressBadge = !isCardComplete && episodeProgressText
+        let timeAgoText;
+        if (isCardComplete && totalWatchedEpisodes > 0) {
+            const startedDate = UIHelpers.getStartedDate(anime);
+            const endedDate = anime.completedAt || anime.lastWatched;
+            if (startedDate && endedDate) {
+                timeAgoText = `${UIHelpers.formatShortDate(startedDate)} / ${UIHelpers.formatShortDate(endedDate)}`;
+            } else {
+                timeAgoText = anime.lastWatched ? UIHelpers.formatDate(anime.lastWatched) : 'Never';
+            }
+        } else {
+            timeAgoText = anime.lastWatched ? UIHelpers.formatDate(anime.lastWatched) : 'Never';
+        }
+        const progressBadge = !isCardComplete && !isDropped && episodeProgressText
             ? `<span class="meta-badge meta-badge-progress">${episodeProgressText}</span>`
             : '';
-        const statusBadgeClass = isCardComplete ? 'meta-badge-complete' : (totalWatchedEpisodes > 0 ? 'meta-badge-watching' : 'meta-badge-notstarted');
-        const statusBadgeIcon = isCardComplete ? '✓' : '⊙';
+        const statusBadgeClass = isDropped ? 'meta-badge-dropped' : (isCardComplete ? 'meta-badge-complete' : (totalWatchedEpisodes > 0 ? 'meta-badge-watching' : 'meta-badge-notstarted'));
+        const statusBadgeIcon = isDropped ? '⏸' : (isCardComplete ? '✓' : '⊙');
         const statusBadge = `<span class="meta-badge ${statusBadgeClass}">${statusBadgeIcon} ${statusTextCard}</span>`;
 
         const anilistStatus = window.AnimeTracker?.AnilistService?.getStatus(slug);
@@ -246,6 +260,7 @@ const AnimeCardRenderer = {
                     </div>
                     <div class="anime-card-actions">
                         <button class="anime-complete-toggle" data-slug="${slug}" data-completed="${isManuallyCompleted}" title="${isManuallyCompleted ? 'Unmark as completed' : 'Mark as completed'}">${UIHelpers.createIcon('check')}</button>
+                        <button class="anime-drop-toggle" data-slug="${slug}" data-dropped="${!!anime.droppedAt}" title="${anime.droppedAt ? 'Unmark as dropped — moves back to your active list' : 'Mark as dropped — moves to the Dropped List for anime you started but stopped watching'}">${UIHelpers.createIcon('drop')}</button>
                         <button class="anime-edit-title" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
                         <button class="anime-delete" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
                     </div>
@@ -804,8 +819,28 @@ const AnimeCardRenderer = {
         });
 
         const seasonItemsHTML = seasonData.map(d => d.html).join('');
-        const lastWatchedText = latestWatched ? UIHelpers.formatDate(latestWatched.toISOString()) : 'Never';
         const allSeasonsComplete = seasonData.every(d => d.isComplete);
+
+        // Compute date display: date range for completed groups, relative for others
+        let lastWatchedText;
+        if (allSeasonsComplete && seasons.some(({ anime }) => (anime.episodes?.length || 0) > 0)) {
+            let earliestStart = null;
+            seasons.forEach(({ anime }) => {
+                const started = UIHelpers.getStartedDate(anime);
+                if (started) {
+                    const t = new Date(started).getTime();
+                    if (earliestStart === null || t < earliestStart) earliestStart = t;
+                }
+            });
+            const endedDate = latestWatched ? latestWatched.toISOString() : null;
+            if (earliestStart && endedDate) {
+                lastWatchedText = `${UIHelpers.formatShortDate(new Date(earliestStart).toISOString())} / ${UIHelpers.formatShortDate(endedDate)}`;
+            } else {
+                lastWatchedText = latestWatched ? UIHelpers.formatDate(latestWatched.toISOString()) : 'Never';
+            }
+        } else {
+            lastWatchedText = latestWatched ? UIHelpers.formatDate(latestWatched.toISOString()) : 'Never';
+        }
         const itemCount = expandedSeasons.length;
         const itemLabel = itemCount === seasons.length ? `${itemCount} seasons` : `${itemCount} parts`;
 
@@ -937,8 +972,27 @@ const AnimeCardRenderer = {
             `;
         }).join('');
 
-        const lastWatchedText = latestWatched ? UIHelpers.formatDate(latestWatched.toISOString()) : 'Never';
         const watchedCount = movies.filter(m => m.anime.episodes?.length > 0 || (m.anime.totalWatchTime || 0) > 0).length;
+        const allMoviesWatchedForDate = watchedCount >= movies.length;
+        let lastWatchedText;
+        if (allMoviesWatchedForDate && watchedCount > 0) {
+            let earliestStart = null;
+            movies.forEach(({ anime }) => {
+                const started = UIHelpers.getStartedDate(anime);
+                if (started) {
+                    const t = new Date(started).getTime();
+                    if (earliestStart === null || t < earliestStart) earliestStart = t;
+                }
+            });
+            const endedDate = latestWatched ? latestWatched.toISOString() : null;
+            if (earliestStart && endedDate) {
+                lastWatchedText = `${UIHelpers.formatShortDate(new Date(earliestStart).toISOString())} / ${UIHelpers.formatShortDate(endedDate)}`;
+            } else {
+                lastWatchedText = latestWatched ? UIHelpers.formatDate(latestWatched.toISOString()) : 'Never';
+            }
+        } else {
+            lastWatchedText = latestWatched ? UIHelpers.formatDate(latestWatched.toISOString()) : 'Never';
+        }
 
         // Determine cover image for movie group
         const groupImages = (window.AnimeTracker && window.AnimeTracker.groupCoverImages) || {};
@@ -993,8 +1047,18 @@ const AnimeCardRenderer = {
         const title = anime.title || slug;
         const watchTime = anime.totalWatchTime || 0;
         const formattedTime = UIHelpers.formatDuration(watchTime);
-        const lastWatched = anime.lastWatched ? UIHelpers.formatDate(anime.lastWatched) : 'Never';
         const isWatched = anime.episodes?.length > 0 || watchTime > 0;
+        let lastWatched;
+        if (isWatched) {
+            const startedDate = UIHelpers.getStartedDate(anime);
+            if (startedDate && anime.lastWatched) {
+                lastWatched = `${UIHelpers.formatShortDate(startedDate)} / ${UIHelpers.formatShortDate(anime.lastWatched)}`;
+            } else {
+                lastWatched = anime.lastWatched ? UIHelpers.formatDate(anime.lastWatched) : 'Never';
+            }
+        } else {
+            lastWatched = anime.lastWatched ? UIHelpers.formatDate(anime.lastWatched) : 'Never';
+        }
 
         // Determine a cover image for single movie
         const coverImg = anime.coverImage || null;

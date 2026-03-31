@@ -23,6 +23,8 @@
     let durationRefreshAttempted = false;
     let durationRefreshAttempts = 0;
     const MAX_DURATION_REFRESH_ATTEMPTS = 5;
+    let accumulatedPlaybackSeconds = 0;
+    let lastTimeupdateTime = 0; // last currentTime from timeupdate, for accumulating real playback
 
     /**
      * Shared helper: write a completed episode into animeData synchronously.
@@ -62,6 +64,11 @@
 
         if (!Array.isArray(animeData[info.animeSlug].episodes)) {
             animeData[info.animeSlug].episodes = [];
+        }
+
+        // Auto-undrop: if user watches a new episode of a dropped anime, undrop it
+        if (animeData[info.animeSlug].droppedAt) {
+            delete animeData[info.animeSlug].droppedAt;
         }
 
         const MAX_REASONABLE_DURATION_SECONDS = 6 * 60 * 60;
@@ -130,7 +137,7 @@
      * Used when we need to track RIGHT NOW before navigation.
      */
     function trackImmediately() {
-        const { Logger, ProgressTracker, VideoMonitor, Notifications } = AT;
+        const { Logger, ProgressTracker, VideoMonitor, Notifications, CONFIG } = AT;
         const videoElement = VideoMonitor.getVideoElement();
 
         if (!animeInfo || isTracked || !videoElement || isTrackingImmediate) return;
@@ -139,6 +146,13 @@
         const currentTime = videoElement.currentTime;
 
         if (!duration || !ProgressTracker.shouldMarkComplete(currentTime, duration)) return;
+
+        // Misclick guard: require minimum real playback before allowing completion
+        const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
+        if (accumulatedPlaybackSeconds < minWatch) {
+            Logger.debug(`trackImmediately: only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), skipping`);
+            return;
+        }
 
         isTrackingImmediate = true;
         isTracked = true;
@@ -223,7 +237,7 @@
      * Raw timeupdate handler — runs WITHOUT debounce to catch the threshold moment.
      */
     const handleTimeUpdateRaw = async () => {
-        const { ProgressTracker, VideoMonitor, Logger } = AT;
+        const { ProgressTracker, VideoMonitor, Logger, CONFIG } = AT;
         const videoElement = VideoMonitor.getVideoElement();
 
         if (!videoElement || isTracked || earlyTrackDone || !animeInfo) return;
@@ -233,9 +247,24 @@
 
         if (!duration || duration === 0 || isNaN(duration)) return;
 
+        // Accumulate real playback time (small forward deltas only, ignore seeks)
+        if (lastTimeupdateTime > 0) {
+            const delta = currentTime - lastTimeupdateTime;
+            if (delta > 0 && delta < 2) { // normal playback deltas are < 1s; ignore seeks
+                accumulatedPlaybackSeconds += delta;
+            }
+        }
+        lastTimeupdateTime = currentTime;
+
         await tryRefreshTrackedDuration(videoElement, 'timeupdate');
 
         if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
+            // Misclick guard: require minimum real playback before allowing completion
+            const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
+            if (accumulatedPlaybackSeconds < minWatch) {
+                Logger.debug(`Threshold reached but only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), waiting...`);
+                return;
+            }
             earlyTrackDone = true;
             Logger.info('Threshold reached, tracking immediately (no debounce)');
             trackImmediately();
@@ -271,6 +300,13 @@
 
         if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
             if (isTrackingInProgress) {
+                return;
+            }
+
+            // Misclick guard: require minimum real playback before allowing completion
+            const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
+            if (accumulatedPlaybackSeconds < minWatch) {
+                Logger.debug(`Debounced: threshold reached but only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), waiting...`);
                 return;
             }
 
@@ -338,10 +374,16 @@
     };
 
     const handleEnded = async () => {
-        const { Logger, ProgressTracker, VideoMonitor, Notifications } = AT;
+        const { Logger, ProgressTracker, VideoMonitor, Notifications, CONFIG } = AT;
         const videoElement = VideoMonitor.getVideoElement();
 
         if (animeInfo && videoElement) {
+            // Misclick guard on ended event too
+            const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
+            if (!isTracked && accumulatedPlaybackSeconds < minWatch) {
+                Logger.debug(`Video ended but only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), not tracking`);
+                return;
+            }
             if (isTracked) {
                 Logger.info('Episode ended (already tracked), showing notification');
                 Notifications.showCompletion(animeInfo);
@@ -373,7 +415,7 @@
     };
 
     const handleVisibilityChange = async () => {
-        const { Logger, ProgressTracker, VideoMonitor } = AT;
+        const { Logger, ProgressTracker, VideoMonitor, CONFIG } = AT;
         const videoElement = VideoMonitor.getVideoElement();
 
         if (document.hidden && animeInfo && !isTracked && videoElement && videoElement.currentTime > 0) {
@@ -381,6 +423,13 @@
             const currentTime = videoElement.currentTime;
 
             if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
+                // Misclick guard
+                const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
+                if (accumulatedPlaybackSeconds < minWatch) {
+                    Logger.debug(`Visibility change: only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), saving progress instead`);
+                    ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration, true);
+                    return;
+                }
                 isTracked = true;
                 const alreadyTracked = await ProgressTracker.isEpisodeTracked(animeInfo.uniqueId);
                 if (!alreadyTracked) {
@@ -409,7 +458,7 @@
     };
 
     const handleBeforeUnload = () => {
-        const { Logger, ProgressTracker, VideoMonitor } = AT;
+        const { Logger, ProgressTracker, VideoMonitor, CONFIG } = AT;
         const videoElement = VideoMonitor.getVideoElement();
 
         if (!animeInfo || !videoElement || videoElement.currentTime <= 0) return;
@@ -419,6 +468,13 @@
 
         if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
             if (isTracked) return;
+
+            // Misclick guard
+            const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
+            if (accumulatedPlaybackSeconds < minWatch) {
+                ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration, true);
+                return;
+            }
 
             isTracked = true;
 
@@ -489,6 +545,8 @@
         earlyTrackDone = false;
         durationRefreshAttempted = false;
         durationRefreshAttempts = 0;
+        accumulatedPlaybackSeconds = 0;
+        lastTimeupdateTime = 0;
 
         animeInfo = AnimeParser.extractAnimeInfo();
         if (!animeInfo) {
@@ -509,7 +567,8 @@
                     const slug = animeInfo.animeSlug;
 
                     if (animeData[slug]) {
-                        if (!animeData[slug].coverImage) {
+                        // Only update existing entries — don't create new ones just from visiting a page
+                        if (!animeData[slug].coverImage && animeInfo.coverImage) {
                             animeData[slug].coverImage = animeInfo.coverImage;
                         }
                         if (hasDetectedTotal) {
@@ -521,17 +580,9 @@
                                 animeData[slug].totalEpisodes = animeInfo.totalEpisodes;
                             }
                         }
-                    } else {
-                        animeData[slug] = {
-                            title: animeInfo.animeTitle,
-                            slug: slug,
-                            episodes: [],
-                            totalWatchTime: 0,
-                            lastWatched: null,
-                            totalEpisodes: hasDetectedTotal ? animeInfo.totalEpisodes : null,
-                            coverImage: animeInfo.coverImage || null
-                        };
                     }
+                    // Don't create new animeData entries here — they will be created
+                    // when the user actually watches enough to trigger episode tracking.
 
                     try {
                         const baseSlug = getBaseSlug(slug);
@@ -571,9 +622,12 @@
                 const duration = videoElement.duration;
 
                 if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
-                    Logger.info('Periodic check: threshold reached, tracking');
-                    clearInterval(periodicCheck);
-                    trackImmediately();
+                    const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
+                    if (accumulatedPlaybackSeconds >= minWatch) {
+                        Logger.info('Periodic check: threshold reached, tracking');
+                        clearInterval(periodicCheck);
+                        trackImmediately();
+                    }
                 }
             }
         }, 5000);
@@ -672,6 +726,8 @@
                     earlyTrackDone = false;
                     durationRefreshAttempted = false;
                     durationRefreshAttempts = 0;
+                    accumulatedPlaybackSeconds = 0;
+                    lastTimeupdateTime = 0;
 
                     ProgressTracker.reset();
 

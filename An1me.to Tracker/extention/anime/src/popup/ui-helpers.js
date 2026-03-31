@@ -94,6 +94,37 @@ const UIHelpers = {
     },
 
     /**
+     * Format date as short absolute: "10 Mar 25" or "10 Mar 2025" if different year
+     */
+    formatShortDate(isoString) {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        if (isNaN(date.getTime())) return '';
+        const now = new Date();
+        const sameYear = date.getFullYear() === now.getFullYear();
+        const day = date.getDate();
+        const month = date.toLocaleDateString('en-US', { month: 'short' });
+        const year = sameYear ? '' : ` ${String(date.getFullYear()).slice(2)}`;
+        return `${day} ${month}${year}`;
+    },
+
+    /**
+     * Get the earliest watchedAt date from anime episodes
+     */
+    getStartedDate(anime) {
+        if (!anime?.episodes || anime.episodes.length === 0) return null;
+        let earliest = null;
+        for (const ep of anime.episodes) {
+            if (!ep.watchedAt) continue;
+            const t = new Date(ep.watchedAt).getTime();
+            if (!isNaN(t) && (earliest === null || t < earliest)) {
+                earliest = t;
+            }
+        }
+        return earliest ? new Date(earliest).toISOString() : null;
+    },
+
+    /**
      * Get progress bar size class based on episode count
      */
     getProgressSizeClass(episodeCount, totalEpisodes) {
@@ -159,7 +190,9 @@ const UIHelpers = {
             // Edit — minimal pencil tip, iOS-style
             edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 4.5l4 4L8 20H4v-4L15.5 4.5z"/><path d="M13 7l4 4"/></svg>',
             // Check in circle — mark as completed
-            check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="8 12 11 15 16 9"/></svg>'
+            check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="8 12 11 15 16 9"/></svg>',
+            // Drop — pause in circle, mark as dropped/abandoned
+            drop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="10" y1="9" x2="10" y2="15"/><line x1="14" y1="9" x2="14" y2="15"/></svg>'
         };
         return icons[name] || '';
     },

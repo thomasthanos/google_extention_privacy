@@ -9,6 +9,7 @@ const ContentConfig = {
     MAX_RETRIES: 60,
     PROGRESS_SAVE_INTERVAL: 2000,
     MIN_PROGRESS_TO_SAVE: 5,
+    MIN_WATCH_SECONDS_BEFORE_COMPLETE: 120, // minimum real playback seconds before allowing completion (misclick guard)
     COMPLETED_PERCENTAGE: 85, // must match CONFIG.COMPLETED_PERCENTAGE in src/popup/config.js
     LOG_LEVEL: 'INFO', // DEBUG, INFO, WARN, ERROR
     MAX_PROGRESS_ENTRIES: 20,

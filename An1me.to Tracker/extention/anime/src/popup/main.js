@@ -301,6 +301,10 @@
         const completedWasOpen = completedSection
             ? (completedSection.querySelector('.completed-list-cards')?.style.display !== 'none')
             : false;
+        const droppedSection = elements.animeList.querySelector('.dropped-list-section');
+        const droppedWasOpen = droppedSection
+            ? (droppedSection.querySelector('.dropped-list-cards')?.style.display !== 'none')
+            : false;
         const ipGroupWasOpen = elements.animeList.querySelector('.ip-group-content')?.classList.contains('open') ?? false;
 
         // Filter by category
@@ -400,11 +404,14 @@
             return html;
         };
 
-        // Single pass — avoids calling isAgedCompleted twice per entry.
+        // Single pass — partition into normal, completed, and dropped entries.
         const normalEntries = [];
         const completedEntries = [];
+        const droppedEntries = [];
         for (const entry of sortedEntries) {
-            if (isAgedCompleted(entry[0], entry[1])) {
+            if (entry[1].droppedAt) {
+                droppedEntries.push(entry);
+            } else if (isAgedCompleted(entry[0], entry[1])) {
                 completedEntries.push(entry);
             } else {
                 normalEntries.push(entry);
@@ -445,6 +452,7 @@
 
         const trackedHtml        = renderGroupedEntries(normalEntries);
         const completedCardsHtml = renderCompletedGroupedEntries(completedEntries);
+        const droppedCardsHtml   = renderCompletedGroupedEntries(droppedEntries);
         const inProgressHtml     = AnimeCardRenderer.createInProgressGroup(inProgressOnly);
 
         const completedGroupHtml = completedEntries.length > 0
@@ -466,7 +474,26 @@
             `
             : '';
 
-        elements.animeList.innerHTML = inProgressHtml + trackedHtml + completedGroupHtml;
+        const droppedGroupHtml = droppedEntries.length > 0
+            ? `
+                <div class="dropped-list-section">
+                    <div class="dropped-list-label" id="droppedListToggle">
+                        <div class="dropped-list-label-left">
+                            <span class="dropped-list-label-title">DROPPED LIST</span>
+                            <span class="dropped-list-label-sub">${droppedEntries.length} anime</span>
+                        </div>
+                        <svg class="dropped-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="dropped-list-cards" style="display:none;">
+                        ${droppedCardsHtml}
+                    </div>
+                </div>
+            `
+            : '';
+
+        elements.animeList.innerHTML = inProgressHtml + trackedHtml + completedGroupHtml + droppedGroupHtml;
 
         // Restore expanded state
         elements.animeList.querySelectorAll('.anime-card').forEach(card => {
@@ -496,6 +523,14 @@
         if (newCompletedToggle && completedWasOpen) {
             const cards = newCompletedToggle.nextElementSibling;
             const chevron = newCompletedToggle.querySelector('.completed-chevron');
+            if (cards) cards.style.display = 'flex';
+            if (chevron) chevron.style.transform = 'rotate(0deg)';
+        }
+
+        const newDroppedToggle = elements.animeList.querySelector('#droppedListToggle');
+        if (newDroppedToggle && droppedWasOpen) {
+            const cards = newDroppedToggle.nextElementSibling;
+            const chevron = newDroppedToggle.querySelector('.dropped-chevron');
             if (cards) cards.style.display = 'flex';
             if (chevron) chevron.style.transform = 'rotate(0deg)';
         }
@@ -549,7 +584,7 @@
             const header = card.querySelector('.anime-card-header');
             if (header) {
                 const toggleCard = (e) => {
-                    if (e.target.closest('.anime-delete') || e.target.closest('.anime-edit-title') || e.target.closest('.anime-fetch-filler') || e.target.closest('.anime-complete-toggle')) return;
+                    if (e.target.closest('.anime-delete') || e.target.closest('.anime-edit-title') || e.target.closest('.anime-fetch-filler') || e.target.closest('.anime-complete-toggle') || e.target.closest('.anime-drop-toggle')) return;
                     e.stopPropagation();
                     card.classList.toggle('expanded');
                 };
@@ -617,6 +652,20 @@
                 chevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
             });
             const chevron = completedToggle.querySelector('.completed-chevron');
+            chevron.style.transform = 'rotate(-90deg)';
+        }
+
+        const droppedToggle = elements.animeList.querySelector('#droppedListToggle');
+        if (droppedToggle) {
+            droppedToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const cards = droppedToggle.nextElementSibling;
+                const chevron = droppedToggle.querySelector('.dropped-chevron');
+                const isHidden = cards.style.display === 'none';
+                cards.style.display = isHidden ? 'flex' : 'none';
+                chevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
+            });
+            const chevron = droppedToggle.querySelector('.dropped-chevron');
             chevron.style.transform = 'rotate(-90deg)';
         }
 
@@ -997,6 +1046,48 @@
             updateStats();
         } catch (e) {
             console.error('[Complete] Error:', e);
+        }
+    }
+
+    /**
+     * Toggle dropped status
+     */
+    async function toggleAnimeDropped(slug) {
+        const { Storage, FirebaseSync } = AT;
+        if (!animeData[slug]) return;
+
+        try {
+            if (animeData[slug].droppedAt) {
+                delete animeData[slug].droppedAt;
+            } else {
+                animeData[slug].droppedAt = new Date().toISOString();
+                // If it was marked complete, unmark it
+                if (animeData[slug].completedAt) {
+                    delete animeData[slug].completedAt;
+                }
+            }
+
+            const result = await Storage.get(['videoProgress', 'deletedAnime', 'groupCoverImages']);
+            const currentVideoProgress = result.videoProgress || {};
+            const deletedAnime = result.deletedAnime || {};
+
+            const dataToSave = { animeData, videoProgress: currentVideoProgress, deletedAnime };
+            const user = FirebaseSync.getUser();
+            if (user) dataToSave.userId = user.uid;
+            markInternalSave(dataToSave);
+            await Storage.set(dataToSave);
+
+            if (user) {
+                await FirebaseSync.saveToCloud({
+                    animeData, videoProgress: currentVideoProgress, deletedAnime,
+                    groupCoverImages: result.groupCoverImages || {}
+                }, true);
+            }
+
+            renderAnimeList(elements.searchInput?.value || '');
+            updateStats();
+        } catch (e) {
+            console.error('[Drop] Error:', e);
         }
     }
 
@@ -1479,7 +1570,7 @@
                                 <h3>Export Token</h3>
                             </div>
                             <div class="export-token-body">
-                                <p>Copy this token and paste it in the <strong>Import Token</strong> panel on Orion/Safari. Valid for ~1 hour.</p>
+                                <p>Copy this token and paste it in the <strong>Import Token</strong> panel on Orion/Safari. Valid for 20 minutes.</p>
                                 <textarea class="export-token-text" readonly>${tokenStr}</textarea>
                                 <div class="export-token-actions">
                                     <button class="btn-copy-token">Copy Token</button>
@@ -1769,6 +1860,12 @@
                 if (target.classList.contains('anime-complete-toggle') || target.closest('.anime-complete-toggle')) {
                     const btn = target.classList.contains('anime-complete-toggle') ? target : target.closest('.anime-complete-toggle');
                     if (btn.dataset.slug) await toggleAnimeCompleted(btn.dataset.slug);
+                    return;
+                }
+
+                if (target.classList.contains('anime-drop-toggle') || target.closest('.anime-drop-toggle')) {
+                    const btn = target.classList.contains('anime-drop-toggle') ? target : target.closest('.anime-drop-toggle');
+                    if (btn.dataset.slug) await toggleAnimeDropped(btn.dataset.slug);
                     return;
                 }
 

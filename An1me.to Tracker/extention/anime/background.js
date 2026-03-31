@@ -594,16 +594,28 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         const oldCount = Object.values(oldAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
         const newCount = Object.values(newAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
 
-        let coverChanged = false;
-        if (!coverChanged && (newCount === oldCount)) {
+        let metadataChanged = false;
+        if (newCount === oldCount) {
             for (const slug of Object.keys(newAnime)) {
-                const oldCover = oldAnime[slug]?.coverImage || null;
-                const newCover = newAnime[slug]?.coverImage || null;
-                if (oldCover !== newCover) { coverChanged = true; break; }
+                const oldEntry = oldAnime[slug];
+                const newEntry = newAnime[slug];
+                // Detect cover image, droppedAt, completedAt, totalEpisodes, or title changes
+                if ((oldEntry?.coverImage || null) !== (newEntry?.coverImage || null) ||
+                    (oldEntry?.droppedAt || null) !== (newEntry?.droppedAt || null) ||
+                    (oldEntry?.completedAt || null) !== (newEntry?.completedAt || null) ||
+                    (oldEntry?.totalEpisodes || null) !== (newEntry?.totalEpisodes || null) ||
+                    (oldEntry?.title || '') !== (newEntry?.title || '')) {
+                    metadataChanged = true;
+                    break;
+                }
+            }
+            // Also detect deleted entries
+            if (!metadataChanged && Object.keys(oldAnime).length !== Object.keys(newAnime).length) {
+                metadataChanged = true;
             }
         }
 
-        if (newCount > oldCount || coverChanged) {
+        if (newCount > oldCount || metadataChanged) {
             if (newCount > oldCount) {
                 console.log(
                     `%cAnime Tracker %c➕ New episode! (${oldCount}→${newCount})`,
@@ -611,7 +623,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
                     'color:rgb(148,163,184);font-size:11px'
                 );
             } else {
-                console.log('[BG] Anime metadata changed (cover updated), scheduling sync');
+                console.log('[BG] Anime metadata changed, scheduling sync');
             }
             if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
             syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 2000);
@@ -1014,6 +1026,12 @@ async function persistBeforeUnloadTrack(animeInfo, duration) {
 
     if (!Array.isArray(animeData[slug].episodes)) {
         animeData[slug].episodes = [];
+    }
+
+    // Auto-undrop: if user watches a new episode of a dropped anime, undrop it
+    if (animeData[slug].droppedAt) {
+        delete animeData[slug].droppedAt;
+        console.log('[BG] Auto-undropped anime (new episode tracked):', slug);
     }
 
     const validDuration = normalizeTrackedDuration(duration);

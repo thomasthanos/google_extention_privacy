@@ -646,6 +646,64 @@ body {
   border-top: 1px solid rgba(76,175,130,0.12);
 }
 
+/* ─── Dropped List Section ────────────────────────────────── */
+.dropped-list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 4px;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(229,115,115,0.18);
+  background: linear-gradient(180deg, rgba(229,115,115,0.06) 0%, rgba(229,115,115,0.02) 100%);
+  overflow: hidden;
+}
+.dropped-list-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  cursor: pointer;
+  user-select: none;
+  background: rgba(229,115,115,0.04);
+  transition: background var(--tf);
+}
+.dropped-list-label:hover {
+  background: rgba(229,115,115,0.1);
+}
+.dropped-list-label:hover .dropped-list-label-title {
+  color: var(--cyan);
+}
+.dropped-list-label-left {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.dropped-list-label-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #e57373;
+  letter-spacing: 0.08em;
+  transition: color var(--tf);
+}
+.dropped-list-label-sub {
+  font-size: 10px;
+  color: var(--t3);
+}
+.dropped-chevron {
+  width: 12px;
+  height: 12px;
+  color: var(--t3);
+  flex-shrink: 0;
+  transition: transform var(--tn);
+}
+.dropped-list-cards {
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 10px 10px;
+  border-top: 1px solid rgba(229,115,115,0.12);
+}
+
 /* ═══════════════════════════════════════════════════════════════
    ANIME CARD
 ═══════════════════════════════════════════════════════════════ */
@@ -703,7 +761,7 @@ body {
 .anime-card:hover .anime-expand-icon { color: var(--t2); }
 
 .anime-card-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; align-self: center; }
-.anime-delete, .anime-edit-title, .anime-fetch-filler, .anime-complete-toggle {
+.anime-delete, .anime-edit-title, .anime-fetch-filler, .anime-complete-toggle, .anime-drop-toggle {
   width: 22px; height: 22px; display: none; align-items: center; justify-content: center;
   background: transparent; border: none; color: var(--t3);
   cursor: pointer; border-radius: var(--r-xs); font-size: 0; transition: all var(--tf); flex-shrink: 0;
@@ -712,13 +770,16 @@ body {
 .anime-card.expanded .anime-delete,
 .anime-card.expanded .anime-edit-title,
 .anime-card.expanded .anime-fetch-filler,
-.anime-card.expanded .anime-complete-toggle { display: flex; }
+.anime-card.expanded .anime-complete-toggle,
+.anime-card.expanded .anime-drop-toggle { display: flex; }
 .anime-delete:hover         { background: rgba(240,69,69,0.12); color: #f04545; }
 .anime-edit-title:hover     { background: rgba(79,195,247,0.1);  color: var(--cyan); }
 .anime-fetch-filler:hover   { background: rgba(240,192,64,0.1);  color: var(--amber); }
 .anime-fetch-filler:disabled { opacity: 0.35; cursor: not-allowed; }
 .anime-complete-toggle:hover { background: rgba(76,175,80,0.12); color: #4caf50; }
 .anime-complete-toggle[data-completed="true"] { color: #4caf50; }
+.anime-drop-toggle:hover { background: rgba(229,115,115,0.12); color: #e57373; }
+.anime-drop-toggle[data-dropped="true"] { color: #e57373; }
 
 /* ─── Progress ──────────────────────────────────────────────── */
 .progress-container { margin-bottom: 0; max-height: 0; overflow: hidden; opacity: 0; transition: max-height var(--tn), opacity var(--tn), margin var(--tn); }
@@ -1237,6 +1298,7 @@ body {
 .meta-badge-watching   { color: var(--amber); background: rgba(240,192,64,0.1);  border: 1px solid rgba(240,192,64,0.22); }
 .meta-badge-complete   { color: var(--green); background: rgba(76,175,130,0.1);  border: 1px solid rgba(76,175,130,0.22); }
 .meta-badge-notstarted { color: var(--t3);    background: rgba(255,255,255,0.03); border: 1px solid var(--b0); }
+.meta-badge-dropped    { color: #e57373;      background: rgba(229,115,115,0.1);  border: 1px solid rgba(229,115,115,0.25); }
 .meta-badge-airing     { color: #ff6b6b;      background: rgba(255,107,107,0.1);  border: 1px solid rgba(255,107,107,0.3); }
 .meta-time { font-size: 9px; color: var(--t2); white-space: nowrap; flex-shrink: 0; }
 
