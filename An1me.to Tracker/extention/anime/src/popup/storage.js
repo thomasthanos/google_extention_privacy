@@ -91,6 +91,26 @@ const Storage = {
     },
 
     /**
+     * Invalidate cached stats if version changed
+     */
+    async invalidateCachedStats(currentVersion) {
+        return new Promise((resolve) => {
+            chrome.storage.local.get(['cachedStatsVersion'], (result) => {
+                const storedVersion = result.cachedStatsVersion || '';
+                if (storedVersion !== currentVersion) {
+                    chrome.storage.local.remove(['cachedStats', 'cachedStatsVersion'], () => {
+                        chrome.storage.local.set({ cachedStatsVersion: currentVersion }, () => {
+                            resolve(true);
+                        });
+                    });
+                } else {
+                    resolve(false);
+                }
+            });
+        });
+    },
+
+    /**
      * Migrate multi-part anime entries to merged format.
      * Also fixes accidental slugs that end with -episode/-ep.
      */

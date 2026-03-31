@@ -891,20 +891,27 @@ body {
 .ip-group-chevron { width: 14px; height: 14px; color: var(--amber); opacity: 0.75; transition: transform var(--tf); flex-shrink: 0; }
 .ip-group-content { overflow: hidden; max-height: 0; padding: 0 7px; background: rgba(240,150,30,0.045); border-left: 1px solid rgba(240,192,64,0.13); border-right: 1px solid rgba(240,192,64,0.13); border-bottom: 1px solid rgba(240,192,64,0.13); border-radius: 0 0 var(--r-sm) var(--r-sm); transition: max-height 0.28s ease, padding 0.28s ease; }
 .ip-group-content.open { max-height: 800px; padding: 5px 7px 7px; }
-.ip-card { padding: 7px 10px 6px; margin-top: 4px; background: rgba(20,25,38,0.8); border: 1px solid var(--b1); border-radius: var(--r-sm); transition: border-color var(--tf); }
-.ip-card:hover { border-color: rgba(240,192,64,0.22); }
-.ip-row { display: flex; align-items: center; gap: 8px; }
-.ip-icon { font-size: 8px; color: var(--amber); opacity: 0.6; flex-shrink: 0; }
-.ip-body { flex: 1; min-width: 0; }
-.ip-title { display: block; font-size: 11px; font-weight: 600; color: var(--t1); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.ip-sub { display: block; font-size: 10px; color: var(--t3); margin-top: 1px; }
-.ip-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
-.ip-pct { font-size: 10px; font-weight: 650; color: var(--amber); min-width: 26px; text-align: right; }
-.ip-delete-btn { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; border-radius: 50%; color: var(--t3); cursor: pointer; padding: 0; transition: background var(--tf), color var(--tf); flex-shrink: 0; }
+.ip-card { padding: 8px; margin-top: 5px; background: linear-gradient(180deg, rgba(240,192,64,0.05) 0%, rgba(240,192,64,0.02) 100%); border: 1px solid rgba(240,192,64,0.15); border-radius: var(--r-sm); transition: border-color var(--tf), background var(--tf); }
+.ip-card:hover { border-color: rgba(240,192,64,0.28); background: linear-gradient(180deg, rgba(240,192,64,0.08) 0%, rgba(240,192,64,0.03) 100%); }
+
+.ip-header { display: flex; align-items: flex-start; gap: 8px; }
+.ip-info { flex: 1; min-width: 0; }
+.ip-title-row { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+.ip-title { font-size: 12px; font-weight: 600; color: var(--t1); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex: 1; }
+.ip-pct-badge { font-size: 9px; font-weight: 700; color: var(--amber); background: rgba(240,192,64,0.18); padding: 2px 6px; border-radius: var(--r-xs); white-space: nowrap; flex-shrink: 0; }
+.ip-meta { display: flex; align-items: center; gap: 4px; font-size: 9px; color: var(--t3); }
+.ip-meta-item { white-space: nowrap; }
+.ip-meta-sep { opacity: 0.4; }
+.ip-meta-time { font-style: italic; opacity: 0.8; }
+
+.ip-delete-btn { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; border-radius: 50%; color: var(--t3); cursor: pointer; padding: 0; transition: background var(--tf), color var(--tf); flex-shrink: 0; margin-top: -2px; }
 .ip-delete-btn svg { width: 11px; height: 11px; }
-.ip-delete-btn:hover { background: rgba(240,69,69,0.8); color: #fff; }
-.ip-bar { height: 2px; background: var(--b1); border-radius: 2px; margin-top: 6px; overflow: hidden; }
-.ip-fill { height: 100%; background: var(--amber); border-radius: 2px; }
+.ip-delete-btn:hover { background: rgba(240,69,69,0.75); color: #fff; }
+
+.ip-progress { margin-top: 6px; display: flex; align-items: center; gap: 6px; }
+.ip-bar { height: 3px; background: rgba(240,192,64,0.12); border-radius: 2px; overflow: hidden; flex: 1; }
+.ip-fill { height: 100%; background: var(--grad-amber); border-radius: 2px; transition: width 0.3s ease; }
+.ip-remaining { font-size: 8px; color: var(--amber); font-weight: 600; white-space: nowrap; min-width: 40px; text-align: right; opacity: 0.9; }
 
 /* ─── In-progress-only card (legacy, kept for compat) ───────── */
 .anime-card.in-progress-only { border-color: rgba(240,192,64,0.18); background: rgba(240,192,64,0.02); }

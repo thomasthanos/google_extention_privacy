@@ -404,28 +404,75 @@ const AnimeCardRenderer = {
         if (activeEpisodes.length === 0) return '';
 
         const latestEp = [...activeEpisodes].sort((a, b) => b.number - a.number)[0];
-        const minutes = Math.floor(latestEp.currentTime / 60);
-        const seconds = Math.floor(latestEp.currentTime % 60);
-        const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        const currentMin = Math.floor(latestEp.currentTime / 60);
+        const currentSec = Math.floor(latestEp.currentTime % 60);
+        const currentTimeStr = `${currentMin}:${currentSec.toString().padStart(2, '0')}`;
+
+        const durationMin = Math.floor((latestEp.duration || 0) / 60);
+        const durationStr = durationMin > 0 ? `${durationMin}m` : '?';
+
+        const remainingTime = Math.max(0, (latestEp.duration || 0) - latestEp.currentTime);
+        const remainingMin = Math.ceil(remainingTime / 60);
+        const remainingStr = remainingMin > 0 ? `${remainingMin}m left` : 'Done';
+
         const pct = Math.round(latestEp.percentage);
         const safeSlug = UIHelpers.escapeHtml(anime.slug);
 
+        // Cover image thumbnail
+        const safeCoverImage = UIHelpers.sanitizeImageUrl(anime.coverImage);
+        const coverHtml = safeCoverImage
+            ? `<img src="${UIHelpers.escapeHtml(safeCoverImage)}" alt="" style="width:32px;height:42px;border-radius:3px;object-fit:cover;flex-shrink:0;">`
+            : `<div style="width:32px;height:42px;border-radius:3px;border:1px solid var(--b1);background:rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--t3);flex-shrink:0;">▶</div>`;
+
+        // Format last saved time
+        const savedDate = latestEp.savedAt ? new Date(latestEp.savedAt) : null;
+        const now = new Date();
+        let savedTimeStr = 'just now';
+        if (savedDate) {
+            const diffMs = now - savedDate;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            if (diffMins < 1) savedTimeStr = 'just now';
+            else if (diffMins < 60) savedTimeStr = `${diffMins}m ago`;
+            else if (diffHours < 24) savedTimeStr = `${diffHours}h ago`;
+            else if (diffDays < 7) savedTimeStr = `${diffDays}d ago`;
+            else savedTimeStr = savedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        // Format watched date (when episode was first started)
+        const watchedDate = latestEp.watchedAt ? new Date(latestEp.watchedAt) : null;
+        let watchedDateStr = '';
+        if (watchedDate) {
+            watchedDateStr = watchedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
         return `
             <div class="ip-card" data-slug="${safeSlug}">
-                <div class="ip-row">
-                    <span class="ip-icon">▶</span>
-                    <div class="ip-body">
-                        <span class="ip-title">${UIHelpers.escapeHtml(anime.title)}</span>
-                        <span class="ip-sub">Ep ${latestEp.number} · ${timeStr}</span>
+                <div class="ip-header">
+                    ${coverHtml}
+                    <div class="ip-info">
+                        <div class="ip-title-row">
+                            <span class="ip-title">${UIHelpers.escapeHtml(anime.title)}</span>
+                            <span class="ip-pct-badge">${pct}%</span>
+                        </div>
+                        <div class="ip-meta">
+                            <span class="ip-meta-item">Ep ${latestEp.number}</span>
+                            <span class="ip-meta-sep">·</span>
+                            <span class="ip-meta-item">${currentTimeStr} / ${durationStr}</span>
+                            <span class="ip-meta-sep">·</span>
+                            <span class="ip-meta-time">${watchedDateStr ? `Started ${watchedDateStr}` : savedTimeStr}</span>
+                        </div>
                     </div>
-                    <div class="ip-right">
-                        <span class="ip-pct">${pct}%</span>
-                        <button class="ip-delete-btn" data-slug="${safeSlug}" data-episode="${latestEp.number}" title="Delete">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                        </button>
-                    </div>
+                    <button class="ip-delete-btn" data-slug="${safeSlug}" data-episode="${latestEp.number}" title="Delete progress">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
                 </div>
-                <div class="ip-bar"><div class="ip-fill" style="width:${pct}%"></div></div>
+                <div class="ip-progress">
+                    <div class="ip-bar"><div class="ip-fill" style="width:${pct}%"></div></div>
+                    <span class="ip-remaining">${remainingStr}</span>
+                </div>
             </div>`;
     },
 

@@ -323,7 +323,8 @@ const ProgressManager = {
                     slug: animeSlug,
                     title: animeSlug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
                     episodes: [],
-                    lastProgress: progress.savedAt || new Date(0).toISOString()
+                    lastProgress: progress.savedAt || new Date(0).toISOString(),
+                    coverImage: progress.coverImage || null // Get cover image from progress data
                 };
                 inProgressOnly.push(existing);
             }
@@ -333,11 +334,17 @@ const ProgressManager = {
                 currentTime: progress.currentTime,
                 duration: progress.duration,
                 percentage: progress.percentage,
-                savedAt: progress.savedAt
+                savedAt: progress.savedAt,
+                watchedAt: progress.watchedAt || progress.savedAt // watchedAt is when first started
             });
 
             if (progress.savedAt && progress.savedAt > existing.lastProgress) {
                 existing.lastProgress = progress.savedAt;
+            }
+
+            // Update coverImage if new progress has it and existing doesn't
+            if (progress.coverImage && !existing.coverImage) {
+                existing.coverImage = progress.coverImage;
             }
         }
 

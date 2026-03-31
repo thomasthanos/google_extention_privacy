@@ -28,6 +28,15 @@ const ProgressTracker = {
         return d <= 0 || d === 1440 || d === 6000 || d === 7200;
     },
 
+    getCoverImageUrl() {
+        try {
+            const coverImageElement = document.querySelector('.anime-featured img');
+            return coverImageElement?.src || null;
+        } catch (e) {
+            return null;
+        }
+    },
+
     // Two signals: (A) progress >= threshold, or (B) within 120s of end AND >= 60% watched.
     // The 60% guard on signal B prevents false positives on short clips.
     shouldMarkComplete(currentTime, duration) {
@@ -205,11 +214,16 @@ const ProgressTracker = {
                 return;
             }
 
+            // Extract cover image if available
+            const coverImage = !existingProgress?.coverImage ? this.getCoverImageUrl() : existingProgress.coverImage;
+
             videoProgress[uniqueId] = {
                 currentTime: newCurrentTime,
                 duration: Math.floor(duration),
                 savedAt: new Date().toISOString(),
-                percentage: Math.floor((currentTime / duration) * 100)
+                percentage: Math.floor((currentTime / duration) * 100),
+                watchedAt: existingProgress?.watchedAt || new Date().toISOString(), // Track when first started
+                coverImage: coverImage || undefined // Store cover image if available
             };
 
             await Storage.set({ videoProgress });
