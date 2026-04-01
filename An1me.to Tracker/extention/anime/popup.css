@@ -1496,10 +1496,26 @@ body {
 
 /* ─── Mobile ────────────────────────────────────────────────── */
 @media screen and (max-width: 600px) and (min-height: 700px) {
-  body { width: 100vw; height: 100vh; max-width: 100%; max-height: 100%; }
-  .app { width: 100vw; height: 100vh; max-width: 100%; max-height: 100%; }
+  body { width: 100vw; height: 100dvh; max-width: 100%; max-height: 100%; overflow: hidden; }
+  .app { width: 100vw; height: 100dvh; max-width: 100%; max-height: 100%; }
   .auth-section { padding: 20px; justify-content: center; }
   .auth-content { width: 100%; max-width: 340px; margin: 0 auto; }
-  .main-app { width: 100vw; height: 100vh; max-width: 100%; max-height: 100%; }
-  .main-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .main-app {
+    width: 100vw; height: 100dvh; max-width: 100%; max-height: 100%;
+    display: flex; flex-direction: column;
+  }
+  .main-content {
+    flex: 1 1 0; min-height: 0;
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding-bottom: 16px;
+  }
+  .footer {
+    flex-shrink: 0;
+    padding: 10px 18px;
+    font-size: 11px;
+  }
+  /* Slightly larger tap targets on mobile */
+  .anime-card { padding: 12px 14px; }
+  .category-tab { padding: 9px 0; font-size: 12px; }
+  .stats-bar { padding: 12px 16px; }
 }
