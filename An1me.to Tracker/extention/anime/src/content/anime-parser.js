@@ -178,7 +178,7 @@ const AnimeParser = {
 
             return {
                 animeSlug,
-                animeTitle: this.escapeHtml(animeTitle),
+                animeTitle,
                 episodeSlug: `episode-${episodeNumber}`,
                 episodeNumber,
                 uniqueId,

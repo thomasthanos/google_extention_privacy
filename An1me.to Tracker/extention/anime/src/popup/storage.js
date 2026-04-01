@@ -17,6 +17,23 @@ const STORAGE_EPISODE_OFFSET_MAPPING = {
 
 const LEGACY_SYNC_KEYS = new Set(['animeData', 'trackedEpisodes', 'videoProgress']);
 
+function decodeHtmlEntities(value) {
+    if (typeof value !== 'string' || !value.includes('&')) return value;
+
+    const textarea = document.createElement('textarea');
+    let decoded = value;
+
+    // Decode a few rounds so strings like "&amp;#x2F;" fully normalize to "/".
+    for (let i = 0; i < 3; i += 1) {
+        textarea.innerHTML = decoded;
+        const next = textarea.value;
+        if (next === decoded) break;
+        decoded = next;
+    }
+
+    return decoded;
+}
+
 const Storage = {
     /**
      * Get data from storage with sync migration
@@ -163,6 +180,15 @@ const Storage = {
                 const getCanonicalSlugFromTitle = (slug, title) =>
                     window.AnimeTracker.SlugUtils.getCanonicalSlug(slug, title);
 
+                const normalizeStoredTitle = (title) => {
+                    if (typeof title !== 'string') return title;
+
+                    const TITLE_CLEANUP_RE = /(?:\s*[-–—]\s*Episode\s*\d*.*|\s+Episode)\s*$/i;
+                    return decodeHtmlEntities(title)
+                        .replace(TITLE_CLEANUP_RE, '')
+                        .trim();
+                };
+
                 const migrateSlug = (oldSlug, newSlug, offset = 0, titleTransform = null) => {
                     if (!animeData[oldSlug] || oldSlug === newSlug) return;
 
@@ -172,8 +198,11 @@ const Storage = {
                     const oldEntry = animeData[oldSlug];
 
                     if (!animeData[newSlug]) {
+                        const migratedTitle = normalizeStoredTitle(
+                            (titleTransform ? titleTransform(oldEntry.title || '') : oldEntry.title) || ''
+                        );
                         animeData[newSlug] = {
-                            title: (titleTransform ? titleTransform(oldEntry.title || '') : oldEntry.title) || newSlug,
+                            title: migratedTitle || newSlug,
                             slug: newSlug,
                             episodes: [],
                             totalWatchTime: 0,
@@ -188,7 +217,12 @@ const Storage = {
                     if (!Array.isArray(newEntry.episodes)) newEntry.episodes = [];
                     if (!newEntry.coverImage && oldEntry.coverImage) newEntry.coverImage = oldEntry.coverImage;
                     if ((!newEntry.title || newEntry.title.trim() === '') && oldEntry.title) {
-                        newEntry.title = titleTransform ? titleTransform(oldEntry.title) : oldEntry.title;
+                        const migratedTitle = normalizeStoredTitle(
+                            titleTransform ? titleTransform(oldEntry.title) : oldEntry.title
+                        );
+                        if (migratedTitle) {
+                            newEntry.title = migratedTitle;
+                        }
                     }
 
                     const episodeMap = new Map();
@@ -292,18 +326,18 @@ const Storage = {
                 // Title-based canonical migration for known inconsistent slug families.
                 for (const oldSlug of Object.keys(animeData)) {
                     const oldEntry = animeData[oldSlug];
-                    const canonicalSlug = getCanonicalSlugFromTitle(oldSlug, oldEntry?.title || '');
+                    const canonicalSlug = getCanonicalSlugFromTitle(
+                        oldSlug,
+                        normalizeStoredTitle(oldEntry?.title || '')
+                    );
                     if (canonicalSlug && canonicalSlug !== oldSlug) {
                         migrateSlug(oldSlug, canonicalSlug, 0, (title) => title);
                     }
                 }
 
-                // Clean up titles that have a trailing " Episode" or " – Episode N" suffix
-                // caused by the DOM extractor picking up the page title verbatim.
-                const TITLE_CLEANUP_RE = /(?:\s*[-–—]\s*Episode\s*\d*.*|\s+Episode)\s*$/i;
                 for (const [slug, entry] of Object.entries(animeData)) {
                     if (!entry?.title) continue;
-                    const cleaned = entry.title.replace(TITLE_CLEANUP_RE, '').trim();
+                    const cleaned = normalizeStoredTitle(entry.title);
                     if (cleaned && cleaned !== entry.title) {
                         entry.title = cleaned;
                         migrated = true;

@@ -413,6 +413,7 @@ const Notifications = {
 
         const { doc, container } = this._resolveTarget();
         this._ensureRootStyles(doc);
+        const safeTitle = window.AnimeTrackerContent?.AnimeParser?.escapeHtml?.(info?.animeTitle || '') || '';
 
         const notification = doc.createElement('div');
         notification.id = 'anime-tracker-notification';
@@ -424,7 +425,7 @@ const Notifications = {
             </div>
             <div class="at-notif-text">
                 <strong>Episode Complete!</strong>
-                <span>${info.animeTitle}</span>
+                <span>${safeTitle}</span>
                 <span class="at-notif-ep">Episode ${info.episodeNumber}</span>
             </div>
             <div class="at-notif-progress"></div>
