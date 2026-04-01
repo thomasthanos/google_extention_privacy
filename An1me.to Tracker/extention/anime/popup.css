@@ -473,7 +473,7 @@ body {
 
 /* ─── Main Content ──────────────────────────────────────────── */
 .main-content {
-  flex: 1; overflow-y: auto; overflow-x: hidden;
+  flex: 1; overflow-y: scroll; overflow-x: hidden;
   padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px;
 }
 .main-content::-webkit-scrollbar { width: 4px; }

@@ -845,8 +845,7 @@ async function discoverFillerSlug(an1meSlug, animeTitle) {
 // ─── an1me.to anime info fetcher ─────────────────────────────────────────────
 
 async function fetchAnimePageInfo(slug) {
-    const cleanSlug = slug.replace(/-\d+$/, '');
-    const url = `https://an1me.to/anime/${cleanSlug}/`;
+    const url = `https://an1me.to/anime/${slug}/`;
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 15000);
     let response;
@@ -872,10 +871,10 @@ async function fetchAnimePageInfo(slug) {
         if (numMatch) totalEpisodes = parseInt(numMatch[1], 10);
     }
 
-    // Always scan episode links on the page for the highest actually available episode
+    // Always scan episode links on the page for the highest actually available episode.
     let latestEpisode = null;
     {
-        const epPattern = new RegExp(`/watch/${cleanSlug}-episode-(\\d+)`, 'gi');
+        const epPattern = new RegExp(`/watch/${slug}-episode-(\\d+)`, 'gi');
         let m;
         let maxEp = 0;
         while ((m = epPattern.exec(html)) !== null) {
@@ -906,6 +905,19 @@ async function fetchAnimePageInfo(slug) {
     if (!status) {
         if (/Finished\s+Airing|Ολοκληρώθηκε/i.test(html)) status = 'FINISHED';
         else if (/Currently\s+Airing|Προβάλλεται\s+τώρα/i.test(html)) status = 'RELEASING';
+    }
+
+    // Check for an explicit "Airing" badge on the page (the site marks anime
+    // as Airing when episodes are still being uploaded, e.g. ongoing translations,
+    // even if the original air dates are complete).
+    if (status === 'FINISHED' || !status) {
+        if (/>Airing<\//i.test(html)) status = 'RELEASING';
+    }
+
+    // If the date metadata says FINISHED but not all episodes are on the site yet,
+    // the anime is effectively still releasing (e.g. ongoing fan translations).
+    if (status === 'FINISHED' && totalEpisodes && latestEpisode && latestEpisode < totalEpisodes) {
+        status = 'RELEASING';
     }
 
     return { totalEpisodes, status, latestEpisode };

@@ -77,6 +77,7 @@
 
     const OWN_WRITE_TTL_MS = 15000;
     const ownWriteTokens = new Set();
+    let deferredListRefresh = null;
 
     function generateWriteToken() {
         try {
@@ -103,6 +104,54 @@
         return true;
     }
 
+    function getActiveFilter() {
+        return elements.searchInput?.value || '';
+    }
+
+    function flushDeferredListRefresh() {
+        if (!deferredListRefresh) return;
+        if (elements.animeList?.matches(':hover')) return;
+
+        const pending = deferredListRefresh;
+        deferredListRefresh = null;
+
+        if (pending.timerId) clearTimeout(pending.timerId);
+
+        renderAnimeList(pending.filter);
+        if (pending.updateStats) updateStats();
+    }
+
+    function scheduleDeferredListRefresh(options = {}) {
+        const {
+            filter = getActiveFilter(),
+            updateStats: shouldUpdateStats = true,
+            delayMs = 0
+        } = options;
+
+        if (!elements.animeList) {
+            renderAnimeList(filter);
+            if (shouldUpdateStats) updateStats();
+            return;
+        }
+
+        if (deferredListRefresh?.timerId) {
+            clearTimeout(deferredListRefresh.timerId);
+        }
+
+        deferredListRefresh = {
+            filter,
+            updateStats: (deferredListRefresh?.updateStats || false) || shouldUpdateStats,
+            timerId: setTimeout(() => {
+                if (elements.animeList?.matches(':hover')) return;
+                flushDeferredListRefresh();
+            }, delayMs)
+        };
+
+        if (!elements.animeList.matches(':hover') && delayMs === 0) {
+            flushDeferredListRefresh();
+        }
+    }
+
     function normalizeCategory(value) {
         const allowed = new Set(['all', 'series', 'movies']);
         return allowed.has(value) ? value : 'all';
@@ -125,15 +174,25 @@
         if (watchedCount === 0) return false;
         if (anime.completedAt) return true;
         if (SeasonGrouping.isMovie(slug, anime)) return true;
+
+        const lowerSlug = slug.toLowerCase();
         const progressData = FillerService.calculateProgress(watchedCount, slug, anime);
-        if (progressData.progress >= 100) return true;
+
+        // Guard: if the site doesn't have all episodes yet (latestEpisode < totalEpisodes
+        // from metadata), reaching 100% of *available* episodes is NOT completion.
+        const latestAvailable = AnilistService?.getLatestEpisode(lowerSlug);
+        const metaTotal = AnilistService?.getTotalEpisodes(lowerSlug);
+        const isPartiallyUploaded = metaTotal && latestAvailable && latestAvailable < metaTotal;
+
+        if (progressData.progress >= 100 && !isPartiallyUploaded) return true;
+
         // AniList says FINISHED and total is unknown → user has watched all available episodes
-        const anilistStatus = AnilistService?.getStatus(slug.toLowerCase());
-        if (anilistStatus === 'FINISHED' && progressData.total == null) return true;
+        const anilistStatus = AnilistService?.getStatus(lowerSlug);
+        if (anilistStatus === 'FINISHED' && progressData.total == null && !isPartiallyUploaded) return true;
         // AniList says FINISHED and user has tracked the final episode (handles gaps in the middle)
         if (anilistStatus === 'FINISHED' && progressData.total != null) {
             const highestEp = Math.max(0, ...(anime.episodes || []).map(ep => Number(ep.number) || 0));
-            if (highestEp >= progressData.total) return true;
+            if (highestEp >= progressData.total && !isPartiallyUploaded) return true;
         }
         return false;
     }
@@ -164,7 +223,6 @@
 
         const lowerSlug = slug.toLowerCase();
         const anilistStatus = AnilistService?.getStatus(lowerSlug);
-        if (anilistStatus !== 'RELEASING') return false;
 
         // Get the latest actually available episode on an1me.to (not the planned total)
         const latestAvailable = AnilistService?.getLatestEpisode(lowerSlug);
@@ -173,8 +231,20 @@
         // Get highest watched episode
         const highestWatched = Math.max(0, ...(anime.episodes || []).map(ep => Number(ep.number) || 0));
 
-        // User is caught up if their highest watched episode >= latest available on site
-        return highestWatched >= latestAvailable;
+        // Standard case: anime is currently airing
+        if (anilistStatus === 'RELEASING' && highestWatched >= latestAvailable) return true;
+
+        // Partially uploaded case: anime is FINISHED but the site doesn't have all
+        // episodes yet (e.g. ongoing fan translations). Treat as "airing" if the user
+        // has watched everything that's actually available.
+        if (anilistStatus === 'FINISHED') {
+            const totalEpisodes = AnilistService?.getTotalEpisodes(lowerSlug);
+            if (totalEpisodes && latestAvailable < totalEpisodes && highestWatched >= latestAvailable) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     function normalizeMovieDurations(data, progress = {}) {
@@ -880,15 +950,13 @@
 
             if (!allFillersCached) {
                 FillerService.autoFetchMissing(animeData, () => {
-                    renderAnimeList(elements.searchInput?.value || '');
-                    updateStats();
+                    scheduleDeferredListRefresh();
                 });
             }
 
             if (!allAnilistCached) {
                 AT.AnilistService.autoFetchMissing(animeData, () => {
-                    renderAnimeList(elements.searchInput?.value || '');
-                    updateStats();
+                    scheduleDeferredListRefresh();
                 });
             }
         } catch (e) {
@@ -977,15 +1045,13 @@
 
                 if (!allFillersCached) {
                     FillerService.autoFetchMissing(animeData, () => {
-                        renderAnimeList(elements.searchInput?.value || '');
-                        updateStats();
+                        scheduleDeferredListRefresh();
                     });
                 }
 
                 if (!allAnilistCached) {
                     AT.AnilistService.autoFetchMissing(animeData, () => {
-                        renderAnimeList(elements.searchInput?.value || '');
-                        updateStats();
+                        scheduleDeferredListRefresh();
                     });
                 }
             }
@@ -1730,8 +1796,7 @@
                     AnilistService.cache = {};
                     // Re-fetch for all tracked anime
                     await AnilistService.autoFetchMissing(animeData, () => {
-                        renderAnimeList(elements.searchInput?.value || '');
-                        updateStats();
+                        scheduleDeferredListRefresh();
                     });
                 } catch (e) {
                     console.error('[RefreshInfo] Error:', e);
@@ -1918,8 +1983,7 @@
             if (needsFullRender) {
                 if (storageUpdateTimeout) clearTimeout(storageUpdateTimeout);
                 storageUpdateTimeout = setTimeout(async () => {
-                    renderAnimeList(elements.searchInput?.value || '');
-                    updateStats();
+                    scheduleDeferredListRefresh({ delayMs: 0 });
                     if (isExternalUpdate && elements.syncStatus && elements.syncText) {
                         elements.syncStatus.classList.add('synced');
                         elements.syncText.textContent = 'Synced ✓';
@@ -1937,6 +2001,7 @@
         });
 
         if (elements.animeList) {
+            elements.animeList.addEventListener('mouseleave', flushDeferredListRefresh);
             elements.animeList.addEventListener('click', async (e) => {
                 const target = e.target;
 
@@ -2010,25 +2075,9 @@
                     return;
                 }
 
-                const card = target.closest('.anime-card');
-                if (card && !target.closest('button') && !target.closest('.anime-card-actions')) {
-                    card.classList.toggle('expanded');
-                    return;
-                }
-
-                const inProgressHeader = target.closest('.in-progress-header');
-                if (inProgressHeader) {
-                    const section = inProgressHeader.closest('.anime-in-progress');
-                    if (section) section.classList.toggle('collapsed');
-                    return;
-                }
-
-                const episodesHeader = target.closest('.episodes-header');
-                if (episodesHeader) {
-                    const section = episodesHeader.closest('.anime-episodes');
-                    if (section) section.classList.toggle('collapsed');
-                    return;
-                }
+                // Card expand/collapse and collapsible sections are handled by
+                // setupCardEventListeners() via direct addEventListener — do NOT
+                // duplicate them here in the delegated handler.
             });
         }
     }

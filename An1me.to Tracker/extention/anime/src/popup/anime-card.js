@@ -154,7 +154,8 @@ const AnimeCardRenderer = {
         const totalDisplay = unknownTotal ? null : progressData.total;
         const totalCanonDisplay = unknownTotal ? null : totalCanon;
 
-        const anilistStatusForProgress = window.AnimeTracker?.AnilistService?.getStatus(slug);
+        const AnilistService = window.AnimeTracker?.AnilistService;
+        const anilistStatusForProgress = AnilistService?.getStatus(slug);
         const progressInfoText = unknownTotal
             ? (anilistStatusForProgress === 'FINISHED'
                 ? `<span>📍 ${currentEpText} · Watched ${episodeCount} eps</span>`
@@ -201,22 +202,39 @@ const AnimeCardRenderer = {
         const totalWatchedEpisodes = anime.episodes?.length || 0;
         const totalEpisodesPossible = progressData.total || 0;
         const isManuallyCompleted = !!anime.completedAt && totalWatchedEpisodes > 0;
+
+        // Guard: site doesn't have all episodes yet (e.g. ongoing fan translations)
+        const _latestAvail = AnilistService?.getLatestEpisode(slug);
+        const _metaTotal = AnilistService?.getTotalEpisodes(slug);
+        const _isPartiallyUploaded = _metaTotal && _latestAvail && _latestAvail < _metaTotal;
+        const _hasAnilistData = AnilistService?.cache?.[slug] != null;
+
         // AniList says FINISHED: complete if total is unknown, progress=100, or highest tracked ep >= total
+        // BUT NOT if the site only has partial episodes uploaded
         const isFinishedByAnilist = anilistStatusForProgress === 'FINISHED' && totalWatchedEpisodes > 0
+            && !_isPartiallyUploaded
             && (progressData.total == null || progressData.progress >= 100
                 || (progressData.total > 0 && highestCompletedEp >= progressData.total));
         const isCardComplete = isManuallyCompleted
-            || (progressData.progress === 100 && totalWatchedEpisodes > 0)
+            || (progressData.progress === 100 && totalWatchedEpisodes > 0 && !_isPartiallyUploaded)
             || isFinishedByAnilist
             || (window.AnimeTracker.SeasonGrouping.isMovie(slug, anime) && totalWatchedEpisodes > 0);
         const totalProgressText = totalEpisodesPossible > 0 ? `${currentEpisode}/${totalEpisodesPossible}` : `${currentEpisode}`;
         const episodeProgressText = currentEpisode > 0 ? `Ep ${totalProgressText}` : '';
         const isDropped = !!anime.droppedAt;
+        // Detect "caught up with airing" — user watched everything available on site
+        const _isCaughtUpAiring = !isDropped && !isCardComplete && totalWatchedEpisodes > 0
+            && _hasAnilistData && _latestAvail > 0
+            && highestCompletedEp >= _latestAvail
+            && (anilistStatusForProgress === 'RELEASING' || _isPartiallyUploaded);
+
         let statusTextCard = '';
         if (isDropped) {
             statusTextCard = 'Dropped';
         } else if (totalWatchedEpisodes === 0) {
             statusTextCard = 'Not started';
+        } else if (_isCaughtUpAiring) {
+            statusTextCard = 'Airing';
         } else if (!isCardComplete) {
             statusTextCard = 'Watching';
         } else {
@@ -237,12 +255,13 @@ const AnimeCardRenderer = {
         const progressBadge = !isCardComplete && !isDropped && episodeProgressText
             ? `<span class="meta-badge meta-badge-progress">${episodeProgressText}</span>`
             : '';
-        const statusBadgeClass = isDropped ? 'meta-badge-dropped' : (isCardComplete ? 'meta-badge-complete' : (totalWatchedEpisodes > 0 ? 'meta-badge-watching' : 'meta-badge-notstarted'));
-        const statusBadgeIcon = isDropped ? '⏸' : (isCardComplete ? '✓' : '⊙');
+        const statusBadgeClass = isDropped ? 'meta-badge-dropped' : (isCardComplete ? 'meta-badge-complete' : (_isCaughtUpAiring ? 'meta-badge-airing' : (totalWatchedEpisodes > 0 ? 'meta-badge-watching' : 'meta-badge-notstarted')));
+        const statusBadgeIcon = isDropped ? '⏸' : (isCardComplete ? '✓' : (_isCaughtUpAiring ? '⊙' : '⊙'));
         const statusBadge = `<span class="meta-badge ${statusBadgeClass}">${statusBadgeIcon} ${statusTextCard}</span>`;
 
-        const anilistStatus = window.AnimeTracker?.AnilistService?.getStatus(slug);
-        const airingBadge = anilistStatus === 'RELEASING'
+        const anilistStatus = AnilistService?.getStatus(slug);
+        // Show separate airing badge only if the card status doesn't already say "Airing"
+        const airingBadge = anilistStatus === 'RELEASING' && !_isCaughtUpAiring
             ? `<span class="meta-badge meta-badge-airing" title="Currently airing">⬤ Airing</span>`
             : '';
 
@@ -279,7 +298,6 @@ const AnimeCardRenderer = {
                     </div>
                     ${fillerProgressSection}
                     ${partsSection}
-                    ${progressSection}
                     <div class="anime-meta">
                         ${skippedFillersIndicator}
                     </div>
@@ -711,16 +729,19 @@ const AnimeCardRenderer = {
                 }
 
                 // Handle null progress (unknown total)
-                const anilistSt = window.AnimeTracker?.AnilistService?.getStatus(slug);
+                const anilistSt = AnilistService?.getStatus(slug);
+                const _sLatest = AnilistService?.getLatestEpisode(slug);
+                const _sMetaTotal = AnilistService?.getTotalEpisodes(slug);
+                const _sPartial = _sMetaTotal && _sLatest && _sLatest < _sMetaTotal;
                 if (progressData.progress === null) {
-                    // Total unknown: FINISHED = complete, RELEASING = in-progress
-                    isComplete = anilistSt === 'FINISHED' && episodeCount > 0;
+                    // Total unknown: FINISHED = complete (unless partially uploaded), RELEASING = in-progress
+                    isComplete = anilistSt === 'FINISHED' && episodeCount > 0 && !_sPartial;
                     hasProgress = episodeCount > 0;
                     progressPercent = isComplete ? 100 : 0;
                 } else {
-                    isComplete = progressPercent >= 100;
+                    isComplete = progressPercent >= 100 && !_sPartial;
                     // For long-running: if reached last episode, mark complete
-                    if (!isComplete && anime.episodes?.length > 0) {
+                    if (!isComplete && !_sPartial && anime.episodes?.length > 0) {
                         const totalEps = FillerService.getTotalEpisodes(slug, episodeCount, anime);
                         if (totalEps && currentEp >= totalEps) isComplete = true;
                     }
