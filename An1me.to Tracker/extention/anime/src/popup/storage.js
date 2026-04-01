@@ -67,7 +67,11 @@ const Storage = {
         return new Promise((resolve, reject) => {
             chrome.storage.local.set(data, () => {
                 if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError.message));
+                    const msg = chrome.runtime.lastError.message || '';
+                    if (msg.includes('QUOTA') || msg.includes('quota') || msg.includes('exceeded')) {
+                        console.error('[Storage] ⚠ Quota exceeded! Consider clearing old data.', msg);
+                    }
+                    reject(new Error(msg));
                 } else {
                     resolve();
                 }
