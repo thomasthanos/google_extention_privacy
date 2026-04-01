@@ -2,6 +2,7 @@
  * Filler Fetch UI
  * Handles the "Fetch Filler Data" modal — correctly distinguishes
  * fresh fetches, valid cache hits, notFound entries, movies, and errors.
+ * Used by the full library repair flow after sign-in and from Settings.
  */
 
 const FillerFetchUI = {
@@ -20,6 +21,8 @@ const FillerFetchUI = {
         isOpen:      false,
         isRunning:   false,
         isCancelled: false,
+        fetchDone:   false,
+        primaryAction: 'start',
         total:   0,
         fetched: 0,
         cached:  0,
@@ -48,7 +51,7 @@ const FillerFetchUI = {
           <div id="${container}" class="ffui-box">
 
             <div class="ffui-header">
-              <span class="ffui-title"><span class="ffui-title-dot"></span>Filler Data Fetch</span>
+              <span class="ffui-title"><span class="ffui-title-dot"></span>Fetch & Import</span>
               <button id="${closeBtn}" class="ffui-close" aria-label="Close">×</button>
             </div>
 
@@ -90,7 +93,7 @@ const FillerFetchUI = {
 
             <div class="ffui-footer">
               <button id="${cancelBtn}" class="ffui-btn ffui-btn-sec" style="display:none">Cancel</button>
-              <button id="${startBtn}"  class="ffui-btn ffui-btn-pri">Start Fetch</button>
+              <button id="${startBtn}"  class="ffui-btn ffui-btn-pri">Start Import</button>
             </div>
 
           </div>
@@ -342,16 +345,19 @@ const FillerFetchUI = {
 
     attachEventListeners() {
         document.getElementById(this.IDS.closeBtn)
-            .addEventListener('click', () => { if (!this.state.isRunning) this.close(); });
+            .addEventListener('click', () => this.close());
 
         document.getElementById(this.IDS.overlay)
             .addEventListener('click', (e) => {
-                if (e.target.id === this.IDS.overlay && !this.state.isRunning) this.close();
+                if (e.target.id === this.IDS.overlay) this.close();
             });
 
         document.getElementById(this.IDS.startBtn)
             .addEventListener('click', () => {
-                if (this.state.fetchDone) { this.close(); return; }
+                if (this.state.primaryAction === 'close' || this.state.fetchDone) {
+                    this.close();
+                    return;
+                }
                 this.startFetch();
             });
 
@@ -359,7 +365,7 @@ const FillerFetchUI = {
             .addEventListener('click', () => this.cancel());
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.state.isOpen && !this.state.isRunning) this.close();
+            if (e.key === 'Escape' && this.state.isOpen) this.close();
         });
     },
 
@@ -385,10 +391,11 @@ const FillerFetchUI = {
     resetUI() {
         Object.assign(this.state, {
             isRunning: false, isCancelled: false, fetchDone: false,
+            primaryAction: 'start',
             fetched: 0, cached: 0, skipped: 0, failed: 0,
         });
 
-        this._setProgress(0, 'Ready to fetch filler data…');
+        this._setProgress(0, 'Ready to fetch and import your data…');
         ['fetched','cached','skipped','failed'].forEach(k => this._setStat(k, 0));
 
         const log = document.getElementById(this.IDS.logFeed);
@@ -396,7 +403,7 @@ const FillerFetchUI = {
         log.style.display = 'none';
 
         const startBtn = document.getElementById(this.IDS.startBtn);
-        startBtn.textContent = 'Start Fetch';
+        startBtn.textContent = 'Start Import';
         startBtn.style.display = '';
         startBtn.disabled = false;
         document.getElementById(this.IDS.cancelBtn).style.display = 'none';
@@ -412,6 +419,85 @@ const FillerFetchUI = {
     _setStat(name, value) {
         const el = document.querySelector(`[data-stat="${name}"]`);
         if (el) el.textContent = value;
+    },
+
+    _renderLogs(entries) {
+        const log = document.getElementById(this.IDS.logFeed);
+        log.innerHTML = '';
+
+        if (!entries || entries.length === 0) {
+            log.style.display = 'none';
+            return;
+        }
+
+        log.style.display = 'flex';
+        entries.forEach((entry) => {
+            this._log(entry.type || 'cached', entry.name || entry.slug || 'Import item', entry.detail || '');
+        });
+    },
+
+    showPendingStart(label = 'Starting import…') {
+        this.state.isRunning = true;
+        this.state.fetchDone = false;
+        this.state.primaryAction = 'close';
+        this._setProgress(0, label);
+        document.getElementById(this.IDS.cancelBtn).style.display = 'none';
+        const startBtn = document.getElementById(this.IDS.startBtn);
+        startBtn.textContent = 'Hide';
+        startBtn.style.display = '';
+        startBtn.disabled = false;
+    },
+
+    applyBackgroundState(state) {
+        if (!state) {
+            this.resetUI();
+            return;
+        }
+
+        this.state.total = Number(state.total) || 0;
+        this.state.fetched = Number(state.fetched) || 0;
+        this.state.cached = Number(state.cached) || 0;
+        this.state.skipped = Number(state.skipped) || 0;
+        this.state.failed = Number(state.failed) || 0;
+        this.state.isRunning = state.status === 'running';
+        this.state.fetchDone = state.status === 'completed' || state.status === 'error';
+        this.state.primaryAction = 'close';
+
+        this._setStat('fetched', this.state.fetched);
+        this._setStat('cached', this.state.cached);
+        this._setStat('skipped', this.state.skipped);
+        this._setStat('failed', this.state.failed);
+        this._renderLogs(Array.isArray(state.logs) ? state.logs : []);
+
+        const processed = Number(state.processed) || 0;
+        const total = Number(state.total) || 0;
+        const pct = state.status === 'completed'
+            ? 100
+            : total > 0
+                ? Math.min(100, (processed / total) * 100)
+                : 0;
+
+        let label = 'Ready to fetch and import your data…';
+        if (state.status === 'running') {
+            const currentTitle = state.currentTitle || state.currentSlug || 'Working…';
+            label = `${processed} / ${total} — ${currentTitle}`;
+        } else if (state.status === 'completed') {
+            label = state.failed > 0
+                ? `Import complete — ${state.failed} failed, see log above`
+                : 'Import complete — see log above';
+        } else if (state.status === 'error') {
+            label = state.errorMessage
+                ? `Import error — ${state.errorMessage}`
+                : 'Import error — see log above';
+        }
+
+        this._setProgress(pct, label);
+
+        document.getElementById(this.IDS.cancelBtn).style.display = 'none';
+        const startBtn = document.getElementById(this.IDS.startBtn);
+        startBtn.style.display = '';
+        startBtn.disabled = false;
+        startBtn.textContent = state.status === 'running' ? 'Hide' : 'Close';
     },
 
     /**
@@ -443,6 +529,7 @@ const FillerFetchUI = {
     // ─── Core fetch logic ────────────────────────────────────────────────────
 
     async startFetch() {
+        if (this.state.isRunning) return;
         this.state.isRunning  = true;
         this.state.isCancelled = false;
 

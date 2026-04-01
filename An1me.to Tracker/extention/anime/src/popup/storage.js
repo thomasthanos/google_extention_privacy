@@ -15,12 +15,17 @@ const STORAGE_EPISODE_OFFSET_MAPPING = {
     'bleach-sennen-kessen-hen-soukoku-tan': 26,
 };
 
+const LEGACY_SYNC_KEYS = new Set(['animeData', 'trackedEpisodes', 'videoProgress']);
+
 const Storage = {
     /**
      * Get data from storage with sync migration
      */
     async get(keys) {
         return new Promise((resolve) => {
+            const requestedKeys = Array.isArray(keys) ? keys : [keys];
+            const legacySyncKeys = requestedKeys.filter((key) => LEGACY_SYNC_KEYS.has(key));
+
             chrome.storage.local.get(keys, (localResult) => {
                 if (chrome.runtime.lastError) {
                     console.error('[Storage] Local get error:', chrome.runtime.lastError.message);
@@ -31,25 +36,35 @@ const Storage = {
                 // Only skip the sync fallback when ALL requested keys are present locally.
                 // If even one key is missing, check sync storage so we don't silently drop
                 // data that was written there (e.g. during cross-key migration).
-                const hasLocalData = keys.every(key => localResult[key] !== undefined &&
+                const hasLocalData = requestedKeys.every(key => localResult[key] !== undefined &&
                     (typeof localResult[key] !== 'object' || Object.keys(localResult[key]).length > 0));
 
-                if (hasLocalData) {
+                if (hasLocalData || legacySyncKeys.length === 0) {
                     resolve(localResult);
                 } else {
-                    chrome.storage.sync.get(keys, (syncResult) => {
+                    const missingLegacyKeys = legacySyncKeys.filter((key) =>
+                        localResult[key] === undefined ||
+                        (typeof localResult[key] === 'object' && localResult[key] && Object.keys(localResult[key]).length === 0)
+                    );
+
+                    if (missingLegacyKeys.length === 0) {
+                        resolve(localResult);
+                        return;
+                    }
+
+                    chrome.storage.sync.get(missingLegacyKeys, (syncResult) => {
                         if (chrome.runtime.lastError) {
                             resolve(localResult);
                             return;
                         }
 
-                        const hasSyncData = keys.some(key => syncResult[key] !== undefined &&
+                        const hasSyncData = missingLegacyKeys.some(key => syncResult[key] !== undefined &&
                             (typeof syncResult[key] !== 'object' || Object.keys(syncResult[key]).length > 0));
 
                         if (hasSyncData) {
                             console.log('[Storage] Migrating from sync to local');
                             chrome.storage.local.set(syncResult, () => {
-                                chrome.storage.sync.remove(['animeData', 'trackedEpisodes', 'videoProgress']);
+                                chrome.storage.sync.remove(missingLegacyKeys);
                             });
                         }
 

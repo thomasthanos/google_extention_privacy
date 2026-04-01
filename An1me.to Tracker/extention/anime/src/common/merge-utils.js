@@ -8,6 +8,248 @@
 (function () {
     'use strict';
 
+    function toMillis(value) {
+        if (!value) return 0;
+        const ts = new Date(value).getTime();
+        return Number.isFinite(ts) ? ts : 0;
+    }
+
+    function pickLatestIso(a, b) {
+        const aTs = toMillis(a);
+        const bTs = toMillis(b);
+        if (!aTs && !bTs) return null;
+        return bTs > aTs ? b : a;
+    }
+
+    function getSafeString(value) {
+        return typeof value === 'string' ? value : '';
+    }
+
+    function getSafeNumber(value) {
+        return Number.isFinite(value) ? value : 0;
+    }
+
+    function getExplicitListState(anime) {
+        const state = anime?.listState;
+        return state === 'completed' || state === 'dropped' || state === 'active'
+            ? state
+            : null;
+    }
+
+    function getResolvedListState(anime) {
+        const explicitState = getExplicitListState(anime);
+        if (explicitState) return explicitState;
+        const completedAt = toMillis(anime?.completedAt);
+        const droppedAt = toMillis(anime?.droppedAt);
+        if (!completedAt && !droppedAt) return 'active';
+        return droppedAt > completedAt ? 'dropped' : 'completed';
+    }
+
+    function getTitleSelection(localAnime, cloudAnime, slug) {
+        const localTitle = getSafeString(localAnime?.title).trim();
+        const cloudTitle = getSafeString(cloudAnime?.title).trim();
+        const localTitleTs = toMillis(localAnime?.titleUpdatedAt);
+        const cloudTitleTs = toMillis(cloudAnime?.titleUpdatedAt);
+
+        let title = localTitle || cloudTitle || slug;
+        let titleUpdatedAt = null;
+
+        if (localTitleTs || cloudTitleTs) {
+            if (cloudTitleTs > localTitleTs) {
+                title = cloudTitle || localTitle || slug;
+                titleUpdatedAt = cloudAnime?.titleUpdatedAt || null;
+            } else {
+                title = localTitle || cloudTitle || slug;
+                titleUpdatedAt = localAnime?.titleUpdatedAt || null;
+            }
+        } else if (!localTitle && cloudTitle) {
+            title = cloudTitle;
+        }
+
+        return { title, titleUpdatedAt };
+    }
+
+    function applyMergedListState(target, localAnime, cloudAnime) {
+        const localListTs = toMillis(localAnime?.listStateUpdatedAt);
+        const cloudListTs = toMillis(cloudAnime?.listStateUpdatedAt);
+
+        delete target.completedAt;
+        delete target.droppedAt;
+        delete target.listState;
+        delete target.listStateUpdatedAt;
+
+        if (localListTs || cloudListTs) {
+            const sourceAnime = cloudListTs > localListTs ? cloudAnime : localAnime;
+            const state = getResolvedListState(sourceAnime);
+            const updatedAt = sourceAnime?.listStateUpdatedAt || null;
+
+            if (state === 'completed') {
+                target.completedAt = sourceAnime?.completedAt || pickLatestIso(localAnime?.completedAt, cloudAnime?.completedAt);
+            } else if (state === 'dropped') {
+                target.droppedAt = sourceAnime?.droppedAt || pickLatestIso(localAnime?.droppedAt, cloudAnime?.droppedAt);
+            }
+
+            target.listState = state;
+            if (updatedAt) target.listStateUpdatedAt = updatedAt;
+            return;
+        }
+
+        const completedAt = pickLatestIso(localAnime?.completedAt, cloudAnime?.completedAt);
+        const droppedAt = pickLatestIso(localAnime?.droppedAt, cloudAnime?.droppedAt);
+        const completedTs = toMillis(completedAt);
+        const droppedTs = toMillis(droppedAt);
+
+        if (!completedTs && !droppedTs) return;
+        if (droppedTs > completedTs) {
+            target.droppedAt = droppedAt;
+            return;
+        }
+        target.completedAt = completedAt;
+    }
+
+    function areEpisodesEqual(aEpisodes, bEpisodes) {
+        const left = Array.isArray(aEpisodes) ? aEpisodes : [];
+        const right = Array.isArray(bEpisodes) ? bEpisodes : [];
+        if (left.length !== right.length) return false;
+
+        for (let i = 0; i < left.length; i++) {
+            const a = left[i] || {};
+            const b = right[i] || {};
+            if (getSafeNumber(Number(a.number)) !== getSafeNumber(Number(b.number))) return false;
+            if (getSafeString(a.watchedAt) !== getSafeString(b.watchedAt)) return false;
+            if (getSafeNumber(Number(a.duration)) !== getSafeNumber(Number(b.duration))) return false;
+            if (getSafeString(a.durationSource) !== getSafeString(b.durationSource)) return false;
+        }
+
+        return true;
+    }
+
+    function areAnimeEntriesEqual(aAnime, bAnime) {
+        const a = aAnime || {};
+        const b = bAnime || {};
+
+        if (getSafeString(a.title) !== getSafeString(b.title)) return false;
+        if (getSafeString(a.titleUpdatedAt) !== getSafeString(b.titleUpdatedAt)) return false;
+        if (getSafeString(a.coverImage) !== getSafeString(b.coverImage)) return false;
+        if (getSafeString(a.lastWatched) !== getSafeString(b.lastWatched)) return false;
+        if (getSafeString(a.completedAt) !== getSafeString(b.completedAt)) return false;
+        if (getSafeString(a.droppedAt) !== getSafeString(b.droppedAt)) return false;
+        if (getSafeString(a.listState) !== getSafeString(b.listState)) return false;
+        if (getSafeString(a.listStateUpdatedAt) !== getSafeString(b.listStateUpdatedAt)) return false;
+        if (getSafeNumber(Number(a.totalEpisodes)) !== getSafeNumber(Number(b.totalEpisodes))) return false;
+        if (getSafeNumber(Number(a.totalWatchTime)) !== getSafeNumber(Number(b.totalWatchTime))) return false;
+        if (!areEpisodesEqual(a.episodes, b.episodes)) return false;
+
+        return true;
+    }
+
+    function areAnimeDataMapsEqual(aData, bData) {
+        const a = aData || {};
+        const b = bData || {};
+        const aKeys = Object.keys(a);
+        const bKeys = Object.keys(b);
+
+        if (aKeys.length !== bKeys.length) return false;
+
+        for (const slug of aKeys) {
+            if (!Object.prototype.hasOwnProperty.call(b, slug)) return false;
+            if (!areAnimeEntriesEqual(a[slug], b[slug])) return false;
+        }
+
+        return true;
+    }
+
+    function areProgressMapsEqual(aProgress, bProgress) {
+        const a = aProgress || {};
+        const b = bProgress || {};
+        const aKeys = Object.keys(a);
+        const bKeys = Object.keys(b);
+
+        if (aKeys.length !== bKeys.length) return false;
+
+        for (const id of aKeys) {
+            const ap = a[id];
+            const bp = b[id];
+            if (!bp) return false;
+
+            if (getSafeNumber(Number(ap?.currentTime)) !== getSafeNumber(Number(bp?.currentTime))) return false;
+            if (getSafeNumber(Number(ap?.duration)) !== getSafeNumber(Number(bp?.duration))) return false;
+            if (getSafeNumber(Number(ap?.percentage)) !== getSafeNumber(Number(bp?.percentage))) return false;
+            if (!!ap?.deleted !== !!bp?.deleted) return false;
+            if (getSafeString(ap?.savedAt) !== getSafeString(bp?.savedAt)) return false;
+            if (getSafeString(ap?.deletedAt) !== getSafeString(bp?.deletedAt)) return false;
+        }
+
+        return true;
+    }
+
+    function shallowEqualDeletedAnime(aDeleted, bDeleted) {
+        const a = aDeleted || {};
+        const b = bDeleted || {};
+        const aKeys = Object.keys(a);
+        const bKeys = Object.keys(b);
+
+        if (aKeys.length !== bKeys.length) return false;
+
+        for (const slug of aKeys) {
+            if (!Object.prototype.hasOwnProperty.call(b, slug)) return false;
+            if (getSafeString(a[slug]?.deletedAt) !== getSafeString(b[slug]?.deletedAt)) return false;
+        }
+
+        return true;
+    }
+
+    function shallowEqualStringMap(aMap, bMap) {
+        const a = aMap || {};
+        const b = bMap || {};
+        const aKeys = Object.keys(a);
+        const bKeys = Object.keys(b);
+
+        if (aKeys.length !== bKeys.length) return false;
+
+        for (const key of aKeys) {
+            if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+            if (getSafeString(a[key]) !== getSafeString(b[key])) return false;
+        }
+
+        return true;
+    }
+
+    function shallowEqualObjectMap(aMap, bMap) {
+        const a = aMap || {};
+        const b = bMap || {};
+        const aKeys = Object.keys(a);
+        const bKeys = Object.keys(b);
+
+        if (aKeys.length !== bKeys.length) return false;
+
+        for (const key of aKeys) {
+            if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+            if (JSON.stringify(a[key] ?? null) !== JSON.stringify(b[key] ?? null)) return false;
+        }
+
+        return true;
+    }
+
+    function isLikelyMovieSlug(slug) {
+        const value = getSafeString(slug);
+        if (!value) return false;
+
+        const moviePatterns = [
+            /-movie(-|$)/i,
+            /-film(-|$)/i,
+            /-gekijouban/i,
+            /-the-movie/i,
+            /^.*-movie-\d+/i,
+            /-3d-/i,
+            /-ova(-|$)/i,
+            /-special(-|$)/i,
+            /-recap(-|$)/i
+        ];
+
+        return moviePatterns.some((pattern) => pattern.test(value));
+    }
+
     // ─── videoProgress merge ──────────────────────────────────────────────────
     // Primary conflict resolver: currentTime (clock-independent).
     // Timestamps used only as tiebreaker or for tombstone ordering.
@@ -101,7 +343,15 @@
                 }
             }
 
-            const mergedMetadata = { ...localAnime };
+            const mergedMetadata = { ...(cloudAnime || {}), ...(localAnime || {}) };
+            const { title, titleUpdatedAt } = getTitleSelection(localAnime, cloudAnime, slug);
+            mergedMetadata.title = title;
+            if (titleUpdatedAt) {
+                mergedMetadata.titleUpdatedAt = titleUpdatedAt;
+            } else {
+                delete mergedMetadata.titleUpdatedAt;
+            }
+
             if (!mergedMetadata.coverImage && cloudAnime.coverImage) {
                 mergedMetadata.coverImage = cloudAnime.coverImage;
             }
@@ -112,6 +362,9 @@
                 ? cloudAnime.totalEpisodes : 0;
             const bestTotal = Math.max(localTotal, cloudTotal);
             mergedMetadata.totalEpisodes = bestTotal > 0 ? bestTotal : null;
+            mergedMetadata.lastWatched = pickLatestIso(localAnime.lastWatched, cloudAnime.lastWatched);
+
+            applyMergedListState(mergedMetadata, localAnime, cloudAnime);
 
             mergedMetadata.episodes = Array.from(episodesByNumber.values()).sort((a, b) => a.number - b.number);
             mergedMetadata.totalWatchTime = mergedMetadata.episodes.reduce((sum, ep) => sum + (ep.duration || 0), 0);
@@ -200,6 +453,12 @@
         applyDeletedAnime,
         mergeGroupCoverImages,
         getCoverUrl,
-        getCoverSetAt
+        getCoverSetAt,
+        areAnimeDataMapsEqual,
+        areProgressMapsEqual,
+        shallowEqualDeletedAnime,
+        shallowEqualStringMap,
+        shallowEqualObjectMap,
+        isLikelyMovieSlug
     };
 })();

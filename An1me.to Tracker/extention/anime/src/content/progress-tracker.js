@@ -481,6 +481,8 @@ const ProgressTracker = {
             // Auto-undrop: if user watches a new episode of a dropped anime, undrop it
             if (animeData[info.animeSlug].droppedAt) {
                 delete animeData[info.animeSlug].droppedAt;
+                animeData[info.animeSlug].listState = 'active';
+                animeData[info.animeSlug].listStateUpdatedAt = new Date().toISOString();
                 Logger.info('Auto-undropped anime (new episode tracked):', info.animeSlug);
             }
 

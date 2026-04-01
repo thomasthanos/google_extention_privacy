@@ -52,18 +52,7 @@ const FillerService = {
      * Check if slug looks like a movie/special that won't have filler data
      */
     isLikelyMovie(slug) {
-        const moviePatterns = [
-            /-movie(-|$)/i,
-            /-film(-|$)/i,
-            /-gekijouban/i,
-            /-the-movie/i,
-            /^.*-movie-\d+/i,
-            /-3d-/i,
-            /-ova(-|$)/i,
-            /-special(-|$)/i,
-            /-recap(-|$)/i
-        ];
-        return moviePatterns.some(pattern => pattern.test(slug));
+        return !!globalThis.AnimeTrackerMergeUtils?.isLikelyMovieSlug?.(slug);
     },
 
     /**

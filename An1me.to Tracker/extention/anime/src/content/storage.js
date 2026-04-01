@@ -4,6 +4,8 @@
  */
 
 const ContentStorage = {
+    LEGACY_SYNC_KEYS: new Set(['animeData', 'trackedEpisodes', 'videoProgress']),
+
     /**
      * Check if extension context is still valid
      */
@@ -22,6 +24,9 @@ const ContentStorage = {
         const { Logger } = window.AnimeTrackerContent;
         
         return new Promise((resolve) => {
+            const requestedKeys = Array.isArray(keys) ? keys : [keys];
+            const legacySyncKeys = requestedKeys.filter((key) => this.LEGACY_SYNC_KEYS.has(key));
+
             if (!this.isContextValid()) {
                 resolve({});
                 return;
@@ -49,24 +54,24 @@ const ContentStorage = {
                     return;
                 }
 
-                const hasLocalData = keys.some(key => localResult[key] !== undefined);
+                const hasLocalData = requestedKeys.some(key => localResult[key] !== undefined);
 
-                if (hasLocalData) {
+                if (hasLocalData || legacySyncKeys.length === 0) {
                     clearTimeout(timeoutId);
                     resolve(localResult);
                 } else {
-                    chrome.storage.sync.get(keys, (syncResult) => {
+                    chrome.storage.sync.get(legacySyncKeys, (syncResult) => {
                         clearTimeout(timeoutId);
                         if (chrome.runtime.lastError) {
                             resolve(localResult);
                             return;
                         }
 
-                        const hasSyncData = keys.some(key => syncResult[key] !== undefined);
+                        const hasSyncData = legacySyncKeys.some(key => syncResult[key] !== undefined);
                         if (hasSyncData) {
                             Logger.info('Migrating data from sync to local storage');
                             chrome.storage.local.set(syncResult, () => {
-                                chrome.storage.sync.remove(keys);
+                                chrome.storage.sync.remove(legacySyncKeys);
                             });
                         }
 

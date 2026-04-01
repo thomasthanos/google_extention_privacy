@@ -21,6 +21,11 @@ const mergeAnimeData         = sharedMergeUtils.mergeAnimeData         || missin
 const mergeDeletedAnime      = sharedMergeUtils.mergeDeletedAnime      || missingMergeUtil('mergeDeletedAnime');
 const applyDeletedAnime      = sharedMergeUtils.applyDeletedAnime      || missingMergeUtil('applyDeletedAnime');
 const mergeGroupCoverImages  = sharedMergeUtils.mergeGroupCoverImages  || missingMergeUtil('mergeGroupCoverImages');
+const areAnimeDataMapsEqual  = sharedMergeUtils.areAnimeDataMapsEqual  || missingMergeUtil('areAnimeDataMapsEqual');
+const areProgressMapsEqual   = sharedMergeUtils.areProgressMapsEqual   || missingMergeUtil('areProgressMapsEqual');
+const shallowEqualDeletedAnime = sharedMergeUtils.shallowEqualDeletedAnime || missingMergeUtil('shallowEqualDeletedAnime');
+const shallowEqualObjectMap  = sharedMergeUtils.shallowEqualObjectMap  || missingMergeUtil('shallowEqualObjectMap');
+const isLikelyMovieSlug      = sharedMergeUtils.isLikelyMovieSlug      || missingMergeUtil('isLikelyMovieSlug');
 
 // ─── Storage helpers ─────────────────────────────────────────────────────────
 
@@ -58,6 +63,216 @@ function bgStorageRemove(keys) {
             }
         });
     });
+}
+
+const METADATA_REPAIR_STATE_KEY = 'metadataRepairState';
+const PENDING_METADATA_REPAIR_KEY = 'pendingBackgroundMetadataRepair';
+const METADATA_REPAIR_ALARM = 'metadataRepairTick';
+const METADATA_REPAIR_INFO_TTL_MS = 24 * 60 * 60 * 1000;
+const METADATA_REPAIR_INFO_TTL_AIRING_MS = 60 * 60 * 1000;
+const METADATA_REPAIR_EPISODE_TYPES_TTL_MS = 24 * 60 * 60 * 1000;
+const METADATA_REPAIR_NOT_FOUND_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+const METADATA_REPAIR_ITEMS_PER_TICK = 3;
+const METADATA_REPAIR_INTER_ITEM_DELAY_MS = 250;
+const METADATA_REPAIR_MAX_LOGS = 60;
+const METADATA_REPAIR_MAX_ATTEMPTS = 3;
+const METADATA_REPAIR_RETRY_BASE_DELAY_MS = 1500;
+
+function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableMetadataRepairError(error) {
+    const message = String(error?.message || '').toLowerCase();
+    if (!message) return true;
+
+    if (message.includes('http 404')) return false;
+    if (message.includes('http 400')) return false;
+    if (message.includes('http 401')) return false;
+    if (message.includes('http 403')) return false;
+
+    return true;
+}
+
+async function runMetadataRepairWithRetry(task, options = {}) {
+    const {
+        attempts = METADATA_REPAIR_MAX_ATTEMPTS,
+        baseDelayMs = METADATA_REPAIR_RETRY_BASE_DELAY_MS,
+        shouldRetry = isRetryableMetadataRepairError
+    } = options;
+
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+            return await task(attempt);
+        } catch (error) {
+            lastError = error;
+            if (attempt >= attempts || !shouldRetry(error)) {
+                throw error;
+            }
+
+            const delayMs = baseDelayMs * Math.pow(2, attempt - 1);
+            await delay(delayMs);
+        }
+    }
+
+    throw lastError || new Error('Metadata repair retry failed');
+}
+
+function scheduleMetadataRepairTick(delayMs = 0) {
+    const when = Date.now() + Math.max(50, delayMs);
+    chrome.alarms.create(METADATA_REPAIR_ALARM, { when });
+}
+
+async function getMetadataRepairState() {
+    const result = await bgStorageGet([METADATA_REPAIR_STATE_KEY]);
+    return result[METADATA_REPAIR_STATE_KEY] || null;
+}
+
+async function setMetadataRepairState(state) {
+    await bgStorageSet({ [METADATA_REPAIR_STATE_KEY]: state });
+}
+
+function appendMetadataRepairLog(logs, entry) {
+    const next = Array.isArray(logs) ? logs.slice(-(METADATA_REPAIR_MAX_LOGS - 1)) : [];
+    next.push(entry);
+    return next;
+}
+
+function isAnimeInfoCacheFresh(entry) {
+    if (!entry || typeof entry !== 'object') return false;
+    const age = entry.cachedAt ? Date.now() - entry.cachedAt : Infinity;
+    if (entry.notFound) return age < METADATA_REPAIR_NOT_FOUND_TTL_MS;
+    const ttl = entry.status === 'RELEASING'
+        ? METADATA_REPAIR_INFO_TTL_AIRING_MS
+        : METADATA_REPAIR_INFO_TTL_MS;
+    return age < ttl;
+}
+
+function isEpisodeTypesCacheFresh(entry) {
+    if (!entry || typeof entry !== 'object') return false;
+    const age = entry.cachedAt ? Date.now() - entry.cachedAt : Infinity;
+    if (entry.notFound) return age < METADATA_REPAIR_NOT_FOUND_TTL_MS;
+    return age < METADATA_REPAIR_EPISODE_TYPES_TTL_MS;
+}
+
+function formatMetadataRepairDetail(infoResult, fillerResult) {
+    const parts = [];
+
+    if (infoResult?.status === 'fetched') parts.push('info refreshed');
+    else if (infoResult?.status === 'cached') parts.push('info cached');
+    else if (infoResult?.status === 'unavailable') parts.push('info unavailable');
+    else if (infoResult?.status === 'failed') parts.push(`info failed: ${infoResult.error || 'error'}`);
+
+    if (fillerResult?.status === 'fetched') {
+        const fillers = fillerResult.fillerCount || 0;
+        const total = fillerResult.totalEpisodes || '?';
+        parts.push(`${fillers} fillers / ${total} eps`);
+    } else if (fillerResult?.status === 'cached') {
+        parts.push('filler cached');
+    } else if (fillerResult?.status === 'nofill') {
+        parts.push('not listed');
+    } else if (fillerResult?.status === 'movie') {
+        parts.push('movie/OVA');
+    } else if (fillerResult?.status === 'failed') {
+        parts.push(`filler failed: ${fillerResult.error || 'error'}`);
+    }
+
+    return parts.join(' • ');
+}
+
+function buildMetadataRepairLog(slug, title, infoResult, fillerResult) {
+    const displayTitle = title || slug;
+    const detail = formatMetadataRepairDetail(infoResult, fillerResult);
+
+    if (infoResult?.status === 'failed' || fillerResult?.status === 'failed') {
+        return { type: 'error', slug, name: displayTitle, detail, at: Date.now() };
+    }
+
+    if (fillerResult?.status === 'movie') {
+        return { type: 'movie', slug, name: displayTitle, detail, at: Date.now() };
+    }
+
+    if (fillerResult?.status === 'nofill') {
+        return { type: 'nofill', slug, name: displayTitle, detail, at: Date.now() };
+    }
+
+    if (infoResult?.status === 'fetched' || fillerResult?.status === 'fetched') {
+        return { type: 'fetch', slug, name: displayTitle, detail, at: Date.now() };
+    }
+
+    return { type: 'cached', slug, name: displayTitle, detail, at: Date.now() };
+}
+
+function countMetadataRepairOutcome(logEntry) {
+    const base = { fetched: 0, cached: 0, skipped: 0, failed: 0 };
+    if (!logEntry) return base;
+
+    if (logEntry.type === 'fetch') base.fetched = 1;
+    else if (logEntry.type === 'cached') base.cached = 1;
+    else if (logEntry.type === 'movie' || logEntry.type === 'nofill') base.skipped = 1;
+    else if (logEntry.type === 'error') base.failed = 1;
+
+    return base;
+}
+
+async function buildLibraryRepairPlan(animeData, options = {}) {
+    const forceInfoRefresh = options.forceInfoRefresh === true;
+    const forceFillerRefresh = options.forceFillerRefresh === true;
+    const entries = Object.entries(animeData || {});
+    const storageKeys = [];
+
+    entries.forEach(([slug]) => {
+        storageKeys.push(`animeinfo_${slug}`);
+        storageKeys.push(`episodeTypes_${slug}`);
+    });
+
+    const cachedEntries = storageKeys.length > 0 ? await bgStorageGet(storageKeys) : {};
+    const items = [];
+    let processed = 0;
+    let cached = 0;
+    let skipped = 0;
+
+    for (const [slug, anime] of entries) {
+        const infoEntry = cachedEntries[`animeinfo_${slug}`];
+        const fillerEntry = cachedEntries[`episodeTypes_${slug}`];
+        const movieLike = isLikelyMovieSlug(slug);
+
+        const hasFreshInfo = !forceInfoRefresh && isAnimeInfoCacheFresh(infoEntry);
+        const hasFreshFiller = movieLike
+            ? true
+            : (!forceFillerRefresh && isEpisodeTypesCacheFresh(fillerEntry));
+
+        const needsInfo = !hasFreshInfo;
+        const needsFiller = !movieLike && !hasFreshFiller;
+
+        if (!needsInfo && !needsFiller) {
+            processed++;
+            if (movieLike || fillerEntry?.notFound) {
+                skipped++;
+            } else {
+                cached++;
+            }
+            continue;
+        }
+
+        items.push({
+            slug,
+            title: anime?.title || slug
+        });
+    }
+
+    return {
+        total: entries.length,
+        processed,
+        cached,
+        skipped,
+        items,
+        queueIndex: 0,
+        forceInfoRefresh,
+        forceFillerRefresh
+    };
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -198,51 +413,6 @@ function fromFSDoc(doc) {
 
 // ─── Merge helpers ────────────────────────────────────────────────────────────
 
-function shallowEqualDeletedAnime(a, b) {
-    const aKeys = Object.keys(a);
-    const bKeys = Object.keys(b);
-    if (aKeys.length !== bKeys.length) return false;
-    for (const slug of aKeys) {
-        if (!b[slug]) return false;
-        if (a[slug]?.deletedAt !== b[slug]?.deletedAt) return false;
-    }
-    return true;
-}
-
-function areProgressMapsEqual(a, b) {
-    const aObj = a || {};
-    const bObj = b || {};
-    const aKeys = Object.keys(aObj);
-    const bKeys = Object.keys(bObj);
-    if (aKeys.length !== bKeys.length) return false;
-
-    for (const id of aKeys) {
-        const ap = aObj[id];
-        const bp = bObj[id];
-        if (!bp) return false;
-
-        if ((ap.currentTime || 0) !== (bp.currentTime || 0)) return false;
-        if ((ap.duration || 0) !== (bp.duration || 0)) return false;
-        if ((ap.percentage || 0) !== (bp.percentage || 0)) return false;
-        if (!!ap.deleted !== !!bp.deleted) return false;
-        if ((ap.savedAt || '') !== (bp.savedAt || '')) return false;
-        if ((ap.deletedAt || '') !== (bp.deletedAt || '')) return false;
-    }
-    return true;
-}
-
-function shallowEqualStringMap(a, b) {
-    const aObj = a || {};
-    const bObj = b || {};
-    const aKeys = Object.keys(aObj);
-    const bKeys = Object.keys(bObj);
-    if (aKeys.length !== bKeys.length) return false;
-    for (const key of aKeys) {
-        if (!Object.prototype.hasOwnProperty.call(bObj, key)) return false;
-        if ((aObj[key] || '') !== (bObj[key] || '')) return false;
-    }
-    return true;
-}
 
 // ─── Cloud fetch ──────────────────────────────────────────────────────────────
 
@@ -360,13 +530,12 @@ async function syncToFirebase() {
         const cloudGroup  = cloudDoc?.groupCoverImages || {};
         const mergedGroup = mergeGroupCoverImages(localGroup, cloudGroup);
 
-        const localEps        = Object.values(localAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
-        const mergedEps       = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
+        const animeChanged    = !areAnimeDataMapsEqual(localAnime, mergedAnime);
         const progressChanged = !areProgressMapsEqual(localProgress, mergedProgress);
         const deletedChanged  = !shallowEqualDeletedAnime(localDeleted, mergedDeleted);
-        const groupChanged    = !shallowEqualStringMap(localGroup, mergedGroup);
+        const groupChanged    = !shallowEqualObjectMap(localGroup, mergedGroup);
 
-        if (mergedEps > localEps || progressChanged || deletedChanged || groupChanged) {
+        if (animeChanged || progressChanged || deletedChanged || groupChanged) {
             pauseSync();
             await bgStorageSet({
                 animeData:        mergedAnime,
@@ -449,14 +618,15 @@ async function _doApplyCloudUpdate(cloudDoc) {
         const cloudGroup  = cloudDoc.groupCoverImages || {};
         const mergedGroup = mergeGroupCoverImages(localGroup, cloudGroup);
 
-        const localEps  = Object.values(local.animeData || {}).reduce((s, a) => s + (a.episodes?.length || 0), 0);
+        const localEps = Object.values(local.animeData || {}).reduce((s, a) => s + (a.episodes?.length || 0), 0);
         const mergedEps = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
+        const animeChanged = !areAnimeDataMapsEqual(local.animeData || {}, mergedAnime);
 
         const progressChanged = !areProgressMapsEqual(local.videoProgress || {}, mergedProgress);
         const deletedChanged  = !shallowEqualDeletedAnime(local.deletedAnime || {}, mergedDeleted);
-        const groupChanged    = !shallowEqualStringMap(localGroup, mergedGroup);
+        const groupChanged    = !shallowEqualObjectMap(localGroup, mergedGroup);
 
-        if (mergedEps !== localEps || progressChanged || deletedChanged || groupChanged) {
+        if (animeChanged || progressChanged || deletedChanged || groupChanged) {
             pauseSync(5000);
             await bgStorageSet({
                 animeData:        mergedAnime,
@@ -663,6 +833,12 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
             syncProgressOnly();
         }, 8000);
     }
+
+    if (changes.animeData) {
+        maybeStartPendingMetadataRepair().catch((error) => {
+            console.error('[BG] Failed to honor pending repair request:', error);
+        });
+    }
 });
 
 // ─── AnimeFillerList slug discovery ──────────────────────────────────────────
@@ -773,10 +949,11 @@ function generateFillerSlugCandidates(an1meSlug, animeTitle) {
     return candidates;
 }
 
-async function discoverFillerSlug(an1meSlug, animeTitle) {
+async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
+    const { forceRefresh = false } = options;
     const cacheKey = an1meSlug.toLowerCase();
 
-    if (cacheKey in fillerSlugCache) return fillerSlugCache[cacheKey];
+    if (!forceRefresh && cacheKey in fillerSlugCache) return fillerSlugCache[cacheKey];
 
     // Check pre-defined known mappings first — no HEAD request needed
     if (cacheKey in KNOWN_FILLER_SLUGS) {
@@ -786,6 +963,15 @@ async function discoverFillerSlug(an1meSlug, animeTitle) {
     }
 
     const storageKey = `fillerslug_${cacheKey}`;
+    if (forceRefresh) {
+        delete fillerSlugCache[cacheKey];
+        try {
+            await bgStorageRemove([storageKey]);
+        } catch (e) {
+            console.warn('[BG] Failed to clear filler slug cache before refresh:', e.message);
+        }
+    }
+
     try {
         const stored = await bgStorageGet([storageKey]);
         const cached = stored[storageKey];
@@ -992,6 +1178,297 @@ async function fetchEpisodeTypesFromAnimeFillerList(animeSlug) {
     }
 }
 
+let metadataRepairInProgress = false;
+
+async function repairAnimeInfoCache(slug, forceRefresh = true) {
+    const key = `animeinfo_${slug}`;
+    const stored = await bgStorageGet([key]);
+    const cached = stored[key];
+
+    if (!forceRefresh && isAnimeInfoCacheFresh(cached)) {
+        return cached?.notFound
+            ? { status: 'unavailable', entry: cached }
+            : { status: 'cached', entry: cached };
+    }
+
+    try {
+        const info = await fetchAnimePageInfo(slug);
+        const entry = { ...info, cachedAt: Date.now() };
+        await bgStorageSet({ [key]: entry });
+        return { status: 'fetched', entry };
+    } catch (error) {
+        const message = String(error?.message || '').toLowerCase();
+        if (message.includes('http 404')) {
+            const notFoundEntry = { notFound: true, cachedAt: Date.now() };
+            await bgStorageSet({ [key]: notFoundEntry });
+            return { status: 'unavailable', entry: notFoundEntry };
+        }
+        throw error;
+    }
+}
+
+async function repairEpisodeTypesCache(slug, title, forceRefresh = true) {
+    if (isLikelyMovieSlug(slug)) {
+        return { status: 'movie' };
+    }
+
+    const key = `episodeTypes_${slug}`;
+    const stored = await bgStorageGet([key]);
+    const cached = stored[key];
+
+    if (!forceRefresh && isEpisodeTypesCacheFresh(cached)) {
+        return cached?.notFound
+            ? { status: 'nofill', entry: cached }
+            : {
+                status: 'cached',
+                entry: cached,
+                fillerCount: cached?.filler?.length || 0,
+                totalEpisodes: cached?.totalEpisodes || null
+            };
+    }
+
+    const fillerSlug = await discoverFillerSlug(slug, title || null, { forceRefresh });
+    if (!fillerSlug) {
+        const notFoundEntry = { notFound: true, cachedAt: Date.now() };
+        await bgStorageSet({ [key]: notFoundEntry });
+        return { status: 'nofill', entry: notFoundEntry };
+    }
+
+    const episodeTypes = await fetchEpisodeTypesFromAnimeFillerList(fillerSlug);
+    if (!episodeTypes) {
+        const notFoundEntry = { notFound: true, cachedAt: Date.now() };
+        await bgStorageSet({ [key]: notFoundEntry });
+        return { status: 'nofill', entry: notFoundEntry };
+    }
+
+    const entry = {
+        ...episodeTypes,
+        cachedAt: Date.now(),
+        _fillerSlug: fillerSlug || null
+    };
+    await bgStorageSet({ [key]: entry });
+    return {
+        status: 'fetched',
+        entry,
+        fillerCount: entry.filler?.length || 0,
+        totalEpisodes: entry.totalEpisodes || null
+    };
+}
+
+async function finalizeMetadataRepair(state, patch = {}) {
+    const finalState = {
+        ...state,
+        ...patch,
+        currentSlug: null,
+        currentTitle: null,
+        updatedAt: new Date().toISOString()
+    };
+    await setMetadataRepairState(finalState);
+    await chrome.alarms.clear(METADATA_REPAIR_ALARM);
+    return finalState;
+}
+
+async function runMetadataRepairBatch(options = {}) {
+    const { maxItems = METADATA_REPAIR_ITEMS_PER_TICK } = options;
+
+    if (metadataRepairInProgress) return false;
+    metadataRepairInProgress = true;
+
+    try {
+        let state = await getMetadataRepairState();
+        if (!state || state.status !== 'running') {
+            await chrome.alarms.clear(METADATA_REPAIR_ALARM);
+            return false;
+        }
+
+        for (let step = 0; step < maxItems; step++) {
+            state = await getMetadataRepairState();
+            if (!state || state.status !== 'running') {
+                await chrome.alarms.clear(METADATA_REPAIR_ALARM);
+                return false;
+            }
+
+            const items = Array.isArray(state.items) ? state.items : [];
+            const index = Number.isFinite(Number(state.queueIndex))
+                ? Number(state.queueIndex)
+                : Math.min(Number(state.processed) || 0, items.length);
+
+            if (index >= items.length) {
+                await finalizeMetadataRepair(state, {
+                    status: 'completed',
+                    completedAt: new Date().toISOString()
+                });
+                return true;
+            }
+
+            const item = items[index];
+            const startedAt = new Date().toISOString();
+            if (state.currentSlug !== item.slug || state.currentTitle !== item.title) {
+                state = {
+                    ...state,
+                    currentSlug: item.slug,
+                    currentTitle: item.title || item.slug,
+                    updatedAt: startedAt
+                };
+                await setMetadataRepairState(state);
+            }
+
+            let infoResult = { status: 'cached' };
+            let fillerResult = { status: 'cached' };
+            let logEntry;
+
+            try {
+                infoResult = await runMetadataRepairWithRetry(
+                    () => repairAnimeInfoCache(item.slug, state.options?.forceInfoRefresh !== false)
+                );
+            } catch (error) {
+                infoResult = { status: 'failed', error: error.message };
+            }
+
+            try {
+                fillerResult = await runMetadataRepairWithRetry(
+                    () => repairEpisodeTypesCache(
+                        item.slug,
+                        item.title || item.slug,
+                        state.options?.forceFillerRefresh !== false
+                    )
+                );
+            } catch (error) {
+                fillerResult = { status: 'failed', error: error.message };
+            }
+
+            logEntry = buildMetadataRepairLog(item.slug, item.title || item.slug, infoResult, fillerResult);
+            const counts = countMetadataRepairOutcome(logEntry);
+            const processed = (Number(state.processed) || 0) + 1;
+            const nextQueueIndex = index + 1;
+            const nextItem = items[nextQueueIndex] || null;
+            const updatedAt = new Date().toISOString();
+
+            state = {
+                ...state,
+                processed,
+                queueIndex: nextQueueIndex,
+                fetched: (state.fetched || 0) + counts.fetched,
+                cached: (state.cached || 0) + counts.cached,
+                skipped: (state.skipped || 0) + counts.skipped,
+                failed: (state.failed || 0) + counts.failed,
+                logs: appendMetadataRepairLog(state.logs, logEntry),
+                lastLog: logEntry,
+                currentSlug: nextItem?.slug || null,
+                currentTitle: nextItem?.title || null,
+                updatedAt
+            };
+
+            if (nextQueueIndex >= items.length) {
+                await finalizeMetadataRepair(state, {
+                    status: 'completed',
+                    completedAt: updatedAt
+                });
+                return true;
+            }
+
+            await setMetadataRepairState(state);
+            await delay(METADATA_REPAIR_INTER_ITEM_DELAY_MS);
+        }
+
+        scheduleMetadataRepairTick(500);
+        return true;
+    } catch (error) {
+        console.error('[BG] Library repair failed:', error);
+        const state = await getMetadataRepairState();
+        if (state?.status === 'running') {
+            await finalizeMetadataRepair(state, {
+                status: 'error',
+                errorMessage: error.message || 'Unknown repair error',
+                completedAt: new Date().toISOString()
+            });
+        }
+        return false;
+    } finally {
+        metadataRepairInProgress = false;
+    }
+}
+
+async function startLibraryRepair(options = {}) {
+    await bgStorageSet({ [PENDING_METADATA_REPAIR_KEY]: false });
+
+    const existing = await getMetadataRepairState();
+    if (existing?.status === 'running') {
+        scheduleMetadataRepairTick(0);
+        runMetadataRepairBatch({ maxItems: 1 }).catch((error) => {
+            console.error('[BG] Failed to resume running repair:', error);
+        });
+        return existing;
+    }
+
+    const stored = await bgStorageGet(['animeData']);
+    const animeData = stored.animeData || {};
+    const plan = await buildLibraryRepairPlan(animeData, options);
+    const now = new Date().toISOString();
+
+    let state = {
+        status: 'running',
+        startedAt: now,
+        updatedAt: now,
+        completedAt: null,
+        errorMessage: null,
+        total: plan.total,
+        processed: plan.processed,
+        queueIndex: plan.queueIndex,
+        fetched: 0,
+        cached: plan.cached,
+        skipped: plan.skipped,
+        failed: 0,
+        currentSlug: plan.items[0]?.slug || null,
+        currentTitle: plan.items[0]?.title || null,
+        items: plan.items,
+        logs: [],
+        options: {
+            forceInfoRefresh: plan.forceInfoRefresh,
+            forceFillerRefresh: plan.forceFillerRefresh
+        }
+    };
+
+    if (plan.total === 0 || plan.items.length === 0) {
+        state = {
+            ...state,
+            status: 'completed',
+            completedAt: now,
+            currentSlug: null,
+            currentTitle: null
+        };
+        await setMetadataRepairState(state);
+        await chrome.alarms.clear(METADATA_REPAIR_ALARM);
+        return state;
+    }
+
+    await setMetadataRepairState(state);
+    scheduleMetadataRepairTick(0);
+    runMetadataRepairBatch({ maxItems: 1 }).catch((error) => {
+        console.error('[BG] Failed to start library repair batch:', error);
+    });
+    return state;
+}
+
+async function maybeStartPendingMetadataRepair() {
+    const stored = await bgStorageGet([PENDING_METADATA_REPAIR_KEY]);
+    if (!stored[PENDING_METADATA_REPAIR_KEY]) return false;
+    await startLibraryRepair({
+        forceInfoRefresh: false,
+        forceFillerRefresh: false
+    });
+    return true;
+}
+
+async function resumeMetadataRepairIfNeeded() {
+    const state = await getMetadataRepairState();
+    if (state?.status !== 'running') return;
+    scheduleMetadataRepairTick(0);
+    runMetadataRepairBatch({ maxItems: 1 }).catch((error) => {
+        console.error('[BG] Failed to resume metadata repair on boot:', error);
+    });
+}
+
 // ─── Migration ────────────────────────────────────────────────────────────────
 
 async function migrateFromSyncToLocal() {
@@ -1150,7 +1627,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
 
     if (message.type === 'CLEAR_DATA') {
-        bgStorageSet({ animeData: {}, videoProgress: {} })
+        chrome.alarms.clear(METADATA_REPAIR_ALARM).catch?.(() => {});
+        bgStorageSet({
+            animeData: {},
+            videoProgress: {},
+            deletedAnime: {},
+            groupCoverImages: {},
+            [METADATA_REPAIR_STATE_KEY]: null,
+            [PENDING_METADATA_REPAIR_KEY]: false
+        })
             .then(() => sendResponse({ success: true }))
             .catch((e) => sendResponse({ success: false, error: e.message }));
         return true;
@@ -1221,6 +1706,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return true;
     }
 
+    if (message.type === 'START_LIBRARY_REPAIR') {
+        startLibraryRepair({
+            forceInfoRefresh: message.forceInfoRefresh === true,
+            forceFillerRefresh: message.forceFillerRefresh === true
+        })
+            .then((state) => sendResponse({ success: true, state }))
+            .catch((error) => sendResponse({ success: false, error: error.message }));
+        return true;
+    }
+
     if (message.type === 'TRACK_BEFORE_UNLOAD') {
         persistBeforeUnloadTrack(message.animeInfo, message.duration)
             .then(() => sendResponse({ success: true }))
@@ -1281,6 +1776,13 @@ chrome.runtime.onConnect.addListener((port) => {
 chrome.alarms.create('keepAlive', { periodInMinutes: 0.33 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === METADATA_REPAIR_ALARM) {
+        runMetadataRepairBatch().catch((error) => {
+            console.error('[BG] Metadata repair alarm failed:', error);
+        });
+        return;
+    }
+
     if (alarm.name !== 'keepAlive') return;
 
     const streamDead = !rtListenAbort || rtListenAbort.signal.aborted;
@@ -1291,6 +1793,10 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     }
 
     checkStreamHealth();
+
+    resumeMetadataRepairIfNeeded().catch((error) => {
+        console.error('[BG] Failed to resume metadata repair from keepAlive:', error);
+    });
 });
 
 // ─── Stream health watchdog ───────────────────────────────────────────────────
@@ -1313,3 +1819,9 @@ function checkStreamHealth() {
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 startRealtimeListener();
+maybeStartPendingMetadataRepair().catch((error) => {
+    console.error('[BG] Failed to start pending metadata repair on boot:', error);
+});
+resumeMetadataRepairIfNeeded().catch((error) => {
+    console.error('[BG] Failed to resume metadata repair on boot:', error);
+});

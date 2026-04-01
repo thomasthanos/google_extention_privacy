@@ -82,53 +82,6 @@
         return out;
     }
 
-    function areProgressMapsEqual(a, b) {
-        const aObj = a || {};
-        const bObj = b || {};
-        const aKeys = Object.keys(aObj);
-        const bKeys = Object.keys(bObj);
-        if (aKeys.length !== bKeys.length) return false;
-
-        for (const id of aKeys) {
-            const ap = aObj[id];
-            const bp = bObj[id];
-            if (!bp) return false;
-            if ((ap.currentTime || 0) !== (bp.currentTime || 0)) return false;
-            if ((ap.duration || 0) !== (bp.duration || 0)) return false;
-            if ((ap.percentage || 0) !== (bp.percentage || 0)) return false;
-            if (!!ap.deleted !== !!bp.deleted) return false;
-            if ((ap.savedAt || '') !== (bp.savedAt || '')) return false;
-            if ((ap.deletedAt || '') !== (bp.deletedAt || '')) return false;
-        }
-        return true;
-    }
-
-    function shallowEqualStringMap(a, b) {
-        const aObj = a || {};
-        const bObj = b || {};
-        const aKeys = Object.keys(aObj);
-        const bKeys = Object.keys(bObj);
-        if (aKeys.length !== bKeys.length) return false;
-        for (const key of aKeys) {
-            if (!Object.prototype.hasOwnProperty.call(bObj, key)) return false;
-            if ((aObj[key] || '') !== (bObj[key] || '')) return false;
-        }
-        return true;
-    }
-
-    function shallowEqualDeletedAnime(a, b) {
-        const aObj = a || {};
-        const bObj = b || {};
-        const aKeys = Object.keys(aObj);
-        const bKeys = Object.keys(bObj);
-        if (aKeys.length !== bKeys.length) return false;
-        for (const slug of aKeys) {
-            if (!bObj[slug]) return false;
-            if ((aObj[slug]?.deletedAt || '') !== (bObj[slug]?.deletedAt || '')) return false;
-        }
-        return true;
-    }
-
     // ─── Token ────────────────────────────────────────────────────────────────
 
     async function signOutDueToTokenFailure() {
@@ -198,7 +151,11 @@
         mergeVideoProgress,
         mergeDeletedAnime,
         applyDeletedAnime,
-        mergeGroupCoverImages
+        mergeGroupCoverImages,
+        areAnimeDataMapsEqual,
+        areProgressMapsEqual,
+        shallowEqualDeletedAnime,
+        shallowEqualObjectMap
     } = window.AnimeTrackerContent.MergeUtils;
 
     // ─── Direct push to Firestore (fallback when SW unavailable) ─────────────
@@ -300,12 +257,11 @@
             const cloudGroupCovers  = cloudData?.groupCoverImages  || {};
             const mergedGroupCovers = mergeGroupCoverImages(localGroupCovers, cloudGroupCovers);
 
-            const localEps  = Object.values(local.animeData || {}).reduce((s, a) => s + (a.episodes?.length || 0), 0);
-            const mergedEps = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
+            const animeDiff = !areAnimeDataMapsEqual(local.animeData || {}, mergedAnime);
             const progressDiff = !areProgressMapsEqual(local.videoProgress || {}, mergedProgress);
             const deletedDiff  = !shallowEqualDeletedAnime(local.deletedAnime || {}, mergedDeleted);
-            const groupDiff    = !shallowEqualStringMap(local.groupCoverImages || {}, mergedGroupCovers);
-            if (mergedEps > localEps || progressDiff || deletedDiff || groupDiff) {
+            const groupDiff    = !shallowEqualObjectMap(local.groupCoverImages || {}, mergedGroupCovers);
+            if (animeDiff || progressDiff || deletedDiff || groupDiff) {
                 csPauseSync();
                 await chrome.storage.local.set({
                     animeData:        mergedAnime,
@@ -448,14 +404,15 @@
             const cloudGroupCovers  = cloudDoc.groupCoverImages   || {};
             const mergedGroupCovers = mergeGroupCoverImages(localGroupCovers, cloudGroupCovers);
 
-            const localEps  = Object.values(local.animeData || {}).reduce((s, a) => s + (a.episodes?.length || 0), 0);
+            const localEps = Object.values(local.animeData || {}).reduce((s, a) => s + (a.episodes?.length || 0), 0);
             const mergedEps = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
+            const animeChanged = !areAnimeDataMapsEqual(local.animeData || {}, mergedAnime);
 
             const progressChanged = !areProgressMapsEqual(local.videoProgress || {}, mergedProgress);
             const deletedChanged  = !shallowEqualDeletedAnime(local.deletedAnime || {}, mergedDeleted);
-            const groupChanged    = !shallowEqualStringMap(local.groupCoverImages || {}, mergedGroupCovers);
+            const groupChanged    = !shallowEqualObjectMap(local.groupCoverImages || {}, mergedGroupCovers);
 
-            if (mergedEps !== localEps || progressChanged || deletedChanged || groupChanged) {
+            if (animeChanged || progressChanged || deletedChanged || groupChanged) {
                 csPauseSync();
                 await chrome.storage.local.set({
                     animeData:        mergedAnime,

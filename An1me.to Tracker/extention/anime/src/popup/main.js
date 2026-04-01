@@ -74,6 +74,10 @@
     // State for edit title
     let editingSlug = null;
     let loadAndSyncInProgress = false;
+    let pendingAutoRepairAfterSignIn = false;
+    let metadataRepairPromise = null;
+    let lastMetadataRepairState = null;
+    let metadataRepairStatusResetTimer = null;
 
     const OWN_WRITE_TTL_MS = 15000;
     const ownWriteTokens = new Set();
@@ -104,8 +108,43 @@
         return true;
     }
 
+    function sendRuntimeMessage(message, timeoutMs = 30000) {
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('Runtime message timeout')), timeoutMs);
+            chrome.runtime.sendMessage(message, (response) => {
+                clearTimeout(timer);
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                    return;
+                }
+                resolve(response);
+            });
+        });
+    }
+
     function getActiveFilter() {
         return elements.searchInput?.value || '';
+    }
+
+    function doesProgressChangeAffectLists(oldProgress = {}, newProgress = {}) {
+        const completedPct = AT.CONFIG?.COMPLETED_PERCENTAGE || 85;
+        const keys = new Set([
+            ...Object.keys(oldProgress || {}),
+            ...Object.keys(newProgress || {})
+        ]);
+
+        for (const key of keys) {
+            const oldEntry = oldProgress?.[key];
+            const newEntry = newProgress?.[key];
+            const oldVisible = !!oldEntry && !oldEntry.deleted && (Number(oldEntry.percentage) || 0) < completedPct;
+            const newVisible = !!newEntry && !newEntry.deleted && (Number(newEntry.percentage) || 0) < completedPct;
+
+            if (oldVisible !== newVisible) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     function flushDeferredListRefresh() {
@@ -670,9 +709,9 @@
 
         setupCardEventListeners();
 
-        // Start/stop live polling for ip-cards
-        if (elements.animeList.querySelector('.ip-card')) _ipPollStart();
-        else _ipPollStop();
+        if (elements.animeList.querySelector('.ip-card')) {
+            _ipPatch(videoProgress || {});
+        }
     }
 
     /**
@@ -946,15 +985,18 @@
             const { allFillersCached, allAnilistCached } = checkAllCached(slugsList);
 
             renderAnimeList();
-            updateStats();
+            await updateStats();
 
-            if (!allFillersCached) {
+            const repairState = await syncMetadataRepairStateFromStorage({ autoOpenRunning: true });
+            const repairRunning = repairState?.status === 'running';
+
+            if (!pendingAutoRepairAfterSignIn && !repairRunning && !allFillersCached) {
                 FillerService.autoFetchMissing(animeData, () => {
                     scheduleDeferredListRefresh();
                 });
             }
 
-            if (!allAnilistCached) {
+            if (!pendingAutoRepairAfterSignIn && !repairRunning && !allAnilistCached) {
                 AT.AnilistService.autoFetchMissing(animeData, () => {
                     scheduleDeferredListRefresh();
                 });
@@ -1041,15 +1083,18 @@
                 const { allFillersCached, allAnilistCached } = checkAllCached(slugsList);
 
                 renderAnimeList(elements.searchInput?.value || '');
-                updateStats();
+                await updateStats();
 
-                if (!allFillersCached) {
+                const repairState = await syncMetadataRepairStateFromStorage({ autoOpenRunning: true });
+                const repairRunning = repairState?.status === 'running';
+
+                if (!pendingAutoRepairAfterSignIn && !repairRunning && !allFillersCached) {
                     FillerService.autoFetchMissing(animeData, () => {
                         scheduleDeferredListRefresh();
                     });
                 }
 
-                if (!allAnilistCached) {
+                if (!pendingAutoRepairAfterSignIn && !repairRunning && !allAnilistCached) {
                     AT.AnilistService.autoFetchMissing(animeData, () => {
                         scheduleDeferredListRefresh();
                     });
@@ -1166,10 +1211,11 @@
         if (!animeData[slug]) return;
 
         try {
+            const now = new Date().toISOString();
             if (animeData[slug].completedAt) {
-                delete animeData[slug].completedAt;
+                setManualListState(animeData[slug], 'active', now);
             } else {
-                animeData[slug].completedAt = new Date().toISOString();
+                setManualListState(animeData[slug], 'completed', now);
             }
 
             const result = await Storage.get(['videoProgress', 'deletedAnime', 'groupCoverImages']);
@@ -1204,14 +1250,11 @@
         if (!animeData[slug]) return;
 
         try {
+            const now = new Date().toISOString();
             if (animeData[slug].droppedAt) {
-                delete animeData[slug].droppedAt;
+                setManualListState(animeData[slug], 'active', now);
             } else {
-                animeData[slug].droppedAt = new Date().toISOString();
-                // If it was marked complete, unmark it
-                if (animeData[slug].completedAt) {
-                    delete animeData[slug].completedAt;
-                }
+                setManualListState(animeData[slug], 'dropped', now);
             }
 
             const result = await Storage.get(['videoProgress', 'deletedAnime', 'groupCoverImages']);
@@ -1243,12 +1286,19 @@
      */
     async function clearAllData() {
         const { Storage, FirebaseSync } = AT;
-        const dataToSave = { animeData: {}, videoProgress: {}, groupCoverImages: {} };
+        const dataToSave = { animeData: {}, videoProgress: {}, groupCoverImages: {}, deletedAnime: {} };
         const user = FirebaseSync.getUser();
         if (user) dataToSave.userId = user.uid;
         markInternalSave(dataToSave);
         await Storage.set(dataToSave);
-        if (user) await FirebaseSync.saveToCloud({ animeData: {}, videoProgress: {}, groupCoverImages: {} }, true);
+        if (user) {
+            await FirebaseSync.saveToCloud({
+                animeData: {},
+                videoProgress: {},
+                groupCoverImages: {},
+                deletedAnime: {}
+            }, true);
+        }
         animeData = {};
         videoProgress = {};
         renderAnimeList();
@@ -1407,11 +1457,39 @@
         return slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     }
 
+    function setManualListState(entry, state, at = new Date().toISOString()) {
+        if (!entry) return;
+        entry.listState = state;
+        entry.listStateUpdatedAt = at;
+
+        if (state === 'completed') {
+            entry.completedAt = entry.completedAt || at;
+            delete entry.droppedAt;
+            return;
+        }
+
+        if (state === 'dropped') {
+            entry.droppedAt = entry.droppedAt || at;
+            delete entry.completedAt;
+            return;
+        }
+
+        delete entry.completedAt;
+        delete entry.droppedAt;
+    }
+
+    function markTitleEdited(entry, title, at = new Date().toISOString()) {
+        if (!entry) return;
+        entry.title = title;
+        entry.titleUpdatedAt = at;
+    }
+
     async function addAnimeWithEpisodes() {
         const { Storage, FirebaseSync, SeasonGrouping } = AT;
         const slugInput = elements.animeSlugInput.value;
         const slug = extractSlugFromInput(slugInput);
-        const title = elements.animeTitleInput.value.trim() || generateTitleFromSlug(slug);
+        const manualTitle = elements.animeTitleInput.value.trim();
+        const title = manualTitle || generateTitleFromSlug(slug);
         const episodesRawInput = elements.episodesWatchedInput.value.trim();
 
         if (!slug) {
@@ -1464,6 +1542,9 @@
                     totalWatchTime: episodes.reduce((sum, ep) => sum + (ep.duration || 0), 0),
                     lastWatched: now, totalEpisodes: null
                 };
+                if (manualTitle) {
+                    animeData[slug].titleUpdatedAt = now;
+                }
             }
 
             const dataToSave = { animeData, videoProgress };
@@ -1514,7 +1595,7 @@
         if (newTitle === '' || newTitle === currentTitle) { hideEditTitleDialog(); return; }
 
         try {
-            animeData[editingSlug].title = newTitle;
+            markTitleEdited(animeData[editingSlug], newTitle);
             const dataToSave = { animeData, videoProgress };
             const user = FirebaseSync.getUser();
             if (user) dataToSave.userId = user.uid;
@@ -1554,13 +1635,203 @@
         }
     }
 
-    async function fetchAllFillers() {
+    async function refreshAllAnimeInfo(options = {}) {
+        const { force = true } = options;
+        const { Storage, AnilistService } = AT;
+        const slugs = Object.keys(animeData || {});
+
+        if (slugs.length === 0) return;
+
+        if (force) {
+            const infoKeys = slugs.map((slug) => `animeinfo_${slug}`);
+            if (infoKeys.length > 0) {
+                await Storage.remove(infoKeys);
+            }
+            for (const slug of slugs) {
+                delete AnilistService.cache[slug];
+            }
+        }
+
+        await AnilistService.autoFetchMissing(animeData, () => {
+            scheduleDeferredListRefresh({ delayMs: 0 });
+        });
+    }
+
+    function setMetadataRepairStatus(label, synced = false) {
+        if (!elements.syncStatus || !elements.syncText) return;
+
+        if (metadataRepairStatusResetTimer) {
+            clearTimeout(metadataRepairStatusResetTimer);
+            metadataRepairStatusResetTimer = null;
+        }
+
+        elements.syncStatus.classList.remove('synced', 'syncing');
+        if (synced) {
+            elements.syncStatus.classList.add('synced');
+        } else {
+            elements.syncStatus.classList.add('syncing');
+        }
+        elements.syncText.textContent = label;
+    }
+
+    function restoreDefaultSyncStatus() {
+        if (!elements.syncStatus || !elements.syncText) return;
+
+        if (metadataRepairStatusResetTimer) {
+            clearTimeout(metadataRepairStatusResetTimer);
+            metadataRepairStatusResetTimer = null;
+        }
+
+        const user = AT.FirebaseSync?.getUser?.();
+        elements.syncStatus.classList.remove('syncing', 'synced');
+        if (user) elements.syncStatus.classList.add('synced');
+        elements.syncText.textContent = user ? 'Cloud Synced' : 'Local Only';
+    }
+
+    function scheduleDefaultSyncStatusRestore(delayMs = 2500) {
+        if (metadataRepairStatusResetTimer) clearTimeout(metadataRepairStatusResetTimer);
+        metadataRepairStatusResetTimer = setTimeout(() => {
+            metadataRepairStatusResetTimer = null;
+            restoreDefaultSyncStatus();
+        }, delayMs);
+    }
+
+    function applyAnimeInfoCacheChange(storageKey, value) {
+        const slug = storageKey.replace('animeinfo_', '');
+        if (!slug) return;
+
+        if (value) {
+            AT.AnilistService.cache[slug] = value;
+        } else {
+            delete AT.AnilistService.cache[slug];
+        }
+    }
+
+    function applyEpisodeTypesCacheChange(storageKey, value) {
+        const slug = storageKey.replace('episodeTypes_', '');
+        if (!slug) return;
+
+        const { FillerService } = AT;
+        if (value) {
+            FillerService.episodeTypesCache[slug] = value;
+            FillerService.updateFromEpisodeTypes(slug, value);
+        } else {
+            delete FillerService.episodeTypesCache[slug];
+        }
+    }
+
+    async function applyMetadataRepairState(state, options = {}) {
+        const {
+            ensureOpen = false,
+            autoOpenRunning = false
+        } = options;
+
+        const previousStatus = lastMetadataRepairState?.status || null;
+        lastMetadataRepairState = state || null;
         const { FillerFetchUI } = AT;
-        FillerFetchUI.onComplete = () => {
-            renderAnimeList(elements.searchInput?.value || '');
-            updateStats();
-        };
+
+        if (!state) {
+            if (FillerFetchUI.state.isOpen) FillerFetchUI.applyBackgroundState(null);
+            restoreDefaultSyncStatus();
+            return null;
+        }
+
+        const shouldOpen = ensureOpen || (autoOpenRunning && state.status === 'running');
+        if (shouldOpen && !FillerFetchUI.state.isOpen) {
+            await FillerFetchUI.open();
+        }
+        if (FillerFetchUI.state.isOpen || shouldOpen) {
+            FillerFetchUI.applyBackgroundState(state);
+        }
+
+        if (state.status === 'running') {
+            const total = Number(state.total) || 0;
+            const processed = Number(state.processed) || 0;
+            const nextStep = total > 0 ? Math.min(total, processed + 1) : 0;
+            setMetadataRepairStatus(
+                total > 0
+                    ? `Importing ${nextStep}/${total}...`
+                    : 'Importing data...'
+            );
+            return state;
+        }
+
+        if (state.status === 'completed') {
+            const label = state.failed > 0
+                ? `Import Complete (${state.failed} failed)`
+                : 'Import Complete';
+            setMetadataRepairStatus(label, true);
+            if (previousStatus !== 'completed') {
+                scheduleDeferredListRefresh({ delayMs: 0 });
+                await updateStats();
+            }
+            scheduleDefaultSyncStatusRestore();
+            return state;
+        }
+
+        if (state.status === 'error') {
+            if (elements.syncStatus && elements.syncText) {
+                elements.syncStatus.classList.remove('syncing', 'synced');
+                elements.syncText.textContent = 'Import Error';
+            }
+            return state;
+        }
+
+        return state;
+    }
+
+    async function syncMetadataRepairStateFromStorage(options = {}) {
+        const { Storage } = AT;
+        const result = await Storage.get(['metadataRepairState']);
+        return applyMetadataRepairState(result.metadataRepairState || null, options);
+    }
+
+    async function fetchAllFillers(options = {}) {
+        const {
+            autoStart = true,
+            forceInfoRefresh = false,
+            forceFillerRefresh = false
+        } = options;
+
+        const { FillerFetchUI } = AT;
+
         await FillerFetchUI.open();
+
+        if (!autoStart) {
+            return syncMetadataRepairStateFromStorage({ ensureOpen: true });
+        }
+
+        if (metadataRepairPromise) {
+            return metadataRepairPromise;
+        }
+
+        metadataRepairPromise = (async () => {
+            setMetadataRepairStatus('Importing data...');
+            FillerFetchUI.showPendingStart('Starting import…');
+
+            const response = await sendRuntimeMessage({
+                type: 'START_LIBRARY_REPAIR',
+                forceInfoRefresh,
+                forceFillerRefresh
+            }, 30000);
+
+            if (!response?.success) {
+                throw new Error(response?.error || 'Failed to start import');
+            }
+
+            return applyMetadataRepairState(response.state || null, { ensureOpen: true });
+        })().catch((error) => {
+            console.error('[RepairAll] Error:', error);
+            if (elements.syncStatus && elements.syncText) {
+                elements.syncStatus.classList.remove('syncing');
+                elements.syncText.textContent = 'Import Error';
+            }
+            throw error;
+        }).finally(() => {
+            metadataRepairPromise = null;
+        });
+
+        return metadataRepairPromise;
     }
 
     const GOOGLE_BTN_DEFAULT_HTML = `
@@ -1577,6 +1848,8 @@
     async function signInWithGoogle() {
         const { FirebaseSync } = AT;
         try {
+            pendingAutoRepairAfterSignIn = true;
+            await chrome.storage.local.set({ pendingBackgroundMetadataRepair: true });
             elements.googleSignIn.disabled = true;
             elements.googleSignIn.innerHTML = `
                 <span class="btn-content">
@@ -1596,6 +1869,8 @@
                 console.error('[Firebase] Sign in error:', error);
                 showAuthToast('Sign in failed. Please try again.', 'error');
             }
+            pendingAutoRepairAfterSignIn = false;
+            await chrome.storage.local.set({ pendingBackgroundMetadataRepair: false });
         } finally {
             elements.googleSignIn.disabled = false;
             elements.googleSignIn.innerHTML = GOOGLE_BTN_DEFAULT_HTML;
@@ -1623,6 +1898,8 @@
         const { Storage, FirebaseSync } = AT;
         animeData = {};
         videoProgress = {};
+        lastMetadataRepairState = null;
+        await chrome.storage.local.set({ pendingBackgroundMetadataRepair: false, metadataRepairState: null });
         await Storage.set({ animeData: {}, videoProgress: {} });
         await FirebaseSync.signOut();
         renderAnimeList();
@@ -1689,9 +1966,13 @@
                 tokenSignInBtn.textContent = 'Importing...';
                 if (errorEl) errorEl.style.display = 'none';
                 try {
+                    pendingAutoRepairAfterSignIn = true;
+                    await chrome.storage.local.set({ pendingBackgroundMetadataRepair: true });
                     const tokenData = JSON.parse(tokenInput);
                     await FirebaseLib.signInWithExportedToken(tokenData);
                 } catch (err) {
+                    pendingAutoRepairAfterSignIn = false;
+                    await chrome.storage.local.set({ pendingBackgroundMetadataRepair: false });
                     const msg = err.message.includes('JSON') ? 'Invalid token format. Please copy it again from Chrome.' : err.message;
                     if (errorEl) { errorEl.textContent = msg; errorEl.style.display = 'block'; }
                 } finally {
@@ -1821,9 +2102,9 @@
         }
 
         if (elements.settingsFetchFillers) {
-            elements.settingsFetchFillers.addEventListener('click', () => {
+            elements.settingsFetchFillers.addEventListener('click', async () => {
                 elements.settingsDropdown.classList.remove('visible');
-                fetchAllFillers();
+                await fetchAllFillers({ autoStart: true });
             });
         }
 
@@ -1953,6 +2234,8 @@
             let isExternalUpdate = false;
             let needsFullRender = false;
             let needsProgressOnly = false;
+            let handledRepairStateChange = false;
+            let handledMetadataCacheChange = false;
 
             if (changes.animeData) {
                 animeData = changes.animeData.newValue || {};
@@ -1964,33 +2247,57 @@
                 needsFullRender = true;
                 if (!isOwn) isExternalUpdate = true;
             }
+            if (changes.deletedAnime) {
+                needsFullRender = true;
+                if (!isOwn) isExternalUpdate = true;
+            }
             if (changes.videoProgress) {
                 videoProgress = changes.videoProgress.newValue || {};
                 if (!isOwn) isExternalUpdate = true;
                 // Instantly patch ip-card bars (no debounce needed)
                 if (typeof _ipPatch === 'function') _ipPatch(videoProgress);
-                // Only do full re-render if animeData also changed or if entry count changed
-                // (new progress added/removed). Otherwise ip-cards handle their own patching.
-                const oldKeys = Object.keys(changes.videoProgress.oldValue || {}).length;
-                const newKeys = Object.keys(changes.videoProgress.newValue || {}).length;
-                if (oldKeys !== newKeys) {
+                // Re-render when progress changes move entries between active/completed/deleted
+                // states, or when keys change. Otherwise the lightweight ip-card patch is enough.
+                if (doesProgressChangeAffectLists(
+                    changes.videoProgress.oldValue || {},
+                    changes.videoProgress.newValue || {}
+                )) {
                     needsFullRender = true;
                 } else {
                     needsProgressOnly = true;
                 }
             }
 
+            Object.entries(changes).forEach(([key, change]) => {
+                if (key.startsWith('animeinfo_')) {
+                    handledMetadataCacheChange = true;
+                    applyAnimeInfoCacheChange(key, change.newValue || null);
+                    needsFullRender = true;
+                    if (!isOwn) isExternalUpdate = true;
+                } else if (key.startsWith('episodeTypes_')) {
+                    handledMetadataCacheChange = true;
+                    applyEpisodeTypesCacheChange(key, change.newValue || null);
+                    needsFullRender = true;
+                    if (!isOwn) isExternalUpdate = true;
+                }
+            });
+
+            if (changes.metadataRepairState) {
+                handledRepairStateChange = true;
+                void applyMetadataRepairState(changes.metadataRepairState.newValue || null);
+            }
+
             if (needsFullRender) {
                 if (storageUpdateTimeout) clearTimeout(storageUpdateTimeout);
                 storageUpdateTimeout = setTimeout(async () => {
                     scheduleDeferredListRefresh({ delayMs: 0 });
-                    if (isExternalUpdate && elements.syncStatus && elements.syncText) {
+                    if (isExternalUpdate && !handledRepairStateChange && !handledMetadataCacheChange && elements.syncStatus && elements.syncText) {
                         elements.syncStatus.classList.add('synced');
                         elements.syncText.textContent = 'Synced ✓';
                         setTimeout(() => { elements.syncText.textContent = 'Cloud Synced'; }, 2500);
                     }
                 }, CONFIG.STORAGE_UPDATE_DEBOUNCE_MS);
-            } else if (needsProgressOnly && isExternalUpdate) {
+            } else if (needsProgressOnly && isExternalUpdate && !handledRepairStateChange && !handledMetadataCacheChange) {
                 // External progress update (cloud sync) — only show sync badge, no re-render
                 if (elements.syncStatus && elements.syncText) {
                     elements.syncStatus.classList.add('synced');
@@ -2141,7 +2448,11 @@
                     console.log('[Popup] SW was asleep, sending wake-up sync signal');
                     try { chrome.runtime.sendMessage({ type: 'SYNC_TO_FIREBASE' }); } catch {}
                 }
-                loadAndSyncData();
+                await loadAndSyncData();
+                if (pendingAutoRepairAfterSignIn) {
+                    pendingAutoRepairAfterSignIn = false;
+                    await fetchAllFillers({ autoStart: true });
+                }
             },
             onUserSignedOut: () => showAuthScreen(),
             onError: () => { showMainApp(null); loadData(); }
@@ -2149,30 +2460,7 @@
     }
 
     // ── In-Progress live refresh ──────────────────────────────────────────────
-    // Raw polling: read directly from chrome.storage.local every 3s and patch DOM.
-    // Also listens to storage.onChanged for instant updates.
-
-    let _ipPollId = null;
-
-    function _ipPollStart() {
-        if (_ipPollId) return;
-        _ipPollId = setInterval(_ipPollTick, 3000);
-        _ipPollTick(); // run once immediately
-    }
-
-    function _ipPollStop() {
-        if (_ipPollId) { clearInterval(_ipPollId); _ipPollId = null; }
-    }
-
-    function _ipPollTick() {
-        const cards = document.querySelectorAll('.ip-card[data-slug]');
-        if (!cards.length) { _ipPollStop(); return; }
-
-        chrome.storage.local.get(['videoProgress'], (result) => {
-            if (chrome.runtime.lastError) return;
-            _ipPatch(result.videoProgress || {});
-        });
-    }
+    // Event-driven only: patch after render and on storage.onChanged updates.
 
     function _ipPatch(vp) {
         const completedPct = AT.CONFIG?.COMPLETED_PERCENTAGE || 85;
@@ -2226,10 +2514,9 @@
     // _ipPatch is called from the main storage.onChanged listener (initEventListeners)
     // to avoid registering duplicate listeners. Exposed here for access.
 
-    window.addEventListener('beforeunload', () => { _ipPollStop(); AT.FirebaseSync.cleanup(); });
+    window.addEventListener('beforeunload', () => { AT.FirebaseSync.cleanup(); });
     document.addEventListener('visibilitychange', () => {
-        if (document.hidden) { _ipPollStop(); AT.FirebaseSync.cleanup(); }
-        else { _ipPollStart(); }
+        if (document.hidden) { AT.FirebaseSync.cleanup(); }
     });
 
     init();

@@ -3,6 +3,12 @@
  * Handles Firebase authentication and cloud synchronization
  */
 
+const {
+    areProgressMapsEqual,
+    shallowEqualDeletedAnime,
+    shallowEqualObjectMap
+} = window.AnimeTracker.MergeUtils;
+
 const FirebaseSync = {
     // State
     currentUser: null,
@@ -312,13 +318,11 @@ const FirebaseSync = {
                 if (shouldMerge) {
                     // Only push back to cloud if the merged result actually differs
                     // from what we just fetched — avoids a redundant full write.
-                    const cloudEpCount = Object.values(cloudData.animeData || {})
-                        .reduce((s, a) => s + (a.episodes?.length || 0), 0);
-                    const mergedEpCount = Object.values(finalData.animeData || {})
-                        .reduce((s, a) => s + (a.episodes?.length || 0), 0);
-                    const cloudVpKeys = Object.keys(cloudData.videoProgress || {}).length;
-                    const mergedVpKeys = Object.keys(finalData.videoProgress || {}).length;
-                    const needsCloudWrite = mergedEpCount !== cloudEpCount || cloudVpKeys !== mergedVpKeys;
+                    const needsCloudWrite =
+                        !AnimeTracker.MergeUtils.areAnimeDataMapsEqual(finalData.animeData || {}, cloudData.animeData || {}) ||
+                        !areProgressMapsEqual(finalData.videoProgress || {}, cloudData.videoProgress || {}) ||
+                        !shallowEqualDeletedAnime(finalData.deletedAnime || {}, cloudData.deletedAnime || {}) ||
+                        !shallowEqualObjectMap(finalData.groupCoverImages || {}, cloudData.groupCoverImages || {});
 
                     if (needsCloudWrite) {
                         if (this.saveToCloudTimeout) {

@@ -10,6 +10,7 @@ const AnilistService = {
 
     CACHE_TTL:        24 * 60 * 60 * 1000, // 24h for finished anime
     CACHE_TTL_AIRING:      60 * 60 * 1000, // 1h for airing anime (episode count changes)
+    CACHE_TTL_NOT_FOUND: 3 * 24 * 60 * 60 * 1000,
 
     // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -79,7 +80,9 @@ const AnilistService = {
                 if (!key.startsWith('animeinfo_') || !value) continue;
                 const slug = key.replace('animeinfo_', '');
                 const age = value.cachedAt ? Date.now() - value.cachedAt : Infinity;
-                const ttl = value.status === 'RELEASING' ? this.CACHE_TTL_AIRING : this.CACHE_TTL;
+                const ttl = value.notFound
+                    ? this.CACHE_TTL_NOT_FOUND
+                    : (value.status === 'RELEASING' ? this.CACHE_TTL_AIRING : this.CACHE_TTL);
                 if (age < ttl) {
                     this.cache[slug] = value;
                     loaded++;
@@ -105,7 +108,7 @@ const AnilistService = {
             // Re-fetch if not cached at all, OR if cached but episode count is missing
             const slugsToFetch = Object.keys(animeData).filter(slug => {
                 const cached = this.cache[slug];
-                return !cached || cached.totalEpisodes == null;
+                return !cached || (cached.totalEpisodes == null && !cached.notFound);
             });
 
             if (slugsToFetch.length === 0) {

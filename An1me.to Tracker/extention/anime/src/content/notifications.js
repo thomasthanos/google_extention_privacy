@@ -152,15 +152,6 @@ const Notifications = {
     },
 
     // ── SVG Icons with gradients ─────────────────────────────────────────────
-    _svgDefs(id, color1, color2) {
-        return `<defs>
-            <linearGradient id="${id}" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="${color1}"/>
-                <stop offset="100%" stop-color="${color2}"/>
-            </linearGradient>
-        </defs>`;
-    },
-
     _icons: {
         clock(gradId = 'atGradClock') {
             return `<svg class="at-icon" viewBox="0 0 24 24" fill="none">

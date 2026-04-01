@@ -69,6 +69,8 @@
         // Auto-undrop: if user watches a new episode of a dropped anime, undrop it
         if (animeData[info.animeSlug].droppedAt) {
             delete animeData[info.animeSlug].droppedAt;
+            animeData[info.animeSlug].listState = 'active';
+            animeData[info.animeSlug].listStateUpdatedAt = new Date().toISOString();
         }
 
         const MAX_REASONABLE_DURATION_SECONDS = 6 * 60 * 60;
