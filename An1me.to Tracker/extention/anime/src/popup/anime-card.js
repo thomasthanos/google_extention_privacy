@@ -417,6 +417,7 @@ const AnimeCardRenderer = {
 
         const pct = Math.round(latestEp.percentage);
         const safeSlug = UIHelpers.escapeHtml(anime.slug);
+        const cardClass = anime.isResumeOnly ? 'ip-card ip-card-untracked' : 'ip-card';
 
         // Cover image thumbnail (44x58)
         const safeCoverImage = UIHelpers.sanitizeImageUrl(anime.coverImage);
@@ -449,7 +450,7 @@ const AnimeCardRenderer = {
         }
 
         return `
-            <div class="ip-card" data-slug="${safeSlug}">
+            <div class="${cardClass}" data-slug="${safeSlug}">
                 <div class="ip-header">
                     ${coverHtml}
                     <div class="ip-body">
@@ -482,7 +483,20 @@ const AnimeCardRenderer = {
     createInProgressGroup(inProgressItems) {
         if (!inProgressItems || inProgressItems.length === 0) return '';
 
-        const itemsHtml = inProgressItems.map(anime => this.createInProgressItem(anime)).join('');
+        const trackedItems = inProgressItems.filter(anime => !anime.isResumeOnly);
+        const resumeOnlyItems = inProgressItems.filter(anime => anime.isResumeOnly);
+
+        const trackedHtml = trackedItems.map(anime => this.createInProgressItem(anime)).join('');
+        const resumeOnlyHtml = resumeOnlyItems.map(anime => this.createInProgressItem(anime)).join('');
+        const separatorHtml = trackedHtml && resumeOnlyHtml
+            ? `
+                <div class="ip-group-separator" role="separator" aria-label="Not tracked yet">
+                    <span class="ip-group-separator-line"></span>
+                    <span class="ip-group-separator-label">Not Tracked Yet</span>
+                    <span class="ip-group-separator-line"></span>
+                </div>`
+            : '';
+
         const count = inProgressItems.length;
 
         return `
@@ -496,7 +510,9 @@ const AnimeCardRenderer = {
                     </svg>
                 </div>
                 <div class="ip-group-content">
-                    ${itemsHtml}
+                    ${trackedHtml}
+                    ${separatorHtml}
+                    ${resumeOnlyHtml}
                 </div>
             </div>`;
     },

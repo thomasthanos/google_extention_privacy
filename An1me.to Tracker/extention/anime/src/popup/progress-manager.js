@@ -301,11 +301,13 @@ const ProgressManager = {
     },
 
     /**
-     * Get anime that have progress but no completed episodes
+     * Get anime that currently have active resume progress.
+     * Includes tracked titles too, so the top "In Progress" group can act as a
+     * true continue-watching list.
      */
-    getInProgressOnlyAnime(animeData, videoProgress) {
-        const inProgressOnly = [];
-        const trackedSlugs = new Set(Object.keys(animeData));
+    getInProgressAnime(animeData, videoProgress) {
+        const inProgressMap = new Map();
+        const completedPercentage = window.AnimeTracker?.CONFIG?.COMPLETED_PERCENTAGE || 85;
 
         for (const [id, progress] of Object.entries(videoProgress)) {
             const slugMatch = id.match(/^(.+)__episode-(\d+)$/);
@@ -315,18 +317,33 @@ const ProgressManager = {
             const episodeNum = parseInt(slugMatch[2], 10);
 
             if (isNaN(episodeNum) || episodeNum <= 0) continue;
-            if (trackedSlugs.has(animeSlug)) continue;
+            if (!progress || progress.deleted) continue;
+            if ((Number(progress.percentage) || 0) >= completedPercentage) continue;
 
-            let existing = inProgressOnly.find(a => a.slug === animeSlug);
+            const trackedAnime = animeData?.[animeSlug];
+            if (trackedAnime?.completedAt || trackedAnime?.droppedAt) continue;
+            const trackedEpisodeNumbers = new Set(
+                Array.isArray(trackedAnime?.episodes)
+                    ? trackedAnime.episodes.map(ep => Number(ep?.number)).filter(n => Number.isFinite(n) && n > 0)
+                    : []
+            );
+            // If the episode is already in the tracked/watch list, this resume entry
+            // is stale and should not appear in the top continue-watching section.
+            if (trackedEpisodeNumbers.has(episodeNum)) continue;
+            let existing = inProgressMap.get(animeSlug);
             if (!existing) {
+                const hasTrackedEpisodes = Array.isArray(trackedAnime?.episodes) && trackedAnime.episodes.length > 0;
                 existing = {
                     slug: animeSlug,
-                    title: animeSlug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+                    title: trackedAnime?.title || animeSlug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
                     episodes: [],
                     lastProgress: progress.savedAt || new Date(0).toISOString(),
-                    coverImage: progress.coverImage || null // Get cover image from progress data
+                    coverImage: progress.coverImage || trackedAnime?.coverImage || null,
+                    isTracked: !!trackedAnime,
+                    hasTrackedEpisodes,
+                    isResumeOnly: !hasTrackedEpisodes
                 };
-                inProgressOnly.push(existing);
+                inProgressMap.set(animeSlug, existing);
             }
 
             existing.episodes.push({
@@ -348,7 +365,7 @@ const ProgressManager = {
             }
         }
 
-        return inProgressOnly;
+        return Array.from(inProgressMap.values());
     }
 };
 

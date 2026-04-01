@@ -356,16 +356,19 @@
             Object.entries(videoProgress).filter(([, p]) => !p.deleted)
         );
 
-        const inProgressOnly = ProgressManager.getInProgressOnlyAnime(animeData, visibleProgress)
+        const inProgressAnime = ProgressManager.getInProgressAnime(animeData, visibleProgress)
             .filter(anime => {
                 const matchesSearch = !filter || anime.title.toLowerCase().includes(filter.toLowerCase());
-                const trackedAnime = animeData[anime.slug] || anime;
-                const matchesCategory = categoryFilter(anime.slug || '', trackedAnime);
+                const trackedAnime = animeData[anime.slug];
+                if (trackedAnime?.droppedAt) return false;
+                if (trackedAnime && isAnimeCompleted(anime.slug, trackedAnime)) return false;
+                const categoryAnime = trackedAnime || anime;
+                const matchesCategory = categoryFilter(anime.slug || '', categoryAnime);
                 return matchesSearch && matchesCategory;
             })
             .sort((a, b) => new Date(b.lastProgress || 0) - new Date(a.lastProgress || 0));
 
-        if (entries.length === 0 && inProgressOnly.length === 0) {
+        if (entries.length === 0 && inProgressAnime.length === 0) {
             elements.animeList.innerHTML = '';
             elements.emptyState.classList.add('visible');
             return;
@@ -486,7 +489,7 @@
         const completedCardsHtml = renderCompletedGroupedEntries(completedEntries);
         const droppedCardsHtml   = renderCompletedGroupedEntries(droppedEntries);
         const airingCardsHtml    = renderCompletedGroupedEntries(airingEntries);
-        const inProgressHtml     = AnimeCardRenderer.createInProgressGroup(inProgressOnly);
+        const inProgressHtml     = AnimeCardRenderer.createInProgressGroup(inProgressAnime);
 
         const completedGroupHtml = completedEntries.length > 0
             ? `
