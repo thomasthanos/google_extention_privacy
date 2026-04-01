@@ -115,15 +115,10 @@ const FirebaseSync = {
      */
     async performCloudSave(elements = null) {
         const { CONFIG } = window.AnimeTracker;
-        
+
         if (this.isSavingToCloud) {
-            if (this.currentSavePromise) {
-                try { await this.currentSavePromise; } catch {}
-            }
-            if (this.pendingSave) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-                return this.performCloudSave(elements);
-            }
+            // Don't recurse — just mark that we have pending data; it will be
+            // picked up in the finally block of the current save.
             return;
         }
 
@@ -180,17 +175,19 @@ const FirebaseSync = {
                 const retryDelay = Math.min(2000 * Math.pow(2, this.cloudSaveRetryCount - 1), CONFIG.MAX_RETRY_DELAY_MS);
                 console.log('[Firebase] Will retry in', retryDelay, 'ms');
 
+                // Schedule retry without recursion — reuse the same data
+                this.pendingSave = dataToSave;
                 setTimeout(() => {
-                    if (this.currentUser) {
-                        this.pendingSave = this.cloneSyncData(dataToSave);
+                    if (this.currentUser && this.pendingSave) {
                         this.performCloudSave(elements);
                     }
                 }, retryDelay);
             } finally {
                 this.isSavingToCloud = false;
 
-                if (this.pendingSave) {
-                    setTimeout(() => this.performCloudSave(elements), 500);
+                // If new data arrived while we were saving, process it (with delay)
+                if (this.pendingSave && this.cloudSaveRetryCount === 0) {
+                    setTimeout(() => this.performCloudSave(elements), 1000);
                 }
             }
         })();
@@ -319,9 +316,9 @@ const FirebaseSync = {
                         .reduce((s, a) => s + (a.episodes?.length || 0), 0);
                     const mergedEpCount = Object.values(finalData.animeData || {})
                         .reduce((s, a) => s + (a.episodes?.length || 0), 0);
-                    const vpChanged = JSON.stringify(finalData.videoProgress) !==
-                        JSON.stringify(cloudData.videoProgress || {});
-                    const needsCloudWrite = mergedEpCount !== cloudEpCount || vpChanged;
+                    const cloudVpKeys = Object.keys(cloudData.videoProgress || {}).length;
+                    const mergedVpKeys = Object.keys(finalData.videoProgress || {}).length;
+                    const needsCloudWrite = mergedEpCount !== cloudEpCount || cloudVpKeys !== mergedVpKeys;
 
                     if (needsCloudWrite) {
                         if (this.saveToCloudTimeout) {

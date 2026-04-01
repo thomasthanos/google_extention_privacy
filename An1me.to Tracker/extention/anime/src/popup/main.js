@@ -1884,15 +1884,38 @@
         let storageUpdateTimeout = null;
         chrome.storage.onChanged.addListener((changes, namespace) => {
             if (namespace !== 'local') return;
-            let needsUpdate = false;
             const isOwn = isOwnStorageChange(changes);
             let isExternalUpdate = false;
+            let needsFullRender = false;
+            let needsProgressOnly = false;
 
-            if (changes.animeData) { animeData = changes.animeData.newValue || {}; needsUpdate = true; if (!isOwn) isExternalUpdate = true; }
-            if (changes.videoProgress) { videoProgress = changes.videoProgress.newValue || {}; needsUpdate = true; if (!isOwn) isExternalUpdate = true; }
-            if (changes.groupCoverImages) { window.AnimeTracker.groupCoverImages = changes.groupCoverImages.newValue || {}; needsUpdate = true; if (!isOwn) isExternalUpdate = true; }
+            if (changes.animeData) {
+                animeData = changes.animeData.newValue || {};
+                needsFullRender = true;
+                if (!isOwn) isExternalUpdate = true;
+            }
+            if (changes.groupCoverImages) {
+                window.AnimeTracker.groupCoverImages = changes.groupCoverImages.newValue || {};
+                needsFullRender = true;
+                if (!isOwn) isExternalUpdate = true;
+            }
+            if (changes.videoProgress) {
+                videoProgress = changes.videoProgress.newValue || {};
+                if (!isOwn) isExternalUpdate = true;
+                // Instantly patch ip-card bars (no debounce needed)
+                if (typeof _ipPatch === 'function') _ipPatch(videoProgress);
+                // Only do full re-render if animeData also changed or if entry count changed
+                // (new progress added/removed). Otherwise ip-cards handle their own patching.
+                const oldKeys = Object.keys(changes.videoProgress.oldValue || {}).length;
+                const newKeys = Object.keys(changes.videoProgress.newValue || {}).length;
+                if (oldKeys !== newKeys) {
+                    needsFullRender = true;
+                } else {
+                    needsProgressOnly = true;
+                }
+            }
 
-            if (needsUpdate) {
+            if (needsFullRender) {
                 if (storageUpdateTimeout) clearTimeout(storageUpdateTimeout);
                 storageUpdateTimeout = setTimeout(async () => {
                     renderAnimeList(elements.searchInput?.value || '');
@@ -1903,6 +1926,13 @@
                         setTimeout(() => { elements.syncText.textContent = 'Cloud Synced'; }, 2500);
                     }
                 }, CONFIG.STORAGE_UPDATE_DEBOUNCE_MS);
+            } else if (needsProgressOnly && isExternalUpdate) {
+                // External progress update (cloud sync) — only show sync badge, no re-render
+                if (elements.syncStatus && elements.syncText) {
+                    elements.syncStatus.classList.add('synced');
+                    elements.syncText.textContent = 'Synced ✓';
+                    setTimeout(() => { elements.syncText.textContent = 'Cloud Synced'; }, 2500);
+                }
             }
         });
 
@@ -2144,12 +2174,8 @@
         });
     }
 
-    // Also patch instantly on storage changes
-    chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === 'local' && changes.videoProgress) {
-            _ipPatch(changes.videoProgress.newValue || {});
-        }
-    });
+    // _ipPatch is called from the main storage.onChanged listener (initEventListeners)
+    // to avoid registering duplicate listeners. Exposed here for access.
 
     window.addEventListener('beforeunload', () => { _ipPollStop(); AT.FirebaseSync.cleanup(); });
     document.addEventListener('visibilitychange', () => {

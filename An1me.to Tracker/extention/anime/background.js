@@ -66,7 +66,7 @@ let pendingSync         = false;
 let syncDebounceTimeout = null;
 let syncPausedUntil     = 0;
 
-function pauseSync(ms = 3000) {
+function pauseSync(ms = 5000) {
     syncPausedUntil = Math.max(syncPausedUntil, Date.now() + ms);
 }
 function isSyncPaused() {
@@ -275,9 +275,9 @@ async function syncProgressOnly() {
     try {
         const result   = await bgStorageGet(['videoProgress']);
         const localVP  = result.videoProgress || {};
-        const snapshot = JSON.stringify(localVP);
 
-        if (snapshot === lastPushedProgressBG) return;
+        // Quick check: skip if nothing changed since last push
+        if (lastPushedProgressBG && areProgressMapsEqual(localVP, lastPushedProgressBG)) return;
 
         let cloudVP = {};
         try {
@@ -308,7 +308,7 @@ async function syncProgressOnly() {
         });
 
         if (response.ok) {
-            lastPushedProgressBG = JSON.stringify(mergedVP);
+            lastPushedProgressBG = { ...mergedVP }; // shallow copy for comparison
         } else {
             console.warn('[BG] Progress sync failed:', response.status);
         }
@@ -318,7 +318,7 @@ async function syncProgressOnly() {
         progressSyncInProgress = false;
         if (progressSyncPending) {
             progressSyncPending = false;
-            setTimeout(syncProgressOnly, 1000);
+            setTimeout(syncProgressOnly, 5000);
         }
     }
 }
@@ -405,16 +405,35 @@ async function syncToFirebase() {
         console.error('[BG] Sync error:', error);
     } finally {
         syncInProgress = false;
-        if (pendingSync) { pendingSync = false; setTimeout(syncToFirebase, 1000); }
+        if (pendingSync) { pendingSync = false; setTimeout(syncToFirebase, 5000); }
     }
 }
 
 // ─── Real-time listener (SSE) ─────────────────────────────────────────────────
 
+let _applyCloudUpdatePending = false;
+let _applyCloudUpdateDoc    = null;
+let _applyCloudDebounce     = null;
+
 async function applyCloudUpdate(cloudDoc) {
     if (!cloudDoc) return;
+
+    // Debounce rapid SSE updates (e.g. multiple field changes in quick succession)
+    _applyCloudUpdateDoc = cloudDoc;
+    if (_applyCloudDebounce) clearTimeout(_applyCloudDebounce);
+    _applyCloudDebounce = setTimeout(() => {
+        _applyCloudDebounce = null;
+        _doApplyCloudUpdate(_applyCloudUpdateDoc);
+    }, 500);
+}
+
+async function _doApplyCloudUpdate(cloudDoc) {
+    if (!cloudDoc) return;
+    if (_applyCloudUpdatePending) return; // skip if already running
+    _applyCloudUpdatePending = true;
+
     try {
-        // First read: baseline local state
+        // Single read: get the latest local state
         const local = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
 
         const mergedDeleted = cloudDoc.deletedAnime
@@ -424,39 +443,33 @@ async function applyCloudUpdate(cloudDoc) {
         let mergedAnime = mergeAnimeData(local.animeData || {}, cloudDoc.animeData || {});
         applyDeletedAnime(mergedAnime, mergedDeleted);
 
-        let mergedProgress = mergeVideoProgress(local.videoProgress || {}, cloudDoc.videoProgress || {});
+        const mergedProgress = mergeVideoProgress(local.videoProgress || {}, cloudDoc.videoProgress || {});
 
         const localGroup  = local.groupCoverImages   || {};
         const cloudGroup  = cloudDoc.groupCoverImages || {};
-        let mergedGroup = mergeGroupCoverImages(localGroup, cloudGroup);
+        const mergedGroup = mergeGroupCoverImages(localGroup, cloudGroup);
 
-        // Second read: pick up any local writes that arrived during the merge computation
-        // (e.g. a content script saving video progress between the first read and now).
-        const fresh = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
-        if (fresh.animeData)       mergedAnime     = mergeAnimeData(mergedAnime, fresh.animeData);
-        if (fresh.videoProgress)   mergedProgress  = mergeVideoProgress(mergedProgress, fresh.videoProgress);
-        if (fresh.groupCoverImages) mergedGroup    = mergeGroupCoverImages(mergedGroup, fresh.groupCoverImages);
-        applyDeletedAnime(mergedAnime, mergedDeleted);
-
-        const freshEps  = Object.values(fresh.animeData || {}).reduce((s, a) => s + (a.episodes?.length || 0), 0);
+        const localEps  = Object.values(local.animeData || {}).reduce((s, a) => s + (a.episodes?.length || 0), 0);
         const mergedEps = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
 
-        const progressChanged = !areProgressMapsEqual(fresh.videoProgress || {}, mergedProgress);
-        const deletedChanged  = !shallowEqualDeletedAnime(fresh.deletedAnime || {}, mergedDeleted);
-        const groupChanged    = !shallowEqualStringMap(fresh.groupCoverImages || {}, mergedGroup);
+        const progressChanged = !areProgressMapsEqual(local.videoProgress || {}, mergedProgress);
+        const deletedChanged  = !shallowEqualDeletedAnime(local.deletedAnime || {}, mergedDeleted);
+        const groupChanged    = !shallowEqualStringMap(localGroup, mergedGroup);
 
-        if (mergedEps !== freshEps || progressChanged || deletedChanged || groupChanged) {
-            pauseSync();
+        if (mergedEps !== localEps || progressChanged || deletedChanged || groupChanged) {
+            pauseSync(5000);
             await bgStorageSet({
                 animeData:        mergedAnime,
                 videoProgress:    mergedProgress,
                 deletedAnime:     mergedDeleted,
                 groupCoverImages: mergedGroup
             });
-            console.log(`[BG-RT] ← Cloud update applied (eps: ${freshEps}→${mergedEps})`);
+            console.log(`[BG-RT] ← Cloud update applied (eps: ${localEps}→${mergedEps})`);
         }
     } catch (e) {
         console.warn('[BG-RT] Apply update failed:', e.message);
+    } finally {
+        _applyCloudUpdatePending = false;
     }
 }
 
@@ -579,12 +592,15 @@ let progressSyncDebounce = null;
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace !== 'local') return;
 
+    // ── Coalesced sync: collect all changes within window, then fire ONE sync ──
+    // Instead of separate debounces for videoProgress vs animeData vs groupCover,
+    // use a single unified debounce that picks the right sync type.
+
+    let _pendingProgressSync = false;
+    let _pendingFullSync     = false;
+
     if (changes.videoProgress && !isSyncPaused()) {
-        if (progressSyncDebounce) clearTimeout(progressSyncDebounce);
-        progressSyncDebounce = setTimeout(() => {
-            progressSyncDebounce = null;
-            syncProgressOnly();
-        }, 3000);
+        _pendingProgressSync = true;
     }
 
     if (changes.animeData && !isSyncPaused()) {
@@ -599,7 +615,6 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
             for (const slug of Object.keys(newAnime)) {
                 const oldEntry = oldAnime[slug];
                 const newEntry = newAnime[slug];
-                // Detect cover image, droppedAt, completedAt, totalEpisodes, or title changes
                 if ((oldEntry?.coverImage || null) !== (newEntry?.coverImage || null) ||
                     (oldEntry?.droppedAt || null) !== (newEntry?.droppedAt || null) ||
                     (oldEntry?.completedAt || null) !== (newEntry?.completedAt || null) ||
@@ -609,7 +624,6 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
                     break;
                 }
             }
-            // Also detect deleted entries
             if (!metadataChanged && Object.keys(oldAnime).length !== Object.keys(newAnime).length) {
                 metadataChanged = true;
             }
@@ -622,11 +636,8 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
                     'color:rgb(255,107,107);font-weight:bold;font-size:12px',
                     'color:rgb(148,163,184);font-size:11px'
                 );
-            } else {
-                console.log('[BG] Anime metadata changed, scheduling sync');
             }
-            if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
-            syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 2000);
+            _pendingFullSync = true;
         }
     }
 
@@ -634,10 +645,23 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         const oldLen = Object.keys(changes.groupCoverImages.oldValue || {}).length;
         const newLen = Object.keys(changes.groupCoverImages.newValue || {}).length;
         if (newLen !== oldLen) {
-            console.log('[BG] Group cover images changed, scheduling sync');
-            if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
-            syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 2000);
+            _pendingFullSync = true;
         }
+    }
+
+    // Coalesce: full sync supersedes progress-only sync
+    if (_pendingFullSync) {
+        if (progressSyncDebounce) { clearTimeout(progressSyncDebounce); progressSyncDebounce = null; }
+        if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
+        syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 5000);
+    } else if (_pendingProgressSync) {
+        if (progressSyncDebounce) clearTimeout(progressSyncDebounce);
+        progressSyncDebounce = setTimeout(() => {
+            progressSyncDebounce = null;
+            // Skip if a full sync is already scheduled
+            if (syncDebounceTimeout) return;
+            syncProgressOnly();
+        }, 8000);
     }
 });
 

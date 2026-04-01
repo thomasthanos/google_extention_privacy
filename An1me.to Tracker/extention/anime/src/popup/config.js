@@ -9,7 +9,7 @@ const CONFIG = {
 
     // UI settings
     SEARCH_DEBOUNCE_MS: 150,
-    STORAGE_UPDATE_DEBOUNCE_MS: 300,
+    STORAGE_UPDATE_DEBOUNCE_MS: 600,
 
     // Rate limiting for auto-fetch
     AUTO_FETCH_BATCH_SIZE:    3,

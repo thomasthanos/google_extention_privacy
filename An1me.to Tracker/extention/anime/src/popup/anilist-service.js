@@ -115,8 +115,8 @@ const AnilistService = {
 
             console.log(`[AnimeInfo] Fetching ${slugsToFetch.length} anime from an1me.to...`);
 
-            const BATCH_SIZE = 5;
-            const DELAY_MS   = 800;
+            const BATCH_SIZE = 3;
+            const DELAY_MS   = 1200;
             let successCount = 0;
 
             for (let i = 0; i < slugsToFetch.length; i += BATCH_SIZE) {
