@@ -163,8 +163,9 @@
     let lastPushedProgress      = null;
     let isPushingProgressDirect = false;
 
-    async function pushProgressDirect() {
-        if (isPushingProgressDirect) return;
+    async function pushProgressDirect(options = {}) {
+        const { keepalive = false } = options;
+        if (isPushingProgressDirect && !keepalive) return;
         const token = await getValidToken();
         const user  = currentUser || await getUser();
         if (!token || !user) return;
@@ -176,37 +177,45 @@
             const snapshot = JSON.stringify(localVP);
             if (snapshot === lastPushedProgress) return;
 
-            const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
             let cloudVP = {};
-            try {
-                const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-                if (r.ok) cloudVP = fromFSDoc(await r.json())?.videoProgress || {};
-            } catch {}
+            if (!keepalive) {
+                const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
+                try {
+                    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+                    if (r.ok) cloudVP = fromFSDoc(await r.json())?.videoProgress || {};
+                } catch {}
+            }
 
             const mergedVP = mergeVideoProgress(localVP, cloudVP);
 
-            const localCount  = Object.keys(localVP).length;
-            const mergedCount = Object.keys(mergedVP).length;
-            if (mergedCount > localCount) {
-                csPauseSync();
-                await chrome.storage.local.set({ videoProgress: mergedVP });
-                Logger?.info(`Pulled ${mergedCount - localCount} new progress entries from cloud`);
+            if (!keepalive) {
+                const localCount  = Object.keys(localVP).length;
+                const mergedCount = Object.keys(mergedVP).length;
+                if (mergedCount > localCount) {
+                    csPauseSync();
+                    await chrome.storage.local.set({ videoProgress: mergedVP });
+                    Logger?.info(`Pulled ${mergedCount - localCount} new progress entries from cloud`);
+                }
             }
 
+            const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
             const updateMask = 'updateMask.fieldPaths=videoProgress&updateMask.fieldPaths=lastUpdated';
+            const body = JSON.stringify({
+                fields: toFSFields({
+                    videoProgress: mergedVP,
+                    lastUpdated:   new Date().toISOString()
+                })
+            });
             const res = await fetch(`${url}?${updateMask}`, {
                 method:  'PATCH',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body:    JSON.stringify({
-                    fields: toFSFields({
-                        videoProgress: mergedVP,
-                        lastUpdated:   new Date().toISOString()
-                    })
-                })
+                body,
+                keepalive
             });
 
             if (res.ok) {
                 lastPushedProgress = JSON.stringify(mergedVP);
+                lastPushAt = Date.now();
                 Logger?.info('videoProgress pushed (merged)');
             } else {
                 Logger?.warn(`Direct progress push failed: ${res.status}`);
@@ -222,8 +231,9 @@
     let fullPushPending    = false;
     let lastPushedFullSnap = null;
 
-    async function pushFullDirect() {
-        if (fullPushInProgress) { fullPushPending = true; return; }
+    async function pushFullDirect(options = {}) {
+        const { keepalive = false } = options;
+        if (fullPushInProgress && !keepalive) { fullPushPending = true; return; }
         const token = await getValidToken();
         const user  = currentUser || await getUser();
         if (!token || !user) return;
@@ -234,10 +244,12 @@
 
             const url     = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
             let cloudData = null;
-            try {
-                const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-                if (r.ok) cloudData = fromFSDoc(await r.json());
-            } catch {}
+            if (!keepalive) {
+                try {
+                    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+                    if (r.ok) cloudData = fromFSDoc(await r.json());
+                } catch {}
+            }
 
             const mergedDeleted = cloudData?.deletedAnime
                 ? mergeDeletedAnime(local.deletedAnime || {}, cloudData.deletedAnime)
@@ -257,18 +269,20 @@
             const cloudGroupCovers  = cloudData?.groupCoverImages  || {};
             const mergedGroupCovers = mergeGroupCoverImages(localGroupCovers, cloudGroupCovers);
 
-            const animeDiff = !areAnimeDataMapsEqual(local.animeData || {}, mergedAnime);
-            const progressDiff = !areProgressMapsEqual(local.videoProgress || {}, mergedProgress);
-            const deletedDiff  = !shallowEqualDeletedAnime(local.deletedAnime || {}, mergedDeleted);
-            const groupDiff    = !shallowEqualObjectMap(local.groupCoverImages || {}, mergedGroupCovers);
-            if (animeDiff || progressDiff || deletedDiff || groupDiff) {
-                csPauseSync();
-                await chrome.storage.local.set({
-                    animeData:        mergedAnime,
-                    videoProgress:    mergedProgress,
-                    deletedAnime:     mergedDeleted,
-                    groupCoverImages: mergedGroupCovers
-                });
+            if (!keepalive) {
+                const animeDiff = !areAnimeDataMapsEqual(local.animeData || {}, mergedAnime);
+                const progressDiff = !areProgressMapsEqual(local.videoProgress || {}, mergedProgress);
+                const deletedDiff  = !shallowEqualDeletedAnime(local.deletedAnime || {}, mergedDeleted);
+                const groupDiff    = !shallowEqualObjectMap(local.groupCoverImages || {}, mergedGroupCovers);
+                if (animeDiff || progressDiff || deletedDiff || groupDiff) {
+                    csPauseSync();
+                    await chrome.storage.local.set({
+                        animeData:        mergedAnime,
+                        videoProgress:    mergedProgress,
+                        deletedAnime:     mergedDeleted,
+                        groupCoverImages: mergedGroupCovers
+                    });
+                }
             }
 
             const uploadSnap = JSON.stringify({ mergedAnime, mergedProgress, mergedDeleted, mergedGroupCovers });
@@ -277,23 +291,31 @@
                 return;
             }
 
+            const body = JSON.stringify({
+                fields: toFSFields({
+                    animeData:        mergedAnime,
+                    videoProgress:    mergedProgress,
+                    deletedAnime:     mergedDeleted,
+                    groupCoverImages: mergedGroupCovers,
+                    lastUpdated:      new Date().toISOString(),
+                    email:            user.email
+                })
+            });
+
+            // keepalive fetch has a 64KB body limit — fall back to regular fetch
+            // if the payload is too large.
+            const useKeepalive = keepalive && body.length < 63000;
+
             const res = await fetch(url, {
                 method:  'PATCH',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body:    JSON.stringify({
-                    fields: toFSFields({
-                        animeData:        mergedAnime,
-                        videoProgress:    mergedProgress,
-                        deletedAnime:     mergedDeleted,
-                        groupCoverImages: mergedGroupCovers,
-                        lastUpdated:      new Date().toISOString(),
-                        email:            user.email
-                    })
-                })
+                body,
+                keepalive: useKeepalive
             });
 
             if (res.ok) {
                 lastPushedFullSnap = uploadSnap;
+                lastPushAt = Date.now();
                 Logger?.info('Full push to Firestore complete');
             } else {
                 Logger?.warn(`Full push failed: ${res.status}`);
@@ -363,19 +385,48 @@
         fullPushDebounce = setTimeout(() => { fullPushDebounce = null; pushFullDirect(); }, delay);
     }
 
+    // ─── Periodic forced push ─────────────────────────────────────────────────
+    // The debounce pattern means pushes never fire during active watching
+    // (saves every 2s keep resetting the 3s timer). This interval guarantees
+    // data reaches the cloud regularly even while the video is playing.
+    const PERIODIC_PUSH_INTERVAL = 30000; // 30 s
+    let periodicPushTimer = null;
+    let lastPushAt = 0;
+
+    function startPeriodicPush(isOrionMode) {
+        if (periodicPushTimer) return;
+        periodicPushTimer = setInterval(async () => {
+            if (csIsSyncPaused()) return;
+            if (Date.now() - lastPushAt < PERIODIC_PUSH_INTERVAL * 0.8) return;
+            if (isOrionMode) {
+                pushFullDirect().then(() => { lastPushAt = Date.now(); });
+            } else {
+                const swAlive = await wakeBackgroundSW('SYNC_PROGRESS_ONLY');
+                if (!swAlive) pushProgressDirect().then(() => { lastPushAt = Date.now(); });
+                else lastPushAt = Date.now();
+            }
+        }, PERIODIC_PUSH_INTERVAL);
+    }
+
+    function stopPeriodicPush() {
+        if (periodicPushTimer) { clearInterval(periodicPushTimer); periodicPushTimer = null; }
+    }
+
     function pushOnTeardown(isOrionMode) {
         if (teardownSyncTriggered) return;
         teardownSyncTriggered = true;
+        stopPeriodicPush();
 
         if (isOrionMode) {
             if (fullPushDebounce) clearTimeout(fullPushDebounce);
-            pushFullDirect();
+            // Use keepalive so the request survives page unload on mobile
+            pushFullDirect({ keepalive: true });
             return;
         }
 
         if (progressDebounce) clearTimeout(progressDebounce);
         wakeBackgroundSW('SYNC_PROGRESS_ONLY').then(alive => {
-            if (!alive) pushProgressDirect();
+            if (!alive) pushProgressDirect({ keepalive: true });
         });
     }
 
@@ -531,11 +582,12 @@
     // ─── Storage watcher ──────────────────────────────────────────────────────
 
     function watchStorage(isOrionMode) {
+        startPeriodicPush(isOrionMode);
+
         chrome.storage.onChanged.addListener((changes, namespace) => {
             if (namespace !== 'local') return;
 
-            if (changes.videoProgress) {
-                if (csIsSyncPaused()) return;
+            if (changes.videoProgress && !csIsSyncPaused()) {
                 if (isOrionMode) {
                     scheduleFullPush(3000);
                 } else {
@@ -573,9 +625,11 @@
 
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
+                stopPeriodicPush();
                 pushOnTeardown(isOrionMode);
             } else {
                 resetTeardownSyncGuard();
+                startPeriodicPush(isOrionMode);
             }
         });
 
@@ -587,6 +641,7 @@
         window.addEventListener('pageshow', (event) => {
             if (!event || !event.persisted) return;
             resetTeardownSyncGuard();
+            startPeriodicPush(isOrionMode);
         }, { passive: true });
     }
 
