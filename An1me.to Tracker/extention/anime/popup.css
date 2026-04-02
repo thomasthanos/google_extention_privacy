@@ -517,7 +517,7 @@ body {
   transition: transform var(--tn), color var(--tn);
 }
 .settings-collapsible.expanded .settings-collapsible-arrow {
-  transform: rotate(180deg);
+  transform: rotate(90deg);
 }
 .settings-collapsible.expanded .settings-collapsible-trigger {
   background: rgba(255,255,255,0.03);

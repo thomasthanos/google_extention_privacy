@@ -2132,9 +2132,17 @@
                 elements.settingsRefresh.classList.add('loading');
                 elements.settingsDropdown.classList.remove('visible');
                 setSettingsDataToolsExpanded(false);
-                if (FirebaseSync.getUser()) await loadAndSyncData();
-                else loadData();
-                setTimeout(() => elements.settingsRefresh.classList.remove('loading'), 500);
+                try {
+                    if (FirebaseSync.getUser()) {
+                        await loadAndSyncData();
+                    } else {
+                        await loadData();
+                    }
+                } catch (error) {
+                    console.error('[RefreshData] Error:', error);
+                } finally {
+                    setTimeout(() => elements.settingsRefresh.classList.remove('loading'), 500);
+                }
             });
         }
 

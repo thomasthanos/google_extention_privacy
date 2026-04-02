@@ -12,9 +12,9 @@
     const STYLE_ID = 'anime-tracker-copy-guard-style';
     const STORAGE_KEY = 'copyGuardEnabled';
     const ALLOWED_SELECTORS = [
-        '.group-data-\\[language\\=jp\\]\\/body\\:hidden',
-        '.line-clamp-2',
-        '.leading-relaxed'
+        '.group-data-\\[language\\=jp\\]\\/body\\:hidden.line-clamp-2.leading-relaxed',
+        '.line-clamp-2.leading-relaxed',
+        '.group-data-\\[language\\=jp\\]\\/body\\:hidden'
     ];
     const ALLOWED_SELECTOR = ALLOWED_SELECTORS.join(', ');
     const EDITABLE_SELECTOR = 'input, textarea, [contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"]';

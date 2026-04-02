@@ -583,9 +583,10 @@ async function syncToFirebase() {
 
 // ─── Real-time listener (SSE) ─────────────────────────────────────────────────
 
-let _applyCloudUpdatePending = false;
-let _applyCloudUpdateDoc    = null;
-let _applyCloudDebounce     = null;
+let _applyCloudUpdateDoc     = null;
+let _applyCloudDebounce      = null;
+let _applyCloudUpdateQueue   = Promise.resolve();
+let _applyCloudUpdateWaiters = [];
 
 async function applyCloudUpdate(cloudDoc) {
     if (!cloudDoc) return;
@@ -593,21 +594,34 @@ async function applyCloudUpdate(cloudDoc) {
     // Debounce rapid SSE updates (e.g. multiple field changes in quick succession)
     _applyCloudUpdateDoc = cloudDoc;
     if (_applyCloudDebounce) clearTimeout(_applyCloudDebounce);
-    _applyCloudDebounce = setTimeout(() => {
-        _applyCloudDebounce = null;
-        _doApplyCloudUpdate(_applyCloudUpdateDoc).catch((error) => {
-            console.warn('[BG-RT] Apply update failed:', error.message);
-        });
-    }, 500);
+    return new Promise((resolve, reject) => {
+        _applyCloudUpdateWaiters.push({ resolve, reject });
+        _applyCloudDebounce = setTimeout(() => {
+            _applyCloudDebounce = null;
+            const pendingWaiters = _applyCloudUpdateWaiters.splice(0);
+            _applyCloudUpdateQueue = _applyCloudUpdateQueue
+                .catch(() => {})
+                .then(() => _drainCloudUpdates())
+                .then(() => {
+                    for (const waiter of pendingWaiters) waiter.resolve();
+                })
+                .catch((error) => {
+                    for (const waiter of pendingWaiters) waiter.reject(error);
+                });
+        }, 500);
+    });
+}
+
+async function _drainCloudUpdates() {
+    while (_applyCloudUpdateDoc) {
+        const nextCloudDoc = _applyCloudUpdateDoc;
+        _applyCloudUpdateDoc = null;
+        await _doApplyCloudUpdate(nextCloudDoc);
+    }
 }
 
 async function _doApplyCloudUpdate(cloudDoc) {
     if (!cloudDoc) return;
-    if (_applyCloudUpdatePending) {
-        _applyCloudUpdateDoc = cloudDoc;
-        return;
-    }
-    _applyCloudUpdatePending = true;
 
     try {
         // Single read: get the latest local state
@@ -646,14 +660,6 @@ async function _doApplyCloudUpdate(cloudDoc) {
         }
     } catch (e) {
         console.warn('[BG-RT] Apply update failed:', e.message);
-    } finally {
-        _applyCloudUpdatePending = false;
-    }
-
-    if (_applyCloudUpdateDoc && _applyCloudUpdateDoc !== cloudDoc) {
-        const queuedCloudDoc = _applyCloudUpdateDoc;
-        _applyCloudUpdateDoc = null;
-        await _doApplyCloudUpdate(queuedCloudDoc);
     }
 }
 
