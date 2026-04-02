@@ -294,10 +294,9 @@ const FirebaseSync = {
                     finalData.animeData = ProgressManager.removeDuplicateEpisodes(finalData.animeData);
                 }
 
-                // Prefer local covers to preserve user-set posters
                 const localGroupCovers = localData.groupCoverImages || {};
                 const cloudGroupCovers = cloudData.groupCoverImages || {};
-                const mergedGroupCovers = { ...cloudGroupCovers, ...localGroupCovers };
+                const mergedGroupCovers = AnimeTracker.MergeUtils.mergeGroupCoverImages(localGroupCovers, cloudGroupCovers);
 
                 AnimeTracker.MergeUtils.applyDeletedAnime(finalData.animeData, mergedDeletedAnime);
                 finalData.deletedAnime = mergedDeletedAnime;
