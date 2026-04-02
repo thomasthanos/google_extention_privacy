@@ -14,6 +14,7 @@
     let videoProgress = {};
     let currentSort = 'date';
     let currentCategory = 'all'; // 'all', 'series', 'movies'
+    const COPY_GUARD_STORAGE_KEY = 'copyGuardEnabled';
 
     // DOM Elements
     const elements = {
@@ -30,6 +31,11 @@
         settingsDonate: document.getElementById('settingsDonate'),
         settingsRefresh: document.getElementById('settingsRefresh'),
         settingsRefreshInfo: document.getElementById('settingsRefreshInfo'),
+        settingsCopyGuard: document.getElementById('settingsCopyGuard'),
+        settingsCopyGuardSubtitle: document.getElementById('settingsCopyGuardSubtitle'),
+        settingsDataTools: document.getElementById('settingsDataTools'),
+        settingsDataToolsToggle: document.getElementById('settingsDataToolsToggle'),
+        settingsDataToolsContent: document.getElementById('settingsDataToolsContent'),
         settingsClear: document.getElementById('settingsClear'),
         settingsSignOut: document.getElementById('settingsSignOut'),
         // Main
@@ -124,6 +130,40 @@
 
     function getActiveFilter() {
         return elements.searchInput?.value || '';
+    }
+
+    function renderCopyGuardSetting(enabled) {
+        if (!elements.settingsCopyGuard) return;
+        elements.settingsCopyGuard.dataset.enabled = enabled ? 'true' : 'false';
+        elements.settingsCopyGuard.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+        if (elements.settingsCopyGuardSubtitle) {
+            elements.settingsCopyGuardSubtitle.textContent = enabled
+                ? 'Disable copy outside allowed text blocks'
+                : 'Copy protection is turned off';
+        }
+    }
+
+    async function loadCopyGuardSetting() {
+        try {
+            const result = await chrome.storage.local.get([COPY_GUARD_STORAGE_KEY]);
+            const enabled = result[COPY_GUARD_STORAGE_KEY] !== false;
+            renderCopyGuardSetting(enabled);
+            return enabled;
+        } catch (error) {
+            console.warn('[Settings] Failed to load copy guard setting:', error);
+            renderCopyGuardSetting(true);
+            return true;
+        }
+    }
+
+    function setSettingsDataToolsExpanded(expanded) {
+        if (!elements.settingsDataTools || !elements.settingsDataToolsToggle) return;
+        const isExpanded = !!expanded;
+        elements.settingsDataTools.classList.toggle('expanded', isExpanded);
+        elements.settingsDataToolsToggle.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+        if (elements.settingsDataToolsContent) {
+            elements.settingsDataToolsContent.hidden = !isExpanded;
+        }
     }
 
     function doesProgressChangeAffectLists(oldProgress = {}, newProgress = {}) {
@@ -1178,7 +1218,7 @@
             }
 
             videoProgress = currentVideoProgress;
-            const deletedAnime = result.deletedAnime || {};
+            const deletedAnime = clearDeletedAnimeSlug(result.deletedAnime || {}, slug);
             deletedAnime[slug] = { deletedAt: new Date().toISOString() };
 
             const dataToSave = { animeData, videoProgress: currentVideoProgress, deletedAnime };
@@ -1220,7 +1260,7 @@
 
             const result = await Storage.get(['videoProgress', 'deletedAnime', 'groupCoverImages']);
             const currentVideoProgress = result.videoProgress || {};
-            const deletedAnime = result.deletedAnime || {};
+            const deletedAnime = clearDeletedAnimeSlug(result.deletedAnime || {}, slug);
 
             const dataToSave = { animeData, videoProgress: currentVideoProgress, deletedAnime };
             const user = FirebaseSync.getUser();
@@ -1259,7 +1299,7 @@
 
             const result = await Storage.get(['videoProgress', 'deletedAnime', 'groupCoverImages']);
             const currentVideoProgress = result.videoProgress || {};
-            const deletedAnime = result.deletedAnime || {};
+            const deletedAnime = clearDeletedAnimeSlug(result.deletedAnime || {}, slug);
 
             const dataToSave = { animeData, videoProgress: currentVideoProgress, deletedAnime };
             const user = FirebaseSync.getUser();
@@ -1484,6 +1524,14 @@
         entry.titleUpdatedAt = at;
     }
 
+    function clearDeletedAnimeSlug(deletedAnime, slug) {
+        const nextDeletedAnime = { ...(deletedAnime || {}) };
+        if (slug && Object.prototype.hasOwnProperty.call(nextDeletedAnime, slug)) {
+            delete nextDeletedAnime[slug];
+        }
+        return nextDeletedAnime;
+    }
+
     async function addAnimeWithEpisodes() {
         const { Storage, FirebaseSync, SeasonGrouping } = AT;
         const slugInput = elements.animeSlugInput.value;
@@ -1547,7 +1595,9 @@
                 }
             }
 
-            const dataToSave = { animeData, videoProgress };
+            const deletedResult = await Storage.get(['deletedAnime']);
+            const deletedAnime = clearDeletedAnimeSlug(deletedResult.deletedAnime || {}, slug);
+            const dataToSave = { animeData, videoProgress, deletedAnime };
             const user = FirebaseSync.getUser();
             if (user) dataToSave.userId = user.uid;
             markInternalSave(dataToSave);
@@ -1560,7 +1610,12 @@
             if (user) {
                 (async () => {
                     const gcRes = await Storage.get(['groupCoverImages']);
-                    await FirebaseSync.saveToCloud({ animeData, videoProgress, groupCoverImages: gcRes.groupCoverImages || {} });
+                    await FirebaseSync.saveToCloud({
+                        animeData,
+                        videoProgress,
+                        deletedAnime,
+                        groupCoverImages: gcRes.groupCoverImages || {}
+                    });
                 })().catch(err => console.error('[AddAnime] Cloud save error:', err));
             }
         } catch (error) {
@@ -1596,7 +1651,9 @@
 
         try {
             markTitleEdited(animeData[editingSlug], newTitle);
-            const dataToSave = { animeData, videoProgress };
+            const deletedResult = await Storage.get(['deletedAnime']);
+            const deletedAnime = clearDeletedAnimeSlug(deletedResult.deletedAnime || {}, editingSlug);
+            const dataToSave = { animeData, videoProgress, deletedAnime };
             const user = FirebaseSync.getUser();
             if (user) dataToSave.userId = user.uid;
             markInternalSave(dataToSave);
@@ -1606,7 +1663,12 @@
             if (user) {
                 (async () => {
                     const gcRes = await Storage.get(['groupCoverImages']);
-                    await FirebaseSync.saveToCloud({ animeData, videoProgress, groupCoverImages: gcRes.groupCoverImages || {} });
+                    await FirebaseSync.saveToCloud({
+                        animeData,
+                        videoProgress,
+                        deletedAnime,
+                        groupCoverImages: gcRes.groupCoverImages || {}
+                    });
                 })().catch(err => console.error('[EditTitle] Cloud save error:', err));
             }
             hideEditTitleDialog();
@@ -2029,7 +2091,9 @@
                 if (elements.donateDropdown) elements.donateDropdown.classList.remove('visible');
                 if (elements.sortDropdown) elements.sortDropdown.classList.remove('visible');
                 if (elements.sortBtn) elements.sortBtn.classList.remove('active');
+                const willOpen = !elements.settingsDropdown.classList.contains('visible');
                 elements.settingsDropdown.classList.toggle('visible');
+                if (!willOpen) setSettingsDataToolsExpanded(false);
             });
         }
 
@@ -2037,6 +2101,7 @@
             if (elements.settingsDropdown && elements.settingsBtn &&
                 !elements.settingsDropdown.contains(e.target) && !elements.settingsBtn.contains(e.target)) {
                 elements.settingsDropdown.classList.remove('visible');
+                setSettingsDataToolsExpanded(false);
             }
             if (elements.donateDropdown &&
                 !elements.donateDropdown.contains(e.target) &&
@@ -2049,7 +2114,16 @@
             elements.settingsDonate.addEventListener('click', (e) => {
                 e.stopPropagation();
                 elements.settingsDropdown.classList.remove('visible');
+                setSettingsDataToolsExpanded(false);
                 setTimeout(() => elements.donateDropdown.classList.add('visible'), 150);
+            });
+        }
+
+        if (elements.settingsDataToolsToggle) {
+            elements.settingsDataToolsToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isExpanded = elements.settingsDataTools?.classList.contains('expanded');
+                setSettingsDataToolsExpanded(!isExpanded);
             });
         }
 
@@ -2057,6 +2131,7 @@
             elements.settingsRefresh.addEventListener('click', async () => {
                 elements.settingsRefresh.classList.add('loading');
                 elements.settingsDropdown.classList.remove('visible');
+                setSettingsDataToolsExpanded(false);
                 if (FirebaseSync.getUser()) await loadAndSyncData();
                 else loadData();
                 setTimeout(() => elements.settingsRefresh.classList.remove('loading'), 500);
@@ -2068,6 +2143,7 @@
                 const { Storage, AnilistService } = AT;
                 elements.settingsRefreshInfo.classList.add('loading');
                 elements.settingsDropdown.classList.remove('visible');
+                setSettingsDataToolsExpanded(false);
                 try {
                     // Clear all cached anime info from storage so autoFetchMissing re-fetches everything
                     const allKeys = await new Promise(resolve => chrome.storage.local.get(null, resolve));
@@ -2090,6 +2166,7 @@
         if (elements.settingsClear) {
             elements.settingsClear.addEventListener('click', () => {
                 elements.settingsDropdown.classList.remove('visible');
+                setSettingsDataToolsExpanded(false);
                 showDialog();
             });
         }
@@ -2097,6 +2174,7 @@
         if (elements.settingsSignOut) {
             elements.settingsSignOut.addEventListener('click', () => {
                 elements.settingsDropdown.classList.remove('visible');
+                setSettingsDataToolsExpanded(false);
                 signOut();
             });
         }
@@ -2104,7 +2182,23 @@
         if (elements.settingsFetchFillers) {
             elements.settingsFetchFillers.addEventListener('click', async () => {
                 elements.settingsDropdown.classList.remove('visible');
+                setSettingsDataToolsExpanded(false);
                 await fetchAllFillers({ autoStart: true });
+            });
+        }
+
+        if (elements.settingsCopyGuard) {
+            elements.settingsCopyGuard.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                const currentlyEnabled = elements.settingsCopyGuard.dataset.enabled !== 'false';
+                const nextEnabled = !currentlyEnabled;
+                renderCopyGuardSetting(nextEnabled);
+                try {
+                    await chrome.storage.local.set({ [COPY_GUARD_STORAGE_KEY]: nextEnabled });
+                } catch (error) {
+                    console.error('[Settings] Failed to update copy guard setting:', error);
+                    renderCopyGuardSetting(currentlyEnabled);
+                }
             });
         }
 
@@ -2250,6 +2344,9 @@
             if (changes.deletedAnime) {
                 needsFullRender = true;
                 if (!isOwn) isExternalUpdate = true;
+            }
+            if (changes[COPY_GUARD_STORAGE_KEY]) {
+                renderCopyGuardSetting(changes[COPY_GUARD_STORAGE_KEY].newValue !== false);
             }
             if (changes.videoProgress) {
                 videoProgress = changes.videoProgress.newValue || {};
@@ -2439,6 +2536,7 @@
         }
 
         initEventListeners();
+        await loadCopyGuardSetting();
 
         FirebaseSync.init({
             onUserSignedIn: async (user) => {

@@ -45,6 +45,24 @@
         return droppedAt > completedAt ? 'dropped' : 'completed';
     }
 
+    function getAnimeActivityTimestamp(anime) {
+        if (!anime || typeof anime !== 'object') return 0;
+
+        let latest = Math.max(
+            toMillis(anime.lastWatched),
+            toMillis(anime.listStateUpdatedAt),
+            toMillis(anime.titleUpdatedAt),
+            toMillis(anime.completedAt),
+            toMillis(anime.droppedAt)
+        );
+
+        for (const episode of Array.isArray(anime.episodes) ? anime.episodes : []) {
+            latest = Math.max(latest, toMillis(episode?.watchedAt));
+        }
+
+        return latest;
+    }
+
     function getTitleSelection(localAnime, cloudAnime, slug) {
         const localTitle = getSafeString(localAnime?.title).trim();
         const cloudTitle = getSafeString(cloudAnime?.title).trim();
@@ -380,15 +398,10 @@
         const merged = { ...(cloud || {}) };
 
         for (const [slug, info] of Object.entries(local || {})) {
-            if (!merged[slug] || new Date(info.deletedAt) > new Date(merged[slug].deletedAt)) {
+            const localDeletedAt = toMillis(info?.deletedAt || info);
+            const cloudDeletedAt = toMillis(merged[slug]?.deletedAt || merged[slug]);
+            if (!merged[slug] || localDeletedAt > cloudDeletedAt) {
                 merged[slug] = info;
-            }
-        }
-
-        const cutoff = Date.now() - 60 * 24 * 60 * 60 * 1000;
-        for (const [slug, info] of Object.entries(merged)) {
-            if (new Date(info.deletedAt).getTime() < cutoff) {
-                delete merged[slug];
             }
         }
 
@@ -399,12 +412,10 @@
         for (const [slug, info] of Object.entries(deletedAnime || {})) {
             if (!animeData[slug]) continue;
 
-            const deletedAt   = new Date(info.deletedAt).getTime();
-            const lastWatched = animeData[slug].lastWatched
-                ? new Date(animeData[slug].lastWatched).getTime()
-                : 0;
+            const deletedAt = toMillis(info?.deletedAt || info);
+            if (!deletedAt) continue;
 
-            if (deletedAt >= lastWatched) {
+            if (deletedAt > getAnimeActivityTimestamp(animeData[slug])) {
                 delete animeData[slug];
             }
         }

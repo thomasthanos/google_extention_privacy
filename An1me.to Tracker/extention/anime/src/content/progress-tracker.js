@@ -340,8 +340,9 @@ const ProgressTracker = {
                 return false;
             }
 
-            const result = await Storage.get(['animeData']);
+            const result = await Storage.get(['animeData', 'deletedAnime']);
             const animeData = result.animeData || {};
+            const deletedAnime = { ...(result.deletedAnime || {}) };
             const anime = animeData[animeSlug];
 
             if (!anime || !anime.episodes || !Array.isArray(anime.episodes)) {
@@ -364,8 +365,9 @@ const ProgressTracker = {
             const validDuration = this.normalizeDuration(videoDuration);
             if (!validDuration) return false;
 
-            const result = await Storage.get(['animeData']);
+            const result = await Storage.get(['animeData', 'deletedAnime']);
             const animeData = result.animeData || {};
+            const deletedAnime = { ...(result.deletedAnime || {}) };
             const animeKey = info.animeSlug;
             const anime = animeData[animeKey];
             if (!anime || !Array.isArray(anime.episodes)) return false;
@@ -439,8 +441,9 @@ const ProgressTracker = {
                 throw new Error('Invalid video duration');
             }
 
-            const result = await Storage.get(['animeData']);
+            const result = await Storage.get(['animeData', 'deletedAnime']);
             const animeData = result.animeData || {};
+            const deletedAnime = { ...(result.deletedAnime || {}) };
 
             if (!animeData[info.animeSlug]) {
                 animeData[info.animeSlug] = {
@@ -485,6 +488,7 @@ const ProgressTracker = {
                 animeData[info.animeSlug].listStateUpdatedAt = new Date().toISOString();
                 Logger.info('Auto-undropped anime (new episode tracked):', info.animeSlug);
             }
+            delete deletedAnime[info.animeSlug];
 
             const existingIndex = animeData[info.animeSlug].episodes
                 .findIndex(ep => ep.number === info.episodeNumber);
@@ -502,7 +506,7 @@ const ProgressTracker = {
                     animeData[info.animeSlug].totalWatchTime = animeData[info.animeSlug].episodes
                         .reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
                     animeData[info.animeSlug].lastWatched = new Date().toISOString();
-                    await Storage.set({ animeData });
+                    await Storage.set({ animeData, deletedAnime });
                     Logger.debug(`Updated placeholder duration for tracked episode: ${info.uniqueId}`);
                     return true;
                 }
@@ -540,7 +544,7 @@ const ProgressTracker = {
 
             animeData[info.animeSlug].episodes.sort((a, b) => a.number - b.number);
 
-            await Storage.set({ animeData });
+            await Storage.set({ animeData, deletedAnime });
 
             Logger.success(`✓ Tracked: ${info.animeTitle} Ep${info.episodeNumber}${info.isDoubleEpisode ? '-' + info.secondEpisodeNumber : ''}`);
             Notifications.showCompletion(info);

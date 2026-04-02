@@ -40,6 +40,32 @@ const FirebaseSync = {
         }
     },
 
+    async hydrateSyncData(data) {
+        const payload = this.cloneSyncData(data);
+        const missingKeys = ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']
+            .filter((key) => typeof payload[key] === 'undefined');
+
+        if (missingKeys.length > 0) {
+            try {
+                const stored = await window.AnimeTracker.Storage.get(missingKeys);
+                for (const key of missingKeys) {
+                    payload[key] = stored[key] || this.pendingSave?.[key] || {};
+                }
+            } catch (error) {
+                console.warn('[Firebase] Failed to hydrate sync payload from storage:', error);
+                for (const key of missingKeys) {
+                    payload[key] = this.pendingSave?.[key] || {};
+                }
+            }
+        }
+
+        payload.animeData = payload.animeData || {};
+        payload.videoProgress = payload.videoProgress || {};
+        payload.deletedAnime = payload.deletedAnime || {};
+        payload.groupCoverImages = payload.groupCoverImages || {};
+        return payload;
+    },
+
     /**
      * Get current user
      */
@@ -97,7 +123,7 @@ const FirebaseSync = {
         
         if (!this.currentUser) return Promise.resolve();
 
-        this.pendingSave = this.cloneSyncData(data);
+        this.pendingSave = await this.hydrateSyncData(data);
 
         if (this.saveToCloudTimeout) {
             clearTimeout(this.saveToCloudTimeout);
@@ -110,7 +136,11 @@ const FirebaseSync = {
 
         return new Promise((resolve) => {
             this.saveToCloudTimeout = setTimeout(async () => {
-                await this.performCloudSave();
+                try {
+                    await this.performCloudSave();
+                } catch (error) {
+                    console.error('[Firebase] Debounced save failed:', error);
+                }
                 resolve();
             }, CONFIG.CLOUD_SAVE_DEBOUNCE_MS);
         });
@@ -122,13 +152,17 @@ const FirebaseSync = {
     async performCloudSave(elements = null) {
         const { CONFIG } = window.AnimeTracker;
 
+        if (this.currentSavePromise) {
+            await this.currentSavePromise;
+        }
+
         if (this.isSavingToCloud) {
             // Don't recurse — just mark that we have pending data; it will be
             // picked up in the finally block of the current save.
             return;
         }
 
-        if (!this.pendingSave || !this.currentUser) {
+        if (this.isSavingToCloud || !this.pendingSave || !this.currentUser) {
             this.cloudSaveRetryCount = 0;
             return;
         }
@@ -244,14 +278,23 @@ const FirebaseSync = {
                 }
             }
 
+            const readLocalSyncData = () => Storage.get([
+                'animeData',
+                'videoProgress',
+                'userId',
+                'deletedAnime',
+                'groupCoverImages'
+            ]);
+
+            const localDataForPreUpload = await readLocalSyncData();
+
             // On Orion/mobile (no SW), merge local videoProgress into the cloud doc
             // before proceeding, to avoid losing progress saved by content scripts.
-            const localSnapshot = await Storage.get(['videoProgress', 'userId']);
-            if (cloudData && localSnapshot.userId === this.currentUser.uid &&
-                    localSnapshot.videoProgress && Object.keys(localSnapshot.videoProgress).length > 0) {
+            if (cloudData && localDataForPreUpload.userId === this.currentUser.uid &&
+                    localDataForPreUpload.videoProgress && Object.keys(localDataForPreUpload.videoProgress).length > 0) {
                 try {
                     const cloudVP = cloudData.videoProgress || {};
-                    const localVP = localSnapshot.videoProgress;
+                    const localVP = localDataForPreUpload.videoProgress;
                     const merged = AnimeTracker.MergeUtils.mergeVideoProgress(localVP, cloudVP);
                     const hasChanges = Object.entries(merged).some(([id, val]) =>
                         !cloudVP[id] || val.currentTime !== cloudVP[id].currentTime
@@ -268,8 +311,7 @@ const FirebaseSync = {
                     console.warn('[Sync] Pre-upload failed (non-critical):', e.message);
                 }
             }
-            
-            const localData = await Storage.get(['animeData', 'videoProgress', 'userId', 'deletedAnime', 'groupCoverImages']);
+            const localData = await readLocalSyncData();
             let finalData;
 
             if (cloudData) {
@@ -342,12 +384,14 @@ const FirebaseSync = {
                     finalData = {
                         animeData: ProgressManager.removeDuplicateEpisodes(localData.animeData || {}),
                         videoProgress: localData.videoProgress || {},
+                        deletedAnime: localData.deletedAnime || {},
                         groupCoverImages: localData.groupCoverImages || {}
                     };
 
                     await Storage.set({
                         animeData: finalData.animeData,
                         videoProgress: finalData.videoProgress,
+                        deletedAnime: finalData.deletedAnime,
                         groupCoverImages: finalData.groupCoverImages,
                         userId: this.currentUser.uid
                     });
@@ -359,10 +403,11 @@ const FirebaseSync = {
                     this.pendingSave = this.cloneSyncData(finalData);
                     await this.performCloudSave(elements);
                 } else {
-                    finalData = { animeData: {}, videoProgress: {}, groupCoverImages: {} };
+                    finalData = { animeData: {}, videoProgress: {}, deletedAnime: {}, groupCoverImages: {} };
                     await Storage.set({
                         animeData: {},
                         videoProgress: {},
+                        deletedAnime: {},
                         groupCoverImages: {},
                         userId: this.currentUser.uid
                     });
@@ -389,7 +434,8 @@ const FirebaseSync = {
     },
 
     /**
-     * Cleanup on popup close
+     * Cleanup on popup close — fire-and-forget with keepalive fetch
+     * so the request survives popup unload.
      */
     cleanup() {
         if (this.saveToCloudTimeout) {
@@ -397,9 +443,19 @@ const FirebaseSync = {
             this.saveToCloudTimeout = null;
         }
 
-        if (this.pendingSave && this.currentUser && !this.isSavingToCloud) {
-            console.warn('[Popup] Closing with pending save');
-            this.performCloudSave().catch(err => {
+        if (this.pendingSave && this.currentUser) {
+            const dataToSave = this.pendingSave;
+            this.pendingSave = null;
+
+            // Use keepalive so the request outlives the popup
+            FirebaseLib.setDocument('users', this.currentUser.uid, {
+                animeData:        dataToSave.animeData || {},
+                videoProgress:    dataToSave.videoProgress || {},
+                deletedAnime:     dataToSave.deletedAnime || {},
+                groupCoverImages: dataToSave.groupCoverImages || {},
+                lastUpdated:      new Date().toISOString(),
+                email:            this.currentUser.email
+            }, { keepalive: true }).catch(err => {
                 console.error('[Popup] Save on unload failed:', err);
             });
         }

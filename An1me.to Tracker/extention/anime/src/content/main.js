@@ -160,17 +160,19 @@
         isTracked = true;
 
         try {
-            chrome.storage.local.get(['animeData'], (result) => {
+            chrome.storage.local.get(['animeData', 'deletedAnime'], (result) => {
                 if (chrome.runtime.lastError) {
                     isTrackingImmediate = false;
                     return;
                 }
 
                 const animeData = result.animeData || {};
+                const deletedAnime = { ...(result.deletedAnime || {}) };
                 const written   = writeSyncEpisode(animeInfo, duration, animeData, 'Immediate');
 
                 if (written) {
-                    chrome.storage.local.set({ animeData }, () => {
+                    delete deletedAnime[animeInfo.animeSlug];
+                    chrome.storage.local.set({ animeData, deletedAnime }, () => {
                         isTrackingImmediate = false;
                         if (!chrome.runtime.lastError) {
                             Logger.success('✓ Immediate track successful');

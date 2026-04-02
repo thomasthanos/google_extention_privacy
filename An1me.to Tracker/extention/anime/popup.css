@@ -465,6 +465,64 @@ body {
 .settings-item-title { font-size: 12px; font-weight: 600; color: var(--t1); }
 .settings-item-subtitle { font-size: 10px; color: var(--t3); }
 .settings-item-arrow { width: 12px; height: 12px; color: var(--t3); }
+.settings-toggle-item { justify-content: flex-start; }
+.settings-toggle-control {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+  transition: background var(--tn), border-color var(--tn);
+}
+.settings-toggle-control::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #dbe9ff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+  transition: transform var(--tn), background var(--tn);
+}
+.settings-toggle-item[data-enabled="true"] .settings-toggle-control {
+  background: rgba(79,195,247,0.22);
+  border-color: rgba(79,195,247,0.45);
+}
+.settings-toggle-item[data-enabled="true"] .settings-toggle-control::after {
+  transform: translateX(14px);
+  background: #4fc3f7;
+}
+.settings-toggle-item[data-enabled="true"] .settings-item-title {
+  color: #eef8ff;
+}
+.settings-collapsible {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.settings-collapsible-content {
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 12px;
+}
+.settings-collapsible.expanded .settings-collapsible-content {
+  display: flex;
+}
+.settings-collapsible-arrow {
+  transition: transform var(--tn), color var(--tn);
+}
+.settings-collapsible.expanded .settings-collapsible-arrow {
+  transform: rotate(180deg);
+}
+.settings-collapsible.expanded .settings-collapsible-trigger {
+  background: rgba(255,255,255,0.03);
+  border-color: var(--b1);
+}
 .settings-item.danger:hover { border-color: rgba(240,69,69,0.15); background: rgba(240,69,69,0.04); }
 .settings-item.danger:hover .settings-item-icon { background: rgba(240,69,69,0.08); border-color: rgba(240,69,69,0.2); }
 .settings-item.danger:hover .settings-item-icon svg, .settings-item.danger:hover .settings-item-title { color: #f04545; }

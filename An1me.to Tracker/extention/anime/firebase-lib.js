@@ -391,22 +391,28 @@ const FirebaseLib = (function() {
     /**
      * Set Firestore document
      */
-    async function setDocument(collection, docId, data) {
+    async function setDocument(collection, docId, data, options = {}) {
         const idToken = await getIdToken();
         if (!idToken) return false;
 
         const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collection}/${docId}`;
-        
+
         try {
+            const body = JSON.stringify({
+                fields: jsonToFirestoreFields(data)
+            });
+            // keepalive allows the request to survive page unload (popup close).
+            // Has a 64KB body limit — fall back to regular fetch if too large.
+            const useKeepalive = !!options.keepalive && body.length < 63000;
+
             const response = await fetch(url, {
                 method: 'PATCH',
                 headers: {
                     'Authorization': `Bearer ${idToken}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    fields: jsonToFirestoreFields(data)
-                })
+                body,
+                keepalive: useKeepalive
             });
 
             if (!response.ok) {

@@ -443,8 +443,8 @@ async function syncProgressOnly() {
 
     progressSyncInProgress = true;
     try {
-        const result   = await bgStorageGet(['videoProgress']);
-        const localVP  = result.videoProgress || {};
+        const result = await bgStorageGet(['videoProgress']);
+        const localVP = result.videoProgress || {};
 
         // Quick check: skip if nothing changed since last push
         if (lastPushedProgressBG && areProgressMapsEqual(localVP, lastPushedProgressBG)) return;
@@ -457,9 +457,11 @@ async function syncProgressOnly() {
             if (r.ok) cloudVP = fromFSDoc(await r.json())?.videoProgress || {};
         } catch {}
 
-        const mergedVP = mergeVideoProgress(localVP, cloudVP);
+        const latestResult = await bgStorageGet(['videoProgress']);
+        const latestLocalVP = latestResult.videoProgress || {};
+        const mergedVP = mergeVideoProgress(latestLocalVP, cloudVP);
 
-        if (!areProgressMapsEqual(localVP, mergedVP)) {
+        if (!areProgressMapsEqual(latestLocalVP, mergedVP)) {
             pauseSync();
             await bgStorageSet({ videoProgress: mergedVP });
         }
@@ -478,7 +480,7 @@ async function syncProgressOnly() {
         });
 
         if (response.ok) {
-            lastPushedProgressBG = { ...mergedVP }; // shallow copy for comparison
+            lastPushedProgressBG = JSON.parse(JSON.stringify(mergedVP));
         } else {
             console.warn('[BG] Progress sync failed:', response.status);
         }
@@ -505,13 +507,14 @@ async function syncToFirebase() {
 
     syncInProgress = true;
     try {
-        const result = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
-        const localAnime    = result.animeData        || {};
-        const localProgress = result.videoProgress    || {};
-        const localDeleted  = result.deletedAnime     || {};
-        const localGroup    = result.groupCoverImages || {};
-
+        const initialLocal = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
         const cloudDoc = await fetchCloudData(user, token);
+
+        const result = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
+        const localAnime    = result.animeData        || initialLocal.animeData        || {};
+        const localProgress = result.videoProgress    || initialLocal.videoProgress    || {};
+        const localDeleted  = result.deletedAnime     || initialLocal.deletedAnime     || {};
+        const localGroup    = result.groupCoverImages || initialLocal.groupCoverImages || {};
 
         const mergedDeleted = cloudDoc?.deletedAnime
             ? mergeDeletedAnime(localDeleted, cloudDoc.deletedAnime)
@@ -592,13 +595,18 @@ async function applyCloudUpdate(cloudDoc) {
     if (_applyCloudDebounce) clearTimeout(_applyCloudDebounce);
     _applyCloudDebounce = setTimeout(() => {
         _applyCloudDebounce = null;
-        _doApplyCloudUpdate(_applyCloudUpdateDoc);
+        _doApplyCloudUpdate(_applyCloudUpdateDoc).catch((error) => {
+            console.warn('[BG-RT] Apply update failed:', error.message);
+        });
     }, 500);
 }
 
 async function _doApplyCloudUpdate(cloudDoc) {
     if (!cloudDoc) return;
-    if (_applyCloudUpdatePending) return; // skip if already running
+    if (_applyCloudUpdatePending) {
+        _applyCloudUpdateDoc = cloudDoc;
+        return;
+    }
     _applyCloudUpdatePending = true;
 
     try {
@@ -640,6 +648,12 @@ async function _doApplyCloudUpdate(cloudDoc) {
         console.warn('[BG-RT] Apply update failed:', e.message);
     } finally {
         _applyCloudUpdatePending = false;
+    }
+
+    if (_applyCloudUpdateDoc && _applyCloudUpdateDoc !== cloudDoc) {
+        const queuedCloudDoc = _applyCloudUpdateDoc;
+        _applyCloudUpdateDoc = null;
+        await _doApplyCloudUpdate(queuedCloudDoc);
     }
 }
 
@@ -811,10 +825,20 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         }
     }
 
+    if (changes.deletedAnime && !isSyncPaused()) {
+        if (!shallowEqualDeletedAnime(
+            changes.deletedAnime.oldValue || {},
+            changes.deletedAnime.newValue || {}
+        )) {
+            _pendingFullSync = true;
+        }
+    }
+
     if (changes.groupCoverImages && !isSyncPaused()) {
-        const oldLen = Object.keys(changes.groupCoverImages.oldValue || {}).length;
-        const newLen = Object.keys(changes.groupCoverImages.newValue || {}).length;
-        if (newLen !== oldLen) {
+        if (!shallowEqualObjectMap(
+            changes.groupCoverImages.oldValue || {},
+            changes.groupCoverImages.newValue || {}
+        )) {
             _pendingFullSync = true;
         }
     }

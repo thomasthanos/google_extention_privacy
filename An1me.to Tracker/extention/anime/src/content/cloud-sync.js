@@ -162,19 +162,22 @@
 
     let lastPushedProgress      = null;
     let isPushingProgressDirect = false;
+    let progressPushPending     = false;
 
     async function pushProgressDirect(options = {}) {
         const { keepalive = false } = options;
-        if (isPushingProgressDirect && !keepalive) return;
+        if (isPushingProgressDirect && !keepalive) {
+            progressPushPending = true;
+            return;
+        }
         const token = await getValidToken();
         const user  = currentUser || await getUser();
         if (!token || !user) return;
         isPushingProgressDirect = true;
 
         try {
-            const local   = await chrome.storage.local.get(['videoProgress']);
-            const localVP = local.videoProgress || {};
-            const snapshot = JSON.stringify(localVP);
+            const localSnapshot = await chrome.storage.local.get(['videoProgress']);
+            const snapshot = JSON.stringify(localSnapshot.videoProgress || {});
             if (snapshot === lastPushedProgress) return;
 
             let cloudVP = {};
@@ -183,13 +186,24 @@
                 try {
                     const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
                     if (r.ok) cloudVP = fromFSDoc(await r.json())?.videoProgress || {};
-                } catch {}
+                    else if (r.status >= 500) { Logger?.warn('Cloud fetch 5xx, aborting push'); return; }
+                } catch (e) {
+                    Logger?.warn(`Cloud fetch failed, aborting push: ${e.message}`);
+                    return;
+                }
             }
 
-            const mergedVP = mergeVideoProgress(localVP, cloudVP);
+            const latestLocal = keepalive
+                ? (localSnapshot.videoProgress || {})
+                : ((await chrome.storage.local.get(['videoProgress'])).videoProgress || {});
+            if (!keepalive && JSON.stringify(latestLocal) !== snapshot) {
+                progressPushPending = true;
+            }
+
+            const mergedVP = mergeVideoProgress(latestLocal, cloudVP);
 
             if (!keepalive) {
-                const localCount  = Object.keys(localVP).length;
+                const localCount  = Object.keys(latestLocal).length;
                 const mergedCount = Object.keys(mergedVP).length;
                 if (mergedCount > localCount) {
                     csPauseSync();
@@ -224,6 +238,14 @@
             Logger?.warn(`Direct progress push error: ${e.message}`);
         } finally {
             isPushingProgressDirect = false;
+            if (progressPushPending && !keepalive) {
+                progressPushPending = false;
+                setTimeout(() => {
+                    pushProgressDirect().catch((error) => {
+                        Logger?.warn(`Queued progress push failed: ${error.message}`);
+                    });
+                }, 1000);
+            }
         }
     }
 
@@ -240,7 +262,7 @@
 
         fullPushInProgress = true;
         try {
-            const local = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
+            const localSnapshot = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
 
             const url     = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
             let cloudData = null;
@@ -249,6 +271,13 @@
                     const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
                     if (r.ok) cloudData = fromFSDoc(await r.json());
                 } catch {}
+            }
+
+            const local = keepalive
+                ? localSnapshot
+                : await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
+            if (!keepalive && JSON.stringify(local) !== JSON.stringify(localSnapshot)) {
+                fullPushPending = true;
             }
 
             const mergedDeleted = cloudData?.deletedAnime
@@ -587,12 +616,11 @@
         chrome.storage.onChanged.addListener((changes, namespace) => {
             if (namespace !== 'local') return;
 
+            let shouldSyncProgress = false;
+            let shouldSyncFull = false;
+
             if (changes.videoProgress && !csIsSyncPaused()) {
-                if (isOrionMode) {
-                    scheduleFullPush(3000);
-                } else {
-                    scheduleProgressPush(3000);
-                }
+                shouldSyncProgress = true;
             }
 
             if (changes.animeData && !csIsSyncPaused()) {
@@ -611,14 +639,46 @@
                 }
 
                 if (newCount > oldCount || coverChanged) {
-                    if (isOrionMode) {
-                        scheduleFullPush(1500);
-                    } else {
-                        setTimeout(async () => {
-                            const swAlive = await wakeBackgroundSW('SYNC_TO_FIREBASE');
-                            if (!swAlive) pushFullDirect();
-                        }, 500);
-                    }
+                    shouldSyncFull = true;
+                }
+            }
+
+            if (changes.deletedAnime && !csIsSyncPaused()) {
+                if (!shallowEqualDeletedAnime(
+                    changes.deletedAnime.oldValue || {},
+                    changes.deletedAnime.newValue || {}
+                )) {
+                    shouldSyncFull = true;
+                }
+            }
+
+            if (changes.groupCoverImages && !csIsSyncPaused()) {
+                if (!shallowEqualObjectMap(
+                    changes.groupCoverImages.oldValue || {},
+                    changes.groupCoverImages.newValue || {}
+                )) {
+                    shouldSyncFull = true;
+                }
+            }
+
+            if (shouldSyncFull) {
+                if (progressDebounce) clearTimeout(progressDebounce);
+                if (isOrionMode) {
+                    scheduleFullPush(1500);
+                } else {
+                    setTimeout(async () => {
+                        const swAlive = await wakeBackgroundSW('SYNC_TO_FIREBASE');
+                        if (!swAlive) pushFullDirect();
+                    }, 500);
+                }
+                return;
+            }
+
+            if (shouldSyncProgress) {
+                if (isOrionMode) {
+                    scheduleFullPush(3000);
+                } else {
+                    scheduleProgressPush(3000);
                 }
             }
         });
