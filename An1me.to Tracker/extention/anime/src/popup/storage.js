@@ -151,9 +151,28 @@ const Storage = {
      * Also fixes accidental slugs that end with -episode/-ep.
      */
     async migrateMultiPartAnime() {
+        // Prevent concurrent migrations (e.g. two popup windows open simultaneously)
+        const LOCK_KEY = '_migrationLock';
+        const LOCK_MAX_AGE = 30000; // 30s — stale lock safety net
+        try {
+            const lockResult = await new Promise(r => chrome.storage.local.get([LOCK_KEY], r));
+            if (lockResult[LOCK_KEY] && Date.now() - lockResult[LOCK_KEY] < LOCK_MAX_AGE) {
+                console.log('[Storage] Migration already in progress, skipping');
+                return false;
+            }
+            await new Promise(r => chrome.storage.local.set({ [LOCK_KEY]: Date.now() }, r));
+        } catch {
+            // If lock check fails, proceed anyway — better than skipping migration
+        }
+
+        const releaseLock = () => {
+            try { chrome.storage.local.remove([LOCK_KEY]); } catch {}
+        };
+
         return new Promise((resolve) => {
             chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime'], (result) => {
                 if (chrome.runtime.lastError || !result.animeData) {
+                    releaseLock();
                     resolve(false);
                     return;
                 }
@@ -346,10 +365,12 @@ const Storage = {
 
                 if (migrated) {
                     chrome.storage.local.set({ animeData, videoProgress, deletedAnime }, () => {
+                        releaseLock();
                         console.log('[Storage] Anime slug migration complete');
                         resolve(true);
                     });
                 } else {
+                    releaseLock();
                     resolve(false);
                 }
             });

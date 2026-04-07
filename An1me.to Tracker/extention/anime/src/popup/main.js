@@ -58,6 +58,10 @@
         sortBtn: document.getElementById('sortBtn'),
         sortDropdown: document.getElementById('sortDropdown'),
         settingsFetchFillers: document.getElementById('settingsFetchFillers'),
+        settingsSmartNotif: document.getElementById('settingsSmartNotif'),
+        settingsSmartNotifSubtitle: document.getElementById('settingsSmartNotifSubtitle'),
+        settingsAutoSkipFiller: document.getElementById('settingsAutoSkipFiller'),
+        settingsAutoSkipFillerSubtitle: document.getElementById('settingsAutoSkipFillerSubtitle'),
         // Add Anime Dialog
         addAnimeBtn: document.getElementById('addAnimeBtn'),
         addAnimeDialog: document.getElementById('addAnimeDialog'),
@@ -156,6 +160,60 @@
         }
     }
 
+    // ── Smart Notifications setting ──
+    const SMART_NOTIF_STORAGE_KEY = 'smartNotifEnabled';
+
+    function renderSmartNotifSetting(enabled) {
+        if (!elements.settingsSmartNotif) return;
+        elements.settingsSmartNotif.dataset.enabled = enabled ? 'true' : 'false';
+        elements.settingsSmartNotif.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+        if (elements.settingsSmartNotifSubtitle) {
+            elements.settingsSmartNotifSubtitle.textContent = enabled
+                ? 'You will be notified of new episodes'
+                : 'Get notified when new episodes are available';
+        }
+    }
+
+    async function loadSmartNotifSetting() {
+        try {
+            const result = await chrome.storage.local.get([SMART_NOTIF_STORAGE_KEY]);
+            const enabled = result[SMART_NOTIF_STORAGE_KEY] === true;
+            renderSmartNotifSetting(enabled);
+            return enabled;
+        } catch (error) {
+            console.warn('[Settings] Failed to load smart notif setting:', error);
+            renderSmartNotifSetting(false);
+            return false;
+        }
+    }
+
+    // ── Auto-Skip Fillers setting ──
+    const AUTO_SKIP_FILLER_STORAGE_KEY = 'autoSkipFillers';
+
+    function renderAutoSkipFillerSetting(enabled) {
+        if (!elements.settingsAutoSkipFiller) return;
+        elements.settingsAutoSkipFiller.dataset.enabled = enabled ? 'true' : 'false';
+        elements.settingsAutoSkipFiller.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+        if (elements.settingsAutoSkipFillerSubtitle) {
+            elements.settingsAutoSkipFillerSubtitle.textContent = enabled
+                ? 'Filler episodes will be auto-skipped'
+                : 'Automatically skip to next canon episode';
+        }
+    }
+
+    async function loadAutoSkipFillerSetting() {
+        try {
+            const result = await chrome.storage.local.get([AUTO_SKIP_FILLER_STORAGE_KEY]);
+            const enabled = result[AUTO_SKIP_FILLER_STORAGE_KEY] === true;
+            renderAutoSkipFillerSetting(enabled);
+            return enabled;
+        } catch (error) {
+            console.warn('[Settings] Failed to load auto-skip filler setting:', error);
+            renderAutoSkipFillerSetting(false);
+            return false;
+        }
+    }
+
     function setSettingsDataToolsExpanded(expanded) {
         if (!elements.settingsDataTools || !elements.settingsDataToolsToggle) return;
         const isExpanded = !!expanded;
@@ -246,84 +304,83 @@
         return Math.round((nowMidnight - targetMidnight) / (1000 * 60 * 60 * 24));
     }
 
-    function isAnimeCompleted(slug, anime) {
-        const { FillerService, SeasonGrouping, AnilistService } = AT;
-        if (!anime) return false;
+    /**
+     * Unified anime status resolver.  One function replaces the old
+     * isAnimeCompleted / isAgedCompleted / isCaughtUpAiring trio.
+     *
+     * Returns: 'dropped' | 'completed' | 'airing' | 'watching'
+     */
+    const AnimeStatus = { WATCHING: 'watching', COMPLETED: 'completed', AIRING: 'airing', DROPPED: 'dropped' };
+
+    function getAnimeStatus(slug, anime) {
+        const { FillerService, SeasonGrouping, AnilistService, CONFIG } = AT;
+        if (!anime) return AnimeStatus.WATCHING;
+
+        // ── Dropped ─────────────────────────────────────────────────────────
+        if (anime.droppedAt) return AnimeStatus.DROPPED;
+
         const watchedCount = anime.episodes?.length || 0;
-        if (watchedCount === 0) return false;
-        if (anime.completedAt) return true;
-        if (SeasonGrouping.isMovie(slug, anime)) return true;
-
         const lowerSlug = slug.toLowerCase();
-        const progressData = FillerService.calculateProgress(watchedCount, slug, anime);
-
-        // Guard: if the site doesn't have all episodes yet (latestEpisode < totalEpisodes
-        // from metadata), reaching 100% of *available* episodes is NOT completion.
+        const anilistStatus = AnilistService?.getStatus(lowerSlug);
         const latestAvailable = AnilistService?.getLatestEpisode(lowerSlug);
         const metaTotal = AnilistService?.getTotalEpisodes(lowerSlug);
         const isPartiallyUploaded = metaTotal && latestAvailable && latestAvailable < metaTotal;
 
-        if (progressData.progress >= 100 && !isPartiallyUploaded) return true;
+        // ── Completion checks ───────────────────────────────────────────────
+        let isComplete = false;
 
-        // AniList says FINISHED and total is unknown → user has watched all available episodes
-        const anilistStatus = AnilistService?.getStatus(lowerSlug);
-        if (anilistStatus === 'FINISHED' && progressData.total == null && !isPartiallyUploaded) return true;
-        // AniList says FINISHED and user has tracked the final episode (handles gaps in the middle)
-        if (anilistStatus === 'FINISHED' && progressData.total != null) {
-            const highestEp = Math.max(0, ...(anime.episodes || []).map(ep => Number(ep.number) || 0));
-            if (highestEp >= progressData.total && !isPartiallyUploaded) return true;
-        }
-        return false;
-    }
+        if (watchedCount === 0) {
+            isComplete = false;
+        } else if (anime.completedAt) {
+            isComplete = true;
+        } else if (SeasonGrouping.isMovie(slug, anime)) {
+            isComplete = true;
+        } else {
+            const progressData = FillerService.calculateProgress(watchedCount, slug, anime);
 
-    function isAgedCompleted(slug, anime) {
-        const { CONFIG, AnilistService, SeasonGrouping } = AT;
-        if (!isAnimeCompleted(slug, anime)) return false;
-        if (anime.completedAt) return true;
-        // Movies are always immediately completed — no waiting period needed
-        if (SeasonGrouping.isMovie(slug, anime)) return true;
-        // For definitively finished series, move to completed section immediately
-        const anilistStatus = AnilistService?.getStatus(slug.toLowerCase());
-        if (anilistStatus === 'FINISHED') return true;
-        // For airing/unknown series, wait a few days to avoid false moves
-        const daysSinceLastWatch = getCalendarDayDiff(anime?.lastWatched);
-        return daysSinceLastWatch >= CONFIG.COMPLETED_LIST_MIN_DAYS;
-    }
-
-    /**
-     * Check if an anime is airing and the user has caught up with all available episodes.
-     * These get moved to the collapsible "Airing List" section.
-     */
-    function isCaughtUpAiring(slug, anime) {
-        const { AnilistService } = AT;
-        if (!anime || !anime.episodes || anime.episodes.length === 0) return false;
-        if (anime.droppedAt) return false;
-        if (anime.completedAt) return false;
-
-        const lowerSlug = slug.toLowerCase();
-        const anilistStatus = AnilistService?.getStatus(lowerSlug);
-
-        // Get the latest actually available episode on an1me.to (not the planned total)
-        const latestAvailable = AnilistService?.getLatestEpisode(lowerSlug);
-        if (!latestAvailable || latestAvailable <= 0) return false;
-
-        // Get highest watched episode
-        const highestWatched = Math.max(0, ...(anime.episodes || []).map(ep => Number(ep.number) || 0));
-
-        // Standard case: anime is currently airing
-        if (anilistStatus === 'RELEASING' && highestWatched >= latestAvailable) return true;
-
-        // Partially uploaded case: anime is FINISHED but the site doesn't have all
-        // episodes yet (e.g. ongoing fan translations). Treat as "airing" if the user
-        // has watched everything that's actually available.
-        if (anilistStatus === 'FINISHED') {
-            const totalEpisodes = AnilistService?.getTotalEpisodes(lowerSlug);
-            if (totalEpisodes && latestAvailable < totalEpisodes && highestWatched >= latestAvailable) {
-                return true;
+            if (progressData.progress >= 100 && !isPartiallyUploaded) {
+                isComplete = true;
+            } else if (anilistStatus === 'FINISHED' && progressData.total == null && !isPartiallyUploaded) {
+                isComplete = true;
+            } else if (anilistStatus === 'FINISHED' && progressData.total != null) {
+                const highestEp = Math.max(0, ...(anime.episodes || []).map(ep => Number(ep.number) || 0));
+                if (highestEp >= progressData.total && !isPartiallyUploaded) isComplete = true;
             }
         }
 
-        return false;
+        if (isComplete) {
+            // Decide whether to show in completed section (aged) or still in main list
+            const isAged =
+                anime.completedAt ||
+                SeasonGrouping.isMovie(slug, anime) ||
+                anilistStatus === 'FINISHED' ||
+                getCalendarDayDiff(anime?.lastWatched) >= CONFIG.COMPLETED_LIST_MIN_DAYS;
+
+            return isAged ? AnimeStatus.COMPLETED : AnimeStatus.WATCHING;
+        }
+
+        // ── Caught up with airing ───────────────────────────────────────────
+        if (watchedCount > 0 && !anime.completedAt && latestAvailable > 0) {
+            const highestWatched = Math.max(0, ...(anime.episodes || []).map(ep => Number(ep.number) || 0));
+
+            if (anilistStatus === 'RELEASING' && highestWatched >= latestAvailable) {
+                return AnimeStatus.AIRING;
+            }
+            if (anilistStatus === 'FINISHED' && isPartiallyUploaded && highestWatched >= latestAvailable) {
+                return AnimeStatus.AIRING;
+            }
+        }
+
+        return AnimeStatus.WATCHING;
+    }
+
+    // Convenience wrappers used by other parts of the popup
+    function isAnimeCompleted(slug, anime) {
+        const status = getAnimeStatus(slug, anime);
+        return status === AnimeStatus.COMPLETED || (
+            // Also return true for "watching but complete" (not yet aged)
+            anime?.completedAt || (anime?.episodes?.length > 0 && AT.SeasonGrouping.isMovie(slug, anime))
+        );
     }
 
     function normalizeMovieDurations(data, progress = {}) {
@@ -596,20 +653,17 @@
             return html;
         };
 
-        // Single pass — partition into normal, completed, dropped, and airing entries.
+        // Single pass — partition using unified getAnimeStatus().
         const normalEntries = [];
         const completedEntries = [];
         const droppedEntries = [];
         const airingEntries = [];
         for (const entry of sortedEntries) {
-            if (entry[1].droppedAt) {
-                droppedEntries.push(entry);
-            } else if (isAgedCompleted(entry[0], entry[1])) {
-                completedEntries.push(entry);
-            } else if (isCaughtUpAiring(entry[0], entry[1])) {
-                airingEntries.push(entry);
-            } else {
-                normalEntries.push(entry);
+            switch (getAnimeStatus(entry[0], entry[1])) {
+                case AnimeStatus.DROPPED:   droppedEntries.push(entry); break;
+                case AnimeStatus.COMPLETED: completedEntries.push(entry); break;
+                case AnimeStatus.AIRING:    airingEntries.push(entry); break;
+                default:                    normalEntries.push(entry); break;
             }
         }
         completedEntries.sort(([, a], [, b]) =>
@@ -2221,6 +2275,37 @@
             });
         }
 
+        if (elements.settingsSmartNotif) {
+            elements.settingsSmartNotif.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                const currentlyEnabled = elements.settingsSmartNotif.dataset.enabled === 'true';
+                const nextEnabled = !currentlyEnabled;
+                renderSmartNotifSetting(nextEnabled);
+                try {
+                    await chrome.storage.local.set({ [SMART_NOTIF_STORAGE_KEY]: nextEnabled });
+                    chrome.runtime.sendMessage({ type: 'SET_SMART_NOTIFICATIONS', enabled: nextEnabled });
+                } catch (error) {
+                    console.error('[Settings] Failed to update smart notif setting:', error);
+                    renderSmartNotifSetting(currentlyEnabled);
+                }
+            });
+        }
+
+        if (elements.settingsAutoSkipFiller) {
+            elements.settingsAutoSkipFiller.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                const currentlyEnabled = elements.settingsAutoSkipFiller.dataset.enabled === 'true';
+                const nextEnabled = !currentlyEnabled;
+                renderAutoSkipFillerSetting(nextEnabled);
+                try {
+                    await chrome.storage.local.set({ [AUTO_SKIP_FILLER_STORAGE_KEY]: nextEnabled });
+                } catch (error) {
+                    console.error('[Settings] Failed to update auto-skip filler setting:', error);
+                    renderAutoSkipFillerSetting(currentlyEnabled);
+                }
+            });
+        }
+
         if (elements.searchInput) {
             let searchTimeout = null;
             elements.searchInput.addEventListener('input', (e) => {
@@ -2555,7 +2640,11 @@
         }
 
         initEventListeners();
-        await loadCopyGuardSetting();
+        await Promise.all([
+            loadCopyGuardSetting(),
+            loadSmartNotifSetting(),
+            loadAutoSkipFillerSetting()
+        ]);
 
         FirebaseSync.init({
             onUserSignedIn: async (user) => {

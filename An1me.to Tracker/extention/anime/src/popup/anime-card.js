@@ -472,6 +472,8 @@ const AnimeCardRenderer = {
             watchedDateStr = watchedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         }
 
+        const continueUrl = `https://an1me.to/watch/${UIHelpers.escapeHtml(anime.slug)}-episode-${latestEp.number}`;
+
         return `
             <div class="${cardClass}" data-slug="${safeSlug}">
                 <div class="ip-header">
@@ -485,7 +487,7 @@ const AnimeCardRenderer = {
                             </button>
                         </div>
                         <div class="ip-meta">
-                            <span class="ip-meta-item">Ep ${latestEp.number}</span>
+                            <a class="ip-meta-item ip-continue-link" href="${continueUrl}" target="_blank" title="Continue watching Ep ${latestEp.number}">▶ Ep ${latestEp.number}</a>
                             <span class="ip-meta-sep">·</span>
                             <span class="ip-meta-item">${currentTimeStr} / ${durationStr}</span>
                             <span class="ip-meta-sep">·</span>

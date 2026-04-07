@@ -529,6 +529,71 @@
             .replace(/-[a-z]+-hen$/i, '');
     }
 
+    /**
+     * Highlight watched episodes in the page's episode list sidebar.
+     * Reads tracked episodes from storage and applies a persistent style
+     * (dark orange text + reduced opacity) so the user can see progress
+     * even after browser cache is cleared.
+     */
+    let _highlightStorageListener = null;
+
+    function highlightWatchedEpisodes(slug) {
+        const { Logger } = AT;
+
+        // Remove previous listener to prevent leaks on SPA navigation
+        if (_highlightStorageListener) {
+            chrome.storage.onChanged.removeListener(_highlightStorageListener);
+            _highlightStorageListener = null;
+        }
+
+        function applyHighlights(watchedSet) {
+            const items = document.querySelectorAll('.episode-list-item[data-episode-search-query]');
+            let highlighted = 0;
+            for (const item of items) {
+                const epNum = parseInt(item.getAttribute('data-episode-search-query'), 10);
+                if (isNaN(epNum)) continue;
+                if (item.classList.contains('current-episode')) continue;
+                if (watchedSet.has(epNum)) {
+                    item.style.opacity = '0.5';
+                    item.style.color = 'rgb(233, 171, 56)';
+                    highlighted++;
+                } else {
+                    item.style.opacity = '';
+                    item.style.color = '';
+                }
+            }
+            return highlighted;
+        }
+
+        chrome.storage.local.get(['animeData'], (result) => {
+            if (chrome.runtime.lastError || !result.animeData) return;
+
+            const anime = result.animeData[slug];
+            if (!anime?.episodes?.length) return;
+
+            const watchedSet = new Set(anime.episodes.map(ep => Number(ep.number)));
+            if (watchedSet.size === 0) return;
+
+            const count = applyHighlights(watchedSet);
+            if (count > 0) {
+                Logger.debug(`Highlighted ${count} watched episodes in episode list`);
+            }
+        });
+
+        // Re-highlight when storage updates (e.g. user just finished an episode)
+        _highlightStorageListener = (changes) => {
+            if (!changes.animeData) return;
+            const newData = changes.animeData.newValue || {};
+            const anime = newData[slug];
+            if (!anime?.episodes?.length) return;
+
+            const watchedSet = new Set(anime.episodes.map(ep => Number(ep.number)));
+            applyHighlights(watchedSet);
+        };
+
+        chrome.storage.onChanged.addListener(_highlightStorageListener);
+    }
+
     async function init() {
         const { Logger, AnimeParser, ProgressTracker, VideoMonitor, Notifications } = AT;
 
@@ -599,6 +664,54 @@
         }
 
         Logger.info(`Detected: ${animeInfo.animeTitle} Ep${animeInfo.episodeNumber}`);
+
+        // ── Auto-Skip Filler check ──
+        // If enabled, ask background for filler data and redirect to next canon episode.
+        // The filler episode is NOT marked as watched — only navigated past.
+        try {
+            const skipResult = await chrome.storage.local.get(['autoSkipFillers']);
+            if (skipResult.autoSkipFillers === true) {
+                const fillerResponse = await chrome.runtime.sendMessage({
+                    type: 'GET_FILLER_EPISODES',
+                    animeSlug: animeInfo.animeSlug
+                });
+                const fillerEpisodes = fillerResponse?.fillers;
+                if (Array.isArray(fillerEpisodes) && fillerEpisodes.includes(animeInfo.episodeNumber)) {
+                    // Find next non-filler episode
+                    let nextCanon = animeInfo.episodeNumber + 1;
+                    const maxSearch = (animeInfo.totalEpisodes || 9999);
+                    while (fillerEpisodes.includes(nextCanon) && nextCanon <= maxSearch) {
+                        nextCanon++;
+                    }
+                    if (nextCanon <= maxSearch) {
+                        Logger.info(`⏭ Filler detected (Ep ${animeInfo.episodeNumber}), skipping to Ep ${nextCanon}`);
+                        // Show a brief toast before redirecting
+                        try {
+                            const toast = document.createElement('div');
+                            toast.textContent = `⏭ Filler Ep ${animeInfo.episodeNumber} — skipping to Ep ${nextCanon}`;
+                            Object.assign(toast.style, {
+                                position: 'fixed', bottom: '30px', right: '30px', zIndex: '2147483647',
+                                padding: '12px 20px', borderRadius: '10px', fontSize: '14px', fontWeight: '600',
+                                color: '#fff', background: 'rgba(30,30,40,0.92)', backdropFilter: 'blur(12px)',
+                                boxShadow: '0 4px 20px rgba(0,0,0,0.4)', fontFamily: 'system-ui, sans-serif'
+                            });
+                            document.body.appendChild(toast);
+                        } catch { /* non-critical UI */ }
+                        // Small delay so the user sees the notification
+                        setTimeout(() => {
+                            window.location.href = `https://an1me.to/watch/${animeInfo.animeSlug}-episode-${nextCanon}`;
+                        }, 1500);
+                        return; // Don't set up video monitoring for a filler we're skipping
+                    }
+                    Logger.info(`⏭ Filler detected (Ep ${animeInfo.episodeNumber}) but no more canon episodes found`);
+                }
+            }
+        } catch (e) {
+            Logger.warn('Auto-skip filler check failed:', e);
+        }
+
+        // ── Highlight watched episodes in the episode list ──
+        highlightWatchedEpisodes(animeInfo.animeSlug);
 
         const alreadyTracked = await ProgressTracker.isEpisodeTracked(animeInfo.uniqueId);
         if (alreadyTracked) {

@@ -1208,6 +1208,189 @@ async function fetchEpisodeTypesFromAnimeFillerList(animeSlug) {
     }
 }
 
+// ─── AniList GraphQL API ─────────────────────────────────────────────────────
+
+const ANILIST_API = 'https://graphql.anilist.co';
+
+async function fetchAniListAiring(title) {
+    const query = `
+        query ($search: String) {
+            Media(search: $search, type: ANIME) {
+                id
+                title { romaji english }
+                status
+                episodes
+                nextAiringEpisode { episode airingAt timeUntilAiring }
+            }
+        }`;
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 10000);
+    try {
+        const res = await fetch(ANILIST_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ query, variables: { search: title } }),
+            signal: ctrl.signal
+        });
+        clearTimeout(timer);
+        if (!res.ok) return null;
+        const json = await res.json();
+        const media = json?.data?.Media;
+        if (!media) return null;
+        return {
+            anilistId: media.id,
+            title: media.title?.english || media.title?.romaji || title,
+            status: media.status,         // FINISHED | RELEASING | NOT_YET_RELEASED | CANCELLED | HIATUS
+            episodes: media.episodes,
+            nextAiring: media.nextAiringEpisode ? {
+                episode: media.nextAiringEpisode.episode,
+                airingAt: media.nextAiringEpisode.airingAt,
+                timeUntilAiring: media.nextAiringEpisode.timeUntilAiring
+            } : null
+        };
+    } catch {
+        clearTimeout(timer);
+        return null;
+    }
+}
+
+// ─── Jikan API (MAL) — fallback filler source ───────────────────────────────
+
+async function fetchJikanEpisodes(title) {
+    try {
+        // Step 1: search for anime
+        const searchCtrl = new AbortController();
+        const searchTimer = setTimeout(() => searchCtrl.abort(), 10000);
+        const searchRes = await fetch(
+            `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(title)}&limit=1`,
+            { signal: searchCtrl.signal }
+        );
+        clearTimeout(searchTimer);
+        if (!searchRes.ok) return null;
+        const searchData = await searchRes.json();
+        const anime = searchData?.data?.[0];
+        if (!anime?.mal_id) return null;
+
+        // Step 2: fetch episodes (paginated, get all)
+        const malId = anime.mal_id;
+        const allEpisodes = [];
+        let page = 1;
+        let hasNext = true;
+
+        while (hasNext && page <= 10) { // Safety: max 10 pages (250 episodes)
+            const epCtrl = new AbortController();
+            const epTimer = setTimeout(() => epCtrl.abort(), 10000);
+            const epRes = await fetch(
+                `https://api.jikan.moe/v4/anime/${malId}/episodes?page=${page}`,
+                { signal: epCtrl.signal }
+            );
+            clearTimeout(epTimer);
+            if (!epRes.ok) break;
+            const epData = await epRes.json();
+            if (epData?.data) allEpisodes.push(...epData.data);
+            hasNext = epData?.pagination?.has_next_page === true;
+            page++;
+            if (hasNext) await new Promise(r => setTimeout(r, 400)); // Jikan rate limit
+        }
+
+        if (allEpisodes.length === 0) return null;
+
+        // Jikan marks fillers with `filler: true` and recaps with `recap: true`
+        const episodeTypes = { canon: [], filler: [], mixed: [], anime_canon: [], totalEpisodes: allEpisodes.length };
+        for (const ep of allEpisodes) {
+            const num = ep.mal_id; // episode number
+            if (!num || num <= 0) continue;
+            if (ep.filler) {
+                episodeTypes.filler.push(num);
+            } else if (ep.recap) {
+                episodeTypes.mixed.push(num);
+            } else {
+                episodeTypes.canon.push(num);
+            }
+        }
+
+        return episodeTypes;
+    } catch {
+        return null;
+    }
+}
+
+// ─── Smart Notifications — new episode alerts ───────────────────────────────
+
+const SMART_NOTIF_ALARM = 'smartNotifCheck';
+const SMART_NOTIF_INTERVAL_MINUTES = 60; // check every hour
+
+async function checkNewEpisodes() {
+    try {
+        const settings = await bgStorageGet(['smartNotificationsEnabled', 'animeData', 'smartNotifLastCheck']);
+        if (settings.smartNotificationsEnabled === false) return;
+
+        const animeData = settings.animeData || {};
+        const lastCheck = settings.smartNotifLastCheck || {};
+        const now = Date.now();
+        const updatedLastCheck = { ...lastCheck };
+        let checked = 0;
+
+        for (const [slug, anime] of Object.entries(animeData)) {
+            if (anime.droppedAt || anime.completedAt) continue;
+            if (checked >= 5) break; // max 5 checks per cycle to avoid rate limits
+
+            const cachedKey = `animeinfo_${slug}`;
+            const cached = (await bgStorageGet([cachedKey]))[cachedKey];
+
+            // Only check airing anime
+            if (!cached || (cached.status !== 'RELEASING')) continue;
+
+            const lastCheckedTime = lastCheck[slug] || 0;
+            if (now - lastCheckedTime < 3600000) continue; // skip if checked <1h ago
+
+            checked++;
+            try {
+                const info = await fetchAnimePageInfo(slug);
+                if (!info?.latestEpisode) continue;
+
+                const prevLatest = cached.latestEpisode || 0;
+                if (info.latestEpisode > prevLatest && prevLatest > 0) {
+                    // New episode available!
+                    const highestWatched = Math.max(0, ...(anime.episodes || []).map(ep => Number(ep.number) || 0));
+                    if (info.latestEpisode > highestWatched) {
+                        chrome.notifications.create(`new-ep-${slug}`, {
+                            type: 'basic',
+                            iconUrl: 'src/icons/icon128.png',
+                            title: `New Episode Available!`,
+                            message: `${anime.title} — Episode ${info.latestEpisode} is now available`,
+                            priority: 1
+                        });
+                    }
+
+                    // Update cache with new episode count
+                    await bgStorageSet({ [cachedKey]: { ...cached, ...info, cachedAt: now } });
+                }
+
+                updatedLastCheck[slug] = now;
+            } catch {
+                // Skip this anime on error
+            }
+
+            await new Promise(r => setTimeout(r, 1500)); // rate limit
+        }
+
+        await bgStorageSet({ smartNotifLastCheck: updatedLastCheck });
+    } catch (e) {
+        console.warn('[BG] Smart notification check failed:', e);
+    }
+}
+
+// Notification click → open an1me.to
+chrome.notifications.onClicked.addListener((notifId) => {
+    if (notifId.startsWith('new-ep-')) {
+        const slug = notifId.replace('new-ep-', '');
+        chrome.tabs.create({ url: `https://an1me.to/anime/${slug}/` });
+        chrome.notifications.clear(notifId);
+    }
+});
+
 let metadataRepairInProgress = false;
 
 async function repairAnimeInfoCache(slug, forceRefresh = true) {
@@ -1719,20 +1902,63 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         (async () => {
             try {
                 const fillerSlug = await discoverFillerSlug(message.animeSlug, message.animeTitle || null);
-                if (!fillerSlug) {
-                    sendResponse({ success: false, notFound: true, error: 'Not found on animefillerlist.com' });
-                    return;
+                if (fillerSlug) {
+                    const episodeTypes = await fetchEpisodeTypesFromAnimeFillerList(fillerSlug);
+                    if (episodeTypes) {
+                        sendResponse({ success: true, episodeTypes, fillerSlug, source: 'animefillerlist' });
+                        return;
+                    }
                 }
-                const episodeTypes = await fetchEpisodeTypesFromAnimeFillerList(fillerSlug);
-                if (episodeTypes) {
-                    sendResponse({ success: true, episodeTypes, fillerSlug });
-                } else {
-                    sendResponse({ success: false, error: 'Failed to parse episode types' });
+
+                // Fallback: try Jikan API (MAL) for filler data
+                if (message.animeTitle) {
+                    console.log(`[BG] AnimeFillerList miss, trying Jikan for "${message.animeTitle}"`);
+                    const jikanData = await fetchJikanEpisodes(message.animeTitle);
+                    if (jikanData && jikanData.filler.length > 0) {
+                        sendResponse({ success: true, episodeTypes: jikanData, fillerSlug: message.animeSlug, source: 'jikan' });
+                        return;
+                    }
                 }
+
+                sendResponse({ success: false, notFound: true, error: 'Not found on animefillerlist.com or Jikan' });
             } catch (error) {
                 sendResponse({ success: false, error: error.message });
             }
         })();
+        return true;
+    }
+
+    if (message.type === 'FETCH_ANILIST_AIRING') {
+        if (!message.title) { sendResponse({ error: 'Missing title' }); return true; }
+        fetchAniListAiring(message.title)
+            .then(data => sendResponse({ success: !!data, data }))
+            .catch(error => sendResponse({ success: false, error: error.message }));
+        return true;
+    }
+
+    if (message.type === 'SET_SMART_NOTIFICATIONS') {
+        bgStorageSet({ smartNotificationsEnabled: message.enabled })
+            .then(() => {
+                if (message.enabled) {
+                    chrome.alarms.create(SMART_NOTIF_ALARM, { periodInMinutes: SMART_NOTIF_INTERVAL_MINUTES });
+                } else {
+                    chrome.alarms.clear(SMART_NOTIF_ALARM).catch(() => {});
+                }
+                sendResponse({ success: true });
+            })
+            .catch(e => sendResponse({ success: false, error: e.message }));
+        return true;
+    }
+
+    if (message.type === 'GET_FILLER_EPISODES') {
+        // Content script asks for filler data for a specific slug
+        if (!message.animeSlug) { sendResponse({ fillers: null }); return true; }
+        bgStorageGet([`episodeTypes_${message.animeSlug}`])
+            .then(result => {
+                const data = result[`episodeTypes_${message.animeSlug}`];
+                sendResponse({ fillers: data?.filler || null });
+            })
+            .catch(() => sendResponse({ fillers: null }));
         return true;
     }
 
@@ -1785,6 +2011,12 @@ chrome.runtime.onStartup.addListener(() => {
     console.log('[Anime Tracker] Extension started');
     migrateFromSyncToLocal();
     setTimeout(startRealtimeListener, 2000);
+    // Restore smart notification alarm if enabled
+    bgStorageGet(['smartNotificationsEnabled']).then(r => {
+        if (r.smartNotificationsEnabled !== false) {
+            chrome.alarms.create(SMART_NOTIF_ALARM, { periodInMinutes: SMART_NOTIF_INTERVAL_MINUTES });
+        }
+    }).catch(() => {});
 });
 
 // ─── Keep-alive port ──────────────────────────────────────────────────────────
@@ -1810,6 +2042,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
         runMetadataRepairBatch().catch((error) => {
             console.error('[BG] Metadata repair alarm failed:', error);
         });
+        return;
+    }
+
+    if (alarm.name === SMART_NOTIF_ALARM) {
+        checkNewEpisodes().catch(e => console.warn('[BG] Smart notif check error:', e));
         return;
     }
 
