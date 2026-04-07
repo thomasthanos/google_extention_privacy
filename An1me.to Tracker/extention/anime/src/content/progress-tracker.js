@@ -14,6 +14,11 @@ const ProgressTracker = {
     seekSaveTimeout: null,
     MAX_REASONABLE_DURATION_SECONDS: 6 * 60 * 60,
 
+    // In-memory cache for videoProgress reads (avoids redundant storage calls)
+    _vpCache: null,
+    _vpCacheTime: 0,
+    _VP_CACHE_TTL: 5000, // 5 seconds
+
     normalizeDuration(duration) {
         let value = Math.round(Number(duration) || 0);
         if (!Number.isFinite(value) || value <= 0) return 0;
@@ -197,8 +202,16 @@ const ProgressTracker = {
                 throw new Error(`Invalid time values: currentTime=${currentTime}, duration=${duration}`);
             }
 
-            const result = await Storage.get(['videoProgress']);
-            let videoProgress = result.videoProgress || {};
+            const now = Date.now();
+            let videoProgress;
+
+            // Use cached videoProgress if fresh enough
+            if (this._vpCache && (now - this._vpCacheTime) < this._VP_CACHE_TTL) {
+                videoProgress = this._vpCache;
+            } else {
+                const result = await Storage.get(['videoProgress']);
+                videoProgress = result.videoProgress || {};
+            }
 
             if (typeof videoProgress !== 'object' || Array.isArray(videoProgress)) {
                 Logger.warn('Invalid videoProgress structure, resetting');
@@ -227,6 +240,9 @@ const ProgressTracker = {
             };
 
             await Storage.set({ videoProgress });
+            // Update cache after successful write
+            this._vpCache = videoProgress;
+            this._vpCacheTime = Date.now();
             Logger.debug(`Progress saved: ${uniqueId} → ${videoProgress[uniqueId].percentage}% (${newCurrentTime}s/${Math.floor(duration)}s)`);
         } catch (e) {
             if (e.message && e.message.includes('Extension context invalidated')) {
@@ -317,6 +333,8 @@ const ProgressTracker = {
             const videoProgress = result.videoProgress || {};
             delete videoProgress[uniqueId];
             await Storage.set({ videoProgress });
+            this._vpCache = videoProgress;
+            this._vpCacheTime = Date.now();
             Logger.debug('Cleared progress for:', uniqueId);
         } catch (e) {
             Logger.error('Error clearing progress:', e);
@@ -566,6 +584,8 @@ const ProgressTracker = {
         this.saveInProgress = false;
         this.lastSavedProgress.clear();
         this.lastSaveTime = 0;
+        this._vpCache = null;
+        this._vpCacheTime = 0;
     }
 };
 

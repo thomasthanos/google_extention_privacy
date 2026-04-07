@@ -413,7 +413,10 @@ const Notifications = {
 
         const { doc, container } = this._resolveTarget();
         this._ensureRootStyles(doc);
-        const safeTitle = window.AnimeTrackerContent?.AnimeParser?.escapeHtml?.(info?.animeTitle || '') || '';
+        const rawTitle = info?.animeTitle || '';
+        const safeTitle = typeof rawTitle === 'string'
+            ? rawTitle.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;')
+            : '';
 
         const notification = doc.createElement('div');
         notification.id = 'anime-tracker-notification';

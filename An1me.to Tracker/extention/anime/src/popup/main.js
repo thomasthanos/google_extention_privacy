@@ -505,6 +505,17 @@
             Object.entries(videoProgress).filter(([, p]) => !p.deleted)
         );
 
+        // Build slug index for O(1) lookups in anime-card instead of O(N) prefix scan
+        const slugIndex = {};
+        for (const [id, progress] of Object.entries(visibleProgress)) {
+            const sepIdx = id.indexOf('__episode-');
+            if (sepIdx === -1) continue;
+            const slug = id.substring(0, sepIdx);
+            if (!slugIndex[slug]) slugIndex[slug] = [];
+            slugIndex[slug].push([id, progress]);
+        }
+        visibleProgress.__slugIndex = slugIndex;
+
         const inProgressAnime = ProgressManager.getInProgressAnime(animeData, visibleProgress)
             .filter(anime => {
                 const matchesSearch = !filter || anime.title.toLowerCase().includes(filter.toLowerCase());
@@ -1458,7 +1469,7 @@
             if (rangeMatch) {
                 const start = parseInt(rangeMatch[1], 10);
                 const end = parseInt(rangeMatch[2], 10);
-                if (start > 0 && end >= start) {
+                if (start > 0 && end >= start && (end - start) <= 2000) {
                     for (let i = start; i <= end; i++) episodeNumbers.add(i);
                 }
             } else if (singleMatch) {

@@ -290,25 +290,19 @@ const FirebaseSync = {
 
             // On Orion/mobile (no SW), merge local videoProgress into the cloud doc
             // before proceeding, to avoid losing progress saved by content scripts.
+            // Pre-merge: patch in-memory cloudData with local videoProgress so the
+            // main merge below sees the combined VP. We do NOT write to the cloud here
+            // to avoid overwriting animeData with stale cloud-only values; the final
+            // cloud write after the full merge handles everything.
             if (cloudData && localDataForPreUpload.userId === this.currentUser.uid &&
                     localDataForPreUpload.videoProgress && Object.keys(localDataForPreUpload.videoProgress).length > 0) {
                 try {
                     const cloudVP = cloudData.videoProgress || {};
                     const localVP = localDataForPreUpload.videoProgress;
                     const merged = AnimeTracker.MergeUtils.mergeVideoProgress(localVP, cloudVP);
-                    const hasChanges = Object.entries(merged).some(([id, val]) =>
-                        !cloudVP[id] || val.currentTime !== cloudVP[id].currentTime
-                    );
-                    if (hasChanges) {
-                        // Patch the in-memory cloudData so the merge below sees the latest VP.
-                        cloudData = { ...cloudData, videoProgress: merged };
-                        await FirebaseLib.setDocument('users', this.currentUser.uid, {
-                            ...cloudData,
-                            lastUpdated: new Date().toISOString()
-                        });
-                    }
+                    cloudData = { ...cloudData, videoProgress: merged };
                 } catch (e) {
-                    console.warn('[Sync] Pre-upload failed (non-critical):', e.message);
+                    console.warn('[Sync] Pre-merge VP patch failed (non-critical):', e.message);
                 }
             }
             const localData = await readLocalSyncData();

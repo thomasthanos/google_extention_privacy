@@ -138,26 +138,30 @@ const UIHelpers = {
     /**
      * Escape HTML - handles XSS edge cases
      */
+    _ESCAPE_MAP: { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;', '`': '&#x60;', '/': '&#x2F;' },
+    _ESCAPE_RE: /[&<>"'`/]/g,
+
     escapeHtml(str) {
         if (typeof str !== 'string') {
             if (str === null || str === undefined) return '';
             str = String(str);
         }
 
-        return str
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;')
-            .replace(/`/g, '&#x60;')
-            .replace(/\//g, '&#x2F;');
+        return str.replace(this._ESCAPE_RE, c => this._ESCAPE_MAP[c]);
     },
 
     /**
      * Sanitize image URLs used in popup templates.
      * Allows only absolute HTTPS URLs.
      */
+    _ALLOWED_IMAGE_HOSTS: [
+        's4.anilist.co',
+        'cdn.myanimelist.net',
+        'media.kitsu.app',
+        'img1.ak.crunchyroll.com',
+        'an1me.to',
+    ],
+
     sanitizeImageUrl(url) {
         if (typeof url !== 'string') return null;
         const trimmed = url.trim();
@@ -166,6 +170,11 @@ const UIHelpers = {
         try {
             const parsed = new URL(trimmed, window.location.origin);
             if (parsed.protocol !== 'https:') return null;
+            const host = parsed.hostname.toLowerCase();
+            const allowed = this._ALLOWED_IMAGE_HOSTS.some(
+                h => host === h || host.endsWith('.' + h)
+            );
+            if (!allowed) return null;
             return parsed.href;
         } catch {
             return null;

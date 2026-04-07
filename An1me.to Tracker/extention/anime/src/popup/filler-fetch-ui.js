@@ -513,15 +513,27 @@ const FillerFetchUI = {
         const icons   = { fetch: '●', cached: '◌', skip: '□', nofill: '□', error: '×', movie: '▷' };
         const classes = { fetch: 'is-fetch', cached: 'is-cached', skip: 'is-nofill', nofill: 'is-nofill', error: 'is-error', movie: 'is-movie' };
 
-        const { UIHelpers } = window.AnimeTracker;
-        const safeName   = UIHelpers.escapeHtml(name);
-        const safeDetail = UIHelpers.escapeHtml(detail);
         const row = document.createElement('div');
         row.className = `ffui-log-row ${classes[type] || ''}`;
-        row.innerHTML = `
-            <span class="ffui-log-icon">${icons[type] || '□'}</span>
-            <span class="ffui-log-name" title="${safeName}">${safeName}</span>
-            ${safeDetail ? `<span class="ffui-log-detail">${safeDetail}</span>` : ''}`;
+
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'ffui-log-icon';
+        iconSpan.textContent = icons[type] || '□';
+        row.appendChild(iconSpan);
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'ffui-log-name';
+        nameSpan.setAttribute('title', name || '');
+        nameSpan.textContent = name || '';
+        row.appendChild(nameSpan);
+
+        if (detail) {
+            const detailSpan = document.createElement('span');
+            detailSpan.className = 'ffui-log-detail';
+            detailSpan.textContent = detail;
+            row.appendChild(detailSpan);
+        }
+
         log.appendChild(row);
         log.scrollTop = log.scrollHeight;
     },

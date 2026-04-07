@@ -33,36 +33,41 @@ const AnimeCardRenderer = {
         // Get tracked episode numbers
         const trackedEpisodeNumbers = new Set((anime.episodes || []).map(ep => ep.number));
 
-        // Get episodes with progress
+        // Get episodes with progress — use pre-built slug index if available,
+        // otherwise fall back to prefix scan (O(M) where M = entries for this slug)
         const episodesWithProgress = [];
-        Object.entries(videoProgress).forEach(([uniqueId, progress]) => {
-            if (uniqueId.startsWith(slug + '__episode-')) {
-                const parts = uniqueId.split('episode-');
-                if (parts.length !== 2 || !parts[1]) return;
+        const slugEntries = videoProgress.__slugIndex?.[slug] || null;
+        const progressEntries = slugEntries
+            ? slugEntries
+            : Object.entries(videoProgress).filter(([id]) => id.startsWith(slug + '__episode-'));
 
-                const epNum = parseInt(parts[1], 10);
-                if (isNaN(epNum)) return;
-                if (trackedEpisodeNumbers.has(epNum)) return;
-                if (progress.percentage >= CONFIG.COMPLETED_PERCENTAGE) return;
+        for (const [uniqueId, progress] of progressEntries) {
+            if (uniqueId === '__slugIndex') continue;
+            const parts = uniqueId.split('episode-');
+            if (parts.length !== 2 || !parts[1]) continue;
 
-                if (typeof progress.currentTime !== 'number' ||
-                    typeof progress.percentage !== 'number' ||
-                    typeof progress.duration !== 'number' ||
-                    isNaN(progress.currentTime) ||
-                    isNaN(progress.percentage) ||
-                    isNaN(progress.duration)) {
-                    return;
-                }
+            const epNum = parseInt(parts[1], 10);
+            if (isNaN(epNum)) continue;
+            if (trackedEpisodeNumbers.has(epNum)) continue;
+            if (progress.percentage >= CONFIG.COMPLETED_PERCENTAGE) continue;
 
-                const minutes = Math.floor(progress.currentTime / 60);
-                const seconds = progress.currentTime % 60;
-                episodesWithProgress.push({
-                    number: epNum,
-                    timeStr: `${minutes}:${seconds.toString().padStart(2, '0')}`,
-                    percentage: progress.percentage
-                });
+            if (typeof progress.currentTime !== 'number' ||
+                typeof progress.percentage !== 'number' ||
+                typeof progress.duration !== 'number' ||
+                isNaN(progress.currentTime) ||
+                isNaN(progress.percentage) ||
+                isNaN(progress.duration)) {
+                continue;
             }
-        });
+
+            const minutes = Math.floor(progress.currentTime / 60);
+            const seconds = progress.currentTime % 60;
+            episodesWithProgress.push({
+                number: epNum,
+                timeStr: `${minutes}:${seconds.toString().padStart(2, '0')}`,
+                percentage: progress.percentage
+            });
+        }
         episodesWithProgress.sort((a, b) => a.number - b.number);
 
         // Get current episode

@@ -126,9 +126,12 @@ const AnimeParser = {
                 episodeNumber = 1;
             }
 
-            if (episodeNumber < 1 || episodeNumber > 9999) {
-                Logger.warn(`Invalid ep ${episodeNumber}, using 1`);
+            if (episodeNumber < 1) {
+                Logger.warn(`Invalid ep ${episodeNumber}, clamping to 1`);
                 episodeNumber = 1;
+            } else if (episodeNumber > 9999) {
+                Logger.warn(`Invalid ep ${episodeNumber}, clamping to 9999`);
+                episodeNumber = 9999;
             }
 
             // ── Step 2: apply episode offset (3.1) ──────────────────────────────
@@ -246,14 +249,10 @@ const AnimeParser = {
                 ? new RegExp(`/watch/${escapedSlug}-episode-(\\d+)`, 'i')
                 : /\/watch\/[^/]+-episode-(\d+)/i;
 
-            const selectors = [
-                `a[href*="/watch/${animeSlug}-episode-"]`,
-                `a[href*="${animeSlug}-episode-"]`,
-                '.episode-list a[href*="-episode-"]',
-                '.episodes a[href*="-episode-"]',
-                '[data-open-nav-episode]',
-                'a[href*="-episode-"]'
-            ];
+            // Single query covers all selectors — avoids redundant DOM traversals
+            const combinedSelector = hasSlug
+                ? `a[href*="${animeSlug}-episode-"], [data-open-nav-episode]`
+                : 'a[href*="-episode-"], [data-open-nav-episode]';
 
             const parseEpisodeNumber = (value) => {
                 if (!value) return null;
@@ -264,8 +263,8 @@ const AnimeParser = {
                 return Number.isFinite(num) && num > 0 ? num : null;
             };
 
-            for (const selector of selectors) {
-                const nodes = document.querySelectorAll(selector);
+            {
+                const nodes = document.querySelectorAll(combinedSelector);
                 for (const node of nodes) {
                     const href = node.getAttribute('href') || '';
                     const hrefMatch = href.match(hrefPattern);
