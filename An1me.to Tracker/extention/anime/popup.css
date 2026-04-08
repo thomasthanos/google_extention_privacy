@@ -506,13 +506,19 @@ body {
   gap: 4px;
 }
 .settings-collapsible-content {
-  display: none;
+  display: flex;
   flex-direction: column;
   gap: 2px;
   padding-left: 12px;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.2s ease, opacity 0.15s ease;
 }
 .settings-collapsible.expanded .settings-collapsible-content {
-  display: flex;
+  max-height: 300px;
+  opacity: 1;
+  transition: max-height 0.25s ease, opacity 0.2s ease 0.05s;
 }
 .settings-collapsible-arrow {
   transition: transform var(--tn), color var(--tn);
@@ -848,8 +854,8 @@ body {
 }
 .anime-card:hover::before { opacity: 0.7; }
 
-.anime-card-content { display: none; margin-top: 10px; }
-.anime-card.expanded .anime-card-content { display: block; }
+.anime-card-content { margin-top: 0; max-height: 0; overflow: hidden; opacity: 0; transition: max-height 0.2s ease, opacity 0.15s ease, margin-top 0.2s ease; }
+.anime-card.expanded .anime-card-content { max-height: 800px; opacity: 1; margin-top: 10px; transition: max-height 0.25s ease, opacity 0.2s ease 0.05s, margin-top 0.25s ease; }
 
 .anime-card-header { display: flex; align-items: center; cursor: pointer; gap: 10px; }
 
@@ -875,7 +881,7 @@ body {
   display: flex; align-items: center; justify-content: center;
 }
 .anime-expand-icon svg { width: 14px; height: 14px; }
-.anime-card.expanded .anime-expand-icon { color: var(--cyan); }
+.anime-card.expanded .anime-expand-icon { color: var(--cyan); transform: rotate(90deg); }
 .anime-card:hover .anime-expand-icon { color: var(--t2); }
 
 .anime-card-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; align-self: center; }
@@ -936,9 +942,9 @@ body {
 /* ─── In-progress section ───────────────────────────────────── */
 .anime-in-progress { margin-bottom: 0; padding: 0; background: rgba(240,192,64,0.04); border: 1px solid rgba(240,192,64,0.14); border-radius: var(--r-xs); max-height: 0; overflow: hidden; opacity: 0; transition: max-height var(--tn), opacity var(--tn), margin var(--tn), padding var(--tn); }
 .anime-card.expanded .anime-in-progress { max-height: 200px; opacity: 1; margin-bottom: 7px; padding: 7px 9px; }
-.anime-card.expanded .anime-in-progress.collapsed { max-height: 30px; padding: 6px 9px; border-color: rgba(240,192,64,0.22); }
+.anime-card.expanded .anime-in-progress.collapsed { max-height: 30px; padding: 6px 9px; border-color: rgba(240,192,64,0.22); border-bottom: none; }
 .anime-card.in-progress-only .anime-in-progress { max-height: 200px; opacity: 1; margin-bottom: 7px; padding: 7px 9px; }
-.anime-card.in-progress-only .anime-in-progress.collapsed { max-height: 30px; padding: 6px 9px; border-color: rgba(240,192,64,0.22); }
+.anime-card.in-progress-only .anime-in-progress.collapsed { max-height: 30px; padding: 6px 9px; border-color: rgba(240,192,64,0.22); border-bottom: none; }
 .in-progress-header { display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: var(--amber); font-weight: 600; cursor: pointer; user-select: none; }
 .in-progress-header:hover { color: #fcd34d; }
 .in-progress-title { flex: 1; font-size: 10px; }
@@ -1009,8 +1015,8 @@ body {
 .ip-group-label { font-size: 11px; font-weight: 700; color: var(--amber); letter-spacing: 0.25px; flex: 1; }
 .ip-group-count { font-size: 10px; font-weight: 650; color: var(--amber); background: rgba(240,192,64,0.13); border: 1px solid rgba(240,192,64,0.28); border-radius: var(--r-pill); padding: 1px 8px; }
 .ip-group-chevron { width: 14px; height: 14px; color: var(--amber); opacity: 0.75; transition: transform var(--tf); flex-shrink: 0; }
-.ip-group-content { overflow: hidden; max-height: 0; padding: 0 7px; background: rgba(240,150,30,0.045); border-left: 1px solid rgba(240,192,64,0.13); border-right: 1px solid rgba(240,192,64,0.13); border-bottom: 1px solid rgba(240,192,64,0.13); border-radius: 0 0 var(--r-sm) var(--r-sm); transition: max-height 0.28s ease, padding 0.28s ease; }
-.ip-group-content.open { max-height: 800px; padding: 5px 7px 7px; }
+.ip-group-content { overflow: hidden; max-height: 0; padding: 0 7px; background: rgba(240,150,30,0.045); border-left: 1px solid rgba(240,192,64,0.13); border-right: 1px solid rgba(240,192,64,0.13); border-bottom: none; border-radius: 0 0 var(--r-sm) var(--r-sm); transition: max-height 0.2s ease, padding 0.2s ease; }
+.ip-group-content.open { max-height: 800px; padding: 5px 7px 7px; border-bottom: 1px solid rgba(240,192,64,0.13); transition: max-height 0.25s ease, padding 0.25s ease; }
 .ip-card { padding: 8px; margin-top: 5px; background: linear-gradient(180deg, rgba(240,192,64,0.07) 0%, rgba(240,165,42,0.03) 100%); border: 1px solid rgba(240,192,64,0.19); border-radius: var(--r-sm); transition: border-color var(--tf), background var(--tf); }
 .ip-card:hover { border-color: rgba(240,192,64,0.32); background: linear-gradient(180deg, rgba(240,192,64,0.1) 0%, rgba(240,165,42,0.045) 100%); }
 .ip-card.ip-card-untracked { background: linear-gradient(180deg, rgba(240,192,64,0.1) 0%, rgba(240,165,42,0.045) 100%); border-color: rgba(240,192,64,0.24); }

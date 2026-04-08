@@ -426,7 +426,11 @@ const AnimeCardRenderer = {
         const activeEpisodes = anime.episodes.filter(ep => ep.percentage < CONFIG.COMPLETED_PERCENTAGE);
         if (activeEpisodes.length === 0) return '';
 
-        const latestEp = [...activeEpisodes].sort((a, b) => b.number - a.number)[0];
+        const latestEp = [...activeEpisodes].sort((a, b) => {
+            const aTime = a.savedAt ? new Date(a.savedAt).getTime() : 0;
+            const bTime = b.savedAt ? new Date(b.savedAt).getTime() : 0;
+            return bTime - aTime || b.number - a.number;
+        })[0];
         const currentMin = Math.floor(latestEp.currentTime / 60);
         const currentSec = Math.floor(latestEp.currentTime % 60);
         const currentTimeStr = `${currentMin}:${currentSec.toString().padStart(2, '0')}`;

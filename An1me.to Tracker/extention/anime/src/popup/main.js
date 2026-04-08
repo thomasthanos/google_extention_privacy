@@ -222,9 +222,6 @@
         const isExpanded = !!expanded;
         elements.settingsDataTools.classList.toggle('expanded', isExpanded);
         elements.settingsDataToolsToggle.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
-        if (elements.settingsDataToolsContent) {
-            elements.settingsDataToolsContent.hidden = !isExpanded;
-        }
     }
 
     function setSettingsPreferencesExpanded(expanded) {
@@ -232,9 +229,6 @@
         const isExpanded = !!expanded;
         elements.settingsPreferences.classList.toggle('expanded', isExpanded);
         elements.settingsPreferencesToggle.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
-        if (elements.settingsPreferencesContent) {
-            elements.settingsPreferencesContent.hidden = !isExpanded;
-        }
     }
 
     function doesProgressChangeAffectLists(oldProgress = {}, newProgress = {}) {
@@ -2679,37 +2673,44 @@
         // Auto-cleanup stale data on every popup open
         try {
             const { ProgressManager } = AT;
-            const raw = await Storage.get(['animeData', 'videoProgress', 'deletedAnime']);
-            let dirty = false;
+            // Run cleanup only once per day
+            const { lastCleanupDate } = await Storage.get(['lastCleanupDate']);
+            const today = new Date().toISOString().slice(0, 10);
+            if (lastCleanupDate === today) {
+                console.log('[Cleanup] Already ran today, skipping');
+            } else {
+                const raw = await Storage.get(['animeData', 'videoProgress', 'deletedAnime']);
+                let dirty = false;
 
-            // Clean tracked/completed videoProgress entries
-            if (raw.videoProgress && raw.animeData) {
-                const { cleaned, removedCount } = ProgressManager.cleanTrackedProgress(raw.animeData, raw.videoProgress);
-                if (removedCount > 0) {
-                    raw.videoProgress = cleaned;
-                    dirty = true;
-                    console.log(`[Cleanup] Removed ${removedCount} stale videoProgress entries`);
-                }
-            }
-
-            // Prune deletedAnime older than 10 days
-            if (raw.deletedAnime) {
-                const cutoff = Date.now() - 10 * 24 * 60 * 60 * 1000;
-                for (const slug of Object.keys(raw.deletedAnime)) {
-                    const info = raw.deletedAnime[slug];
-                    const delAt = +(new Date(info?.deletedAt || info || 0));
-                    if (delAt > 0 && delAt < cutoff) {
-                        delete raw.deletedAnime[slug];
+                // Clean tracked/completed videoProgress entries
+                if (raw.videoProgress && raw.animeData) {
+                    const { cleaned, removedCount } = ProgressManager.cleanTrackedProgress(raw.animeData, raw.videoProgress);
+                    if (removedCount > 0) {
+                        raw.videoProgress = cleaned;
                         dirty = true;
+                        console.log(`[Cleanup] Removed ${removedCount} stale videoProgress entries`);
                     }
                 }
-            }
 
-            if (dirty) {
-                await Storage.set({
-                    videoProgress: raw.videoProgress,
-                    deletedAnime: raw.deletedAnime
-                });
+                // Prune deletedAnime older than 10 days
+                if (raw.deletedAnime) {
+                    const cutoff = Date.now() - 10 * 24 * 60 * 60 * 1000;
+                    for (const slug of Object.keys(raw.deletedAnime)) {
+                        const info = raw.deletedAnime[slug];
+                        const delAt = +(new Date(info?.deletedAt || info || 0));
+                        if (delAt > 0 && delAt < cutoff) {
+                            delete raw.deletedAnime[slug];
+                            dirty = true;
+                        }
+                    }
+                }
+
+                const saveObj = { lastCleanupDate: today };
+                if (dirty) {
+                    saveObj.videoProgress = raw.videoProgress;
+                    saveObj.deletedAnime = raw.deletedAnime;
+                }
+                await Storage.set(saveObj);
             }
         } catch (e) {
             console.warn('[Cleanup] Auto-cleanup failed:', e);
