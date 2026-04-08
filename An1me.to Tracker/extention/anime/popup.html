@@ -210,6 +210,20 @@
                                         </div>
                                     </button>
 
+                                    <button class="settings-item" id="settingsExportToken">
+                                        <div class="settings-item-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                                <polyline points="17 8 12 3 7 8"/>
+                                                <line x1="12" y1="3" x2="12" y2="15"/>
+                                            </svg>
+                                        </div>
+                                        <div class="settings-item-text">
+                                            <span class="settings-item-title">Export Token</span>
+                                            <span class="settings-item-subtitle">Transfer to Orion/Safari</span>
+                                        </div>
+                                    </button>
+
                                 </div>
                             </div>
 
@@ -219,70 +233,82 @@
                                 </div>
                                 <div class="settings-item-text">
                                     <span class="settings-item-title">Fetch &amp; Import Everything</span>
-                                    <span class="settings-item-subtitle">Fillers, episode counts, status &amp; missing info</span>
+                                    <span class="settings-item-subtitle">Fillers, counts, status &amp; missing info</span>
                                 </div>
-                            </button>
-
-                            <button class="settings-item" id="settingsExportToken">
-                                <div class="settings-item-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                        <polyline points="17 8 12 3 7 8"/>
-                                        <line x1="12" y1="3" x2="12" y2="15"/>
-                                    </svg>
-                                </div>
-                                <div class="settings-item-text">
-                                    <span class="settings-item-title">Export Token</span>
-                                    <span class="settings-item-subtitle">Transfer to Orion/Safari</span>
-                                </div>
-                            </button>
-
-                            <button class="settings-item settings-toggle-item" id="settingsCopyGuard" type="button" data-enabled="true" aria-pressed="true">
-                                <div class="settings-item-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <rect x="9" y="11" width="10" height="10" rx="2"/>
-                                        <path d="M5 15V5a2 2 0 0 1 2-2h10"/>
-                                    </svg>
-                                </div>
-                                <div class="settings-item-text">
-                                    <span class="settings-item-title">Copy Guard</span>
-                                    <span class="settings-item-subtitle" id="settingsCopyGuardSubtitle">Disable copy outside allowed text blocks</span>
-                                </div>
-                                <span class="settings-toggle-control" aria-hidden="true"></span>
-                            </button>
-
-                            <button class="settings-item settings-toggle-item" id="settingsSmartNotif" type="button" data-enabled="false" aria-pressed="false">
-                                <div class="settings-item-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                                        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                                    </svg>
-                                </div>
-                                <div class="settings-item-text">
-                                    <span class="settings-item-title">New Episode Alerts</span>
-                                    <span class="settings-item-subtitle" id="settingsSmartNotifSubtitle">Get notified when new episodes are available</span>
-                                </div>
-                                <span class="settings-toggle-control" aria-hidden="true"></span>
-                            </button>
-
-                            <button class="settings-item settings-toggle-item" id="settingsAutoSkipFiller" type="button" data-enabled="false" aria-pressed="false">
-                                <div class="settings-item-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polygon points="5 4 15 12 5 20 5 4"/>
-                                        <line x1="19" y1="5" x2="19" y2="19"/>
-                                    </svg>
-                                </div>
-                                <div class="settings-item-text">
-                                    <span class="settings-item-title">Auto-Skip Fillers</span>
-                                    <span class="settings-item-subtitle" id="settingsAutoSkipFillerSubtitle">Automatically skip to next canon episode</span>
-                                </div>
-                                <span class="settings-toggle-control" aria-hidden="true"></span>
                             </button>
 
                         </div>
-                        
+
                         <div class="settings-divider"></div>
-                        
+
+                        <!-- Preferences Section (collapsible) -->
+                        <div class="settings-section">
+                            <div class="settings-collapsible" id="settingsPreferences">
+                                <button class="settings-item settings-collapsible-toggle" id="settingsPreferencesToggle" aria-expanded="false">
+                                    <div class="settings-item-icon">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="12" cy="12" r="3"/>
+                                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                                        </svg>
+                                    </div>
+                                    <div class="settings-item-text">
+                                        <span class="settings-item-title">Preferences</span>
+                                        <span class="settings-item-subtitle">Notifications, copy guard &amp; playback</span>
+                                    </div>
+                                    <svg class="settings-item-arrow settings-collapsible-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="9 6 15 12 9 18"/>
+                                    </svg>
+                                </button>
+                                <div class="settings-collapsible-content" id="settingsPreferencesContent" hidden>
+
+                                    <button class="settings-item settings-toggle-item" id="settingsCopyGuard" type="button" data-enabled="true" aria-pressed="true">
+                                        <div class="settings-item-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <rect x="9" y="11" width="10" height="10" rx="2"/>
+                                                <path d="M5 15V5a2 2 0 0 1 2-2h10"/>
+                                            </svg>
+                                        </div>
+                                        <div class="settings-item-text">
+                                            <span class="settings-item-title">Copy Guard</span>
+                                            <span class="settings-item-subtitle" id="settingsCopyGuardSubtitle">Block copy outside allowed text</span>
+                                        </div>
+                                        <span class="settings-toggle-control" aria-hidden="true"></span>
+                                    </button>
+
+                                    <button class="settings-item settings-toggle-item" id="settingsSmartNotif" type="button" data-enabled="false" aria-pressed="false">
+                                        <div class="settings-item-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                                                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                                            </svg>
+                                        </div>
+                                        <div class="settings-item-text">
+                                            <span class="settings-item-title">New Episode Alerts</span>
+                                            <span class="settings-item-subtitle" id="settingsSmartNotifSubtitle">Notify when new episodes drop</span>
+                                        </div>
+                                        <span class="settings-toggle-control" aria-hidden="true"></span>
+                                    </button>
+
+                                    <button class="settings-item settings-toggle-item" id="settingsAutoSkipFiller" type="button" data-enabled="false" aria-pressed="false">
+                                        <div class="settings-item-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polygon points="5 4 15 12 5 20 5 4"/>
+                                                <line x1="19" y1="5" x2="19" y2="19"/>
+                                            </svg>
+                                        </div>
+                                        <div class="settings-item-text">
+                                            <span class="settings-item-title">Auto-Skip Fillers</span>
+                                            <span class="settings-item-subtitle" id="settingsAutoSkipFillerSubtitle">Skip filler, jump to next canon ep</span>
+                                        </div>
+                                        <span class="settings-toggle-control" aria-hidden="true"></span>
+                                    </button>
+
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-divider"></div>
+
                         <!-- Sign Out Section -->
                         <div class="settings-section">
                             <button class="settings-item" id="settingsSignOut">

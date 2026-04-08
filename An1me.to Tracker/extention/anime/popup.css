@@ -430,6 +430,7 @@ body {
 
 /* settings-section: generic column layout for menu items */
 .settings-section { padding: 6px 7px; display: flex; flex-direction: column; gap: 2px; }
+.settings-section-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--t3); padding: 4px 8px 2px; }
 
 /* profile-section: row layout with avatar left */
 .settings-section.profile-section {

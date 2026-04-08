@@ -62,6 +62,9 @@
         settingsSmartNotifSubtitle: document.getElementById('settingsSmartNotifSubtitle'),
         settingsAutoSkipFiller: document.getElementById('settingsAutoSkipFiller'),
         settingsAutoSkipFillerSubtitle: document.getElementById('settingsAutoSkipFillerSubtitle'),
+        settingsPreferences: document.getElementById('settingsPreferences'),
+        settingsPreferencesToggle: document.getElementById('settingsPreferencesToggle'),
+        settingsPreferencesContent: document.getElementById('settingsPreferencesContent'),
         // Add Anime Dialog
         addAnimeBtn: document.getElementById('addAnimeBtn'),
         addAnimeDialog: document.getElementById('addAnimeDialog'),
@@ -142,7 +145,7 @@
         elements.settingsCopyGuard.setAttribute('aria-pressed', enabled ? 'true' : 'false');
         if (elements.settingsCopyGuardSubtitle) {
             elements.settingsCopyGuardSubtitle.textContent = enabled
-                ? 'Disable copy outside allowed text blocks'
+                ? 'Block copy outside allowed text'
                 : 'Copy protection is turned off';
         }
     }
@@ -170,7 +173,7 @@
         if (elements.settingsSmartNotifSubtitle) {
             elements.settingsSmartNotifSubtitle.textContent = enabled
                 ? 'You will be notified of new episodes'
-                : 'Get notified when new episodes are available';
+                : 'Notify when new episodes drop';
         }
     }
 
@@ -197,7 +200,7 @@
         if (elements.settingsAutoSkipFillerSubtitle) {
             elements.settingsAutoSkipFillerSubtitle.textContent = enabled
                 ? 'Filler episodes will be auto-skipped'
-                : 'Automatically skip to next canon episode';
+                : 'Skip filler, jump to next canon ep';
         }
     }
 
@@ -221,6 +224,16 @@
         elements.settingsDataToolsToggle.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
         if (elements.settingsDataToolsContent) {
             elements.settingsDataToolsContent.hidden = !isExpanded;
+        }
+    }
+
+    function setSettingsPreferencesExpanded(expanded) {
+        if (!elements.settingsPreferences || !elements.settingsPreferencesToggle) return;
+        const isExpanded = !!expanded;
+        elements.settingsPreferences.classList.toggle('expanded', isExpanded);
+        elements.settingsPreferencesToggle.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+        if (elements.settingsPreferencesContent) {
+            elements.settingsPreferencesContent.hidden = !isExpanded;
         }
     }
 
@@ -2158,7 +2171,7 @@
                 if (elements.sortBtn) elements.sortBtn.classList.remove('active');
                 const willOpen = !elements.settingsDropdown.classList.contains('visible');
                 elements.settingsDropdown.classList.toggle('visible');
-                if (!willOpen) setSettingsDataToolsExpanded(false);
+                if (!willOpen) { setSettingsDataToolsExpanded(false); setSettingsPreferencesExpanded(false); }
             });
         }
 
@@ -2167,6 +2180,7 @@
                 !elements.settingsDropdown.contains(e.target) && !elements.settingsBtn.contains(e.target)) {
                 elements.settingsDropdown.classList.remove('visible');
                 setSettingsDataToolsExpanded(false);
+                setSettingsPreferencesExpanded(false);
             }
             if (elements.donateDropdown &&
                 !elements.donateDropdown.contains(e.target) &&
@@ -2180,6 +2194,7 @@
                 e.stopPropagation();
                 elements.settingsDropdown.classList.remove('visible');
                 setSettingsDataToolsExpanded(false);
+                setSettingsPreferencesExpanded(false);
                 setTimeout(() => elements.donateDropdown.classList.add('visible'), 150);
             });
         }
@@ -2189,6 +2204,16 @@
                 e.stopPropagation();
                 const isExpanded = elements.settingsDataTools?.classList.contains('expanded');
                 setSettingsDataToolsExpanded(!isExpanded);
+                setSettingsPreferencesExpanded(false);
+            });
+        }
+
+        if (elements.settingsPreferencesToggle) {
+            elements.settingsPreferencesToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isExpanded = elements.settingsPreferences?.classList.contains('expanded');
+                setSettingsPreferencesExpanded(!isExpanded);
+                setSettingsDataToolsExpanded(false);
             });
         }
 
@@ -2197,6 +2222,7 @@
                 elements.settingsRefresh.classList.add('loading');
                 elements.settingsDropdown.classList.remove('visible');
                 setSettingsDataToolsExpanded(false);
+                setSettingsPreferencesExpanded(false);
                 try {
                     if (FirebaseSync.getUser()) {
                         await loadAndSyncData();
@@ -2217,6 +2243,7 @@
                 elements.settingsRefreshInfo.classList.add('loading');
                 elements.settingsDropdown.classList.remove('visible');
                 setSettingsDataToolsExpanded(false);
+                setSettingsPreferencesExpanded(false);
                 try {
                     // Clear all cached anime info from storage so autoFetchMissing re-fetches everything
                     const allKeys = await new Promise(resolve => chrome.storage.local.get(null, resolve));
@@ -2240,6 +2267,7 @@
             elements.settingsClear.addEventListener('click', () => {
                 elements.settingsDropdown.classList.remove('visible');
                 setSettingsDataToolsExpanded(false);
+                setSettingsPreferencesExpanded(false);
                 showDialog();
             });
         }
@@ -2248,6 +2276,7 @@
             elements.settingsSignOut.addEventListener('click', () => {
                 elements.settingsDropdown.classList.remove('visible');
                 setSettingsDataToolsExpanded(false);
+                setSettingsPreferencesExpanded(false);
                 signOut();
             });
         }
@@ -2256,6 +2285,7 @@
             elements.settingsFetchFillers.addEventListener('click', async () => {
                 elements.settingsDropdown.classList.remove('visible');
                 setSettingsDataToolsExpanded(false);
+                setSettingsPreferencesExpanded(false);
                 await fetchAllFillers({ autoStart: true });
             });
         }
