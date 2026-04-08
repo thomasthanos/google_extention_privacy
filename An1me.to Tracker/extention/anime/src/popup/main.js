@@ -157,7 +157,7 @@
             renderCopyGuardSetting(enabled);
             return enabled;
         } catch (error) {
-            console.warn('[Settings] Failed to load copy guard setting:', error);
+            PopupLogger.warn('Settings', 'Failed to load copy guard setting:', error);
             renderCopyGuardSetting(true);
             return true;
         }
@@ -184,7 +184,7 @@
             renderSmartNotifSetting(enabled);
             return enabled;
         } catch (error) {
-            console.warn('[Settings] Failed to load smart notif setting:', error);
+            PopupLogger.warn('Settings', 'Failed to load smart notif setting:', error);
             renderSmartNotifSetting(false);
             return false;
         }
@@ -211,7 +211,7 @@
             renderAutoSkipFillerSetting(enabled);
             return enabled;
         } catch (error) {
-            console.warn('[Settings] Failed to load auto-skip filler setting:', error);
+            PopupLogger.warn('Settings', 'Failed to load auto-skip filler setting:', error);
             renderAutoSkipFillerSetting(false);
             return false;
         }
@@ -1019,13 +1019,47 @@
                 }
             });
         } catch (e) {
-            console.error('[Stats] Failed to cache stats:', e);
+            PopupLogger.error('Stats', 'Failed to cache stats:', e);
         }
     }
 
     /**
      * Helper: check if all anime slugs have cached filler + anilist data.
      */
+    // ─── Auto-sync tracking ─────────────────────────────────────────────────
+    let _autoSyncCount = 0;
+    function startAutoSync() {
+        _autoSyncCount++;
+        setMetadataRepairStatus('Updating info…');
+    }
+    function endAutoSync() {
+        _autoSyncCount = Math.max(0, _autoSyncCount - 1);
+        if (_autoSyncCount === 0) {
+            scheduleDefaultSyncStatusRestore(1500);
+        }
+    }
+
+    /**
+     * Wrapper: runs autoFetchMissing with sync status tracking.
+     * Works for any source (FillerService, AnilistService) — no matter who calls it.
+     */
+    function _truncTitle(t, max) {
+        return t && t.length > max ? t.slice(0, max) + '…' : t;
+    }
+
+    function runAutoFetch(service, animeData, extraCallback) {
+        startAutoSync();
+        service.autoFetchMissing(animeData, () => {
+            if (extraCallback) extraCallback();
+        }, (done, total, title) => {
+            setMetadataRepairStatus(`${done}/${total} — ${_truncTitle(title, 18)}`);
+        }).then(() => {
+            endAutoSync();
+        }).catch(() => {
+            endAutoSync();
+        });
+    }
+
     function checkAllCached(slugs) {
         const { FillerService } = AT;
         const allFillersCached = slugs.every(slug =>
@@ -1103,18 +1137,14 @@
             const repairRunning = repairState?.status === 'running';
 
             if (!pendingAutoRepairAfterSignIn && !repairRunning && !allFillersCached) {
-                FillerService.autoFetchMissing(animeData, () => {
-                    scheduleDeferredListRefresh();
-                });
+                runAutoFetch(FillerService, animeData, () => scheduleDeferredListRefresh());
             }
 
             if (!pendingAutoRepairAfterSignIn && !repairRunning && !allAnilistCached) {
-                AT.AnilistService.autoFetchMissing(animeData, () => {
-                    scheduleDeferredListRefresh();
-                });
+                runAutoFetch(AT.AnilistService, animeData, () => scheduleDeferredListRefresh());
             }
         } catch (e) {
-            console.error('[Storage] Load error:', e);
+            PopupLogger.error('Storage', 'Load error:', e);
             animeData = {};
             videoProgress = {};
             renderAnimeList();
@@ -1201,19 +1231,15 @@
                 const repairRunning = repairState?.status === 'running';
 
                 if (!pendingAutoRepairAfterSignIn && !repairRunning && !allFillersCached) {
-                    FillerService.autoFetchMissing(animeData, () => {
-                        scheduleDeferredListRefresh();
-                    });
+                    runAutoFetch(FillerService, animeData, () => scheduleDeferredListRefresh());
                 }
 
                 if (!pendingAutoRepairAfterSignIn && !repairRunning && !allAnilistCached) {
-                    AT.AnilistService.autoFetchMissing(animeData, () => {
-                        scheduleDeferredListRefresh();
-                    });
+                    runAutoFetch(AT.AnilistService, animeData, () => scheduleDeferredListRefresh());
                 }
             }
         } catch (error) {
-            console.error('[Sync] Error:', error);
+            PopupLogger.error('Sync', 'Error:', error);
             loadData();
         } finally {
             loadAndSyncInProgress = false;
@@ -1255,14 +1281,14 @@
                             groupCoverImages: gcResult.groupCoverImages || {}
                         }, true);
                     } catch (syncErr) {
-                        console.error('[DeleteProgress] Cloud sync failed:', syncErr);
+                        PopupLogger.error('Delete', 'Cloud sync failed:', syncErr);
                     }
                 }
 
                 renderAnimeList(elements.searchInput?.value || '');
             }
         } catch (e) {
-            console.error('[DeleteProgress] Error:', e);
+            PopupLogger.error('Delete', 'Error:', e);
             alert('Failed to delete progress. Please try again.');
         }
     }
@@ -1285,7 +1311,7 @@
             }
 
             if (progressDeleted === 0 && !wasInAnimeData) {
-                console.warn('[Delete] No data found to delete for:', slug);
+                PopupLogger.warn('Delete', 'No data found to delete for:', slug);
                 return;
             }
 
@@ -1310,7 +1336,7 @@
             renderAnimeList(elements.searchInput?.value || '');
             updateStats();
         } catch (e) {
-            console.error('[Delete] Error:', e);
+            PopupLogger.error('Delete', 'Error:', e);
             alert('Failed to delete anime. Please try again.');
         }
     }
@@ -1350,7 +1376,7 @@
             renderAnimeList(elements.searchInput?.value || '');
             updateStats();
         } catch (e) {
-            console.error('[Complete] Error:', e);
+            PopupLogger.error('Complete', 'Error:', e);
         }
     }
 
@@ -1389,7 +1415,7 @@
             renderAnimeList(elements.searchInput?.value || '');
             updateStats();
         } catch (e) {
-            console.error('[Drop] Error:', e);
+            PopupLogger.error('Drop', 'Error:', e);
         }
     }
 
@@ -1688,10 +1714,10 @@
                         deletedAnime,
                         groupCoverImages: gcRes.groupCoverImages || {}
                     });
-                })().catch(err => console.error('[AddAnime] Cloud save error:', err));
+                })().catch(err => PopupLogger.error('AddAnime', 'Cloud save error:', err));
             }
         } catch (error) {
-            console.error('[AddAnime] Error:', error);
+            PopupLogger.error('AddAnime', 'Error:', error);
             alert('Failed to add anime. Please try again.');
         } finally {
             elements.confirmAddAnime.disabled = false;
@@ -1700,7 +1726,7 @@
     }
 
     function showEditTitleDialog(slug) {
-        if (!animeData[slug]) { console.warn('[EditTitle] Anime not found:', slug); return; }
+        if (!animeData[slug]) { PopupLogger.warn('EditTitle', 'Anime not found:', slug); return; }
         editingSlug = slug;
         elements.editTitleInput.value = animeData[slug].title || '';
         elements.editTitleDialog.classList.add('visible');
@@ -1741,11 +1767,11 @@
                         deletedAnime,
                         groupCoverImages: gcRes.groupCoverImages || {}
                     });
-                })().catch(err => console.error('[EditTitle] Cloud save error:', err));
+                })().catch(err => PopupLogger.error('EditTitle', 'Cloud save error:', err));
             }
             hideEditTitleDialog();
         } catch (error) {
-            console.error('[EditTitle] Error:', error);
+            PopupLogger.error('EditTitle', 'Error:', error);
             alert('Failed to update title. Please try again.');
         }
     }
@@ -1763,7 +1789,7 @@
                 updateStats();
             }
         } catch (error) {
-            console.error('[FetchFiller] Error:', error);
+            PopupLogger.error('FetchFiller', 'Error:', error);
         } finally {
             if (btn) { btn.disabled = false; btn.textContent = '🎭'; }
         }
@@ -1786,9 +1812,16 @@
             }
         }
 
-        await AnilistService.autoFetchMissing(animeData, () => {
-            scheduleDeferredListRefresh({ delayMs: 0 });
-        });
+        startAutoSync();
+        try {
+            await AnilistService.autoFetchMissing(animeData, () => {
+                scheduleDeferredListRefresh({ delayMs: 0 });
+            }, (done, total, title) => {
+                setMetadataRepairStatus(`${done}/${total} — ${_truncTitle(title, 18)}`);
+            });
+        } finally {
+            endAutoSync();
+        }
     }
 
     function setMetadataRepairStatus(label, synced = false) {
@@ -1955,7 +1988,7 @@
 
             return applyMetadataRepairState(response.state || null, { ensureOpen: true });
         })().catch((error) => {
-            console.error('[RepairAll] Error:', error);
+            PopupLogger.error('RepairAll', 'Error:', error);
             if (elements.syncStatus && elements.syncText) {
                 elements.syncStatus.classList.remove('syncing');
                 elements.syncText.textContent = 'Import Error';
@@ -2000,7 +2033,7 @@
                 msg.includes('closed') || msg.includes('popup_closed') ||
                 error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request';
             if (!isCancelled) {
-                console.error('[Firebase] Sign in error:', error);
+                PopupLogger.error('Firebase', 'Sign in error:', error);
                 showAuthToast('Sign in failed. Please try again.', 'error');
             }
             pendingAutoRepairAfterSignIn = false;
@@ -2107,7 +2140,9 @@
                 } catch (err) {
                     pendingAutoRepairAfterSignIn = false;
                     await chrome.storage.local.set({ pendingBackgroundMetadataRepair: false });
-                    const msg = err.message.includes('JSON') ? 'Invalid token format. Please copy it again from Chrome.' : err.message;
+                    const msg = (err instanceof SyntaxError || (err.message && err.message.includes('JSON')))
+                        ? 'Invalid token format. Please copy it again from Chrome.'
+                        : (err.message || 'Import failed');
                     if (errorEl) { errorEl.textContent = msg; errorEl.style.display = 'block'; }
                 } finally {
                     tokenSignInBtn.disabled = false;
@@ -2224,9 +2259,9 @@
                         await loadData();
                     }
                 } catch (error) {
-                    console.error('[RefreshData] Error:', error);
+                    PopupLogger.error('RefreshData', 'Error:', error);
                 } finally {
-                    setTimeout(() => elements.settingsRefresh.classList.remove('loading'), 500);
+                    elements.settingsRefresh.classList.remove('loading');
                 }
             });
         }
@@ -2245,14 +2280,19 @@
                     if (infoKeys.length > 0) await Storage.remove(infoKeys);
                     // Clear in-memory cache too
                     AnilistService.cache = {};
-                    // Re-fetch for all tracked anime
+                    // Re-fetch for all tracked anime with sync status
+                    startAutoSync();
                     await AnilistService.autoFetchMissing(animeData, () => {
                         scheduleDeferredListRefresh();
+                    }, (done, total, title) => {
+                        setMetadataRepairStatus(`${done}/${total} — ${_truncTitle(title, 18)}`);
                     });
+                    endAutoSync();
                 } catch (e) {
-                    console.error('[RefreshInfo] Error:', e);
+                    PopupLogger.error('RefreshInfo', 'Error:', e);
+                    endAutoSync();
                 } finally {
-                    setTimeout(() => elements.settingsRefreshInfo.classList.remove('loading'), 500);
+                    elements.settingsRefreshInfo.classList.remove('loading');
                 }
             });
         }
@@ -2293,7 +2333,7 @@
                 try {
                     await chrome.storage.local.set({ [COPY_GUARD_STORAGE_KEY]: nextEnabled });
                 } catch (error) {
-                    console.error('[Settings] Failed to update copy guard setting:', error);
+                    PopupLogger.error('Settings', 'Failed to update copy guard setting:', error);
                     renderCopyGuardSetting(currentlyEnabled);
                 }
             });
@@ -2309,7 +2349,7 @@
                     await chrome.storage.local.set({ [SMART_NOTIF_STORAGE_KEY]: nextEnabled });
                     chrome.runtime.sendMessage({ type: 'SET_SMART_NOTIFICATIONS', enabled: nextEnabled });
                 } catch (error) {
-                    console.error('[Settings] Failed to update smart notif setting:', error);
+                    PopupLogger.error('Settings', 'Failed to update smart notif setting:', error);
                     renderSmartNotifSetting(currentlyEnabled);
                 }
             });
@@ -2324,7 +2364,7 @@
                 try {
                     await chrome.storage.local.set({ [AUTO_SKIP_FILLER_STORAGE_KEY]: nextEnabled });
                 } catch (error) {
-                    console.error('[Settings] Failed to update auto-skip filler setting:', error);
+                    PopupLogger.error('Settings', 'Failed to update auto-skip filler setting:', error);
                     renderAutoSkipFillerSetting(currentlyEnabled);
                 }
             });
@@ -2638,7 +2678,7 @@
             const manifest = chrome.runtime.getManifest();
             await Storage.invalidateCachedStats(manifest?.version || '');
         } catch (e) {
-            console.warn('[Init] Could not check cachedStats version:', e);
+            PopupLogger.warn('Init', 'Could not check cachedStats version:', e);
         }
 
         try {
@@ -2651,16 +2691,16 @@
                 if (elements.totalTime) elements.totalTime.textContent = stats.totalTime || '0h';
             }
         } catch (e) {
-            console.error('[Init] Failed to load cached stats:', e);
+            PopupLogger.error('Init', 'Failed to load cached stats:', e);
         }
 
         try {
             const manifest = chrome.runtime.getManifest();
-            if (elements.versionText && manifest?.version) {
-                elements.versionText.textContent = `Anime Tracker v${manifest.version}`;
+            if (manifest?.version) {
+                if (elements.versionText) elements.versionText.textContent = `Anime Tracker v${manifest.version}`;
             }
         } catch (e) {
-            console.warn('[Version] Could not load manifest version:', e);
+            PopupLogger.warn('Init', 'Could not load manifest version:', e);
         }
 
         initEventListeners();
@@ -2677,7 +2717,7 @@
             const { lastCleanupDate } = await Storage.get(['lastCleanupDate']);
             const today = new Date().toISOString().slice(0, 10);
             if (lastCleanupDate === today) {
-                console.log('[Cleanup] Already ran today, skipping');
+                PopupLogger.log('Cleanup', 'Already ran today, skipping');
             } else {
                 const raw = await Storage.get(['animeData', 'videoProgress', 'deletedAnime']);
                 let dirty = false;
@@ -2688,7 +2728,7 @@
                     if (removedCount > 0) {
                         raw.videoProgress = cleaned;
                         dirty = true;
-                        console.log(`[Cleanup] Removed ${removedCount} stale videoProgress entries`);
+                        PopupLogger.log('Cleanup', `Removed ${removedCount} stale videoProgress entries`);
                     }
                 }
 
@@ -2713,7 +2753,7 @@
                 await Storage.set(saveObj);
             }
         } catch (e) {
-            console.warn('[Cleanup] Auto-cleanup failed:', e);
+            PopupLogger.warn('Cleanup', 'Auto-cleanup failed:', e);
         }
 
         FirebaseSync.init({
@@ -2771,7 +2811,7 @@
             const fill = card.querySelector('.ip-fill');
             if (fill && fill.style.width !== pct + '%') {
                 fill.style.width = pct + '%';
-                console.log(`[IP-Refresh] ${slug}: ${pct}% (${timeStr}/${durStr})`);
+                PopupLogger.log('IP-Refresh', `${slug}: ${pct}% (${timeStr}/${durStr})`);
             }
 
             const badge = card.querySelector('.ip-pct-badge');

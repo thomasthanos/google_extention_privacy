@@ -46,7 +46,7 @@ const FirebaseLib = (function() {
             const ru = getRedirectUrl();
             if (ru) {
                 const shortUrl = ru.replace(/https:\/\/([a-z0-9]+)\.chromiumapp\.org.*/, 'chrome-extension://$1');
-                console.log('[Firebase] Extension redirect:', shortUrl);
+                PopupLogger.log('Firebase', 'Extension redirect:', shortUrl);
             }
         } catch { /* non-Chrome browser */ }
         
@@ -58,7 +58,7 @@ const FirebaseLib = (function() {
 
                 // FIX: If no refreshToken exists, the session is corrupt — clear it
                 if (!tokens.refreshToken) {
-                    console.warn('[Firebase] Corrupt session (no refreshToken), clearing...');
+                    PopupLogger.warn('Firebase', 'Corrupt session (no refreshToken), clearing...');
                     await signOut();
                     return null;
                 }
@@ -68,9 +68,9 @@ const FirebaseLib = (function() {
                 if (!tokens.expiresAt || tokens.expiresAt < Date.now() + 300000) {
                     try {
                         await refreshToken(tokens.refreshToken);
-                        console.log('[Firebase] Token refreshed successfully');
+                        PopupLogger.log('Firebase', 'Token refreshed successfully');
                     } catch (e) {
-                        console.warn('[Firebase] Token refresh failed, signing out:', e.message);
+                        PopupLogger.warn('Firebase', 'Token refresh failed, signing out:', e.message);
                         // FIX: Always sign out if refresh fails — prevents stuck "logged in" state
                         await signOut();
                         return null;
@@ -83,7 +83,7 @@ const FirebaseLib = (function() {
                 return currentUser;
             }
         } catch (error) {
-            console.error('[Firebase] Init error:', error);
+            PopupLogger.error('Firebase', 'Init error:', error);
         }
         
         notifyAuthStateListeners(null);
@@ -109,7 +109,7 @@ const FirebaseLib = (function() {
             authUrl.searchParams.set('scope', SCOPES);
             authUrl.searchParams.set('prompt', 'select_account');
 
-            console.log('[Firebase] Starting OAuth flow...');
+            PopupLogger.log('Firebase', 'Starting OAuth flow...');
 
             chrome.identity.launchWebAuthFlow(
                 {
@@ -123,7 +123,7 @@ const FirebaseLib = (function() {
                             errMsg.includes('cancelled') || errMsg.includes('closed') ||
                             errMsg.includes('user_cancelled');
                         if (!isCancelled) {
-                            console.error('[Firebase] Auth error:', chrome.runtime.lastError);
+                            PopupLogger.error('Firebase', 'Auth error:', chrome.runtime.lastError);
                         }
                         reject(new Error(errMsg));
                         return;
@@ -134,7 +134,7 @@ const FirebaseLib = (function() {
                         return;
                     }
 
-                    console.log('[Firebase] OAuth redirect received');
+                    PopupLogger.log('Firebase', 'OAuth redirect received');
 
                     try {
                         // Extract access token from URL fragment
@@ -192,7 +192,7 @@ const FirebaseLib = (function() {
                         notifyAuthStateListeners(currentUser);
                         resolve(currentUser);
                     } catch (error) {
-                        console.error('[Firebase] Token exchange error:', error);
+                        PopupLogger.error('Firebase', 'Token exchange error:', error);
                         reject(error);
                     }
                 }
@@ -225,7 +225,7 @@ const FirebaseLib = (function() {
 
             if (!response.ok) {
                 await response.text(); // consume body
-                console.error('[Firebase] Token refresh HTTP error:', response.status);
+                PopupLogger.error('Firebase', 'Token refresh HTTP error:', response.status);
                 throw new Error(`HTTP error: ${response.status}`);
             }
 
@@ -238,7 +238,7 @@ const FirebaseLib = (function() {
             // FIX: Validate response data
             if (!data.id_token || !data.refresh_token || !data.expires_in) {
                 const missing = ['id_token', 'refresh_token', 'expires_in'].filter(k => !data[k]);
-                console.error('[Firebase] Invalid token refresh response, missing fields:', missing);
+                PopupLogger.error('Firebase', 'Invalid token refresh response, missing fields:', missing);
                 throw new Error('Invalid token refresh response');
             }
 
@@ -249,10 +249,10 @@ const FirebaseLib = (function() {
             };
 
             await chrome.storage.local.set({ [STORAGE_KEYS.TOKENS]: tokens });
-            console.log('[Firebase] Token refreshed, expires at:', new Date(tokens.expiresAt));
+            PopupLogger.log('Firebase', 'Token refreshed, expires at:', new Date(tokens.expiresAt));
             return tokens;
         } catch (error) {
-            console.error('[Firebase] Token refresh error:', error);
+            PopupLogger.error('Firebase', 'Token refresh error:', error);
             throw error;
         }
     }
@@ -266,14 +266,14 @@ const FirebaseLib = (function() {
         const tokens = stored[STORAGE_KEYS.TOKENS];
 
         if (!tokens) {
-            console.log('[Firebase] No tokens found in storage');
+            PopupLogger.log('Firebase', 'No tokens found in storage');
             return null;
         }
 
         // FIX: Validate tokens object structure
         if (!tokens.idToken || !tokens.refreshToken || !tokens.expiresAt) {
             const missing = ['idToken', 'refreshToken', 'expiresAt'].filter(k => !tokens[k]);
-            console.error('[Firebase] Invalid tokens structure, missing fields:', missing);
+            PopupLogger.error('Firebase', 'Invalid tokens structure, missing fields:', missing);
             // FIX D12: Clear invalid tokens
             await signOut();
             return null;
@@ -285,9 +285,9 @@ const FirebaseLib = (function() {
         const isExpiringSoon = tokens.expiresAt < now + 300000; // 5 min buffer
 
         if (isExpired) {
-            console.log('[Firebase] Token has expired, attempting refresh...');
+            PopupLogger.log('Firebase', 'Token has expired, attempting refresh...');
         } else if (isExpiringSoon) {
-            console.log('[Firebase] Token expiring soon, refreshing...');
+            PopupLogger.log('Firebase', 'Token expiring soon, refreshing...');
         }
 
         // Refresh if expired or about to expire
@@ -296,7 +296,7 @@ const FirebaseLib = (function() {
                 const newTokens = await refreshToken(tokens.refreshToken);
                 return newTokens.idToken;
             } catch (error) {
-                console.error('[Firebase] Failed to refresh token:', error);
+                PopupLogger.error('Firebase', 'Failed to refresh token:', error);
 
                 // FIX D12: If token was already expired, sign out
                 // If only expiring soon, try to use existing token
@@ -306,7 +306,7 @@ const FirebaseLib = (function() {
                 }
 
                 // Token not expired yet - try using existing token
-                console.warn('[Firebase] Using existing token despite refresh failure');
+                PopupLogger.warn('Firebase', 'Using existing token despite refresh failure');
                 return tokens.idToken;
             }
         }

@@ -261,7 +261,9 @@ const ProgressTracker = {
         } finally {
             this.saveInProgress = false;
             if (this.saveQueue.length > 0 && Storage.isContextValid()) {
-                setTimeout(() => this.processSaveQueue(), 100);
+                setTimeout(() => {
+                    if (Storage.isContextValid()) this.processSaveQueue();
+                }, 100);
             }
         }
     },

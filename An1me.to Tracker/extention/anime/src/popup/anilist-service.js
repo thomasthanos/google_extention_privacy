@@ -58,7 +58,7 @@ const AnilistService = {
             }
             return null;
         } catch (error) {
-            console.warn(`[AnimeInfo] Fetch failed for "${slug}": ${error.message}`);
+            PopupLogger.warn('AnimeInfo', `Fetch failed for "${slug}": ${error.message}`);
             return null;
         }
     },
@@ -79,18 +79,14 @@ const AnilistService = {
             for (const [key, value] of Object.entries(result)) {
                 if (!key.startsWith('animeinfo_') || !value) continue;
                 const slug = key.replace('animeinfo_', '');
-                const age = value.cachedAt ? Date.now() - value.cachedAt : Infinity;
-                const ttl = value.notFound
-                    ? this.CACHE_TTL_NOT_FOUND
-                    : (value.status === 'RELEASING' ? this.CACHE_TTL_AIRING : this.CACHE_TTL);
-                if (age < ttl) {
-                    this.cache[slug] = value;
-                    loaded++;
-                }
+                // Load ALL cached entries (even expired) — autoFetchMissing only
+                // re-fetches truly missing items, not stale ones
+                this.cache[slug] = value;
+                loaded++;
             }
 
         } catch (error) {
-            console.error('[AnimeInfo] Failed to load cache:', error);
+            PopupLogger.error('AnimeInfo', 'Failed to load cache:', error);
         }
     },
 
@@ -98,17 +94,17 @@ const AnilistService = {
      * Fetch info for any tracked anime not yet cached.
      * Batches requests with a delay to avoid hammering the server.
      */
-    async autoFetchMissing(animeData, onComplete) {
+    async autoFetchMissing(animeData, onComplete, onProgress) {
         const { Storage } = window.AnimeTracker;
 
         try {
             // Always reload cache first — avoids race with Firebase sync in loadData()
             await this.loadCachedData(animeData);
 
-            // Re-fetch if not cached at all, OR if cached but episode count is missing
+            // Only re-fetch if truly not cached (never fetched before)
             const slugsToFetch = Object.keys(animeData).filter(slug => {
                 const cached = this.cache[slug];
-                return !cached || (cached.totalEpisodes == null && !cached.notFound);
+                return !cached || !cached.cachedAt;
             });
 
             if (slugsToFetch.length === 0) {
@@ -116,22 +112,32 @@ const AnilistService = {
                 return;
             }
 
-            console.log(`[AnimeInfo] Fetching ${slugsToFetch.length} anime from an1me.to...`);
+            const total = slugsToFetch.length;
+            PopupLogger.log('AnimeInfo', `Fetching ${total} anime from an1me.to...`);
 
             const BATCH_SIZE = 3;
             const DELAY_MS   = 1200;
             let successCount = 0;
+            let processed = 0;
 
             for (let i = 0; i < slugsToFetch.length; i += BATCH_SIZE) {
                 const batch = slugsToFetch.slice(i, i + BATCH_SIZE);
 
                 await Promise.all(batch.map(async (slug) => {
+                    const title = animeData[slug]?.title || slug;
+                    processed++;
+                    if (onProgress) onProgress(processed, total, title);
                     const info = await this.fetchAnimeData(slug);
                     if (info) {
                         const entry = { ...info, cachedAt: Date.now() };
                         this.cache[slug] = entry;
                         await Storage.set({ [`animeinfo_${slug}`]: entry });
                         successCount++;
+                    } else {
+                        // Save notFound so we don't re-fetch every popup open
+                        const notFoundEntry = { notFound: true, cachedAt: Date.now() };
+                        this.cache[slug] = notFoundEntry;
+                        await Storage.set({ [`animeinfo_${slug}`]: notFoundEntry });
                     }
                 }));
 
@@ -143,9 +149,9 @@ const AnilistService = {
                 }
             }
 
-            console.log(`[AnimeInfo] Done — ${successCount}/${slugsToFetch.length} fetched`);
+            PopupLogger.log('AnimeInfo', `Done — ${successCount}/${total} fetched`);
         } catch (error) {
-            console.error('[AnimeInfo] Auto-fetch error:', error);
+            PopupLogger.error('AnimeInfo', 'Auto-fetch error:', error);
         }
     }
 };

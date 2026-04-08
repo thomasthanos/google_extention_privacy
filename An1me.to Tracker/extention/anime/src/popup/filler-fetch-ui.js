@@ -364,9 +364,11 @@ const FillerFetchUI = {
         document.getElementById(this.IDS.cancelBtn)
             .addEventListener('click', () => this.cancel());
 
-        document.addEventListener('keydown', (e) => {
+        // Store reference for potential cleanup
+        this._escHandler = (e) => {
             if (e.key === 'Escape' && this.state.isOpen) this.close();
-        });
+        };
+        document.addEventListener('keydown', this._escHandler);
     },
 
     // ─── Open / Close ────────────────────────────────────────────────────────
@@ -382,6 +384,8 @@ const FillerFetchUI = {
     },
 
     close() {
+        // Block close while fetch is running — user must cancel first
+        if (this.state.isRunning) return;
         this.state.isOpen = false;
         document.getElementById(this.IDS.overlay).style.display = 'none';
     },
@@ -547,6 +551,7 @@ const FillerFetchUI = {
 
         document.getElementById(this.IDS.startBtn).style.display  = 'none';
         document.getElementById(this.IDS.cancelBtn).style.display = '';
+        document.getElementById(this.IDS.closeBtn).style.display  = 'none';
 
         const { FillerService, Storage, CONFIG } = window.AnimeTracker;
 
@@ -650,6 +655,7 @@ const FillerFetchUI = {
             this.state.isCancelled ? 'Cancelled — see log above' : '✓ Complete — see log above');
 
         document.getElementById(this.IDS.cancelBtn).style.display = 'none';
+        document.getElementById(this.IDS.closeBtn).style.display  = '';
         const startBtn = document.getElementById(this.IDS.startBtn);
         startBtn.textContent = this.state.isCancelled ? 'Closed' : '✓ Done';
         startBtn.style.display = '';

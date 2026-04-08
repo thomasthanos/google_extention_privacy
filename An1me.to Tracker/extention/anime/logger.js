@@ -1,7 +1,8 @@
 /**
  * Anime Tracker - Popup Logger
  *
- * Provides optional styled logging helpers without overriding native console.
+ * Styled console output — each tag gets its own colored badge.
+ * Usage: PopupLogger.log('Sync', 'Merged episodes:', 2970);
  */
 
 (function () {
@@ -11,28 +12,38 @@
     const rawWarn = console.warn.bind(console);
     const rawError = console.error.bind(console);
 
-    function formatPrefix(level) {
-        return `%cAnime Tracker%c ${level}`;
+    const TAG_COLORS = {
+        Firebase:    { bg: 'rgba(240,192,64,0.2)',  text: '#f0c040' },
+        Sync:        { bg: 'rgba(79,195,247,0.2)',  text: '#4fc3f7' },
+        Cleanup:     { bg: 'rgba(76,175,130,0.2)',  text: '#4caf82' },
+        Storage:     { bg: 'rgba(155,106,255,0.2)', text: '#9b6aff' },
+        Settings:    { bg: 'rgba(107,118,148,0.2)', text: '#6b7694' },
+        Stats:       { bg: 'rgba(79,195,247,0.2)',  text: '#4fc3f7' },
+        Delete:      { bg: 'rgba(240,112,112,0.2)', text: '#f07070' },
+        Complete:    { bg: 'rgba(76,175,130,0.2)',  text: '#4caf82' },
+        Drop:        { bg: 'rgba(229,115,115,0.2)', text: '#e57373' },
+        AddAnime:    { bg: 'rgba(79,195,247,0.2)',  text: '#4fc3f7' },
+        EditTitle:   { bg: 'rgba(79,195,247,0.2)',  text: '#4fc3f7' },
+        RepairAll:   { bg: 'rgba(240,192,64,0.2)',  text: '#f0c040' },
+        Init:        { bg: 'rgba(148,163,184,0.2)', text: '#94a3b8' },
+        RefreshData: { bg: 'rgba(79,195,247,0.2)',  text: '#4fc3f7' },
+        RefreshInfo: { bg: 'rgba(155,106,255,0.2)', text: '#9b6aff' },
+        AnimeInfo:   { bg: 'rgba(155,106,255,0.2)', text: '#9b6aff' },
+        FetchFiller: { bg: 'rgba(240,192,64,0.2)',  text: '#f0c040' },
+        'IP-Refresh':{ bg: 'rgba(240,192,64,0.2)',  text: '#f0c040' },
+    };
+
+    const DEFAULT_COLOR = { bg: 'rgba(148,163,184,0.15)', text: '#94a3b8' };
+
+    function styled(logFn, tag, args) {
+        const c = TAG_COLORS[tag] || DEFAULT_COLOR;
+        const tagStyle = `color:${c.text};font-weight:700;background:${c.bg};padding:1px 6px;border-radius:3px;`;
+        logFn(`%c${tag}`, tagStyle, ...args);
     }
 
-    const styles = {
-        prefix: 'color:#ff6b6b;font-weight:700;',
-        level: 'color:#94a3b8;font-weight:600;'
+    window.PopupLogger = {
+        log(tag, ...args)   { styled(rawLog, tag, args); },
+        warn(tag, ...args)  { styled(rawWarn, tag, args); },
+        error(tag, ...args) { styled(rawError, tag, args); },
     };
-
-    const PopupLogger = {
-        log(...args) {
-            rawLog(formatPrefix('LOG'), styles.prefix, styles.level, ...args);
-        },
-        warn(...args) {
-            rawWarn(formatPrefix('WARN'), styles.prefix, styles.level, ...args);
-        },
-        error(...args) {
-            rawError(formatPrefix('ERROR'), styles.prefix, styles.level, ...args);
-        }
-    };
-
-    window.PopupLogger = PopupLogger;
-    rawLog(formatPrefix('INIT'), styles.prefix, styles.level, 'Popup logger ready');
 })();
-

@@ -52,7 +52,7 @@ const FirebaseSync = {
                     payload[key] = stored[key] || this.pendingSave?.[key] || {};
                 }
             } catch (error) {
-                console.warn('[Firebase] Failed to hydrate sync payload from storage:', error);
+                PopupLogger.warn('Firebase', 'Failed to hydrate sync payload from storage:', error);
                 for (const key of missingKeys) {
                     payload[key] = this.pendingSave?.[key] || {};
                 }
@@ -85,17 +85,17 @@ const FirebaseSync = {
             FirebaseLib.onAuthStateChanged((user) => {
                 this.currentUser = user;
                 if (user) {
-                    console.log('[Firebase] User signed in:', user.email);
+                    PopupLogger.log('Firebase', 'User signed in:', user.email);
                     if (onUserSignedIn) onUserSignedIn(user);
                 } else {
-                    console.log('[Firebase] No user');
+                    PopupLogger.log('Firebase', 'No user');
                     if (onUserSignedOut) onUserSignedOut();
                 }
             });
 
-            console.log('[Firebase] Initialized');
+            PopupLogger.log('Firebase', 'Initialized');
         } catch (error) {
-            console.error('[Firebase] Init error:', error);
+            PopupLogger.error('Firebase', 'Init error:', error);
             if (onError) onError(error);
         }
     },
@@ -139,7 +139,7 @@ const FirebaseSync = {
                 try {
                     await this.performCloudSave();
                 } catch (error) {
-                    console.error('[Firebase] Debounced save failed:', error);
+                    PopupLogger.error('Firebase', 'Debounced save failed:', error);
                 }
                 resolve();
             }, CONFIG.CLOUD_SAVE_DEBOUNCE_MS);
@@ -189,7 +189,7 @@ const FirebaseSync = {
                     lastUpdated: new Date().toISOString(),
                     email: this.currentUser.email
                 });
-                console.log('[Firebase] ✓ Data saved to cloud');
+                PopupLogger.log('Firebase', 'Data saved to cloud');
 
                 this.cloudSaveRetryCount = 0;
 
@@ -198,7 +198,7 @@ const FirebaseSync = {
                     elements.syncText.textContent = 'Cloud Synced';
                 }
             } catch (error) {
-                console.error('[Firebase] Save error:', error);
+                PopupLogger.error('Firebase', 'Save error:', error);
 
                 if (elements?.syncStatus) {
                     elements.syncStatus.classList.remove('synced');
@@ -207,13 +207,13 @@ const FirebaseSync = {
 
                 this.cloudSaveRetryCount++;
                 if (this.cloudSaveRetryCount >= CONFIG.MAX_CLOUD_SAVE_RETRIES) {
-                    console.error('[Firebase] Max retries reached, giving up');
+                    PopupLogger.error('Firebase', 'Max retries reached, giving up');
                     this.cloudSaveRetryCount = 0;
                     return;
                 }
 
                 const retryDelay = Math.min(2000 * Math.pow(2, this.cloudSaveRetryCount - 1), CONFIG.MAX_RETRY_DELAY_MS);
-                console.log('[Firebase] Will retry in', retryDelay, 'ms');
+                PopupLogger.log('Firebase', 'Will retry in', retryDelay, 'ms');
 
                 // Schedule retry without recursion — reuse the same data
                 this.pendingSave = dataToSave;
@@ -270,7 +270,7 @@ const FirebaseSync = {
                 } catch (e) {
                     retryCount++;
                     if (retryCount < maxRetries) {
-                        console.log(`[Sync] Cloud fetch failed, retrying (${retryCount}/${maxRetries})...`);
+                        PopupLogger.warn('Sync', `Cloud fetch failed, retrying (${retryCount}/${maxRetries})...`);
                         await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
                     } else {
                         throw e;
@@ -302,7 +302,7 @@ const FirebaseSync = {
                     const merged = AnimeTracker.MergeUtils.mergeVideoProgress(localVP, cloudVP);
                     cloudData = { ...cloudData, videoProgress: merged };
                 } catch (e) {
-                    console.warn('[Sync] Pre-merge VP patch failed (non-critical):', e.message);
+                    PopupLogger.warn('Sync', 'Pre-merge VP patch failed (non-critical):', e.message);
                 }
             }
             const localData = await readLocalSyncData();
@@ -321,7 +321,7 @@ const FirebaseSync = {
                         animeData:     AnimeTracker.MergeUtils.mergeAnimeData(localData.animeData || {}, cloudData.animeData || {}),
                         videoProgress: AnimeTracker.MergeUtils.mergeVideoProgress(localData.videoProgress || {}, cloudData.videoProgress || {})
                     };
-                    console.log('[Sync] Merged episodes:', UIHelpers.countEpisodes(finalData.animeData));
+                    PopupLogger.log('Sync', 'Merged episodes:', UIHelpers.countEpisodes(finalData.animeData));
                 } else {
                     finalData = {
                         animeData: cloudData.animeData || {},
@@ -430,7 +430,7 @@ const FirebaseSync = {
 
             return finalData;
         } catch (error) {
-            console.error('[Firebase] Sync error:', error);
+            PopupLogger.error('Firebase', 'Sync error:', error);
             if (elements?.syncStatus) {
                 elements.syncStatus.classList.remove('syncing');
                 elements.syncText.textContent = 'Sync Error';
@@ -462,7 +462,7 @@ const FirebaseSync = {
                 lastUpdated:      new Date().toISOString(),
                 email:            this.currentUser.email
             }, { keepalive: true }).catch(err => {
-                console.error('[Popup] Save on unload failed:', err);
+                PopupLogger.error('Sync', 'Save on unload failed:', err);
             });
         }
     }

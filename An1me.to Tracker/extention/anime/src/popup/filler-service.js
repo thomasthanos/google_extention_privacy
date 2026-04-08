@@ -209,7 +209,7 @@ const FillerService = {
      * Auto-fetch missing episode types with rate limiting.
      * Returns true if any new data was fetched, false if everything was cached.
      */
-    async autoFetchMissing(animeData, onComplete) {
+    async autoFetchMissing(animeData, onComplete, onProgress) {
         const { CONFIG } = window.AnimeTracker;
         const { Logger } = window.AnimeTracker;
 
@@ -233,12 +233,14 @@ const FillerService = {
                 Logger.warn(`Auto-fetch: capping at ${MAX_TOTAL} of ${slugsToFetch.length} pending anime`);
             }
 
-            Logger.info(`Auto-fetching episode types for ${limited.length} anime...`);
+            const total = limited.length;
+            Logger.info(`Auto-fetching episode types for ${total} anime...`);
 
             const BATCH_SIZE = CONFIG.AUTO_FETCH_BATCH_SIZE;
             const BASE_DELAY = CONFIG.AUTO_FETCH_BASE_DELAY_MS;
             let successCount = 0;
             let failCount = 0;
+            let processed = 0;
 
             for (let i = 0; i < limited.length; i += BATCH_SIZE) {
                 const batch = limited.slice(i, i + BATCH_SIZE);
@@ -247,6 +249,8 @@ const FillerService = {
                     batch.map(async (slug) => {
                         try {
                             const animeTitle = animeData[slug]?.title || null;
+                            processed++;
+                            if (onProgress) onProgress(processed, total, animeTitle || slug);
                             const episodeTypes = await this.fetchEpisodeTypes(slug, animeTitle);
                             if (episodeTypes) {
                                 this.updateFromEpisodeTypes(slug, episodeTypes);
