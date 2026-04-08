@@ -2646,6 +2646,45 @@
             loadAutoSkipFillerSetting()
         ]);
 
+        // Auto-cleanup stale data on every popup open
+        try {
+            const { ProgressManager } = AT;
+            const raw = await Storage.get(['animeData', 'videoProgress', 'deletedAnime']);
+            let dirty = false;
+
+            // Clean tracked/completed videoProgress entries
+            if (raw.videoProgress && raw.animeData) {
+                const { cleaned, removedCount } = ProgressManager.cleanTrackedProgress(raw.animeData, raw.videoProgress);
+                if (removedCount > 0) {
+                    raw.videoProgress = cleaned;
+                    dirty = true;
+                    console.log(`[Cleanup] Removed ${removedCount} stale videoProgress entries`);
+                }
+            }
+
+            // Prune deletedAnime older than 10 days
+            if (raw.deletedAnime) {
+                const cutoff = Date.now() - 10 * 24 * 60 * 60 * 1000;
+                for (const slug of Object.keys(raw.deletedAnime)) {
+                    const info = raw.deletedAnime[slug];
+                    const delAt = +(new Date(info?.deletedAt || info || 0));
+                    if (delAt > 0 && delAt < cutoff) {
+                        delete raw.deletedAnime[slug];
+                        dirty = true;
+                    }
+                }
+            }
+
+            if (dirty) {
+                await Storage.set({
+                    videoProgress: raw.videoProgress,
+                    deletedAnime: raw.deletedAnime
+                });
+            }
+        } catch (e) {
+            console.warn('[Cleanup] Auto-cleanup failed:', e);
+        }
+
         FirebaseSync.init({
             onUserSignedIn: async (user) => {
                 showMainApp(user);

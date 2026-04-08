@@ -283,10 +283,10 @@ const AnimeCardRenderer = {
                         ${metaRowHtml}
                     </div>
                     <div class="anime-card-actions">
-                        <button class="anime-complete-toggle" data-slug="${slug}" data-completed="${isManuallyCompleted}" title="${isManuallyCompleted ? 'Unmark as completed' : 'Mark as completed'}">${UIHelpers.createIcon('check')}</button>
-                        <button class="anime-drop-toggle" data-slug="${slug}" data-dropped="${!!anime.droppedAt}" title="${anime.droppedAt ? 'Unmark as dropped — moves back to your active list' : 'Mark as dropped — moves to the Dropped List for anime you started but stopped watching'}">${UIHelpers.createIcon('drop')}</button>
-                        <button class="anime-edit-title" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
-                        <button class="anime-delete" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
+                        <button class="anime-complete-toggle action-labeled" data-slug="${slug}" data-completed="${isManuallyCompleted}" title="${isManuallyCompleted ? 'Unmark as completed' : 'Mark as completed'}">${UIHelpers.createIcon('check')}<span class="action-label">${isManuallyCompleted ? 'Undo' : 'Done'}</span></button>
+                        <button class="anime-drop-toggle action-labeled" data-slug="${slug}" data-dropped="${!!anime.droppedAt}" title="${anime.droppedAt ? 'Unmark as dropped' : 'Drop'}">${UIHelpers.createIcon('drop')}<span class="action-label">${anime.droppedAt ? 'Undrop' : 'Drop'}</span></button>
+                        <button class="anime-edit-title action-labeled" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}<span class="action-label">Edit</span></button>
+                        <button class="anime-delete action-labeled" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}<span class="action-label">Delete</span></button>
                     </div>
                     <div class="anime-expand-icon">${UIHelpers.createIcon('chevron')}</div>
                 </div>
@@ -487,7 +487,7 @@ const AnimeCardRenderer = {
                             </button>
                         </div>
                         <div class="ip-meta">
-                            <a class="ip-meta-item ip-continue-link" href="${continueUrl}" target="_blank" title="Continue watching Ep ${latestEp.number}">▶ Ep ${latestEp.number}</a>
+                            <span class="ip-meta-item">Ep ${latestEp.number}</span>
                             <span class="ip-meta-sep">·</span>
                             <span class="ip-meta-item">${currentTimeStr} / ${durationStr}</span>
                             <span class="ip-meta-sep">·</span>
@@ -497,6 +497,10 @@ const AnimeCardRenderer = {
                             <div class="ip-bar"><div class="ip-fill" style="width:${pct}%"></div></div>
                             <span class="ip-remaining">${remainingStr}</span>
                         </div>
+                        <a class="ip-continue-btn" href="${continueUrl}" target="_blank" title="Continue watching Ep ${latestEp.number}">
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                            Continue Ep ${latestEp.number}
+                        </a>
                     </div>
                 </div>
             </div>`;
