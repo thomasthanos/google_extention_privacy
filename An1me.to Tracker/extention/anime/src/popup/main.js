@@ -161,7 +161,7 @@
     }
 
     // ── Smart Notifications setting ──
-    const SMART_NOTIF_STORAGE_KEY = 'smartNotifEnabled';
+    const SMART_NOTIF_STORAGE_KEY = 'smartNotificationsEnabled';
 
     function renderSmartNotifSetting(enabled) {
         if (!elements.settingsSmartNotif) return;
@@ -2649,11 +2649,10 @@
         FirebaseSync.init({
             onUserSignedIn: async (user) => {
                 showMainApp(user);
-                const bgAlive = await checkBackgroundAlive();
-                if (!bgAlive) {
-                    console.log('[Popup] SW was asleep, sending wake-up sync signal');
-                    try { chrome.runtime.sendMessage({ type: 'SYNC_TO_FIREBASE' }); } catch {}
-                }
+                // Wake background SW if asleep (e.g. Orion on mobile) —
+                // send a lightweight ping instead of SYNC_TO_FIREBASE to avoid
+                // a duplicate full sync (popup handles sync via loadAndSyncData).
+                try { chrome.runtime.sendMessage({ type: 'GET_VERSION' }); } catch {}
                 await loadAndSyncData();
                 if (pendingAutoRepairAfterSignIn) {
                     pendingAutoRepairAfterSignIn = false;

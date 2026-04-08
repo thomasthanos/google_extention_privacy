@@ -19,6 +19,11 @@ const ProgressTracker = {
     _vpCacheTime: 0,
     _VP_CACHE_TTL: 5000, // 5 seconds
 
+    /** Compact ISO timestamp without milliseconds */
+    _compactNow() {
+        return new Date().toISOString().split('.')[0] + 'Z';
+    },
+
     normalizeDuration(duration) {
         let value = Math.round(Number(duration) || 0);
         if (!Number.isFinite(value) || value <= 0) return 0;
@@ -227,16 +232,18 @@ const ProgressTracker = {
                 return;
             }
 
-            // Extract cover image if available
+            // Only store coverImage for untracked anime (fallback for display).
+            // Tracked anime already have coverImage in animeData.
             const coverImage = !existingProgress?.coverImage ? this.getCoverImageUrl() : existingProgress.coverImage;
 
+            const nowIso = this._compactNow();
             videoProgress[uniqueId] = {
                 currentTime: newCurrentTime,
                 duration: Math.floor(duration),
-                savedAt: new Date().toISOString(),
+                savedAt: nowIso,
                 percentage: Math.floor((currentTime / duration) * 100),
-                watchedAt: existingProgress?.watchedAt || new Date().toISOString(), // Track when first started
-                coverImage: coverImage || undefined // Store cover image if available
+                watchedAt: existingProgress?.watchedAt || nowIso,
+                coverImage: coverImage || undefined
             };
 
             await Storage.set({ videoProgress });
@@ -434,7 +441,7 @@ const ProgressTracker = {
             if (!changed) return false;
 
             anime.totalWatchTime = anime.episodes.reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
-            anime.lastWatched = new Date().toISOString();
+            anime.lastWatched = this._compactNow();
             await Storage.set({ animeData });
             Logger.debug(`Refreshed tracked duration: ${animeKey} (${validDuration}s)`);
             return true;
@@ -503,7 +510,7 @@ const ProgressTracker = {
             if (animeData[info.animeSlug].droppedAt) {
                 delete animeData[info.animeSlug].droppedAt;
                 animeData[info.animeSlug].listState = 'active';
-                animeData[info.animeSlug].listStateUpdatedAt = new Date().toISOString();
+                animeData[info.animeSlug].listStateUpdatedAt = this._compactNow();
                 Logger.info('Auto-undropped anime (new episode tracked):', info.animeSlug);
             }
             delete deletedAnime[info.animeSlug];

@@ -335,6 +335,18 @@ const FirebaseSync = {
                 const mergedGroupCovers = AnimeTracker.MergeUtils.mergeGroupCoverImages(localGroupCovers, cloudGroupCovers);
 
                 AnimeTracker.MergeUtils.applyDeletedAnime(finalData.animeData, mergedDeletedAnime);
+
+                // Prune deletedAnime entries older than 30 days
+                const DELETED_MAX_AGE = 10 * 24 * 60 * 60 * 1000;
+                const pruneCutoff = Date.now() - DELETED_MAX_AGE;
+                for (const slug of Object.keys(mergedDeletedAnime)) {
+                    const info = mergedDeletedAnime[slug];
+                    const delAt = +(new Date(info?.deletedAt || info || 0));
+                    if (delAt > 0 && delAt < pruneCutoff) {
+                        delete mergedDeletedAnime[slug];
+                    }
+                }
+
                 finalData.deletedAnime = mergedDeletedAnime;
 
                 const { cleaned: cleanedProgress } =

@@ -25,6 +25,11 @@
     let accumulatedPlaybackSeconds = 0;
     let lastTimeupdateTime = 0; // last currentTime from timeupdate, for accumulating real playback
 
+    /** Compact ISO timestamp without milliseconds */
+    function compactNow() {
+        return new Date().toISOString().split('.')[0] + 'Z';
+    }
+
     /**
      * Shared helper: write a completed episode into animeData synchronously.
      * Used by trackImmediately() to avoid Chrome storage async limitations.
@@ -69,7 +74,7 @@
         if (animeData[info.animeSlug].droppedAt) {
             delete animeData[info.animeSlug].droppedAt;
             animeData[info.animeSlug].listState = 'active';
-            animeData[info.animeSlug].listStateUpdatedAt = new Date().toISOString();
+            animeData[info.animeSlug].listStateUpdatedAt = compactNow();
         }
 
         const MAX_REASONABLE_DURATION_SECONDS = 6 * 60 * 60;
@@ -98,14 +103,14 @@
                 };
                 animeData[info.animeSlug].totalWatchTime = animeData[info.animeSlug].episodes
                     .reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
-                animeData[info.animeSlug].lastWatched = new Date().toISOString();
+                animeData[info.animeSlug].lastWatched = compactNow();
                 return true;
             }
 
             return false;
         }
 
-        const watchedAt = new Date().toISOString().split('.')[0] + 'Z';
+        const watchedAt = compactNow();
         animeData[info.animeSlug].episodes.push({
             number: info.episodeNumber,
             watchedAt,
@@ -128,7 +133,7 @@
             }
         }
 
-        animeData[info.animeSlug].lastWatched = new Date().toISOString();
+        animeData[info.animeSlug].lastWatched = compactNow();
         animeData[info.animeSlug].episodes.sort((a, b) => a.number - b.number);
         return true;
     }
@@ -577,6 +582,20 @@
             const count = applyHighlights(watchedSet);
             if (count > 0) {
                 Logger.debug(`Highlighted ${count} watched episodes in episode list`);
+            } else {
+                // Episode list may not be in DOM yet (lazy/SPA load) — retry when it appears
+                const container = document.querySelector('.episode-list-display-box');
+                const target = container || document.body;
+                const obs = new MutationObserver(() => {
+                    const retry = applyHighlights(watchedSet);
+                    if (retry > 0) {
+                        Logger.debug(`Highlighted ${retry} watched episodes (deferred)`);
+                        obs.disconnect();
+                    }
+                });
+                obs.observe(target, { childList: true, subtree: true });
+                // Stop observing after 10s to avoid leaks
+                setTimeout(() => obs.disconnect(), 10000);
             }
         });
 

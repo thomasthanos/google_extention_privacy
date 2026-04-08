@@ -27,6 +27,74 @@ const shallowEqualDeletedAnime = sharedMergeUtils.shallowEqualDeletedAnime || mi
 const shallowEqualObjectMap  = sharedMergeUtils.shallowEqualObjectMap  || missingMergeUtil('shallowEqualObjectMap');
 const isLikelyMovieSlug      = sharedMergeUtils.isLikelyMovieSlug      || missingMergeUtil('isLikelyMovieSlug');
 
+// ─── Cleanup helpers ─────────────────────────────────────────────────────────
+
+const COMPLETED_PERCENTAGE = 85;
+const DELETED_ANIME_MAX_AGE_MS = 10 * 24 * 60 * 60 * 1000; // 10 days
+
+/**
+ * Lightweight version of ProgressManager.cleanTrackedProgress for background.
+ * Removes videoProgress entries for episodes already tracked in animeData
+ * or that have reached the completion threshold.
+ */
+function cleanTrackedProgressBg(animeData, videoProgress) {
+    if (!videoProgress || !animeData) return videoProgress;
+
+    const trackedIds = new Set();
+    for (const [slug, anime] of Object.entries(animeData)) {
+        if (anime.episodes) {
+            for (const ep of anime.episodes) {
+                trackedIds.add(`${slug}__episode-${ep.number}`);
+            }
+        }
+    }
+
+    const trackedSlugs = new Set(Object.keys(animeData));
+    const now = Date.now();
+    const cleaned = {};
+    for (const [id, progress] of Object.entries(videoProgress)) {
+        if (id === '__slugIndex') continue;
+        const isTracked = trackedIds.has(id);
+        const isCompleted = (progress.percentage || 0) >= COMPLETED_PERCENTAGE;
+        const savedAge = progress.savedAt ? now - new Date(progress.savedAt).getTime() : Infinity;
+
+        // Episode already in animeData → no need for resume progress
+        if (isTracked) continue;
+        // Completed but not tracked → stale
+        if (isCompleted) continue;
+        // Deleted tombstone → remove
+        if (progress.deleted) continue;
+
+        // Strip redundant coverImage if the anime is already tracked
+        if (progress.coverImage) {
+            const slugMatch = id.match(/^(.+)__episode-\d+$/);
+            if (slugMatch && trackedSlugs.has(slugMatch[1])) {
+                const { coverImage, ...rest } = progress;
+                cleaned[id] = rest;
+                continue;
+            }
+        }
+
+        cleaned[id] = progress;
+    }
+    return cleaned;
+}
+
+/**
+ * Prune deletedAnime entries older than 30 days (in-place).
+ */
+function pruneDeletedAnime(deletedAnime) {
+    if (!deletedAnime) return;
+    const cutoff = Date.now() - DELETED_ANIME_MAX_AGE_MS;
+    for (const slug of Object.keys(deletedAnime)) {
+        const info = deletedAnime[slug];
+        const deletedAt = +(new Date(info?.deletedAt || info || 0));
+        if (deletedAt > 0 && deletedAt < cutoff) {
+            delete deletedAnime[slug];
+        }
+    }
+}
+
 // ─── Storage helpers ─────────────────────────────────────────────────────────
 
 function bgStorageGet(keys) {
@@ -443,29 +511,17 @@ async function syncProgressOnly() {
 
     progressSyncInProgress = true;
     try {
-        const result = await bgStorageGet(['videoProgress']);
-        const localVP = result.videoProgress || {};
+        const result = await bgStorageGet(['videoProgress', 'animeData']);
+        let localVP = result.videoProgress || {};
 
         // Quick check: skip if nothing changed since last push
         if (lastPushedProgressBG && areProgressMapsEqual(localVP, lastPushedProgressBG)) return;
 
-        let cloudVP = {};
-        try {
-            // Fetch only the videoProgress field to avoid downloading the full document.
-            const url = `${FIRESTORE_BASE}/documents/users/${user.uid}?fields=videoProgress`;
-            const r   = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-            if (r.ok) cloudVP = fromFSDoc(await r.json())?.videoProgress || {};
-        } catch {}
+        // Clean completed/tracked entries before pushing
+        localVP = cleanTrackedProgressBg(result.animeData || {}, localVP);
 
-        const latestResult = await bgStorageGet(['videoProgress']);
-        const latestLocalVP = latestResult.videoProgress || {};
-        const mergedVP = mergeVideoProgress(latestLocalVP, cloudVP);
-
-        if (!areProgressMapsEqual(latestLocalVP, mergedVP)) {
-            pauseSync();
-            await bgStorageSet({ videoProgress: mergedVP });
-        }
-
+        // Push-only: no cloud read needed. SSE listener handles incoming updates.
+        // This reduces 3 reads + 1 write → 0 reads + 1 write per progress sync.
         const url       = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         const fieldMask = 'updateMask.fieldPaths=videoProgress&updateMask.fieldPaths=lastUpdated';
         const response  = await fetch(`${url}?${fieldMask}`, {
@@ -473,14 +529,14 @@ async function syncProgressOnly() {
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
             body:    JSON.stringify({
                 fields: jsonToFirestoreFields({
-                    videoProgress: mergedVP,
+                    videoProgress: localVP,
                     lastUpdated:   new Date().toISOString()
                 })
             })
         });
 
         if (response.ok) {
-            lastPushedProgressBG = JSON.parse(JSON.stringify(mergedVP));
+            lastPushedProgressBG = JSON.parse(JSON.stringify(localVP));
         } else {
             console.warn('[BG] Progress sync failed:', response.status);
         }
@@ -526,9 +582,15 @@ async function syncToFirebase() {
 
         applyDeletedAnime(mergedAnime, mergedDeleted);
 
-        const mergedProgress = cloudDoc?.videoProgress
+        let mergedProgress = cloudDoc?.videoProgress
             ? mergeVideoProgress(localProgress, cloudDoc.videoProgress)
-            : localProgress;
+            : { ...localProgress };
+
+        // Clean completed/tracked progress entries after merge
+        mergedProgress = cleanTrackedProgressBg(mergedAnime, mergedProgress);
+
+        // Prune deletedAnime entries older than 30 days
+        pruneDeletedAnime(mergedDeleted);
 
         const cloudGroup  = cloudDoc?.groupCoverImages || {};
         const mergedGroup = mergeGroupCoverImages(localGroup, cloudGroup);
@@ -634,7 +696,13 @@ async function _doApplyCloudUpdate(cloudDoc) {
         let mergedAnime = mergeAnimeData(local.animeData || {}, cloudDoc.animeData || {});
         applyDeletedAnime(mergedAnime, mergedDeleted);
 
-        const mergedProgress = mergeVideoProgress(local.videoProgress || {}, cloudDoc.videoProgress || {});
+        let mergedProgress = mergeVideoProgress(local.videoProgress || {}, cloudDoc.videoProgress || {});
+
+        // Clean completed/tracked progress entries after merge — mirrors popup sync logic
+        mergedProgress = cleanTrackedProgressBg(mergedAnime, mergedProgress);
+
+        // Prune deletedAnime entries older than 30 days
+        pruneDeletedAnime(mergedDeleted);
 
         const localGroup  = local.groupCoverImages   || {};
         const cloudGroup  = cloudDoc.groupCoverImages || {};
@@ -858,10 +926,10 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         if (progressSyncDebounce) clearTimeout(progressSyncDebounce);
         progressSyncDebounce = setTimeout(() => {
             progressSyncDebounce = null;
-            // Skip if a full sync is already scheduled
-            if (syncDebounceTimeout) return;
+            // Skip if a full sync is scheduled or currently running
+            if (syncDebounceTimeout || syncInProgress) return;
             syncProgressOnly();
-        }, 8000);
+        }, 30000);
     }
 
     if (changes.animeData) {
@@ -1324,7 +1392,7 @@ const SMART_NOTIF_INTERVAL_MINUTES = 60; // check every hour
 async function checkNewEpisodes() {
     try {
         const settings = await bgStorageGet(['smartNotificationsEnabled', 'animeData', 'smartNotifLastCheck']);
-        if (settings.smartNotificationsEnabled === false) return;
+        if (settings.smartNotificationsEnabled !== true) return;
 
         const animeData = settings.animeData || {};
         const lastCheck = settings.smartNotifLastCheck || {};
@@ -2013,7 +2081,7 @@ chrome.runtime.onStartup.addListener(() => {
     setTimeout(startRealtimeListener, 2000);
     // Restore smart notification alarm if enabled
     bgStorageGet(['smartNotificationsEnabled']).then(r => {
-        if (r.smartNotificationsEnabled !== false) {
+        if (r.smartNotificationsEnabled === true) {
             chrome.alarms.create(SMART_NOTIF_ALARM, { periodInMinutes: SMART_NOTIF_INTERVAL_MINUTES });
         }
     }).catch(() => {});

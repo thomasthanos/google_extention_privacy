@@ -285,14 +285,12 @@ const ProgressManager = {
             }
 
             if (isTracked || isCompleted) {
-                // Keep the resume entry if the episode is tracked but the in-progress
-                // percentage hasn't reached the completion threshold yet (user still watching).
-                if (isTracked && !isCompleted && !progress.deleted) {
-                    cleaned[id] = progress;
-                } else {
-                    removedCount++;
-                }
+                // Episode is already tracked in animeData → resume progress is no longer needed.
+                // Completed entries (>= 85%) are also removed.
+                removedCount++;
             } else {
+                // Untracked + not completed → keep (user may resume later).
+                // Users can manually dismiss via the × button in the In Progress section.
                 cleaned[id] = progress;
             }
         }
