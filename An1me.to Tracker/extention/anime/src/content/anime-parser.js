@@ -176,7 +176,8 @@ const AnimeParser = {
 
             Logger.info(`${animeTitle} Ep${episodeNumber}`, { id: uniqueId });
 
-            const coverImageElement = document.querySelector('.anime-featured img');
+            const coverImageElement = document.querySelector('.anime-featured img')
+                || document.querySelector('.anime-main-image');
             const coverImage = coverImageElement ? coverImageElement.src || null : null;
 
             return {

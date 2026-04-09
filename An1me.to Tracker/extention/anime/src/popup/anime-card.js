@@ -161,13 +161,18 @@ const AnimeCardRenderer = {
 
         const AnilistService = window.AnimeTracker?.AnilistService;
         const anilistStatusForProgress = AnilistService?.getStatus(slug);
+        const _mainLatest = AnilistService?.getLatestEpisode(slug);
+        const _mainMetaTotal = AnilistService?.getTotalEpisodes(slug);
+        const _mainPartial = _mainMetaTotal && _mainLatest && _mainLatest < _mainMetaTotal;
+        const availableInfo = _mainPartial && _mainLatest > 0 ? ` / ${_mainLatest} available` : '';
+
         const progressInfoText = unknownTotal
             ? (anilistStatusForProgress === 'FINISHED'
                 ? `<span>📍 ${currentEpText} · Watched ${episodeCount} eps</span>`
-                : `<span>📍 ${currentEpText} · Airing</span>`)
+                : `<span>📍 ${currentEpText}${availableInfo} · Airing</span>`)
             : hasFillerData
-            ? `<span title="Canon: ${canonWatched}/${totalCanonDisplay}">📍 ${currentEpText} · Canon ${canonWatched}/${totalCanonDisplay}</span>`
-            : `<span>📍 ${currentEpText} · Total ${episodeCount}/${totalDisplay}</span>`;
+            ? `<span title="Canon: ${canonWatched}/${totalCanonDisplay}">📍 ${currentEpText}${availableInfo} · Canon ${canonWatched}/${totalCanonDisplay}</span>`
+            : `<span>📍 ${currentEpText}${availableInfo} · Total ${episodeCount}/${totalDisplay}</span>`;
 
         // Filler progress section
         const watchedFillers = fillerInfo?.watched || 0;
@@ -224,7 +229,9 @@ const AnimeCardRenderer = {
             || (progressData.progress === 100 && totalWatchedEpisodes > 0 && !_isPartiallyUploaded)
             || isFinishedByAnilist
             || (window.AnimeTracker.SeasonGrouping.isMovie(slug, anime) && totalWatchedEpisodes > 0);
-        const totalProgressText = totalEpisodesPossible > 0 ? `${currentEpisode}/${totalEpisodesPossible}` : `${currentEpisode}`;
+        // Show available episodes when airing/partially uploaded
+        const displayTotal = _isPartiallyUploaded && _latestAvail > 0 ? _latestAvail : totalEpisodesPossible;
+        const totalProgressText = displayTotal > 0 ? `${currentEpisode}/${displayTotal}` : `${currentEpisode}`;
         const episodeProgressText = currentEpisode > 0 ? `Ep ${totalProgressText}` : '';
         const isDropped = !!anime.droppedAt;
         // Detect "caught up with airing" — user watched everything available on site
@@ -749,10 +756,10 @@ const AnimeCardRenderer = {
                 const _sMetaTotal = AnilistService?.getTotalEpisodes(slug);
                 const _sPartial = _sMetaTotal && _sLatest && _sLatest < _sMetaTotal;
                 if (progressData.progress === null) {
-                    // Total unknown: FINISHED = complete (unless partially uploaded), RELEASING = in-progress
-                    isComplete = anilistSt === 'FINISHED' && episodeCount > 0 && !_sPartial;
+                    // Total unknown: never auto-complete, show real status
+                    isComplete = false;
                     hasProgress = episodeCount > 0;
-                    progressPercent = isComplete ? 100 : 0;
+                    progressPercent = 0;
                 } else {
                     isComplete = progressPercent >= 100 && !_sPartial;
                     // For long-running: if reached last episode, mark complete
@@ -765,8 +772,14 @@ const AnimeCardRenderer = {
                 statusClass = isComplete ? 'complete' : (hasProgress ? 'in-progress' : 'not-started');
                 statusIcon = isComplete ? '✓' : (hasProgress ? '▶' : '○');
 
-                // Episode badge text
-                episodeBadgeText = currentEp > 0 ? `Ep ${currentEp}` : `${episodeCount} eps`;
+                // Episode badge text — show available count when airing
+                if (currentEp > 0 && _sPartial && _sLatest > 0) {
+                    episodeBadgeText = `Ep ${currentEp}/${_sLatest}`;
+                } else if (currentEp > 0) {
+                    episodeBadgeText = `Ep ${currentEp}`;
+                } else {
+                    episodeBadgeText = `${episodeCount} eps`;
+                }
 
                 // Filler data for this season
                 const hasFillerData = FillerService.hasFillerData(slug);
@@ -839,13 +852,18 @@ const AnimeCardRenderer = {
                 const canonProgressWidth = unknownTotalSeason ? (isComplete ? 100 : 0)
                     : hasFillerData ? (totalCanon > 0 ? (canonWatched / totalCanon) * 100 : 0) : progressData.progress;
 
+                // Show latest available episode when airing
+                const latestAvailEp = _sLatest || null;
+                const availableText = latestAvailEp && latestAvailEp > 0 && _sPartial
+                    ? ` / ${latestAvailEp} available` : '';
+
                 const progressInfoText = unknownTotalSeason
                     ? (anilistSt === 'FINISHED'
                         ? `<span>📍 Ep ${currentEp > 0 ? currentEp : episodeCount} · Watched ${episodeCount} eps</span>`
-                        : `<span>📍 Ep ${currentEp > 0 ? currentEp : episodeCount} · Airing</span>`)
+                        : `<span>📍 Ep ${currentEp > 0 ? currentEp : episodeCount}${availableText} · Airing</span>`)
                     : hasFillerData
-                    ? `<span title="Canon: ${canonWatched}/${totalCanonDisplay}">📍 Ep ${currentEp > 0 ? currentEp : episodeCount} · Canon ${canonWatched}/${totalCanonDisplay}</span>`
-                    : `<span>Ep ${currentEp > 0 ? currentEp : episodeCount} · Total ${episodeCount}/${totalDisplay}</span>`;
+                    ? `<span title="Canon: ${canonWatched}/${totalCanonDisplay}">📍 Ep ${currentEp > 0 ? currentEp : episodeCount}${availableText} · Canon ${canonWatched}/${totalCanonDisplay}</span>`
+                    : `<span>Ep ${currentEp > 0 ? currentEp : episodeCount}${availableText} · Total ${episodeCount}/${totalDisplay}</span>`;
 
                 progressInfoHTML = `
                     <div class="progress-info">

@@ -68,7 +68,8 @@ const SeasonGrouping = {
         if (lowerSlug === 'trinity-seven-nanatsu-no-taizai-to-nana-madoushi') return true;
 
         const anilistTotal = window.AnimeTracker?.AnilistService?.getTotalEpisodes(lowerSlug);
-        if (anilistTotal === 1) return true;
+        const anilistStatus = window.AnimeTracker?.AnilistService?.getStatus(lowerSlug);
+        if (anilistTotal === 1 && anilistStatus !== 'RELEASING') return true;
 
         const moviePatterns = [
             /-movie(-|$)/i,

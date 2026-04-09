@@ -40,7 +40,8 @@ const ProgressTracker = {
 
     getCoverImageUrl() {
         try {
-            const coverImageElement = document.querySelector('.anime-featured img');
+            const coverImageElement = document.querySelector('.anime-main-image')
+                || document.querySelector('.anime-featured img');
             return coverImageElement?.src || null;
         } catch (e) {
             return null;

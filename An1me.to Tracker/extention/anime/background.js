@@ -1204,7 +1204,65 @@ async function fetchAnimePageInfo(slug) {
         status = 'RELEASING';
     }
 
-    return { totalEpisodes, status, latestEpisode };
+    // ── Cover image ─────────────────────────────────────────────────────────
+    // Try multiple selectors: the site uses class="anime-main-image" on the
+    // /anime/{slug}/ page. Fall back to OG/meta image or schema.org image.
+    let coverImage = null;
+    const imgMatch = html.match(/<img[^>]+class=["'][^"']*anime-main-image[^"']*["'][^>]*src=["']([^"']+)["']/i)
+        || html.match(/<img[^>]+src=["']([^"']+)["'][^>]*class=["'][^"']*anime-main-image[^"']*["']/i);
+    if (imgMatch) {
+        coverImage = imgMatch[1];
+    }
+    if (!coverImage) {
+        const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+            || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+        if (ogMatch) coverImage = ogMatch[1];
+    }
+
+    return { totalEpisodes, status, latestEpisode, coverImage };
+}
+
+// ─── Batch anime info fetcher (runs in background) ──────────────────────────
+
+async function batchFetchAnimeInfo(slugs) {
+    const BATCH_SIZE = 3;
+    const DELAY_MS = 1200;
+    let successCount = 0;
+
+    const result = await bgStorageGet(['animeData']);
+    const animeData = result.animeData || {};
+
+    for (let i = 0; i < slugs.length; i += BATCH_SIZE) {
+        const batch = slugs.slice(i, i + BATCH_SIZE);
+
+        await Promise.all(batch.map(async (slug) => {
+            try {
+                const info = await fetchAnimePageInfo(slug);
+                if (info) {
+                    const entry = { ...info, cachedAt: Date.now() };
+                    await bgStorageSet({ [`animeinfo_${slug}`]: entry });
+                    successCount++;
+
+                    // Backfill coverImage into animeData
+                    if (info.coverImage && animeData[slug] && !animeData[slug].coverImage) {
+                        animeData[slug].coverImage = info.coverImage;
+                    }
+                } else {
+                    await bgStorageSet({ [`animeinfo_${slug}`]: { notFound: true, cachedAt: Date.now() } });
+                }
+            } catch (e) {
+                console.warn(`[BG] Fetch failed for ${slug}:`, e.message);
+            }
+        }));
+
+        if (i + BATCH_SIZE < slugs.length) {
+            await new Promise(r => setTimeout(r, DELAY_MS));
+        }
+    }
+
+    // Save all backfilled coverImages in one write
+    await bgStorageSet({ animeData });
+    console.log(`[BG] Batch fetch done — ${successCount}/${slugs.length}`);
 }
 
 // ─── Episode type fetcher ─────────────────────────────────────────────────────
@@ -1946,6 +2004,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         fetchAnimePageInfo(message.slug)
             .then(info => sendResponse({ success: true, info }))
             .catch(error => sendResponse({ success: false, error: error.message }));
+        return true;
+    }
+
+    if (message.type === 'BATCH_FETCH_ANIME_INFO') {
+        sendResponse({ received: true });
+        if (Array.isArray(message.slugs) && message.slugs.length > 0) {
+            batchFetchAnimeInfo(message.slugs).catch(e =>
+                console.warn('[BG] Batch fetch error:', e)
+            );
+        }
         return true;
     }
 

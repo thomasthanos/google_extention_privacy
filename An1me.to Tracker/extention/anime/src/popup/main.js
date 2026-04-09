@@ -348,7 +348,8 @@
             if (progressData.progress >= 100 && !isPartiallyUploaded) {
                 isComplete = true;
             } else if (anilistStatus === 'FINISHED' && progressData.total == null && !isPartiallyUploaded) {
-                isComplete = true;
+                // Total unknown: don't auto-complete, let user decide
+                isComplete = false;
             } else if (anilistStatus === 'FINISHED' && progressData.total != null) {
                 const highestEp = Math.max(0, ...(anime.episodes || []).map(ep => Number(ep.number) || 0));
                 if (highestEp >= progressData.total && !isPartiallyUploaded) isComplete = true;
@@ -1704,6 +1705,14 @@
             renderAnimeList(elements.searchInput?.value || '');
             updateStats();
             hideAddAnimeDialog();
+
+            // Fetch cover image + info for the newly added anime in background
+            if (!animeData[slug].coverImage) {
+                chrome.runtime.sendMessage(
+                    { type: 'BATCH_FETCH_ANIME_INFO', slugs: [slug] },
+                    () => { if (chrome.runtime.lastError) { /* ignore */ } }
+                );
+            }
 
             if (user) {
                 (async () => {

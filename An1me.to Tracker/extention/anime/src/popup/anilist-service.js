@@ -1,7 +1,7 @@
 /**
  * Anime Tracker - Anime Info Service
- * Fetches totalEpisodes + status directly from an1me.to/anime/{slug}/
- * No external API, no title matching — uses the exact same slug from the URL.
+ * Reads cached anime info from chrome.storage.
+ * All fetching is delegated to the background service worker.
  */
 
 const AnilistService = {
@@ -33,36 +33,6 @@ const AnilistService = {
         return data.latestEpisode;
     },
 
-    // ── Fetch ───────────────────────────────────────────────────────────────────
-
-    /** Fetch anime info via the background service worker. */
-    async fetchAnimeData(slug) {
-        try {
-            const response = await new Promise((resolve, reject) => {
-                const timer = setTimeout(() => reject(new Error('Message timeout after 15s')), 15000);
-                chrome.runtime.sendMessage(
-                    { type: 'FETCH_ANIME_INFO', slug },
-                    (response) => {
-                        clearTimeout(timer);
-                        if (chrome.runtime.lastError) {
-                            reject(new Error(chrome.runtime.lastError.message));
-                        } else {
-                            resolve(response);
-                        }
-                    }
-                );
-            });
-
-            if (response?.success && response.info) {
-                return response.info;
-            }
-            return null;
-        } catch (error) {
-            PopupLogger.warn('AnimeInfo', `Fetch failed for "${slug}": ${error.message}`);
-            return null;
-        }
-    },
-
     // ── Cache management ────────────────────────────────────────────────────────
 
     /** Load previously cached entries from chrome.storage. */
@@ -76,13 +46,21 @@ const AnilistService = {
             const result = await Storage.get(keys);
             let loaded = 0;
 
+            let needsSave = false;
             for (const [key, value] of Object.entries(result)) {
                 if (!key.startsWith('animeinfo_') || !value) continue;
                 const slug = key.replace('animeinfo_', '');
-                // Load ALL cached entries (even expired) — autoFetchMissing only
-                // re-fetches truly missing items, not stale ones
                 this.cache[slug] = value;
                 loaded++;
+
+                // Backfill coverImage into animeData if missing
+                if (value.coverImage && animeData[slug] && !animeData[slug].coverImage) {
+                    animeData[slug].coverImage = value.coverImage;
+                    needsSave = true;
+                }
+            }
+            if (needsSave) {
+                await Storage.set({ animeData });
             }
 
         } catch (error) {
@@ -91,17 +69,35 @@ const AnilistService = {
     },
 
     /**
-     * Fetch info for any tracked anime not yet cached.
-     * Batches requests with a delay to avoid hammering the server.
+     * Identify missing anime info and delegate fetching to background.
+     * Fire-and-forget — the popup re-renders via storage.onChanged.
      */
-    async autoFetchMissing(animeData, onComplete, onProgress) {
+    async autoFetchMissing(animeData, onComplete) {
         const { Storage } = window.AnimeTracker;
 
         try {
-            // Always reload cache first — avoids race with Firebase sync in loadData()
             await this.loadCachedData(animeData);
 
-            // Only re-fetch if truly not cached (never fetched before)
+            // Gradual migration: find cached entries missing coverImage
+            const migrationKey = 'animeinfo_coverimage_migration_done';
+            const migResult = await Storage.get([migrationKey]);
+            if (!migResult[migrationKey]) {
+                const MIGRATION_BATCH = 6;
+                let cleared = 0;
+                for (const slug of Object.keys(animeData)) {
+                    if (cleared >= MIGRATION_BATCH) break;
+                    const cached = this.cache[slug];
+                    if (cached && cached.cachedAt && !cached.coverImage && !cached.notFound) {
+                        delete this.cache[slug];
+                        cleared++;
+                    }
+                }
+                if (cleared === 0) {
+                    await Storage.set({ [migrationKey]: true });
+                }
+            }
+
+            // Collect slugs that need fetching
             const slugsToFetch = Object.keys(animeData).filter(slug => {
                 const cached = this.cache[slug];
                 return !cached || !cached.cachedAt;
@@ -112,44 +108,15 @@ const AnilistService = {
                 return;
             }
 
-            const total = slugsToFetch.length;
-            PopupLogger.log('AnimeInfo', `Fetching ${total} anime from an1me.to...`);
+            PopupLogger.log('AnimeInfo', `Delegating ${slugsToFetch.length} anime to background...`);
 
-            const BATCH_SIZE = 3;
-            const DELAY_MS   = 1200;
-            let successCount = 0;
-            let processed = 0;
+            // Fire-and-forget: send to background service worker
+            chrome.runtime.sendMessage(
+                { type: 'BATCH_FETCH_ANIME_INFO', slugs: slugsToFetch },
+                () => { if (chrome.runtime.lastError) { /* ignore */ } }
+            );
 
-            for (let i = 0; i < slugsToFetch.length; i += BATCH_SIZE) {
-                const batch = slugsToFetch.slice(i, i + BATCH_SIZE);
-
-                await Promise.all(batch.map(async (slug) => {
-                    const title = animeData[slug]?.title || slug;
-                    processed++;
-                    if (onProgress) onProgress(processed, total, title);
-                    const info = await this.fetchAnimeData(slug);
-                    if (info) {
-                        const entry = { ...info, cachedAt: Date.now() };
-                        this.cache[slug] = entry;
-                        await Storage.set({ [`animeinfo_${slug}`]: entry });
-                        successCount++;
-                    } else {
-                        // Save notFound so we don't re-fetch every popup open
-                        const notFoundEntry = { notFound: true, cachedAt: Date.now() };
-                        this.cache[slug] = notFoundEntry;
-                        await Storage.set({ [`animeinfo_${slug}`]: notFoundEntry });
-                    }
-                }));
-
-                // Re-render after each batch so badges appear progressively
-                if (onComplete) onComplete();
-
-                if (i + BATCH_SIZE < slugsToFetch.length) {
-                    await new Promise(resolve => setTimeout(resolve, DELAY_MS));
-                }
-            }
-
-            PopupLogger.log('AnimeInfo', `Done — ${successCount}/${total} fetched`);
+            if (onComplete) onComplete();
         } catch (error) {
             PopupLogger.error('AnimeInfo', 'Auto-fetch error:', error);
         }

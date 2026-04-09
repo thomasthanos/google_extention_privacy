@@ -156,7 +156,7 @@ const UIHelpers = {
      */
     _ALLOWED_IMAGE_HOSTS: [
         's4.anilist.co',
-        'cdn.myanimelist.net',
+        'myanimelist.net',
         'media.kitsu.app',
         'img1.ak.crunchyroll.com',
         'an1me.to',
