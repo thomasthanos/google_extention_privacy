@@ -319,7 +319,7 @@ const ProgressManager = {
             if ((Number(progress.percentage) || 0) >= completedPercentage) continue;
 
             const trackedAnime = animeData?.[animeSlug];
-            if (trackedAnime?.completedAt || trackedAnime?.droppedAt) continue;
+            if (trackedAnime?.completedAt || trackedAnime?.droppedAt || trackedAnime?.onHoldAt) continue;
             const trackedEpisodeNumbers = new Set(
                 Array.isArray(trackedAnime?.episodes)
                     ? trackedAnime.episodes.map(ep => Number(ep?.number)).filter(n => Number.isFinite(n) && n > 0)

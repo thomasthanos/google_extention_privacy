@@ -770,6 +770,64 @@ body {
   border-top: 1px solid rgba(229,115,115,0.12);
 }
 
+/* ─── On Hold List Section ────────────────────────────────── */
+.onhold-list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 4px;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(255,183,77,0.18);
+  background: linear-gradient(180deg, rgba(255,183,77,0.06) 0%, rgba(255,183,77,0.02) 100%);
+  overflow: hidden;
+}
+.onhold-list-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  cursor: pointer;
+  user-select: none;
+  background: rgba(255,183,77,0.04);
+  transition: background var(--tf);
+}
+.onhold-list-label:hover {
+  background: rgba(255,183,77,0.1);
+}
+.onhold-list-label:hover .onhold-list-label-title {
+  color: var(--cyan);
+}
+.onhold-list-label-left {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.onhold-list-label-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #ffb74d;
+  letter-spacing: 0.08em;
+  transition: color var(--tf);
+}
+.onhold-list-label-sub {
+  font-size: 10px;
+  color: var(--t3);
+}
+.onhold-chevron {
+  width: 12px;
+  height: 12px;
+  color: var(--t3);
+  flex-shrink: 0;
+  transition: transform var(--tn);
+}
+.onhold-list-cards {
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 10px 10px;
+  border-top: 1px solid rgba(255,183,77,0.12);
+}
+
 /* ─── Airing List Section ─────────────────────────────────── */
 .airing-list-section {
   display: flex;
@@ -885,7 +943,7 @@ body {
 .anime-card:hover .anime-expand-icon { color: var(--t2); }
 
 .anime-card-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; align-self: center; }
-.anime-delete, .anime-edit-title, .anime-fetch-filler, .anime-complete-toggle, .anime-drop-toggle {
+.anime-delete, .anime-edit-title, .anime-fetch-filler, .anime-complete-toggle, .anime-drop-toggle, .anime-onhold-toggle {
   width: 24px; height: 24px; display: none; align-items: center; justify-content: center;
   background: transparent; border: none; color: var(--t3); position: relative;
   cursor: pointer; border-radius: var(--r-xs); font-size: 0; transition: all var(--tf); flex-shrink: 0;
@@ -897,7 +955,8 @@ body {
 .anime-card.expanded .anime-edit-title,
 .anime-card.expanded .anime-fetch-filler,
 .anime-card.expanded .anime-complete-toggle,
-.anime-card.expanded .anime-drop-toggle { display: flex; }
+.anime-card.expanded .anime-drop-toggle,
+.anime-card.expanded .anime-onhold-toggle { display: flex; }
 .anime-delete:hover         { background: rgba(240,69,69,0.12); color: #f04545; }
 .anime-edit-title:hover     { background: rgba(79,195,247,0.1);  color: var(--cyan); }
 .anime-fetch-filler:hover   { background: rgba(240,192,64,0.1);  color: var(--amber); }
@@ -906,6 +965,8 @@ body {
 .anime-complete-toggle[data-completed="true"] { color: #4caf50; }
 .anime-drop-toggle:hover { background: rgba(229,115,115,0.12); color: #e57373; }
 .anime-drop-toggle[data-dropped="true"] { color: #e57373; }
+.anime-onhold-toggle:hover { background: rgba(255,183,77,0.12); color: #ffb74d; }
+.anime-onhold-toggle[data-onhold="true"] { color: #ffb74d; }
 
 /* ─── Progress ──────────────────────────────────────────────── */
 .progress-container { margin-bottom: 0; max-height: 0; overflow: hidden; opacity: 0; transition: max-height var(--tn), opacity var(--tn), margin var(--tn); }

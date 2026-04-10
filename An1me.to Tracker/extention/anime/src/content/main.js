@@ -70,11 +70,33 @@
             animeData[info.animeSlug].episodes = [];
         }
 
+        // Auto-resume on-hold anime when user watches a new episode
+        if (animeData[info.animeSlug].onHoldAt) {
+            delete animeData[info.animeSlug].onHoldAt;
+            animeData[info.animeSlug].listState = 'active';
+            animeData[info.animeSlug].listStateUpdatedAt = compactNow();
+            try {
+                const { WatchlistSync } = window.AnimeTrackerContent;
+                const resumeSiteId = animeData[info.animeSlug].siteAnimeId;
+                if (WatchlistSync && resumeSiteId) {
+                    WatchlistSync.updateStatus(resumeSiteId, 'watching');
+                }
+            } catch { /* non-critical */ }
+        }
+
         // Auto-undrop: if user watches a new episode of a dropped anime, undrop it
         if (animeData[info.animeSlug].droppedAt) {
             delete animeData[info.animeSlug].droppedAt;
             animeData[info.animeSlug].listState = 'active';
             animeData[info.animeSlug].listStateUpdatedAt = compactNow();
+            // Sync undrop → watching on an1me.to
+            try {
+                const { WatchlistSync } = window.AnimeTrackerContent;
+                const undropSiteId = animeData[info.animeSlug].siteAnimeId;
+                if (WatchlistSync && undropSiteId) {
+                    WatchlistSync.updateStatus(undropSiteId, 'watching');
+                }
+            } catch { /* non-critical */ }
         }
 
         const MAX_REASONABLE_DURATION_SECONDS = 6 * 60 * 60;
@@ -640,7 +662,7 @@
             animeInfo.totalEpisodes > 0 &&
             animeInfo.totalEpisodes < 10000;
 
-        if (animeInfo.coverImage || hasDetectedTotal) {
+        if (animeInfo.coverImage || hasDetectedTotal || animeInfo.siteAnimeId) {
             try {
                 chrome.storage.local.get(['animeData', 'groupCoverImages'], (result) => {
                     if (chrome.runtime.lastError) return;
@@ -652,6 +674,10 @@
                         // Only update existing entries — don't create new ones just from visiting a page
                         if (!animeData[slug].coverImage && animeInfo.coverImage) {
                             animeData[slug].coverImage = animeInfo.coverImage;
+                        }
+                        // Store site's numeric anime ID for watchlist sync
+                        if (animeInfo.siteAnimeId && !animeData[slug].siteAnimeId) {
+                            animeData[slug].siteAnimeId = animeInfo.siteAnimeId;
                         }
                         if (hasDetectedTotal) {
                             const existingMaxEpisode = Math.max(
@@ -752,7 +778,7 @@
                 const duration = videoElement.duration;
 
                 if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
-                    const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
+                    const minWatch = AT.CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
                     if (accumulatedPlaybackSeconds >= minWatch) {
                         Logger.info('Periodic check: threshold reached, tracking');
                         clearInterval(periodicCheck);

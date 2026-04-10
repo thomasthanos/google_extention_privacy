@@ -1219,7 +1219,14 @@ async function fetchAnimePageInfo(slug) {
         if (ogMatch) coverImage = ogMatch[1];
     }
 
-    return { totalEpisodes, status, latestEpisode, coverImage };
+    // ── Site anime ID ─────────────────────────────────────────────────────
+    let siteAnimeId = null;
+    const idMatch = html.match(/\bcurrent_post_data_id\s*=\s*(\d+)/)
+        || html.match(/\bcurrent_anime_id\s*=\s*(\d+)/)
+        || html.match(/showWatchlistModal\(['"]#watchlist-(\d+)['"]\)/);
+    if (idMatch) siteAnimeId = parseInt(idMatch[1], 10);
+
+    return { totalEpisodes, status, latestEpisode, coverImage, siteAnimeId };
 }
 
 // ─── Batch anime info fetcher (runs in background) ──────────────────────────
@@ -1243,9 +1250,14 @@ async function batchFetchAnimeInfo(slugs) {
                     await bgStorageSet({ [`animeinfo_${slug}`]: entry });
                     successCount++;
 
-                    // Backfill coverImage into animeData
-                    if (info.coverImage && animeData[slug] && !animeData[slug].coverImage) {
-                        animeData[slug].coverImage = info.coverImage;
+                    // Backfill coverImage and siteAnimeId into animeData
+                    if (animeData[slug]) {
+                        if (info.coverImage && !animeData[slug].coverImage) {
+                            animeData[slug].coverImage = info.coverImage;
+                        }
+                        if (info.siteAnimeId && !animeData[slug].siteAnimeId) {
+                            animeData[slug].siteAnimeId = info.siteAnimeId;
+                        }
                     }
                 } else {
                     await bgStorageSet({ [`animeinfo_${slug}`]: { notFound: true, cachedAt: Date.now() } });
@@ -1950,6 +1962,64 @@ async function persistBeforeUnloadTrack(animeInfo, duration) {
     }
 }
 
+// ─── Watchlist Sync to an1me.to ──────────────────────────────────────────────
+// Called from popup when user toggles complete/drop/active.
+// Finds an open an1me.to tab and forwards the sync request to its content script,
+// which can make the fetch with session cookies. Falls back to direct fetch.
+async function syncWatchlistToSite(animeId, type) {
+    console.log(`[BG] WatchlistSync: sending type="${type}" anime #${animeId}`);
+
+    try {
+        // Find an open an1me.to tab to forward the request through
+        const tabs = await chrome.tabs.query({ url: 'https://an1me.to/*' });
+        if (tabs && tabs.length > 0) {
+            // Forward to content script in the first matching tab
+            chrome.tabs.sendMessage(tabs[0].id, {
+                type: 'WATCHLIST_SYNC_EXECUTE',
+                animeId,
+                watchlistType: type
+            }, (response) => {
+                if (chrome.runtime.lastError) {
+                    console.warn('[BG] WatchlistSync: tab forward failed:', chrome.runtime.lastError.message);
+                    // Fallback to direct fetch
+                    directWatchlistFetch(animeId, type);
+                } else {
+                    console.log('[BG] WatchlistSync: ✓ forwarded to tab');
+                }
+            });
+        } else {
+            console.log('[BG] WatchlistSync: no an1me.to tab open, trying direct fetch');
+            await directWatchlistFetch(animeId, type);
+        }
+    } catch (e) {
+        console.warn(`[BG] WatchlistSync: ✗ error: ${e.message}`);
+    }
+}
+
+// Direct fetch fallback (may lack cookies in service worker context)
+async function directWatchlistFetch(animeId, type) {
+    const AJAX_URL = 'https://an1me.to/wp-admin/admin-ajax.php';
+    const action = type === 'remove' ? 'remove_from_watchlist' : 'add_to_watchlist';
+    try {
+        const formData = new URLSearchParams();
+        formData.append('action', action);
+        formData.append('anime_id', animeId.toString());
+        formData.append('type', type);
+
+        const res = await fetch(AJAX_URL, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString()
+        });
+
+        const text = await res.text();
+        console.log(`[BG] WatchlistSync direct: HTTP ${res.status} - ${text.substring(0, 200)}`);
+    } catch (e) {
+        console.warn(`[BG] WatchlistSync direct: ✗ ${e.message}`);
+    }
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === 'GET_STATS') {
         bgStorageGet(['animeData'])
@@ -2012,6 +2082,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         if (Array.isArray(message.slugs) && message.slugs.length > 0) {
             batchFetchAnimeInfo(message.slugs).catch(e =>
                 console.warn('[BG] Batch fetch error:', e)
+            );
+        }
+        return true;
+    }
+
+    // ── Watchlist Sync (from popup or background) ───────────────────────────
+    if (message.type === 'WATCHLIST_SYNC') {
+        sendResponse({ received: true });
+        const { animeId, watchlistType } = message;
+        if (animeId && watchlistType) {
+            syncWatchlistToSite(animeId, watchlistType).catch(e =>
+                console.warn('[BG] Watchlist sync error:', e)
             );
         }
         return true;

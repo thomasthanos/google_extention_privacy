@@ -252,6 +252,29 @@ const ProgressTracker = {
             this._vpCache = videoProgress;
             this._vpCacheTime = Date.now();
             Logger.debug(`Progress saved: ${uniqueId} → ${videoProgress[uniqueId].percentage}% (${newCurrentTime}s/${Math.floor(duration)}s)`);
+
+            // ── Early watchlist sync after 2 min of playback ──
+            if (!this._watchlistSynced && newCurrentTime >= 120) {
+                this._watchlistSynced = true;
+                try {
+                    const { WatchlistSync } = window.AnimeTrackerContent;
+                    if (WatchlistSync) {
+                        const slugMatch = uniqueId.match(/^(.+)__episode-\d+$/);
+                        const slug = slugMatch ? slugMatch[1] : null;
+                        if (slug) {
+                            const adResult = await Storage.get(['animeData']);
+                            const ad = adResult.animeData || {};
+                            const siteId = ad[slug]?.siteAnimeId;
+                            const pageId = siteId || (window.AnimeTrackerContent.AnimeParser?.extractSiteAnimeId?.());
+                            if (pageId) {
+                                // First episode → plan_to_watch, otherwise → watching
+                                const isFirst = !ad[slug] || !ad[slug].episodes || ad[slug].episodes.length === 0;
+                                WatchlistSync.updateStatus(pageId, isFirst ? 'plan_to_watch' : 'watching');
+                            }
+                        }
+                    }
+                } catch { /* non-critical */ }
+            }
         } catch (e) {
             if (e.message && e.message.includes('Extension context invalidated')) {
                 // silent — extension reloads
@@ -273,6 +296,9 @@ const ProgressTracker = {
         const { CONFIG, Logger } = window.AnimeTrackerContent;
 
         if (currentTime < CONFIG.MIN_PROGRESS_TO_SAVE) return;
+
+        // If past completion threshold but not enough real playback, skip save.
+        // This prevents seek-to-end from creating ghost progress entries.
         if (this.shouldMarkComplete(currentTime, duration)) return;
 
         const now = Date.now();
@@ -473,6 +499,8 @@ const ProgressTracker = {
             const animeData = result.animeData || {};
             const deletedAnime = { ...(result.deletedAnime || {}) };
 
+            const isFirstEpisode = !animeData[info.animeSlug];
+
             if (!animeData[info.animeSlug]) {
                 animeData[info.animeSlug] = {
                     title: info.animeTitle,
@@ -481,8 +509,11 @@ const ProgressTracker = {
                     totalWatchTime: 0,
                     lastWatched: null,
                     totalEpisodes: Number.isFinite(info.totalEpisodes) ? info.totalEpisodes : null,
-                    coverImage: info.coverImage || null
+                    coverImage: info.coverImage || null,
+                    siteAnimeId: info.siteAnimeId || null
                 };
+            } else if (info.siteAnimeId && !animeData[info.animeSlug].siteAnimeId) {
+                animeData[info.animeSlug].siteAnimeId = info.siteAnimeId;
             }
 
             if (!Array.isArray(animeData[info.animeSlug].episodes)) {
@@ -509,12 +540,35 @@ const ProgressTracker = {
                 throw new Error('Invalid normalized video duration');
             }
 
+            // Auto-resume: if user watches a new episode of an on-hold anime, resume it
+            if (animeData[info.animeSlug].onHoldAt) {
+                delete animeData[info.animeSlug].onHoldAt;
+                animeData[info.animeSlug].listState = 'active';
+                animeData[info.animeSlug].listStateUpdatedAt = this._compactNow();
+                Logger.info('Auto-resumed on-hold anime (new episode tracked):', info.animeSlug);
+                try {
+                    const { WatchlistSync } = window.AnimeTrackerContent;
+                    const resumeSiteId = animeData[info.animeSlug].siteAnimeId || info.siteAnimeId;
+                    if (WatchlistSync && resumeSiteId) {
+                        WatchlistSync.updateStatus(resumeSiteId, 'watching');
+                    }
+                } catch { /* non-critical */ }
+            }
+
             // Auto-undrop: if user watches a new episode of a dropped anime, undrop it
             if (animeData[info.animeSlug].droppedAt) {
                 delete animeData[info.animeSlug].droppedAt;
                 animeData[info.animeSlug].listState = 'active';
                 animeData[info.animeSlug].listStateUpdatedAt = this._compactNow();
                 Logger.info('Auto-undropped anime (new episode tracked):', info.animeSlug);
+                // Sync undrop → watching on an1me.to
+                try {
+                    const { WatchlistSync } = window.AnimeTrackerContent;
+                    const undropSiteId = animeData[info.animeSlug].siteAnimeId || info.siteAnimeId;
+                    if (WatchlistSync && undropSiteId) {
+                        WatchlistSync.updateStatus(undropSiteId, 'watching');
+                    }
+                } catch { /* non-critical */ }
             }
             delete deletedAnime[info.animeSlug];
 
@@ -576,6 +630,25 @@ const ProgressTracker = {
 
             Logger.success(`✓ Tracked: ${info.animeTitle} Ep${info.episodeNumber}${info.isDoubleEpisode ? '-' + info.secondEpisodeNumber : ''}`);
             Notifications.showCompletion(info);
+
+            // ── Watchlist sync ──────────────────────────────────────────────
+            try {
+                const { WatchlistSync } = window.AnimeTrackerContent;
+                const siteId = animeData[info.animeSlug].siteAnimeId || info.siteAnimeId;
+                if (WatchlistSync && siteId) {
+                    const watchedEps = animeData[info.animeSlug].episodes.length;
+                    const totalEps = animeData[info.animeSlug].totalEpisodes;
+
+                    if (totalEps && watchedEps >= totalEps) {
+                        // All episodes watched → completed
+                        WatchlistSync.updateStatus(siteId, 'completed');
+                    } else {
+                        // Any episode completed → watching
+                        WatchlistSync.updateStatus(siteId, 'watching');
+                    }
+                }
+            } catch { /* watchlist sync is non-critical */ }
+
             return true;
         } catch (e) {
             Logger.error('Save failed', e);
@@ -596,6 +669,7 @@ const ProgressTracker = {
         this.lastSaveTime = 0;
         this._vpCache = null;
         this._vpCacheTime = 0;
+        this._watchlistSynced = false;
     }
 };
 

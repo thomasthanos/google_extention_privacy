@@ -180,6 +180,9 @@ const AnimeParser = {
                 || document.querySelector('.anime-main-image');
             const coverImage = coverImageElement ? coverImageElement.src || null : null;
 
+            // Extract numeric anime ID from the page for watchlist sync
+            const siteAnimeId = this.extractSiteAnimeId();
+
             return {
                 animeSlug,
                 animeTitle,
@@ -190,12 +193,30 @@ const AnimeParser = {
                 isDoubleEpisode,
                 secondEpisodeNumber,
                 coverImage,
-                totalEpisodes
+                totalEpisodes,
+                siteAnimeId
             };
         } catch (e) {
             Logger.error('extractAnimeInfo failed:', e);
             return null;
         }
+    },
+
+    /**
+     * Extract the numeric anime ID from the page's inline scripts.
+     * The site sets `var current_anime_id = 1234;` in a <script> tag.
+     */
+    extractSiteAnimeId() {
+        try {
+            const scripts = document.querySelectorAll('script:not([src])');
+            for (const script of scripts) {
+                const text = script.textContent;
+                const match = text.match(/\bcurrent_post_data_id\s*=\s*(\d+)/)
+                    || text.match(/\bcurrent_anime_id\s*=\s*(\d+)/);
+                if (match) return parseInt(match[1], 10);
+            }
+        } catch { /* ignore */ }
+        return null;
     },
 
     /**

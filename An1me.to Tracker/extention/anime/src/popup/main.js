@@ -315,13 +315,16 @@
      * Unified anime status resolver.  One function replaces the old
      * isAnimeCompleted / isAgedCompleted / isCaughtUpAiring trio.
      *
-     * Returns: 'dropped' | 'completed' | 'airing' | 'watching'
+     * Returns: 'dropped' | 'completed' | 'airing' | 'watching' | 'on_hold'
      */
-    const AnimeStatus = { WATCHING: 'watching', COMPLETED: 'completed', AIRING: 'airing', DROPPED: 'dropped' };
+    const AnimeStatus = { WATCHING: 'watching', COMPLETED: 'completed', AIRING: 'airing', DROPPED: 'dropped', ON_HOLD: 'on_hold' };
 
     function getAnimeStatus(slug, anime) {
         const { FillerService, SeasonGrouping, AnilistService, CONFIG } = AT;
         if (!anime) return AnimeStatus.WATCHING;
+
+        // ── On Hold ─────────────────────────────────────────────────────────
+        if (anime.onHoldAt) return AnimeStatus.ON_HOLD;
 
         // ── Dropped ─────────────────────────────────────────────────────────
         if (anime.droppedAt) return AnimeStatus.DROPPED;
@@ -666,11 +669,13 @@
         const completedEntries = [];
         const droppedEntries = [];
         const airingEntries = [];
+        const onHoldEntries = [];
         for (const entry of sortedEntries) {
             switch (getAnimeStatus(entry[0], entry[1])) {
                 case AnimeStatus.DROPPED:   droppedEntries.push(entry); break;
                 case AnimeStatus.COMPLETED: completedEntries.push(entry); break;
                 case AnimeStatus.AIRING:    airingEntries.push(entry); break;
+                case AnimeStatus.ON_HOLD:   onHoldEntries.push(entry); break;
                 default:                    normalEntries.push(entry); break;
             }
         }
@@ -711,6 +716,7 @@
         const completedCardsHtml = renderCompletedGroupedEntries(completedEntries);
         const droppedCardsHtml   = renderCompletedGroupedEntries(droppedEntries);
         const airingCardsHtml    = renderCompletedGroupedEntries(airingEntries);
+        const onHoldCardsHtml    = renderCompletedGroupedEntries(onHoldEntries);
         const inProgressHtml     = AnimeCardRenderer.createInProgressGroup(inProgressAnime);
 
         const completedGroupHtml = completedEntries.length > 0
@@ -770,7 +776,26 @@
             `
             : '';
 
-        elements.animeList.innerHTML = inProgressHtml + trackedHtml + airingGroupHtml + completedGroupHtml + droppedGroupHtml;
+        const onHoldGroupHtml = onHoldEntries.length > 0
+            ? `
+                <div class="onhold-list-section">
+                    <div class="onhold-list-label" id="onHoldListToggle">
+                        <div class="onhold-list-label-left">
+                            <span class="onhold-list-label-title">ON HOLD</span>
+                            <span class="onhold-list-label-sub">${onHoldEntries.length} anime</span>
+                        </div>
+                        <svg class="onhold-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="onhold-list-cards" style="display:none;">
+                        ${onHoldCardsHtml}
+                    </div>
+                </div>
+            `
+            : '';
+
+        elements.animeList.innerHTML = inProgressHtml + trackedHtml + airingGroupHtml + onHoldGroupHtml + completedGroupHtml + droppedGroupHtml;
 
         // Restore expanded state
         elements.animeList.querySelectorAll('.anime-card').forEach(card => {
@@ -873,7 +898,7 @@
             const header = card.querySelector('.anime-card-header');
             if (header) {
                 const toggleCard = (e) => {
-                    if (e.target.closest('.anime-delete') || e.target.closest('.anime-edit-title') || e.target.closest('.anime-fetch-filler') || e.target.closest('.anime-complete-toggle') || e.target.closest('.anime-drop-toggle')) return;
+                    if (e.target.closest('.anime-delete') || e.target.closest('.anime-edit-title') || e.target.closest('.anime-fetch-filler') || e.target.closest('.anime-complete-toggle') || e.target.closest('.anime-drop-toggle') || e.target.closest('.anime-onhold-toggle')) return;
                     e.stopPropagation();
                     card.classList.toggle('expanded');
                 };
@@ -969,6 +994,20 @@
                 chevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
             });
             const chevron = airingToggle.querySelector('.airing-chevron');
+            chevron.style.transform = 'rotate(-90deg)';
+        }
+
+        const onHoldToggle = elements.animeList.querySelector('#onHoldListToggle');
+        if (onHoldToggle) {
+            onHoldToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const cards = onHoldToggle.nextElementSibling;
+                const chevron = onHoldToggle.querySelector('.onhold-chevron');
+                const isHidden = cards.style.display === 'none';
+                cards.style.display = isHidden ? 'flex' : 'none';
+                chevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
+            });
+            const chevron = onHoldToggle.querySelector('.onhold-chevron');
             chevron.style.transform = 'rotate(-90deg)';
         }
 
@@ -1300,6 +1339,7 @@
     async function deleteAnime(slug) {
         const { Storage, FirebaseSync } = AT;
         const wasInAnimeData = !!animeData[slug];
+        const siteAnimeId = animeData[slug]?.siteAnimeId;
         if (wasInAnimeData) delete animeData[slug];
 
         try {
@@ -1334,6 +1374,14 @@
                 }, true);
             }
 
+            // Remove from an1me.to watchlist
+            if (siteAnimeId) {
+                chrome.runtime.sendMessage(
+                    { type: 'WATCHLIST_SYNC', animeId: siteAnimeId, watchlistType: 'remove' },
+                    () => { if (chrome.runtime.lastError) { /* ignore */ } }
+                );
+            }
+
             renderAnimeList(elements.searchInput?.value || '');
             updateStats();
         } catch (e) {
@@ -1351,7 +1399,8 @@
 
         try {
             const now = new Date().toISOString();
-            if (animeData[slug].completedAt) {
+            const wasCompleted = !!animeData[slug].completedAt;
+            if (wasCompleted) {
                 setManualListState(animeData[slug], 'active', now);
             } else {
                 setManualListState(animeData[slug], 'completed', now);
@@ -1374,6 +1423,9 @@
                 }, true);
             }
 
+            // Sync to an1me.to watchlist
+            syncWatchlistFromPopup(slug, wasCompleted ? 'watching' : 'completed');
+
             renderAnimeList(elements.searchInput?.value || '');
             updateStats();
         } catch (e) {
@@ -1390,7 +1442,8 @@
 
         try {
             const now = new Date().toISOString();
-            if (animeData[slug].droppedAt) {
+            const wasDropped = !!animeData[slug].droppedAt;
+            if (wasDropped) {
                 setManualListState(animeData[slug], 'active', now);
             } else {
                 setManualListState(animeData[slug], 'dropped', now);
@@ -1413,10 +1466,56 @@
                 }, true);
             }
 
+            // Sync to an1me.to watchlist
+            syncWatchlistFromPopup(slug, wasDropped ? 'watching' : 'dropped');
+
             renderAnimeList(elements.searchInput?.value || '');
             updateStats();
         } catch (e) {
             PopupLogger.error('Drop', 'Error:', e);
+        }
+    }
+
+    /**
+     * Toggle on-hold status
+     */
+    async function toggleAnimeOnHold(slug) {
+        const { Storage, FirebaseSync } = AT;
+        if (!animeData[slug]) return;
+
+        try {
+            const now = new Date().toISOString();
+            const wasOnHold = !!animeData[slug].onHoldAt;
+            if (wasOnHold) {
+                setManualListState(animeData[slug], 'active', now);
+            } else {
+                setManualListState(animeData[slug], 'on_hold', now);
+            }
+
+            const result = await Storage.get(['videoProgress', 'deletedAnime', 'groupCoverImages']);
+            const currentVideoProgress = result.videoProgress || {};
+            const deletedAnime = clearDeletedAnimeSlug(result.deletedAnime || {}, slug);
+
+            const dataToSave = { animeData, videoProgress: currentVideoProgress, deletedAnime };
+            const user = FirebaseSync.getUser();
+            if (user) dataToSave.userId = user.uid;
+            markInternalSave(dataToSave);
+            await Storage.set(dataToSave);
+
+            if (user) {
+                await FirebaseSync.saveToCloud({
+                    animeData, videoProgress: currentVideoProgress, deletedAnime,
+                    groupCoverImages: result.groupCoverImages || {}
+                }, true);
+            }
+
+            // Sync to an1me.to watchlist
+            syncWatchlistFromPopup(slug, wasOnHold ? 'watching' : 'on_hold');
+
+            renderAnimeList(elements.searchInput?.value || '');
+            updateStats();
+        } catch (e) {
+            PopupLogger.error('OnHold', 'Error:', e);
         }
     }
 
@@ -1596,6 +1695,51 @@
         return slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     }
 
+    /**
+     * Send watchlist sync to background service worker → an1me.to
+     * Maps extension slug to site anime ID and fires the sync.
+     * If siteAnimeId is missing, fetches it first from the anime page.
+     */
+    function syncWatchlistFromPopup(slug, watchlistType) {
+        try {
+            const siteId = animeData[slug]?.siteAnimeId;
+            if (siteId) {
+                // Have ID — send sync directly
+                chrome.runtime.sendMessage(
+                    { type: 'WATCHLIST_SYNC', animeId: siteId, watchlistType },
+                    () => { if (chrome.runtime.lastError) { /* ignore */ } }
+                );
+                PopupLogger.log('WatchlistSync', `sent ${watchlistType} for #${siteId}`);
+            } else {
+                // No siteAnimeId yet — fetch it from the anime page, then sync
+                PopupLogger.log('WatchlistSync', `fetching siteAnimeId for ${slug}...`);
+                chrome.runtime.sendMessage(
+                    { type: 'FETCH_ANIME_INFO', slug },
+                    (response) => {
+                        if (chrome.runtime.lastError) return;
+                        const fetchedId = response?.info?.siteAnimeId;
+                        if (fetchedId) {
+                            // Save it locally for next time
+                            if (animeData[slug]) animeData[slug].siteAnimeId = fetchedId;
+                            // Now sync
+                            chrome.runtime.sendMessage(
+                                { type: 'WATCHLIST_SYNC', animeId: fetchedId, watchlistType },
+                                () => { if (chrome.runtime.lastError) { /* ignore */ } }
+                            );
+                            PopupLogger.log('WatchlistSync', `fetched #${fetchedId}, sent ${watchlistType}`);
+                            // Persist the siteAnimeId
+                            AT.Storage.set({ animeData }).catch(() => {});
+                        } else {
+                            PopupLogger.log('WatchlistSync', `could not find siteAnimeId for ${slug}`);
+                        }
+                    }
+                );
+            }
+        } catch (e) {
+            PopupLogger.log('WatchlistSync', 'popup error:', e.message);
+        }
+    }
+
     function setManualListState(entry, state, at = new Date().toISOString()) {
         if (!entry) return;
         entry.listState = state;
@@ -1604,17 +1748,28 @@
         if (state === 'completed') {
             entry.completedAt = entry.completedAt || at;
             delete entry.droppedAt;
+            delete entry.onHoldAt;
             return;
         }
 
         if (state === 'dropped') {
             entry.droppedAt = entry.droppedAt || at;
             delete entry.completedAt;
+            delete entry.onHoldAt;
             return;
         }
 
+        if (state === 'on_hold') {
+            entry.onHoldAt = entry.onHoldAt || at;
+            delete entry.completedAt;
+            delete entry.droppedAt;
+            return;
+        }
+
+        // active — clear all
         delete entry.completedAt;
         delete entry.droppedAt;
+        delete entry.onHoldAt;
     }
 
     function markTitleEdited(entry, title, at = new Date().toISOString()) {
@@ -2623,6 +2778,12 @@
                 if (target.classList.contains('anime-drop-toggle') || target.closest('.anime-drop-toggle')) {
                     const btn = target.classList.contains('anime-drop-toggle') ? target : target.closest('.anime-drop-toggle');
                     if (btn.dataset.slug) await toggleAnimeDropped(btn.dataset.slug);
+                    return;
+                }
+
+                if (target.classList.contains('anime-onhold-toggle') || target.closest('.anime-onhold-toggle')) {
+                    const btn = target.classList.contains('anime-onhold-toggle') ? target : target.closest('.anime-onhold-toggle');
+                    if (btn.dataset.slug) await toggleAnimeOnHold(btn.dataset.slug);
                     return;
                 }
 

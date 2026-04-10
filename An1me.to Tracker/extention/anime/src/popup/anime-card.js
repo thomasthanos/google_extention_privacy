@@ -291,6 +291,7 @@ const AnimeCardRenderer = {
                     </div>
                     <div class="anime-card-actions">
                         <button class="anime-complete-toggle action-labeled" data-slug="${slug}" data-completed="${isManuallyCompleted}" title="${isManuallyCompleted ? 'Unmark as completed' : 'Mark as completed'}">${UIHelpers.createIcon('check')}<span class="action-label">${isManuallyCompleted ? 'Undo' : 'Done'}</span></button>
+                        <button class="anime-onhold-toggle action-labeled" data-slug="${slug}" data-onhold="${!!anime.onHoldAt}" title="${anime.onHoldAt ? 'Resume watching' : 'Put on hold'}">${UIHelpers.createIcon('pause')}<span class="action-label">${anime.onHoldAt ? 'Resume' : 'Hold'}</span></button>
                         <button class="anime-drop-toggle action-labeled" data-slug="${slug}" data-dropped="${!!anime.droppedAt}" title="${anime.droppedAt ? 'Unmark as dropped' : 'Drop'}">${UIHelpers.createIcon('drop')}<span class="action-label">${anime.droppedAt ? 'Undrop' : 'Drop'}</span></button>
                         <button class="anime-edit-title action-labeled" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}<span class="action-label">Edit</span></button>
                         <button class="anime-delete action-labeled" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}<span class="action-label">Delete</span></button>
