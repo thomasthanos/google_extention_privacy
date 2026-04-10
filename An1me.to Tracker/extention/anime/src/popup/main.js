@@ -539,18 +539,10 @@
         elements.animeList.querySelectorAll('.anime-movie-group.expanded').forEach(g => {
             if (g.dataset.baseSlug) expandedMovieGroups.add(g.dataset.baseSlug);
         });
-        const completedSection = elements.animeList.querySelector('.completed-list-section');
-        const completedWasOpen = completedSection
-            ? (completedSection.querySelector('.completed-list-cards')?.style.display !== 'none')
-            : false;
-        const droppedSection = elements.animeList.querySelector('.dropped-list-section');
-        const droppedWasOpen = droppedSection
-            ? (droppedSection.querySelector('.dropped-list-cards')?.style.display !== 'none')
-            : false;
-        const airingSection = elements.animeList.querySelector('.airing-list-section');
-        const airingWasOpen = airingSection
-            ? (airingSection.querySelector('.airing-list-cards')?.style.display !== 'none')
-            : false;
+        const completedWasOpen = elements.animeList.querySelector('.completed-list-cards')?.classList.contains('open') ?? false;
+        const droppedWasOpen = elements.animeList.querySelector('.dropped-list-cards')?.classList.contains('open') ?? false;
+        const airingWasOpen = elements.animeList.querySelector('.airing-list-cards')?.classList.contains('open') ?? false;
+        const onHoldWasOpen = elements.animeList.querySelector('.onhold-list-cards')?.classList.contains('open') ?? false;
         const ipGroupWasOpen = elements.animeList.querySelector('.ip-group-content')?.classList.contains('open') ?? false;
 
         // Filter by category
@@ -731,7 +723,7 @@
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     </div>
-                    <div class="completed-list-cards" style="display:none;">
+                    <div class="completed-list-cards">
                         ${completedCardsHtml}
                     </div>
                 </div>
@@ -750,7 +742,7 @@
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     </div>
-                    <div class="dropped-list-cards" style="display:none;">
+                    <div class="dropped-list-cards">
                         ${droppedCardsHtml}
                     </div>
                 </div>
@@ -769,7 +761,7 @@
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     </div>
-                    <div class="airing-list-cards" style="display:none;">
+                    <div class="airing-list-cards">
                         ${airingCardsHtml}
                     </div>
                 </div>
@@ -788,13 +780,15 @@
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     </div>
-                    <div class="onhold-list-cards" style="display:none;">
+                    <div class="onhold-list-cards">
                         ${onHoldCardsHtml}
                     </div>
                 </div>
             `
             : '';
 
+        // Disable transitions during render to prevent flicker
+        elements.animeList.classList.add('no-transition');
         elements.animeList.innerHTML = inProgressHtml + trackedHtml + airingGroupHtml + onHoldGroupHtml + completedGroupHtml + droppedGroupHtml;
 
         // Restore expanded state
@@ -821,35 +815,31 @@
             if (ipChevron) ipChevron.style.transform = 'rotate(0deg)';
         }
 
-        const newCompletedToggle = elements.animeList.querySelector('#completedListToggle');
-        if (newCompletedToggle && completedWasOpen) {
-            const cards = newCompletedToggle.nextElementSibling;
-            const chevron = newCompletedToggle.querySelector('.completed-chevron');
-            if (cards) cards.style.display = 'flex';
+        // Restore open state for list sections
+        function restoreListOpen(toggleId, chevronClass, wasOpen) {
+            if (!wasOpen) return;
+            const toggle = elements.animeList.querySelector(`#${toggleId}`);
+            if (!toggle) return;
+            const cards = toggle.nextElementSibling;
+            const chevron = toggle.querySelector(`.${chevronClass}`);
+            if (cards) cards.classList.add('open');
             if (chevron) chevron.style.transform = 'rotate(0deg)';
         }
-
-        const newDroppedToggle = elements.animeList.querySelector('#droppedListToggle');
-        if (newDroppedToggle && droppedWasOpen) {
-            const cards = newDroppedToggle.nextElementSibling;
-            const chevron = newDroppedToggle.querySelector('.dropped-chevron');
-            if (cards) cards.style.display = 'flex';
-            if (chevron) chevron.style.transform = 'rotate(0deg)';
-        }
-
-        const newAiringToggle = elements.animeList.querySelector('#airingListToggle');
-        if (newAiringToggle && airingWasOpen) {
-            const cards = newAiringToggle.nextElementSibling;
-            const chevron = newAiringToggle.querySelector('.airing-chevron');
-            if (cards) cards.style.display = 'flex';
-            if (chevron) chevron.style.transform = 'rotate(0deg)';
-        }
+        restoreListOpen('completedListToggle', 'completed-chevron', completedWasOpen);
+        restoreListOpen('droppedListToggle', 'dropped-chevron', droppedWasOpen);
+        restoreListOpen('airingListToggle', 'airing-chevron', airingWasOpen);
+        restoreListOpen('onHoldListToggle', 'onhold-chevron', onHoldWasOpen);
 
         setupCardEventListeners();
 
         if (elements.animeList.querySelector('.ip-card')) {
             _ipPatch(videoProgress || {});
         }
+
+        // Re-enable transitions after layout settles
+        requestAnimationFrame(() => {
+            elements.animeList.classList.remove('no-transition');
+        });
     }
 
     /**
@@ -898,7 +888,7 @@
             const header = card.querySelector('.anime-card-header');
             if (header) {
                 const toggleCard = (e) => {
-                    if (e.target.closest('.anime-delete') || e.target.closest('.anime-edit-title') || e.target.closest('.anime-fetch-filler') || e.target.closest('.anime-complete-toggle') || e.target.closest('.anime-drop-toggle') || e.target.closest('.anime-onhold-toggle')) return;
+                    if (e.target.closest('.anime-card-actions') || e.target.closest('.anime-header-actions') || e.target.closest('.anime-fetch-filler')) return;
                     e.stopPropagation();
                     card.classList.toggle('expanded');
                 };
@@ -955,61 +945,43 @@
             if (header) header.addEventListener('click', () => group.classList.toggle('expanded'));
         });
 
-        const completedToggle = elements.animeList.querySelector('#completedListToggle');
-        if (completedToggle) {
-            completedToggle.addEventListener('click', (e) => {
+        // List section toggle helper
+        function setupListToggle(toggleId, chevronClass) {
+            const toggle = elements.animeList.querySelector(`#${toggleId}`);
+            if (!toggle) return;
+            toggle.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const cards = completedToggle.nextElementSibling;
-                const chevron = completedToggle.querySelector('.completed-chevron');
-                const isHidden = cards.style.display === 'none';
-                cards.style.display = isHidden ? 'flex' : 'none';
-                chevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
+                const cards = toggle.nextElementSibling;
+                const chevron = toggle.querySelector(`.${chevronClass}`);
+                const isOpen = cards.classList.contains('open');
+                if (isOpen) {
+                    // Close: set real height first so animation starts from visible content
+                    cards.style.maxHeight = cards.scrollHeight + 'px';
+                    cards.style.overflow = 'hidden';
+                    requestAnimationFrame(() => {
+                        cards.style.maxHeight = '0';
+                        cards.style.padding = '0 10px';
+                        cards.classList.remove('open');
+                    });
+                    cards.addEventListener('transitionend', function handler(ev) {
+                        if (ev.propertyName !== 'max-height') return;
+                        cards.style.maxHeight = '';
+                        cards.style.overflow = '';
+                        cards.style.padding = '';
+                        cards.removeEventListener('transitionend', handler);
+                    });
+                } else {
+                    cards.classList.add('open');
+                }
+                if (chevron) chevron.style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
             });
-            const chevron = completedToggle.querySelector('.completed-chevron');
-            chevron.style.transform = 'rotate(-90deg)';
+            const chevron = toggle.querySelector(`.${chevronClass}`);
+            if (chevron) chevron.style.transform = 'rotate(-90deg)';
         }
-
-        const droppedToggle = elements.animeList.querySelector('#droppedListToggle');
-        if (droppedToggle) {
-            droppedToggle.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const cards = droppedToggle.nextElementSibling;
-                const chevron = droppedToggle.querySelector('.dropped-chevron');
-                const isHidden = cards.style.display === 'none';
-                cards.style.display = isHidden ? 'flex' : 'none';
-                chevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
-            });
-            const chevron = droppedToggle.querySelector('.dropped-chevron');
-            chevron.style.transform = 'rotate(-90deg)';
-        }
-
-        const airingToggle = elements.animeList.querySelector('#airingListToggle');
-        if (airingToggle) {
-            airingToggle.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const cards = airingToggle.nextElementSibling;
-                const chevron = airingToggle.querySelector('.airing-chevron');
-                const isHidden = cards.style.display === 'none';
-                cards.style.display = isHidden ? 'flex' : 'none';
-                chevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
-            });
-            const chevron = airingToggle.querySelector('.airing-chevron');
-            chevron.style.transform = 'rotate(-90deg)';
-        }
-
-        const onHoldToggle = elements.animeList.querySelector('#onHoldListToggle');
-        if (onHoldToggle) {
-            onHoldToggle.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const cards = onHoldToggle.nextElementSibling;
-                const chevron = onHoldToggle.querySelector('.onhold-chevron');
-                const isHidden = cards.style.display === 'none';
-                cards.style.display = isHidden ? 'flex' : 'none';
-                chevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
-            });
-            const chevron = onHoldToggle.querySelector('.onhold-chevron');
-            chevron.style.transform = 'rotate(-90deg)';
-        }
+        setupListToggle('completedListToggle', 'completed-chevron');
+        setupListToggle('droppedListToggle', 'dropped-chevron');
+        setupListToggle('airingListToggle', 'airing-chevron');
+        setupListToggle('onHoldListToggle', 'onhold-chevron');
 
         elements.animeList.querySelectorAll('.movie-edit-btn').forEach(btn => {
             btn.addEventListener('click', (e) => { e.stopPropagation(); editAnimeTitle(btn.dataset.slug); });
@@ -1222,6 +1194,20 @@
                     elements.categoryTabs.querySelectorAll('.category-tab').forEach(t => {
                         t.classList.toggle('active', t.dataset.category === currentCategory);
                     });
+                    // Update slider position for restored category
+                    const restoredActive = elements.categoryTabs.querySelector('.category-tab.active');
+                    const tabSlider = elements.categoryTabs.querySelector('.category-tabs-slider');
+                    if (restoredActive && tabSlider) {
+                        requestAnimationFrame(() => {
+                            const cr = elements.categoryTabs.getBoundingClientRect();
+                            const tr = restoredActive.getBoundingClientRect();
+                            tabSlider.style.transition = 'none';
+                            tabSlider.style.width = tr.width + 'px';
+                            tabSlider.style.transform = `translateX(${tr.left - cr.left - 4}px)`;
+                            tabSlider.offsetHeight;
+                            tabSlider.style.transition = '';
+                        });
+                    }
                 }
             }
 
@@ -2642,11 +2628,35 @@
         });
 
         if (elements.categoryTabs) {
+            // Create sliding indicator
+            const slider = document.createElement('div');
+            slider.className = 'category-tabs-slider';
+            elements.categoryTabs.appendChild(slider);
+
+            function moveSlider(activeTab, instant) {
+                if (!activeTab) return;
+                const containerRect = elements.categoryTabs.getBoundingClientRect();
+                const tabRect = activeTab.getBoundingClientRect();
+                const offsetX = tabRect.left - containerRect.left - 4; // 4px padding
+                slider.style.width = tabRect.width + 'px';
+                slider.style.transform = `translateX(${offsetX}px)`;
+                if (instant) {
+                    slider.style.transition = 'none';
+                    slider.offsetHeight; // force reflow
+                    slider.style.transition = '';
+                }
+            }
+
+            // Initial position (no animation)
+            const initialActive = elements.categoryTabs.querySelector('.category-tab.active');
+            requestAnimationFrame(() => moveSlider(initialActive, true));
+
             elements.categoryTabs.querySelectorAll('.category-tab').forEach(tab => {
                 tab.addEventListener('click', async () => {
                     currentCategory = normalizeCategory(tab.dataset.category);
                     elements.categoryTabs.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
                     tab.classList.add('active');
+                    moveSlider(tab, false);
                     if (elements.searchInput) renderAnimeList(elements.searchInput.value);
                     await chrome.storage.local.set({ userPreferences: { sort: currentSort, category: currentCategory } });
                 });

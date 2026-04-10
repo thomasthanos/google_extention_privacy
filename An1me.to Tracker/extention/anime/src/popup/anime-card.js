@@ -80,7 +80,7 @@ const AnimeCardRenderer = {
         const skippedFillers = FillerService.getSkippedFillers(slug, anime.episodes, currentEpisode);
         const skippedFillersText = FillerService.formatSkippedFillersCompact(skippedFillers);
         const skippedFillersIndicator = skippedFillers.length > 0
-            ? `<span class="skipped-fillers-badge" title="Skipped filler episodes: ${skippedFillersText}">⏭️ ${skippedFillers.length} filler skipped</span>`
+            ? `<span class="skipped-fillers-badge" title="Skipped filler episodes: ${skippedFillersText}"><span class="icon-inline">${UIHelpers.createIcon('skip')}</span> ${skippedFillers.length} filler skipped</span>`
             : '';
 
         // Progress tags με delete buttons
@@ -168,11 +168,11 @@ const AnimeCardRenderer = {
 
         const progressInfoText = unknownTotal
             ? (anilistStatusForProgress === 'FINISHED'
-                ? `<span>📍 ${currentEpText} · Watched ${episodeCount} eps</span>`
-                : `<span>📍 ${currentEpText}${availableInfo} · Airing</span>`)
+                ? `<span><span class="icon-inline">${UIHelpers.createIcon('canon')}</span> ${currentEpText} · Watched ${episodeCount} eps</span>`
+                : `<span><span class="icon-inline">${UIHelpers.createIcon('canon')}</span> ${currentEpText}${availableInfo} · Airing</span>`)
             : hasFillerData
-            ? `<span title="Canon: ${canonWatched}/${totalCanonDisplay}">📍 ${currentEpText}${availableInfo} · Canon ${canonWatched}/${totalCanonDisplay}</span>`
-            : `<span>📍 ${currentEpText}${availableInfo} · Total ${episodeCount}/${totalDisplay}</span>`;
+            ? `<span title="Canon: ${canonWatched}/${totalCanonDisplay}"><span class="icon-inline">${UIHelpers.createIcon('canon')}</span> ${currentEpText}${availableInfo} · Canon ${canonWatched}/${totalCanonDisplay}</span>`
+            : `<span><span class="icon-inline">${UIHelpers.createIcon('canon')}</span> ${currentEpText}${availableInfo} · Total ${episodeCount}/${totalDisplay}</span>`;
 
         // Filler progress section
         const watchedFillers = fillerInfo?.watched || 0;
@@ -182,7 +182,7 @@ const AnimeCardRenderer = {
         const fillerProgressSection = (hasFillerData && watchedFillers > 0) ? `
             <div class="progress-container filler-progress">
                 <div class="progress-info">
-                    <span class="filler-label" title="Watched fillers: ${watchedFillers} · Skipped fillers: ${skippedFillers.length}">🎭 Filler ${watchedFillers}/${totalFillers}</span>
+                    <span class="filler-label" title="Watched fillers: ${watchedFillers} · Skipped fillers: ${skippedFillers.length}"><span class="icon-inline">${UIHelpers.createIcon('filler')}</span> Filler ${watchedFillers}/${totalFillers}</span>
                     <span>${fillerProgressPercent}%</span>
                 </div>
                 <div class="progress-bar filler-bar ${sizeClass}">
@@ -277,24 +277,21 @@ const AnimeCardRenderer = {
             ? `<span class="meta-badge meta-badge-airing" title="Currently airing">⬤ Airing</span>`
             : '';
 
-        const metaRowHtml = `<div class="anime-meta-row">${progressBadge}${statusBadge}${airingBadge}<span class="meta-time">${timeAgoText}</span></div>`;
+        const metaRowHtml = `<div class="anime-meta-row">${progressBadge}${statusBadge}${airingBadge}</div><span class="meta-time">${timeAgoText}</span>`;
 
         return `
             <div class="anime-card" data-slug="${slug}">
                 <div class="anime-card-header">
                     <div class="anime-cover-container" style="flex-shrink:0;">${coverHtml}</div>
-                    <div class="anime-header-main" style="flex:1; display:flex; flex-direction:column; overflow:hidden; margin-left:8px;">
+                    <div class="anime-header-main" style="flex:1; display:flex; flex-direction:column; min-width:0; margin-left:8px;">
                         <div class="anime-title-row" style="display:flex; align-items:center; overflow:hidden;">
-                            <span class="anime-title-text" style="font-size:14px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${UIHelpers.escapeHtml(anime.title)}</span>
+                            <span class="anime-title-text" style="font-size:14px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1;min-width:0;">${UIHelpers.escapeHtml(anime.title)}</span>
+                            <div class="anime-header-actions">
+                                <button class="anime-edit-title" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
+                                <button class="anime-delete" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
+                            </div>
                         </div>
                         ${metaRowHtml}
-                    </div>
-                    <div class="anime-card-actions">
-                        <button class="anime-complete-toggle action-labeled" data-slug="${slug}" data-completed="${isManuallyCompleted}" title="${isManuallyCompleted ? 'Unmark as completed' : 'Mark as completed'}">${UIHelpers.createIcon('check')}<span class="action-label">${isManuallyCompleted ? 'Undo' : 'Done'}</span></button>
-                        <button class="anime-onhold-toggle action-labeled" data-slug="${slug}" data-onhold="${!!anime.onHoldAt}" title="${anime.onHoldAt ? 'Resume watching' : 'Put on hold'}">${UIHelpers.createIcon('pause')}<span class="action-label">${anime.onHoldAt ? 'Resume' : 'Hold'}</span></button>
-                        <button class="anime-drop-toggle action-labeled" data-slug="${slug}" data-dropped="${!!anime.droppedAt}" title="${anime.droppedAt ? 'Unmark as dropped' : 'Drop'}">${UIHelpers.createIcon('drop')}<span class="action-label">${anime.droppedAt ? 'Undrop' : 'Drop'}</span></button>
-                        <button class="anime-edit-title action-labeled" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}<span class="action-label">Edit</span></button>
-                        <button class="anime-delete action-labeled" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}<span class="action-label">Delete</span></button>
                     </div>
                     <div class="anime-expand-icon">${UIHelpers.createIcon('chevron')}</div>
                 </div>
@@ -325,6 +322,11 @@ const AnimeCardRenderer = {
                             <div class="episode-list">${episodeTags}${moreEpisodes}</div>
                             ${unwatchedFillers.length > 0 ? `<div class="unwatched-fillers-section"><span class="unwatched-fillers-label">Unwatched Fillers <span class="filler-count">${unwatchedFillers.length}</span></span><div class="episode-list">${unwatchedFillerTags}${showMoreFillers}</div></div>` : ''}
                         </div>
+                    </div>
+                    <div class="anime-card-actions">
+                        <button class="anime-onhold-toggle" data-slug="${slug}" data-onhold="${!!anime.onHoldAt}" title="${anime.onHoldAt ? 'Resume watching' : 'Put on hold'}">${UIHelpers.createIcon('pause')}<span>${anime.onHoldAt ? 'Resume' : 'Hold'}</span></button>
+                        <button class="anime-complete-toggle" data-slug="${slug}" data-completed="${isManuallyCompleted}" title="${isManuallyCompleted ? 'Unmark as completed' : 'Mark as completed'}">${UIHelpers.createIcon('check')}<span>${isManuallyCompleted ? 'Undo' : 'Complete'}</span></button>
+                        <button class="anime-drop-toggle" data-slug="${slug}" data-dropped="${!!anime.droppedAt}" title="${anime.droppedAt ? 'Unmark as dropped' : 'Drop'}">${UIHelpers.createIcon('drop')}<span>${anime.droppedAt ? 'Undrop' : 'Drop'}</span></button>
                     </div>
                 </div>
             </div>
@@ -790,7 +792,7 @@ const AnimeCardRenderer = {
                 const skippedFillers = FillerService.getSkippedFillers(slug, anime.episodes, currentEp);
                 const skippedFillersText = FillerService.formatSkippedFillersCompact(skippedFillers);
                 const skippedFillersIndicator = skippedFillers.length > 0
-                    ? `<div class="anime-meta"><span class="skipped-fillers-badge" title="Skipped filler episodes: ${skippedFillersText}">⏭️ ${skippedFillers.length} filler skipped</span></div>`
+                    ? `<div class="anime-meta"><span class="skipped-fillers-badge" title="Skipped filler episodes: ${skippedFillersText}"><span class="icon-inline">${UIHelpers.createIcon('skip')}</span> ${skippedFillers.length} filler skipped</span></div>`
                     : '';
 
                 // Build episode tags for this season
@@ -836,7 +838,7 @@ const AnimeCardRenderer = {
                 const fillerProgressBar = (hasFillerData && watchedFillerCount > 0) ? `
                     <div class="progress-container filler-progress">
                         <div class="progress-info">
-                            <span class="filler-label" title="Watched fillers: ${watchedFillerCount} · Skipped fillers: ${skippedFillers.length}">🎭 Filler ${watchedFillerCount}/${totalFillerCount}</span>
+                            <span class="filler-label" title="Watched fillers: ${watchedFillerCount} · Skipped fillers: ${skippedFillers.length}"><span class="icon-inline">${UIHelpers.createIcon('filler')}</span> Filler ${watchedFillerCount}/${totalFillerCount}</span>
                             <span>${fillerProgressPercent}%</span>
                         </div>
                         <div class="progress-bar filler-bar size-small">
@@ -860,10 +862,10 @@ const AnimeCardRenderer = {
 
                 const progressInfoText = unknownTotalSeason
                     ? (anilistSt === 'FINISHED'
-                        ? `<span>📍 Ep ${currentEp > 0 ? currentEp : episodeCount} · Watched ${episodeCount} eps</span>`
-                        : `<span>📍 Ep ${currentEp > 0 ? currentEp : episodeCount}${availableText} · Airing</span>`)
+                        ? `<span><span class="icon-inline">${UIHelpers.createIcon('canon')}</span> Ep ${currentEp > 0 ? currentEp : episodeCount} · Watched ${episodeCount} eps</span>`
+                        : `<span><span class="icon-inline">${UIHelpers.createIcon('canon')}</span> Ep ${currentEp > 0 ? currentEp : episodeCount}${availableText} · Airing</span>`)
                     : hasFillerData
-                    ? `<span title="Canon: ${canonWatched}/${totalCanonDisplay}">📍 Ep ${currentEp > 0 ? currentEp : episodeCount}${availableText} · Canon ${canonWatched}/${totalCanonDisplay}</span>`
+                    ? `<span title="Canon: ${canonWatched}/${totalCanonDisplay}"><span class="icon-inline">${UIHelpers.createIcon('canon')}</span> Ep ${currentEp > 0 ? currentEp : episodeCount}${availableText} · Canon ${canonWatched}/${totalCanonDisplay}</span>`
                     : `<span>Ep ${currentEp > 0 ? currentEp : episodeCount}${availableText} · Total ${episodeCount}/${totalDisplay}</span>`;
 
                 progressInfoHTML = `
@@ -981,7 +983,7 @@ const AnimeCardRenderer = {
         const groupStatusClass = allSeasonsComplete ? 'meta-badge-complete' : (anyStarted ? 'meta-badge-watching' : 'meta-badge-notstarted');
         const groupStatusIcon = allSeasonsComplete ? '✓' : '⊙';
         const groupStatusBadge = `<span class="meta-badge ${groupStatusClass}">${groupStatusIcon} ${statusGroup}</span>`;
-        const metaRowHtmlGroup = `<div class="season-group-meta-row">${groupProgressBadge}${groupStatusBadge}<span class="meta-time">${lastWatchedText}</span></div>`;
+        const metaRowHtmlGroup = `<div class="season-group-meta-row">${groupProgressBadge}${groupStatusBadge}</div><span class="meta-time">${lastWatchedText}</span>`;
 
         return `
             <div class="anime-season-group" data-base-slug="${baseSlug}">
@@ -989,7 +991,7 @@ const AnimeCardRenderer = {
                     <div class="season-group-logo" style="flex-shrink:0;">
                         ${coverHtmlGroup}
                     </div>
-                    <div class="season-header-main" style="flex:1; display:flex; flex-direction:column; overflow:hidden; margin-left:8px;">
+                    <div class="season-header-main" style="flex:1; display:flex; flex-direction:column; min-width:0; margin-left:8px;">
                         <div class="season-title-row" style="display:flex; align-items:center; overflow:hidden;">
                             <span class="season-group-name" style="font-size:14px;font-weight:600;color:var(--t1);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${UIHelpers.escapeHtml(baseTitle)}</span>
                         </div>
@@ -1131,7 +1133,7 @@ const AnimeCardRenderer = {
         const movieStatusClass = allMoviesWatched ? 'meta-badge-complete' : (watchedCount > 0 ? 'meta-badge-watching' : 'meta-badge-notstarted');
         const movieStatusIcon = allMoviesWatched ? '✓' : '⊙';
         const movieStatusBadge = `<span class="meta-badge ${movieStatusClass}">${movieStatusIcon} ${statusGroup}</span>`;
-        const metaRowHtml = `<div class="movie-group-meta-row">${movieTypeBadge}${movieStatusBadge}<span class="meta-time">${lastWatchedText}</span></div>`;
+        const metaRowHtml = `<div class="movie-group-meta-row">${movieTypeBadge}${movieStatusBadge}</div><span class="meta-time">${lastWatchedText}</span>`;
 
         return `
             <div class="anime-movie-group" data-base-slug="${baseSlug}">
@@ -1139,7 +1141,7 @@ const AnimeCardRenderer = {
                     <div class="movie-group-logo" style="flex-shrink:0;">
                         ${coverHtmlGroup}
                     </div>
-                    <div class="movie-header-main" style="flex:1; display:flex; flex-direction:column; overflow:hidden; margin-left:8px;">
+                    <div class="movie-header-main" style="flex:1; display:flex; flex-direction:column; min-width:0; margin-left:8px;">
                         <div class="movie-title-row" style="display:flex; align-items:center; overflow:hidden;">
                             <span class="movie-group-name" style="font-size:14px;font-weight:600;color:var(--t1);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${UIHelpers.escapeHtml(baseTitle)} Movies</span>
                         </div>
@@ -1192,7 +1194,7 @@ const AnimeCardRenderer = {
         const singleStatusClass = isWatched ? 'meta-badge-complete' : 'meta-badge-notstarted';
         const singleStatusIcon = isWatched ? '✓' : '⊙';
         const singleStatusText = isWatched ? 'Watched' : 'Not watched';
-        const metaRowHtml = `<div class="single-movie-meta-row"><span class="meta-badge" style="color:#f4a261;background:rgba(244,162,97,0.12);border:1px solid rgba(244,162,97,0.35);">Movie</span><span class="meta-badge ${singleStatusClass}">${singleStatusIcon} ${singleStatusText}</span><span class="meta-time">${lastWatched}</span></div>`;
+        const metaRowHtml = `<div class="single-movie-meta-row"><span class="meta-badge" style="color:#f4a261;background:rgba(244,162,97,0.12);border:1px solid rgba(244,162,97,0.35);">Movie</span><span class="meta-badge ${singleStatusClass}">${singleStatusIcon} ${singleStatusText}</span></div><span class="meta-time">${lastWatched}</span>`;
 
         return `
             <div class="anime-movie-group single-movie" data-base-slug="${slug}">
@@ -1200,7 +1202,7 @@ const AnimeCardRenderer = {
                     <div class="movie-group-logo" style="flex-shrink:0;">
                         ${coverHtml}
                     </div>
-                    <div class="movie-header-main" style="flex:1; display:flex; flex-direction:column; overflow:hidden; margin-left:8px;">
+                    <div class="movie-header-main" style="flex:1; display:flex; flex-direction:column; min-width:0; margin-left:8px;">
                         <div class="movie-title-row" style="display:flex; align-items:center; overflow:hidden;">
                             <span class="movie-group-name" style="font-size:14px;font-weight:600;color:var(--t1);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${UIHelpers.escapeHtml(title)}</span>
                         </div>
