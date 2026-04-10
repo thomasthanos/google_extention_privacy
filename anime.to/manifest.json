@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "an1me.to Speed Control",
-  "version": "3.4",
+  "version": "3.5",
   "description": "Control video playback speed with F7 (hold) and F8 (toggle).",
   "icons": {
     "16": "src/icon16.png",
