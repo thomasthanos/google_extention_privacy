@@ -719,12 +719,14 @@
                             <span class="completed-list-label-title">COMPLETED LIST</span>
                             <span class="completed-list-label-sub">${AT.CONFIG.COMPLETED_LIST_MIN_DAYS}+ days since last watch</span>
                         </div>
-                        <svg class="completed-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg class="completed-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: ${completedWasOpen ? 'rotate(0deg)' : 'rotate(-90deg)'}">
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     </div>
-                    <div class="completed-list-cards">
-                        ${completedCardsHtml}
+                    <div class="completed-list-cards${completedWasOpen ? ' open' : ''}">
+                        <div class="list-inner">
+                            ${completedCardsHtml}
+                        </div>
                     </div>
                 </div>
             `
@@ -738,12 +740,14 @@
                             <span class="dropped-list-label-title">DROPPED LIST</span>
                             <span class="dropped-list-label-sub">${droppedEntries.length} anime</span>
                         </div>
-                        <svg class="dropped-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg class="dropped-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: ${droppedWasOpen ? 'rotate(0deg)' : 'rotate(-90deg)'}">
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     </div>
-                    <div class="dropped-list-cards">
-                        ${droppedCardsHtml}
+                    <div class="dropped-list-cards${droppedWasOpen ? ' open' : ''}">
+                        <div class="list-inner">
+                            ${droppedCardsHtml}
+                        </div>
                     </div>
                 </div>
             `
@@ -757,12 +761,14 @@
                             <span class="airing-list-label-title">⬤ AIRING LIST</span>
                             <span class="airing-list-label-sub">${airingEntries.length} anime · Caught up</span>
                         </div>
-                        <svg class="airing-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg class="airing-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: ${airingWasOpen ? 'rotate(0deg)' : 'rotate(-90deg)'}">
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     </div>
-                    <div class="airing-list-cards">
-                        ${airingCardsHtml}
+                    <div class="airing-list-cards${airingWasOpen ? ' open' : ''}">
+                        <div class="list-inner">
+                            ${airingCardsHtml}
+                        </div>
                     </div>
                 </div>
             `
@@ -776,12 +782,14 @@
                             <span class="onhold-list-label-title">ON HOLD</span>
                             <span class="onhold-list-label-sub">${onHoldEntries.length} anime</span>
                         </div>
-                        <svg class="onhold-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg class="onhold-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: ${onHoldWasOpen ? 'rotate(0deg)' : 'rotate(-90deg)'}">
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     </div>
-                    <div class="onhold-list-cards">
-                        ${onHoldCardsHtml}
+                    <div class="onhold-list-cards${onHoldWasOpen ? ' open' : ''}">
+                        <div class="list-inner">
+                            ${onHoldCardsHtml}
+                        </div>
                     </div>
                 </div>
             `
@@ -814,21 +822,6 @@
             if (ipContent) ipContent.classList.add('open');
             if (ipChevron) ipChevron.style.transform = 'rotate(0deg)';
         }
-
-        // Restore open state for list sections
-        function restoreListOpen(toggleId, chevronClass, wasOpen) {
-            if (!wasOpen) return;
-            const toggle = elements.animeList.querySelector(`#${toggleId}`);
-            if (!toggle) return;
-            const cards = toggle.nextElementSibling;
-            const chevron = toggle.querySelector(`.${chevronClass}`);
-            if (cards) cards.classList.add('open');
-            if (chevron) chevron.style.transform = 'rotate(0deg)';
-        }
-        restoreListOpen('completedListToggle', 'completed-chevron', completedWasOpen);
-        restoreListOpen('droppedListToggle', 'dropped-chevron', droppedWasOpen);
-        restoreListOpen('airingListToggle', 'airing-chevron', airingWasOpen);
-        restoreListOpen('onHoldListToggle', 'onhold-chevron', onHoldWasOpen);
 
         setupCardEventListeners();
 
@@ -949,34 +942,23 @@
         function setupListToggle(toggleId, chevronClass) {
             const toggle = elements.animeList.querySelector(`#${toggleId}`);
             if (!toggle) return;
+
+            const updateChevron = () => {
+                const cards = toggle.nextElementSibling;
+                const chevron = toggle.querySelector(`.${chevronClass}`);
+                if (chevron && cards) {
+                    chevron.style.transform = cards.classList.contains('open') ? 'rotate(0deg)' : 'rotate(-90deg)';
+                }
+            };
+
             toggle.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const cards = toggle.nextElementSibling;
-                const chevron = toggle.querySelector(`.${chevronClass}`);
-                const isOpen = cards.classList.contains('open');
-                if (isOpen) {
-                    // Close: set real height first so animation starts from visible content
-                    cards.style.maxHeight = cards.scrollHeight + 'px';
-                    cards.style.overflow = 'hidden';
-                    requestAnimationFrame(() => {
-                        cards.style.maxHeight = '0';
-                        cards.style.padding = '0 10px';
-                        cards.classList.remove('open');
-                    });
-                    cards.addEventListener('transitionend', function handler(ev) {
-                        if (ev.propertyName !== 'max-height') return;
-                        cards.style.maxHeight = '';
-                        cards.style.overflow = '';
-                        cards.style.padding = '';
-                        cards.removeEventListener('transitionend', handler);
-                    });
-                } else {
-                    cards.classList.add('open');
-                }
-                if (chevron) chevron.style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
+                if (!cards) return;
+                cards.classList.toggle('open');
+                updateChevron();
             });
-            const chevron = toggle.querySelector(`.${chevronClass}`);
-            if (chevron) chevron.style.transform = 'rotate(-90deg)';
+            updateChevron();
         }
         setupListToggle('completedListToggle', 'completed-chevron');
         setupListToggle('droppedListToggle', 'dropped-chevron');
