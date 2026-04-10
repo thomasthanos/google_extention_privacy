@@ -6,14 +6,30 @@ let isF7Active = false;
 let isF8Active = false;
 let f8PreviousSpeed = 1; // Speed before F8 was turned ON
 let savedDefaultSpeed = 1; // User's preferred default speed (not boost)
+let savedDefaultVolume = 1; // Saved volume level (0..1)
+let savedMutedState = false; // Saved mute state
+
+function normalizeVolume(value) {
+    const n = Number(value);
+    if (Number.isNaN(n)) return 1;
+    return Math.min(1, Math.max(0, n));
+}
 
 // Get boost speed and default speed from storage
 function updateSpeedFromStorage() {
-    chrome.storage.local.get(['selectedSpeed', 'defaultSpeed'], function(result) {
+    chrome.storage.local.get(['selectedSpeed', 'defaultSpeed', 'defaultVolume', 'defaultVolumePercent', 'defaultMuted'], function(result) {
         currentSpeed = result.selectedSpeed ? Number(result.selectedSpeed) : 4;
         if (result.defaultSpeed) {
             savedDefaultSpeed = Number(result.defaultSpeed);
             f8PreviousSpeed = savedDefaultSpeed;
+        }
+        if (result.defaultVolume !== undefined) {
+            savedDefaultVolume = normalizeVolume(result.defaultVolume);
+        } else if (result.defaultVolumePercent !== undefined) {
+            savedDefaultVolume = normalizeVolume(Number(result.defaultVolumePercent) / 100);
+        }
+        if (result.defaultMuted !== undefined) {
+            savedMutedState = Boolean(result.defaultMuted);
         }
     });
 }
@@ -57,6 +73,27 @@ chrome.storage.onChanged.addListener(function(changes, area) {
             }
         }
     }
+    if (area === "local" && (changes.defaultVolume || changes.defaultVolumePercent || changes.defaultMuted)) {
+        const video = document.querySelector('video');
+        if (!video) return;
+
+        if (changes.defaultVolume || changes.defaultVolumePercent) {
+            const newVolume = changes.defaultVolume
+                ? normalizeVolume(changes.defaultVolume.newValue)
+                : normalizeVolume(Number(changes.defaultVolumePercent.newValue) / 100);
+            savedDefaultVolume = newVolume;
+            if (Math.abs(video.volume - newVolume) > 0.01) {
+                video.volume = newVolume;
+            }
+        }
+        if (changes.defaultMuted) {
+            const newMuted = Boolean(changes.defaultMuted.newValue);
+            savedMutedState = newMuted;
+            if (video.muted !== newMuted) {
+                video.muted = newMuted;
+            }
+        }
+    }
 });
 
 // Setup videos
@@ -81,21 +118,75 @@ function setupVideo(video) {
         });
     }
 
-    // Apply multiple times to ensure it sticks
-    function applySpeedMultipleTimes() {
+    // Apply saved volume + mute state when video is ready
+    function applyDefaultVolumeState() {
+        chrome.storage.local.get(['defaultVolume', 'defaultVolumePercent', 'defaultMuted'], function(result) {
+            let volume = savedDefaultVolume;
+            if (result.defaultVolume !== undefined) {
+                volume = normalizeVolume(result.defaultVolume);
+            } else if (result.defaultVolumePercent !== undefined) {
+                volume = normalizeVolume(Number(result.defaultVolumePercent) / 100);
+            }
+            savedDefaultVolume = volume;
+            if (Math.abs(video.volume - volume) > 0.01) {
+                video.volume = volume;
+            }
+            if (result.defaultMuted !== undefined) {
+                const muted = Boolean(result.defaultMuted);
+                savedMutedState = muted;
+                if (video.muted !== muted) {
+                    video.muted = muted;
+                }
+            }
+        });
+    }
+
+    function saveDefaultVolumeState() {
+        const currentVolume = normalizeVolume(video.volume);
+        const muted = Boolean(video.muted);
+        if (!muted && currentVolume > 0) {
+            savedDefaultVolume = currentVolume;
+        }
+        const volumeToStore = muted ? savedDefaultVolume : currentVolume;
+        savedMutedState = muted;
+        const volumePercent = Math.round(volumeToStore * 100);
+        chrome.storage.local.set({
+            'defaultVolume': volumeToStore,
+            'defaultVolumePercent': volumePercent,
+            'defaultMuted': muted
+        });
+    }
+
+    // Apply multiple times to ensure player UI doesn't overwrite saved values
+    function applyDefaultStateMultipleTimes() {
         applyDefaultSpeed();
-        setTimeout(applyDefaultSpeed, 500);
-        setTimeout(applyDefaultSpeed, 1000);
-        setTimeout(applyDefaultSpeed, 2000);
+        applyDefaultVolumeState();
+        setTimeout(() => {
+            applyDefaultSpeed();
+            applyDefaultVolumeState();
+        }, 500);
+        setTimeout(() => {
+            applyDefaultSpeed();
+            applyDefaultVolumeState();
+        }, 1000);
+        setTimeout(() => {
+            applyDefaultSpeed();
+            applyDefaultVolumeState();
+        }, 2000);
     }
 
     // Apply when video can play
     if (video.readyState >= 1) {
-        applySpeedMultipleTimes();
+        applyDefaultStateMultipleTimes();
     }
-    video.addEventListener('loadedmetadata', applySpeedMultipleTimes, { once: true });
-    video.addEventListener('canplay', applySpeedMultipleTimes, { once: true });
-    video.addEventListener('playing', applyDefaultSpeed, { once: true });
+    video.addEventListener('loadedmetadata', applyDefaultStateMultipleTimes, { once: true });
+    video.addEventListener('canplay', applyDefaultStateMultipleTimes, { once: true });
+    video.addEventListener('playing', applyDefaultStateMultipleTimes, { once: true });
+
+    video.addEventListener('volumechange', function() {
+        clearTimeout(video._volumeSaveTimer);
+        video._volumeSaveTimer = setTimeout(saveDefaultVolumeState, 100);
+    });
 
 }
 
