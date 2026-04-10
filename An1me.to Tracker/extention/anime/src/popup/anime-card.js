@@ -277,7 +277,20 @@ const AnimeCardRenderer = {
             ? `<span class="meta-badge meta-badge-airing" title="Currently airing">⬤ Airing</span>`
             : '';
 
-        const metaRowHtml = `<div class="anime-meta-row">${progressBadge}${statusBadge}${airingBadge}</div><span class="meta-time">${timeAgoText}</span>`;
+        const headerActionsHtml = `
+            <div class="anime-header-actions">
+                <button class="anime-edit-title" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
+                <button class="anime-delete" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
+            </div>`;
+        const metaRowHtml = `
+            <div class="anime-meta-row-wrap">
+                <div class="anime-meta-row">${progressBadge}${statusBadge}${airingBadge}</div>
+                <div class="anime-header-controls">
+                    ${headerActionsHtml}
+                    <div class="anime-expand-icon">${UIHelpers.createIcon('chevron')}</div>
+                </div>
+            </div>
+            <span class="meta-time">${timeAgoText}</span>`;
 
         return `
             <div class="anime-card" data-slug="${slug}">
@@ -286,14 +299,9 @@ const AnimeCardRenderer = {
                     <div class="anime-header-main" style="flex:1; display:flex; flex-direction:column; min-width:0; margin-left:8px;">
                         <div class="anime-title-row" style="display:flex; align-items:center; overflow:hidden;">
                             <span class="anime-title-text" style="font-size:14px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1;min-width:0;">${UIHelpers.escapeHtml(anime.title)}</span>
-                            <div class="anime-header-actions">
-                                <button class="anime-edit-title" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
-                                <button class="anime-delete" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
-                            </div>
                         </div>
                         ${metaRowHtml}
                     </div>
-                    <div class="anime-expand-icon">${UIHelpers.createIcon('chevron')}</div>
                 </div>
                 <div class="anime-card-content">
                     <!-- Main progress: visible when expanded, above filler bar -->

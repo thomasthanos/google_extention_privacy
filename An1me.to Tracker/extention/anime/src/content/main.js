@@ -24,10 +24,37 @@
     const MAX_DURATION_REFRESH_ATTEMPTS = 5;
     let accumulatedPlaybackSeconds = 0;
     let lastTimeupdateTime = 0; // last currentTime from timeupdate, for accumulating real playback
+    let lastVideoSource = '';
+    let earlyTrackDone = false;
 
-    /** Compact ISO timestamp without milliseconds */
-    function compactNow() {
-        return new Date().toISOString().split('.')[0] + 'Z';
+    function resetPlaybackAccumulator(reason = '') {
+        if (reason && AT?.Logger) {
+            AT.Logger.debug(`Reset playback accumulator: ${reason}`);
+        }
+        accumulatedPlaybackSeconds = 0;
+        lastTimeupdateTime = 0;
+    }
+
+    function resetEpisodeTrackingState(reason = '') {
+        resetPlaybackAccumulator(reason);
+        earlyTrackDone = false;
+        trackingState = TrackingState.IDLE;
+        durationRefreshAttempted = false;
+        durationRefreshAttempts = 0;
+    }
+
+    function syncVideoSourceEpisodeBoundary(videoElement) {
+        const src = (videoElement?.currentSrc || videoElement?.src || '').trim();
+        if (!src) return false;
+        if (!lastVideoSource) {
+            lastVideoSource = src;
+            return false;
+        }
+        if (src === lastVideoSource) return false;
+
+        lastVideoSource = src;
+        resetEpisodeTrackingState('video source changed');
+        return true;
     }
 
     /**
@@ -35,129 +62,9 @@
      * Used by trackImmediately() to avoid Chrome storage async limitations.
      */
     function writeSyncEpisode(info, duration, animeData, logPrefix) {
-        const { Logger } = AT;
-
-        if (!animeData[info.animeSlug]) {
-            animeData[info.animeSlug] = {
-                title: info.animeTitle,
-                slug: info.animeSlug,
-                episodes: [],
-                totalWatchTime: 0,
-                lastWatched: null,
-                totalEpisodes: Number.isFinite(info.totalEpisodes) ? info.totalEpisodes : null,
-                coverImage: info.coverImage || null
-            };
-        }
-
-        if (!animeData[info.animeSlug].coverImage && info.coverImage) {
-            animeData[info.animeSlug].coverImage = info.coverImage;
-        }
-
-        if (Number.isFinite(info.totalEpisodes) && info.totalEpisodes > 0 && info.totalEpisodes < 10000) {
-            const trackedEpisodes = animeData[info.animeSlug].episodes || [];
-            const maxTracked = Math.max(
-                0,
-                ...trackedEpisodes.map(ep => Number(ep.number) || 0),
-                Number(info.episodeNumber) || 0,
-                Number(info.secondEpisodeNumber) || 0
-            );
-            if (info.totalEpisodes >= maxTracked) {
-                animeData[info.animeSlug].totalEpisodes = info.totalEpisodes;
-            }
-        }
-
-        if (!Array.isArray(animeData[info.animeSlug].episodes)) {
-            animeData[info.animeSlug].episodes = [];
-        }
-
-        // Auto-resume on-hold anime when user watches a new episode
-        if (animeData[info.animeSlug].onHoldAt) {
-            delete animeData[info.animeSlug].onHoldAt;
-            animeData[info.animeSlug].listState = 'active';
-            animeData[info.animeSlug].listStateUpdatedAt = compactNow();
-            try {
-                const { WatchlistSync } = window.AnimeTrackerContent;
-                const resumeSiteId = animeData[info.animeSlug].siteAnimeId;
-                if (WatchlistSync && resumeSiteId) {
-                    WatchlistSync.updateStatus(resumeSiteId, 'watching');
-                }
-            } catch { /* non-critical */ }
-        }
-
-        // Auto-undrop: if user watches a new episode of a dropped anime, undrop it
-        if (animeData[info.animeSlug].droppedAt) {
-            delete animeData[info.animeSlug].droppedAt;
-            animeData[info.animeSlug].listState = 'active';
-            animeData[info.animeSlug].listStateUpdatedAt = compactNow();
-            // Sync undrop → watching on an1me.to
-            try {
-                const { WatchlistSync } = window.AnimeTrackerContent;
-                const undropSiteId = animeData[info.animeSlug].siteAnimeId;
-                if (WatchlistSync && undropSiteId) {
-                    WatchlistSync.updateStatus(undropSiteId, 'watching');
-                }
-            } catch { /* non-critical */ }
-        }
-
-        const MAX_REASONABLE_DURATION_SECONDS = 6 * 60 * 60;
-        let validDuration = Math.round(Number(duration) || 0);
-        if (!Number.isFinite(validDuration) || validDuration <= 0) {
-            validDuration = 0;
-        }
-        if (validDuration > MAX_REASONABLE_DURATION_SECONDS) {
-            Logger.warn(`${logPrefix}: invalid duration ${validDuration}s, capping to ${MAX_REASONABLE_DURATION_SECONDS}s`);
-            validDuration = MAX_REASONABLE_DURATION_SECONDS;
-        }
-
-        const existingIndex = animeData[info.animeSlug].episodes
-            .findIndex(ep => ep.number === info.episodeNumber);
-
-        if (existingIndex !== -1) {
-            const existingEpisode = animeData[info.animeSlug].episodes[existingIndex] || {};
-            const currentDuration = Number(existingEpisode.duration) || 0;
-            const isPlaceholderDuration = currentDuration <= 0 || currentDuration === 1440 || currentDuration === 6000 || currentDuration === 7200;
-
-            if (isPlaceholderDuration && validDuration > 0 && currentDuration !== validDuration) {
-                animeData[info.animeSlug].episodes[existingIndex] = {
-                    ...existingEpisode,
-                    duration: validDuration,
-                    durationSource: 'video'
-                };
-                animeData[info.animeSlug].totalWatchTime = animeData[info.animeSlug].episodes
-                    .reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
-                animeData[info.animeSlug].lastWatched = compactNow();
-                return true;
-            }
-
-            return false;
-        }
-
-        const watchedAt = compactNow();
-        animeData[info.animeSlug].episodes.push({
-            number: info.episodeNumber,
-            watchedAt,
-            duration: validDuration,
-            durationSource: 'video'
-        });
-        animeData[info.animeSlug].totalWatchTime =
-            (animeData[info.animeSlug].totalWatchTime || 0) + validDuration;
-
-        if (info.isDoubleEpisode && info.secondEpisodeNumber) {
-            const alreadyHasSecond = animeData[info.animeSlug].episodes
-                .some(ep => ep.number === info.secondEpisodeNumber);
-            if (!alreadyHasSecond) {
-                animeData[info.animeSlug].episodes.push({
-                    number: info.secondEpisodeNumber,
-                    watchedAt,
-                    duration: validDuration,
-                    durationSource: 'video'
-                });
-            }
-        }
-
-        animeData[info.animeSlug].lastWatched = compactNow();
-        animeData[info.animeSlug].episodes.sort((a, b) => a.number - b.number);
-        return true;
+        const { EpisodeWriter } = AT;
+        const result = EpisodeWriter.writeEpisode(info, duration, animeData, { logPrefix });
+        return !!result?.changed;
     }
 
     /**
@@ -226,8 +133,6 @@
         };
     }
 
-    let earlyTrackDone = false;
-
     async function tryRefreshTrackedDuration(videoElement, reason = 'metadata') {
         const { ProgressTracker, Logger } = AT;
 
@@ -262,6 +167,8 @@
         const videoElement = VideoMonitor.getVideoElement();
 
         if (!videoElement || trackingState === TrackingState.COMPLETED || earlyTrackDone || !animeInfo) return;
+
+        syncVideoSourceEpisodeBoundary(videoElement);
 
         const duration = videoElement.duration;
         const currentTime = videoElement.currentTime;
@@ -304,9 +211,11 @@
 
         if (!videoElement || trackingState === TrackingState.COMPLETED || !animeInfo) return;
 
+        syncVideoSourceEpisodeBoundary(videoElement);
+
         if (currentEpisodeId && currentEpisodeId !== animeInfo.uniqueId) {
             Logger.info('Episode changed, resetting tracking state');
-            trackingState = TrackingState.IDLE;
+            resetEpisodeTrackingState('episode id changed');
             currentEpisodeId = animeInfo.uniqueId;
         }
 
@@ -563,15 +472,22 @@
      * even after browser cache is cleared.
      */
     let _highlightStorageListener = null;
+    function clearHighlightStorageListener() {
+        if (_highlightStorageListener) {
+            try {
+                chrome.storage.onChanged.removeListener(_highlightStorageListener);
+            } catch {
+                // Ignore remove errors; listener reference is still cleared.
+            }
+            _highlightStorageListener = null;
+        }
+    }
 
     function highlightWatchedEpisodes(slug) {
         const { Logger } = AT;
 
         // Remove previous listener to prevent leaks on SPA navigation
-        if (_highlightStorageListener) {
-            chrome.storage.onChanged.removeListener(_highlightStorageListener);
-            _highlightStorageListener = null;
-        }
+        clearHighlightStorageListener();
 
         function applyHighlights(watchedSet) {
             const items = document.querySelectorAll('.episode-list-item[data-episode-search-query]');
@@ -643,20 +559,22 @@
         VideoMonitor.cleanup();
         Notifications.cleanup();
         ProgressTracker.reset();
+        clearHighlightStorageListener();
 
         trackingState = TrackingState.IDLE;
         currentEpisodeId = null;
         earlyTrackDone = false;
         durationRefreshAttempted = false;
         durationRefreshAttempts = 0;
-        accumulatedPlaybackSeconds = 0;
-        lastTimeupdateTime = 0;
+        resetPlaybackAccumulator('init');
+        lastVideoSource = '';
 
         animeInfo = AnimeParser.extractAnimeInfo();
         if (!animeInfo) {
             Logger.debug('No anime info found');
             return;
         }
+        currentEpisodeId = animeInfo.uniqueId;
 
         const hasDetectedTotal = Number.isFinite(animeInfo.totalEpisodes) &&
             animeInfo.totalEpisodes > 0 &&
@@ -881,8 +799,9 @@
                     earlyTrackDone = false;
                     durationRefreshAttempted = false;
                     durationRefreshAttempts = 0;
-                    accumulatedPlaybackSeconds = 0;
-                    lastTimeupdateTime = 0;
+                    resetPlaybackAccumulator('spa navigation');
+                    lastVideoSource = '';
+                    clearHighlightStorageListener();
 
                     ProgressTracker.reset();
 

@@ -47,7 +47,8 @@ const AnimeParser = {
                 return null;
             }
 
-            let animeSlug = pathMatch[1];
+            const rawPathSlug = pathMatch[1];
+            let animeSlug = rawPathSlug;
             // Strip trailing "-episode" / "-ep" tokens that occasionally appear
             // in the slug segment of some an1me.to URLs.
             animeSlug = animeSlug
@@ -65,7 +66,10 @@ const AnimeParser = {
             // "119-120" suffix is matched as a unit and not split by Pattern 4.
             // We also validate that the second number is strictly greater than
             // the first to reject false positives like "sword-art-online-2".
-            const doubleEpMatch = animeSlug.match(/^(.+?)[-_]ep(?:isode)?[-_]?(\d+)[-_](\d+)$/i);
+            const parseDoubleEpisodeMatch = (value) =>
+                value ? value.match(/^(.+?)[-_](?:ep(?:isode)?)[-_]?(\d+)[-_](\d+)$/i) : null;
+
+            const doubleEpMatch = parseDoubleEpisodeMatch(rawPathSlug) || parseDoubleEpisodeMatch(animeSlug);
             if (doubleEpMatch) {
                 const ep1 = parseInt(doubleEpMatch[2], 10);
                 const ep2 = parseInt(doubleEpMatch[3], 10);
@@ -265,11 +269,12 @@ const AnimeParser = {
     detectTotalEpisodes(animeSlug) {
         try {
             const episodeNumbers = new Set();
+            const navEpisodeNumbers = new Set();
             const escapedSlug = (animeSlug || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const hasSlug = Boolean(escapedSlug);
             const hrefPattern = hasSlug
-                ? new RegExp(`/watch/${escapedSlug}-episode-(\\d+)`, 'i')
-                : /\/watch\/[^/]+-episode-(\d+)/i;
+                ? new RegExp(`/watch/${escapedSlug}-episode-(\\d+)(?:$|[/?#])`, 'i')
+                : /\/watch\/[^/]+-episode-(\d+)(?:$|[/?#])/i;
 
             // Single query covers all selectors — avoids redundant DOM traversals
             const combinedSelector = hasSlug
@@ -285,9 +290,34 @@ const AnimeParser = {
                 return Number.isFinite(num) && num > 0 ? num : null;
             };
 
+            const isLikelyNavigationControl = (node) => {
+                const collect = (el) => {
+                    if (!el) return '';
+                    return [
+                        el.getAttribute?.('rel') || '',
+                        el.getAttribute?.('class') || '',
+                        el.getAttribute?.('id') || '',
+                        el.getAttribute?.('aria-label') || '',
+                        el.getAttribute?.('title') || '',
+                        el.getAttribute?.('data-action') || '',
+                        el.textContent || ''
+                    ].join(' ').toLowerCase();
+                };
+
+                const context = [
+                    collect(node),
+                    collect(node?.parentElement),
+                    collect(node?.closest?.('a,button,[role="button"],[class],[id]'))
+                ].join(' ');
+
+                return /\b(next|prev|previous|forward|back)\b/.test(context);
+            };
+
             {
                 const nodes = document.querySelectorAll(combinedSelector);
                 for (const node of nodes) {
+                    if (isLikelyNavigationControl(node)) continue;
+
                     const href = node.getAttribute('href') || '';
                     const hrefMatch = href.match(hrefPattern);
                     if (hrefMatch) {
@@ -305,14 +335,15 @@ const AnimeParser = {
                         const attrNum = parseEpisodeNumber(
                             node.getAttribute('data-open-nav-episode') || node.dataset?.openNavEpisode
                         );
-                        if (attrNum) episodeNumbers.add(attrNum);
+                        if (attrNum) navEpisodeNumbers.add(attrNum);
                     }
                 }
             }
 
-            if (episodeNumbers.size === 0) return null;
+            const sourceNumbers = navEpisodeNumbers.size >= 3 ? navEpisodeNumbers : episodeNumbers;
+            if (sourceNumbers.size === 0) return null;
 
-            const maxEpisode = Math.max(...episodeNumbers);
+            const maxEpisode = Math.max(...sourceNumbers);
             if (!Number.isFinite(maxEpisode) || maxEpisode <= 0 || maxEpisode > 9999) return null;
             return maxEpisode;
         } catch {

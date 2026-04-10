@@ -574,7 +574,12 @@
             if (!slugIndex[slug]) slugIndex[slug] = [];
             slugIndex[slug].push([id, progress]);
         }
-        visibleProgress.__slugIndex = slugIndex;
+        Object.defineProperty(visibleProgress, '__slugIndex', {
+            value: slugIndex,
+            enumerable: false,
+            configurable: true,
+            writable: true
+        });
 
         const inProgressAnime = ProgressManager.getInProgressAnime(animeData, visibleProgress)
             .filter(anime => {
@@ -1063,6 +1068,79 @@
         return { allFillersCached, allAnilistCached };
     }
 
+    function isQuotaExceededError(error) {
+        const msg = String(error?.message || error || '').toLowerCase();
+        return msg.includes('quota') || msg.includes('bytes') || msg.includes('exceeded');
+    }
+
+    function pruneDeletedAnimeForQuota(deletedAnime) {
+        const source = deletedAnime && typeof deletedAnime === 'object' ? deletedAnime : {};
+        const cutoff = Date.now() - 10 * 24 * 60 * 60 * 1000;
+        const entries = Object.entries(source).sort((a, b) => {
+            const aTs = new Date(a[1]?.deletedAt || a[1] || 0).getTime() || 0;
+            const bTs = new Date(b[1]?.deletedAt || b[1] || 0).getTime() || 0;
+            return bTs - aTs;
+        });
+
+        const kept = {};
+        let keptCount = 0;
+        for (const [slug, info] of entries) {
+            const ts = new Date(info?.deletedAt || info || 0).getTime() || 0;
+            if (ts > 0 && ts < cutoff) continue;
+            kept[slug] = info;
+            keptCount += 1;
+            if (keptCount >= 1500) break;
+        }
+        return kept;
+    }
+
+    async function recoverFromQuotaPressure(context = 'sync') {
+        const { Storage, ProgressManager } = AT;
+
+        try {
+            const all = await new Promise((resolve, reject) => {
+                chrome.storage.local.get(null, (result) => {
+                    if (chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                        return;
+                    }
+                    resolve(result || {});
+                });
+            });
+
+            const cacheKeys = Object.keys(all).filter((key) =>
+                key.startsWith('animeinfo_') || key.startsWith('episodeTypes_')
+            );
+            if (cacheKeys.length > 0) {
+                await Storage.remove(cacheKeys);
+            }
+
+            const localAnimeData = all.animeData || {};
+            const localVideoProgress = all.videoProgress || {};
+            const localDeletedAnime = all.deletedAnime || {};
+
+            const { cleaned } = ProgressManager.cleanTrackedProgress(localAnimeData, localVideoProgress);
+            const sortedProgress = Object.entries(cleaned).sort((a, b) => {
+                const aTs = new Date(a[1]?.savedAt || a[1]?.watchedAt || 0).getTime() || 0;
+                const bTs = new Date(b[1]?.savedAt || b[1]?.watchedAt || 0).getTime() || 0;
+                return bTs - aTs;
+            });
+            const trimmedProgress = Object.fromEntries(sortedProgress.slice(0, 2000));
+            const trimmedDeletedAnime = pruneDeletedAnimeForQuota(localDeletedAnime);
+
+            await Storage.set({
+                videoProgress: trimmedProgress,
+                deletedAnime: trimmedDeletedAnime
+            });
+
+            PopupLogger.warn('Storage', `[${context}] quota recovery succeeded: removed ${cacheKeys.length} cache keys`);
+            return true;
+        } catch (recoveryError) {
+            PopupLogger.error('Storage', `[${context}] quota recovery failed:`, recoveryError);
+            return false;
+        }
+    }
+
     /**
      * Load local data
      */
@@ -1248,7 +1326,14 @@
             }
         } catch (error) {
             PopupLogger.error('Sync', 'Error:', error);
-            loadData();
+            if (isQuotaExceededError(error)) {
+                const recovered = await recoverFromQuotaPressure('loadAndSyncData');
+                if (recovered) {
+                    await loadData();
+                    return;
+                }
+            }
+            await loadData();
         } finally {
             loadAndSyncInProgress = false;
         }

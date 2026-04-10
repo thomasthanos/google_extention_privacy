@@ -7,7 +7,9 @@ const ContentConfig = {
     DEBOUNCE_DELAY: 300,             // Faster debounce for quicker detection
     VIDEO_CHECK_INTERVAL: 1500,      // Check more frequently
     MAX_RETRIES: 60,
-    PROGRESS_SAVE_INTERVAL: 2000,
+    PROGRESS_SAVE_INTERVAL: 2000,    // Video polling interval (not storage write interval)
+    PROGRESS_WRITE_THROTTLE_MS: 15000, // Local storage write throttle while playing
+    FORCED_PROGRESS_WRITE_THROTTLE_MS: 3000, // Throttle for force saves (pause/seek/blur)
     MIN_PROGRESS_TO_SAVE: 5,
     MIN_WATCH_SECONDS_BEFORE_COMPLETE: 120, // minimum real playback seconds before allowing completion (misclick guard)
     COMPLETED_PERCENTAGE: 85, // must match CONFIG.COMPLETED_PERCENTAGE in src/popup/config.js

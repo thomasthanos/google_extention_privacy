@@ -393,7 +393,7 @@
 
     let progressDebounce = null;
 
-    function scheduleProgressPush(delay = 15000) {
+    function scheduleProgressPush(delay = 20000) {
         if (progressDebounce) clearTimeout(progressDebounce);
         progressDebounce = setTimeout(async () => {
             progressDebounce = null;
@@ -415,9 +415,8 @@
     }
 
     // ─── Periodic forced push ─────────────────────────────────────────────────
-    // The debounce pattern means pushes never fire during active watching
-    // (saves every 2s keep resetting the 3s timer). This interval guarantees
-    // data reaches the cloud regularly even while the video is playing.
+    // The debounce pattern avoids excessive cloud writes while playback is active.
+    // A periodic push still guarantees progress reaches the cloud reliably.
     const PERIODIC_PUSH_INTERVAL = 45000; // 45 s
     let periodicPushTimer = null;
     let lastPushAt = 0;
@@ -678,7 +677,7 @@
                 if (isOrionMode) {
                     scheduleFullPush(3000);
                 } else {
-                    scheduleProgressPush(3000);
+                    scheduleProgressPush(20000);
                 }
             }
         });
@@ -722,7 +721,7 @@
             Logger?.info('SW available — acting as wake-up agent');
             initialized = true;
             watchStorage(false);
-            scheduleProgressPush(5000);
+            scheduleProgressPush(10000);
             return;
         }
 

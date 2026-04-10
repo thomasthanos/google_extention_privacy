@@ -302,9 +302,11 @@ const ProgressTracker = {
         if (this.shouldMarkComplete(currentTime, duration)) return;
 
         const now = Date.now();
-        const throttleMs = force ? 2000 : 5000;
+        const regularThrottleMs = Math.max(5000, Number(CONFIG.PROGRESS_WRITE_THROTTLE_MS) || 15000);
+        const forcedThrottleMs = Math.max(1000, Number(CONFIG.FORCED_PROGRESS_WRITE_THROTTLE_MS) || 3000);
+        const throttleMs = force ? forcedThrottleMs : regularThrottleMs;
 
-        if ((now - this.lastSaveTime) < throttleMs && !force) {
+        if ((now - this.lastSaveTime) < throttleMs) {
             this.pendingSeekSave = { uniqueId, currentTime, duration };
 
             if (this.seekSaveTimeout) {
@@ -481,7 +483,7 @@ const ProgressTracker = {
     },
 
     async saveWatchedEpisode(info, videoDuration) {
-        const { Storage, Logger } = window.AnimeTrackerContent;
+        const { Storage, Logger, EpisodeWriter } = window.AnimeTrackerContent;
         const { Notifications } = window.AnimeTrackerContent;
 
         try {
@@ -499,134 +501,27 @@ const ProgressTracker = {
             const animeData = result.animeData || {};
             const deletedAnime = { ...(result.deletedAnime || {}) };
 
-            const isFirstEpisode = !animeData[info.animeSlug];
-
-            if (!animeData[info.animeSlug]) {
-                animeData[info.animeSlug] = {
-                    title: info.animeTitle,
-                    slug: info.animeSlug,
-                    episodes: [],
-                    totalWatchTime: 0,
-                    lastWatched: null,
-                    totalEpisodes: Number.isFinite(info.totalEpisodes) ? info.totalEpisodes : null,
-                    coverImage: info.coverImage || null,
-                    siteAnimeId: info.siteAnimeId || null
-                };
-            } else if (info.siteAnimeId && !animeData[info.animeSlug].siteAnimeId) {
-                animeData[info.animeSlug].siteAnimeId = info.siteAnimeId;
-            }
-
-            if (!Array.isArray(animeData[info.animeSlug].episodes)) {
-                Logger.warn('Episodes not an array, resetting:', info.animeSlug);
-                animeData[info.animeSlug].episodes = [];
-            }
-
-            if (Number.isFinite(info.totalEpisodes) && info.totalEpisodes > 0 && info.totalEpisodes < 10000) {
-                const trackedEpisodes = animeData[info.animeSlug].episodes || [];
-                const maxTracked = Math.max(
-                    0,
-                    ...trackedEpisodes.map(ep => Number(ep.number) || 0),
-                    Number(info.episodeNumber) || 0,
-                    Number(info.secondEpisodeNumber) || 0
-                );
-                if (info.totalEpisodes >= maxTracked) {
-                    animeData[info.animeSlug].totalEpisodes = info.totalEpisodes;
-                }
-            }
-
             const validDuration = this.normalizeDuration(videoDuration);
             if (!validDuration) {
                 Logger.error('Invalid normalized video duration:', videoDuration);
                 throw new Error('Invalid normalized video duration');
             }
 
-            // Auto-resume: if user watches a new episode of an on-hold anime, resume it
-            if (animeData[info.animeSlug].onHoldAt) {
-                delete animeData[info.animeSlug].onHoldAt;
-                animeData[info.animeSlug].listState = 'active';
-                animeData[info.animeSlug].listStateUpdatedAt = this._compactNow();
-                Logger.info('Auto-resumed on-hold anime (new episode tracked):', info.animeSlug);
-                try {
-                    const { WatchlistSync } = window.AnimeTrackerContent;
-                    const resumeSiteId = animeData[info.animeSlug].siteAnimeId || info.siteAnimeId;
-                    if (WatchlistSync && resumeSiteId) {
-                        WatchlistSync.updateStatus(resumeSiteId, 'watching');
-                    }
-                } catch { /* non-critical */ }
-            }
-
-            // Auto-undrop: if user watches a new episode of a dropped anime, undrop it
-            if (animeData[info.animeSlug].droppedAt) {
-                delete animeData[info.animeSlug].droppedAt;
-                animeData[info.animeSlug].listState = 'active';
-                animeData[info.animeSlug].listStateUpdatedAt = this._compactNow();
-                Logger.info('Auto-undropped anime (new episode tracked):', info.animeSlug);
-                // Sync undrop → watching on an1me.to
-                try {
-                    const { WatchlistSync } = window.AnimeTrackerContent;
-                    const undropSiteId = animeData[info.animeSlug].siteAnimeId || info.siteAnimeId;
-                    if (WatchlistSync && undropSiteId) {
-                        WatchlistSync.updateStatus(undropSiteId, 'watching');
-                    }
-                } catch { /* non-critical */ }
-            }
-            delete deletedAnime[info.animeSlug];
-
-            const existingIndex = animeData[info.animeSlug].episodes
-                .findIndex(ep => ep.number === info.episodeNumber);
-
-            if (existingIndex !== -1) {
-                const existing = animeData[info.animeSlug].episodes[existingIndex] || {};
-                const currentDuration = Number(existing.duration) || 0;
-
-                if (this.isPlaceholderDuration(currentDuration) && currentDuration !== validDuration) {
-                    animeData[info.animeSlug].episodes[existingIndex] = {
-                        ...existing,
-                        duration: validDuration,
-                        durationSource: 'video'
-                    };
-                    animeData[info.animeSlug].totalWatchTime = animeData[info.animeSlug].episodes
-                        .reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
-                    animeData[info.animeSlug].lastWatched = new Date().toISOString();
-                    await Storage.set({ animeData, deletedAnime });
-                    Logger.debug(`Updated placeholder duration for tracked episode: ${info.uniqueId}`);
-                    return true;
-                }
-
+            const writeResult = EpisodeWriter.writeEpisode(info, validDuration, animeData, {
+                logPrefix: 'saveWatchedEpisode'
+            });
+            if (!writeResult.changed) {
                 Logger.debug('Episode already tracked:', info.uniqueId);
                 return false;
             }
 
-            const now = new Date();
-
-            const episodeData = {
-                number: info.episodeNumber,
-                watchedAt: now.toISOString().split('.')[0] + 'Z',
-                duration: validDuration,
-                durationSource: 'video'
-            };
-
-            animeData[info.animeSlug].episodes.push(episodeData);
-            animeData[info.animeSlug].totalWatchTime = (animeData[info.animeSlug].totalWatchTime || 0) + validDuration;
-            animeData[info.animeSlug].lastWatched = new Date().toISOString();
-
-            if (info.isDoubleEpisode && info.secondEpisodeNumber) {
-                const alreadyHasSecond = animeData[info.animeSlug].episodes
-                    .some(ep => ep.number === info.secondEpisodeNumber);
-                if (!alreadyHasSecond) {
-                    animeData[info.animeSlug].episodes.push({
-                        number: info.secondEpisodeNumber,
-                        watchedAt: now.toISOString().split('.')[0] + 'Z',
-                        duration: validDuration,
-                        durationSource: 'video'
-                    });
-                    Logger.info(`Double episode: also tracked Ep${info.secondEpisodeNumber}`);
-                }
-            }
-
-            animeData[info.animeSlug].episodes.sort((a, b) => a.number - b.number);
-
+            delete deletedAnime[info.animeSlug];
             await Storage.set({ animeData, deletedAnime });
+
+            if (writeResult.changeType === 'updated-placeholder') {
+                Logger.debug(`Updated placeholder duration for tracked episode: ${info.uniqueId}`);
+                return true;
+            }
 
             Logger.success(`✓ Tracked: ${info.animeTitle} Ep${info.episodeNumber}${info.isDoubleEpisode ? '-' + info.secondEpisodeNumber : ''}`);
             Notifications.showCompletion(info);

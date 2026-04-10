@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "An1me.to Tracker",
-  "version": "6.0.6",
+  "version": "6.1.0",
   "description": "Track your anime watching progress on an1me.to with cloud sync across all browsers",
   "author": "ThomasThanos",
   "permissions": [
@@ -58,6 +58,7 @@
         "src/content/storage.js",
         "src/content/anime-parser.js",
         "src/content/notifications.js",
+        "src/content/episode-writer.js",
         "src/content/progress-tracker.js",
         "src/content/watchlist-sync.js",
         "src/content/video-monitor.js",
