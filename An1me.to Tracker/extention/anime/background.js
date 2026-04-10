@@ -1129,7 +1129,7 @@ async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
 // ─── an1me.to anime info fetcher ─────────────────────────────────────────────
 
 async function fetchAnimePageInfo(slug) {
-    const url = `https://an1me.to/anime/${slug}/`;
+    let url = `https://an1me.to/anime/${slug}/`;
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 15000);
     let response;
@@ -1138,6 +1138,22 @@ async function fetchAnimePageInfo(slug) {
     } finally {
         clearTimeout(timer);
     }
+
+    // If 404, try to find the correct slug via search API
+    // (watch URLs like "jujutsu-kaisen-season-3" may differ from anime page "jujutsu-kaisen")
+    if (!response.ok && response.status === 404) {
+        const searchSlug = slug.replace(/-(?:season-?\d+|(?:\d+)(?:st|nd|rd|th)-season)$/i, '');
+        if (searchSlug !== slug) {
+            const ctrl2 = new AbortController();
+            const timer2 = setTimeout(() => ctrl2.abort(), 15000);
+            try {
+                response = await fetch(`https://an1me.to/anime/${searchSlug}/`, { signal: ctrl2.signal });
+            } finally {
+                clearTimeout(timer2);
+            }
+        }
+    }
+
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const html = await response.text();
 
@@ -1967,7 +1983,7 @@ async function persistBeforeUnloadTrack(animeInfo, duration) {
 // Finds an open an1me.to tab and forwards the sync request to its content script,
 // which can make the fetch with session cookies. Falls back to direct fetch.
 async function syncWatchlistToSite(animeId, type) {
-    console.log(`[BG] WatchlistSync: sending type="${type}" anime #${animeId}`);
+    console.log(`%c WatchlistSync %c ${type} %c anime #${animeId}`, 'background:#6366f1;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'background:#818cf8;color:#fff;padding:2px 6px', 'color:#a5b4fc');
 
     try {
         // Find an open an1me.to tab to forward the request through
@@ -1980,19 +1996,18 @@ async function syncWatchlistToSite(animeId, type) {
                 watchlistType: type
             }, (response) => {
                 if (chrome.runtime.lastError) {
-                    console.warn('[BG] WatchlistSync: tab forward failed:', chrome.runtime.lastError.message);
-                    // Fallback to direct fetch
+                    console.warn(`%c WatchlistSync %c tab forward failed`, 'background:#ef4444;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fca5a5', chrome.runtime.lastError.message);
                     directWatchlistFetch(animeId, type);
                 } else {
-                    console.log('[BG] WatchlistSync: ✓ forwarded to tab');
+                    console.log(`%c WatchlistSync %c ✓ forwarded to tab`, 'background:#22c55e;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#86efac');
                 }
             });
         } else {
-            console.log('[BG] WatchlistSync: no an1me.to tab open, trying direct fetch');
+            console.log(`%c WatchlistSync %c no tab open, direct fetch`, 'background:#f59e0b;color:#000;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fcd34d');
             await directWatchlistFetch(animeId, type);
         }
     } catch (e) {
-        console.warn(`[BG] WatchlistSync: ✗ error: ${e.message}`);
+        console.warn(`%c WatchlistSync %c ✗ ${e.message}`, 'background:#ef4444;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fca5a5');
     }
 }
 
@@ -2014,9 +2029,18 @@ async function directWatchlistFetch(animeId, type) {
         });
 
         const text = await res.text();
-        console.log(`[BG] WatchlistSync direct: HTTP ${res.status} - ${text.substring(0, 200)}`);
+        try {
+            const data = JSON.parse(text);
+            if (data?.success) {
+                console.log(`%c WatchlistSync %c ✓ ${data.data?.message || 'OK'}`, 'background:#22c55e;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#86efac');
+            } else {
+                console.warn(`%c WatchlistSync %c ✗ ${data.data?.message || text.substring(0, 100)}`, 'background:#ef4444;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fca5a5');
+            }
+        } catch {
+            console.log(`%c WatchlistSync %c HTTP ${res.status} ${text.substring(0, 100)}`, 'background:#6366f1;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#a5b4fc');
+        }
     } catch (e) {
-        console.warn(`[BG] WatchlistSync direct: ✗ ${e.message}`);
+        console.warn(`%c WatchlistSync %c ✗ ${e.message}`, 'background:#ef4444;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fca5a5');
     }
 }
 
