@@ -209,28 +209,60 @@ function showBadge(msg) {
 }
 
 // Hint
-function showHint(msg) {
+function showHint(_msg) {
     const container = getContainer();
     document.getElementById("speed-hint-msg")?.remove();
+
     const div = document.createElement("div");
     div.id = "speed-hint-msg";
-    div.textContent = msg;
+    div.innerHTML = `
+        <div style="display:flex; align-items:center; justify-content:center; gap:12px; color:#f0f4ff; font:700 clamp(18px, 2vw, 22px)/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-align:center;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 50 50" style="flex:0 0 auto; filter:drop-shadow(0 4px 8px rgba(74,129,255,0.45));">
+                <path fill="#cfe1ff" d="M 14.78125 5 C 14.75 5.007813 14.71875 5.019531 14.6875 5.03125 C 14.644531 5.050781 14.601563 5.070313 14.5625 5.09375 C 14.550781 5.09375 14.542969 5.09375 14.53125 5.09375 C 14.511719 5.101563 14.488281 5.113281 14.46875 5.125 C 14.457031 5.136719 14.449219 5.144531 14.4375 5.15625 C 14.425781 5.167969 14.417969 5.175781 14.40625 5.1875 C 14.375 5.207031 14.34375 5.226563 14.3125 5.25 C 14.289063 5.269531 14.269531 5.289063 14.25 5.3125 C 14.238281 5.332031 14.226563 5.355469 14.21875 5.375 C 14.183594 5.414063 14.152344 5.457031 14.125 5.5 C 14.113281 5.511719 14.105469 5.519531 14.09375 5.53125 C 14.09375 5.542969 14.09375 5.550781 14.09375 5.5625 C 14.082031 5.582031 14.070313 5.605469 14.0625 5.625 C 14.050781 5.636719 14.042969 5.644531 14.03125 5.65625 C 14.03125 5.675781 14.03125 5.699219 14.03125 5.71875 C 14.019531 5.757813 14.007813 5.800781 14 5.84375 C 14 5.875 14 5.90625 14 5.9375 C 14 5.949219 14 5.957031 14 5.96875 C 14 5.980469 14 5.988281 14 6 C 13.996094 6.050781 13.996094 6.105469 14 6.15625 L 14 39 C 14.003906 39.398438 14.242188 39.757813 14.609375 39.914063 C 14.972656 40.070313 15.398438 39.992188 15.6875 39.71875 L 22.9375 32.90625 L 28.78125 46.40625 C 28.890625 46.652344 29.09375 46.847656 29.347656 46.941406 C 29.601563 47.035156 29.882813 47.023438 30.125 46.90625 L 34.5 44.90625 C 34.996094 44.679688 35.21875 44.09375 35 43.59375 L 28.90625 30.28125 L 39.09375 29.40625 C 39.496094 29.378906 39.84375 29.113281 39.976563 28.730469 C 40.105469 28.347656 39.992188 27.921875 39.6875 27.65625 L 15.84375 5.4375 C 15.796875 5.378906 15.746094 5.328125 15.6875 5.28125 C 15.648438 5.234375 15.609375 5.195313 15.5625 5.15625 C 15.550781 5.15625 15.542969 5.15625 15.53125 5.15625 C 15.511719 5.132813 15.492188 5.113281 15.46875 5.09375 C 15.457031 5.09375 15.449219 5.09375 15.4375 5.09375 C 15.386719 5.070313 15.335938 5.046875 15.28125 5.03125 C 15.269531 5.03125 15.261719 5.03125 15.25 5.03125 C 15.230469 5.019531 15.207031 5.007813 15.1875 5 C 15.175781 5 15.167969 5 15.15625 5 C 15.136719 5 15.113281 5 15.09375 5 C 15.082031 5 15.074219 5 15.0625 5 C 15.042969 5 15.019531 5 15 5 C 14.988281 5 14.980469 5 14.96875 5 C 14.9375 5 14.90625 5 14.875 5 C 14.84375 5 14.8125 5 14.78125 5 Z M 16 8.28125 L 36.6875 27.59375 L 27.3125 28.40625 C 26.992188 28.4375 26.707031 28.621094 26.546875 28.902344 C 26.382813 29.179688 26.367188 29.519531 26.5 29.8125 L 32.78125 43.5 L 30.21875 44.65625 L 24.21875 30.8125 C 24.089844 30.515625 23.828125 30.296875 23.511719 30.230469 C 23.195313 30.160156 22.863281 30.25 22.625 30.46875 L 16 36.6875 Z"></path>
+            </svg>
+            <span style="letter-spacing:0.2px;">Click the video to activate speed controls.</span>
+        </div>
+        <div style="height:2px; margin:14px 0 12px; background:linear-gradient(90deg, rgba(142,166,255,0.14) 0%, rgba(166,188,255,0.5) 50%, rgba(142,166,255,0.14) 100%);"></div>
+        <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:12px; color:#f3f6ff;">
+            <div style="display:flex; align-items:center; border-radius:16px; overflow:hidden; border:1px solid rgba(87,162,255,0.65); background:linear-gradient(180deg, rgba(38,64,146,0.82) 0%, rgba(24,39,103,0.82) 100%); box-shadow:0 8px 18px rgba(18,34,95,0.5), inset 0 1px 0 rgba(255,255,255,0.22);">
+                <span style="display:flex; align-items:center; min-height:68px; padding:0 16px; font:800 clamp(28px, 3.6vw, 38px)/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; letter-spacing:1px; color:#f6f9ff; background:linear-gradient(180deg, #356ae7 0%, #2148bf 100%); text-shadow:0 2px 6px rgba(0,0,0,0.4);">F7</span>
+                <span style="display:flex; align-items:center; min-height:68px; padding:0 18px 0 16px; color:#e8efff; font:600 clamp(24px, 3.2vw, 34px)/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; letter-spacing:0.2px;">Hold</span>
+            </div>
+            <span style="font:500 clamp(24px, 3vw, 34px)/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; opacity:0.95;">or</span>
+            <div style="display:flex; align-items:center; border-radius:16px; overflow:hidden; border:1px solid rgba(156,126,255,0.68); background:linear-gradient(180deg, rgba(82,58,165,0.84) 0%, rgba(50,37,114,0.84) 100%); box-shadow:0 8px 18px rgba(38,25,86,0.52), inset 0 1px 0 rgba(255,255,255,0.2);">
+                <span style="display:flex; align-items:center; min-height:68px; padding:0 16px; font:800 clamp(28px, 3.6vw, 38px)/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; letter-spacing:1px; color:#f6f9ff; background:linear-gradient(180deg, #7857e1 0%, #5739b3 100%); text-shadow:0 2px 6px rgba(0,0,0,0.4);">F8</span>
+                <span style="display:flex; align-items:center; min-height:68px; padding:0 18px 0 16px; color:#ece8ff; font:600 clamp(24px, 3.2vw, 34px)/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; letter-spacing:0.2px;">Toggle</span>
+            </div>
+        </div>
+    `;
+
     div.style.cssText = `
         position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
-        padding: 12px 24px; background: #1e2033; color: #e0e7ff;
-        font: 600 15px -apple-system, sans-serif;
-        border-radius: 10px; border: 2px solid #3b82f6;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+        width: min(900px, calc(100% - 24px));
+        padding: 18px 20px 16px;
+        background:
+            radial-gradient(120% 160% at 50% -35%, rgba(124, 149, 255, 0.24) 0%, rgba(124, 149, 255, 0) 60%),
+            linear-gradient(180deg, #1d2550 0%, #141b3e 100%);
+        color: #e0e7ff;
+        border-radius: 26px;
+        border: 2px solid rgba(123, 155, 255, 0.52);
+        box-shadow:
+            0 18px 34px rgba(8, 13, 34, 0.55),
+            0 0 18px rgba(76, 120, 255, 0.35),
+            inset 0 1px 0 rgba(255,255,255,0.2),
+            inset 0 -2px 0 rgba(82, 127, 255, 0.35);
         z-index: 2147483647; pointer-events: none;
         opacity: 1; transition: opacity 0.3s;
     `;
+
     if (container.style.position !== "relative" && container !== document.body) {
         container.style.position = "relative";
     }
+
     container.appendChild(div);
     setTimeout(() => {
         div.style.opacity = 0;
         setTimeout(() => div.remove(), 300);
-    }, 2500);
+    }, 3400);
 }
 

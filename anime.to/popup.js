@@ -13,11 +13,6 @@ document.querySelectorAll('.speed-btn').forEach(btn => {
         btn.classList.add('selected');
         let speed = btn.dataset.value;
         chrome.storage.local.set({'selectedSpeed': speed});
-
-        // Show hint
-        const hint = document.getElementById('hint');
-        hint.classList.add('show');
-        setTimeout(() => hint.classList.remove('show'), 3000);
     };
 });
 
