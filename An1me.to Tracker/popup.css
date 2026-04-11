@@ -1006,18 +1006,18 @@ body {
 .anime-card-actions button svg { width: 13px; height: 13px; flex-shrink: 0; }
 .anime-card-actions button:hover { background: var(--bg-4); color: var(--t1); border-color: var(--b2, var(--b1)); }
 
-/* Action button color states */
-.anime-onhold-toggle { color: var(--amber) !important; border-color: rgba(255,183,77,0.2) !important; background: rgba(255,183,77,0.06) !important; }
-.anime-onhold-toggle:hover { background: rgba(255,183,77,0.14) !important; }
-.anime-onhold-toggle[data-onhold="true"] { background: rgba(255,183,77,0.15) !important; border-color: rgba(255,183,77,0.35) !important; }
+/* Action button color states — use .anime-card-actions for specificity */
+.anime-card-actions .anime-onhold-toggle { color: var(--amber); border-color: rgba(255,183,77,0.2); background: rgba(255,183,77,0.06); }
+.anime-card-actions .anime-onhold-toggle:hover { background: rgba(255,183,77,0.14); }
+.anime-card-actions .anime-onhold-toggle[data-onhold="true"] { background: rgba(255,183,77,0.15); border-color: rgba(255,183,77,0.35); }
 
-.anime-complete-toggle { color: #4caf50 !important; border-color: rgba(76,175,80,0.2) !important; background: rgba(76,175,80,0.06) !important; }
-.anime-complete-toggle:hover { background: rgba(76,175,80,0.14) !important; }
-.anime-complete-toggle[data-completed="true"] { background: rgba(76,175,80,0.15) !important; border-color: rgba(76,175,80,0.35) !important; }
+.anime-card-actions .anime-complete-toggle { color: #4caf50; border-color: rgba(76,175,80,0.2); background: rgba(76,175,80,0.06); }
+.anime-card-actions .anime-complete-toggle:hover { background: rgba(76,175,80,0.14); }
+.anime-card-actions .anime-complete-toggle[data-completed="true"] { background: rgba(76,175,80,0.15); border-color: rgba(76,175,80,0.35); }
 
-.anime-drop-toggle { color: #e57373 !important; border-color: rgba(229,115,115,0.2) !important; background: rgba(229,115,115,0.06) !important; }
-.anime-drop-toggle:hover { background: rgba(229,115,115,0.14) !important; }
-.anime-drop-toggle[data-dropped="true"] { background: rgba(229,115,115,0.15) !important; border-color: rgba(229,115,115,0.35) !important; }
+.anime-card-actions .anime-drop-toggle { color: #e57373; border-color: rgba(229,115,115,0.2); background: rgba(229,115,115,0.06); }
+.anime-card-actions .anime-drop-toggle:hover { background: rgba(229,115,115,0.14); }
+.anime-card-actions .anime-drop-toggle[data-dropped="true"] { background: rgba(229,115,115,0.15); border-color: rgba(229,115,115,0.35); }
 
 .anime-card-actions .anime-edit-title { color: var(--t3); }
 .anime-card-actions .anime-edit-title:hover { color: var(--cyan); border-color: rgba(79,195,247,0.2); }

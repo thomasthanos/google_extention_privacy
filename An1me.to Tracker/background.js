@@ -563,14 +563,14 @@ async function syncToFirebase() {
 
     syncInProgress = true;
     try {
-        const initialLocal = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
         const cloudDoc = await fetchCloudData(user, token);
 
+        // Single read after cloud fetch to get the freshest local state
         const result = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
-        const localAnime    = result.animeData        || initialLocal.animeData        || {};
-        const localProgress = result.videoProgress    || initialLocal.videoProgress    || {};
-        const localDeleted  = result.deletedAnime     || initialLocal.deletedAnime     || {};
-        const localGroup    = result.groupCoverImages || initialLocal.groupCoverImages || {};
+        const localAnime    = result.animeData        || {};
+        const localProgress = result.videoProgress    || {};
+        const localDeleted  = result.deletedAnime     || {};
+        const localGroup    = result.groupCoverImages || {};
 
         const mergedDeleted = cloudDoc?.deletedAnime
             ? mergeDeletedAnime(localDeleted, cloudDoc.deletedAnime)
@@ -650,12 +650,21 @@ let _applyCloudDebounce      = null;
 let _applyCloudUpdateQueue   = Promise.resolve();
 let _applyCloudUpdateWaiters = [];
 
+const _MAX_CLOUD_UPDATE_WAITERS = 100;
+
 async function applyCloudUpdate(cloudDoc) {
     if (!cloudDoc) return;
 
     // Debounce rapid SSE updates (e.g. multiple field changes in quick succession)
     _applyCloudUpdateDoc = cloudDoc;
     if (_applyCloudDebounce) clearTimeout(_applyCloudDebounce);
+
+    // Cap waiter queue to prevent unbounded growth from rapid SSE bursts
+    if (_applyCloudUpdateWaiters.length >= _MAX_CLOUD_UPDATE_WAITERS) {
+        const stale = _applyCloudUpdateWaiters.splice(0, _applyCloudUpdateWaiters.length - _MAX_CLOUD_UPDATE_WAITERS + 1);
+        for (const w of stale) w.resolve();
+    }
+
     return new Promise((resolve, reject) => {
         _applyCloudUpdateWaiters.push({ resolve, reject });
         _applyCloudDebounce = setTimeout(() => {
@@ -684,6 +693,9 @@ async function _drainCloudUpdates() {
 
 async function _doApplyCloudUpdate(cloudDoc) {
     if (!cloudDoc) return;
+
+    // Skip while a full sync is in progress — it already merges cloud data
+    if (syncInProgress) return;
 
     try {
         // Single read: get the latest local state
@@ -1142,7 +1154,7 @@ async function fetchAnimePageInfo(slug) {
     // If 404, try to find the correct slug via search API
     // (watch URLs like "jujutsu-kaisen-season-3" may differ from anime page "jujutsu-kaisen")
     if (!response.ok && response.status === 404) {
-        const searchSlug = slug.replace(/-(?:season-?\d+|(?:\d+)(?:st|nd|rd|th)-season)$/i, '');
+        const searchSlug = slug.replace(/-(?:season-?\d+|(?:\d+)(?:st|nd|rd|th)-season|s\d+|part-?\d+|(?:ii|iii|iv|v|vi))$/i, '');
         if (searchSlug !== slug) {
             const ctrl2 = new AbortController();
             const timer2 = setTimeout(() => ctrl2.abort(), 15000);
@@ -1252,8 +1264,8 @@ async function batchFetchAnimeInfo(slugs) {
     const DELAY_MS = 1200;
     let successCount = 0;
 
-    const result = await bgStorageGet(['animeData']);
-    const animeData = result.animeData || {};
+    // Collect backfill data separately to avoid stale-snapshot overwrites
+    const backfills = new Map();
 
     for (let i = 0; i < slugs.length; i += BATCH_SIZE) {
         const batch = slugs.slice(i, i + BATCH_SIZE);
@@ -1266,14 +1278,8 @@ async function batchFetchAnimeInfo(slugs) {
                     await bgStorageSet({ [`animeinfo_${slug}`]: entry });
                     successCount++;
 
-                    // Backfill coverImage and siteAnimeId into animeData
-                    if (animeData[slug]) {
-                        if (info.coverImage && !animeData[slug].coverImage) {
-                            animeData[slug].coverImage = info.coverImage;
-                        }
-                        if (info.siteAnimeId && !animeData[slug].siteAnimeId) {
-                            animeData[slug].siteAnimeId = info.siteAnimeId;
-                        }
+                    if (info.coverImage || info.siteAnimeId) {
+                        backfills.set(slug, { coverImage: info.coverImage, siteAnimeId: info.siteAnimeId });
                     }
                 } else {
                     await bgStorageSet({ [`animeinfo_${slug}`]: { notFound: true, cachedAt: Date.now() } });
@@ -1288,8 +1294,24 @@ async function batchFetchAnimeInfo(slugs) {
         }
     }
 
-    // Save all backfilled coverImages in one write
-    await bgStorageSet({ animeData });
+    // Re-read fresh animeData and apply only the backfill changes
+    if (backfills.size > 0) {
+        const fresh = await bgStorageGet(['animeData']);
+        const animeData = fresh.animeData || {};
+        let changed = false;
+        for (const [slug, fill] of backfills) {
+            if (!animeData[slug]) continue;
+            if (fill.coverImage && !animeData[slug].coverImage) {
+                animeData[slug].coverImage = fill.coverImage;
+                changed = true;
+            }
+            if (fill.siteAnimeId && !animeData[slug].siteAnimeId) {
+                animeData[slug].siteAnimeId = fill.siteAnimeId;
+                changed = true;
+            }
+        }
+        if (changed) await bgStorageSet({ animeData });
+    }
     console.log(`[BG] Batch fetch done — ${successCount}/${slugs.length}`);
 }
 
@@ -1997,7 +2019,7 @@ async function syncWatchlistToSite(animeId, type) {
             }, (response) => {
                 if (chrome.runtime.lastError) {
                     console.warn(`%c WatchlistSync %c tab forward failed`, 'background:#ef4444;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fca5a5', chrome.runtime.lastError.message);
-                    directWatchlistFetch(animeId, type);
+                    directWatchlistFetch(animeId, type).catch(e => console.warn('[BG] WatchlistSync direct fallback failed:', e.message));
                 } else {
                     console.log(`%c WatchlistSync %c ✓ forwarded to tab`, 'background:#22c55e;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#86efac');
                 }

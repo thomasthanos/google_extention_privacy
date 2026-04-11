@@ -849,7 +849,7 @@
                 e.stopPropagation();
                 const card = header.closest('.anime-card');
                 if (card && !card.classList.contains('expanded')) card.classList.add('expanded');
-                header.parentElement.classList.toggle('collapsed');
+                if (header.parentElement) header.parentElement.classList.toggle('collapsed');
             };
             header.addEventListener('click', toggleCollapse);
             const title = header.querySelector('.in-progress-title');
@@ -861,7 +861,7 @@
                 e.stopPropagation();
                 const card = header.closest('.anime-card');
                 if (card && !card.classList.contains('expanded')) card.classList.add('expanded');
-                header.parentElement.classList.toggle('collapsed');
+                if (header.parentElement) header.parentElement.classList.toggle('collapsed');
             });
         });
 
@@ -870,7 +870,7 @@
                 e.stopPropagation();
                 const card = header.closest('.anime-card');
                 if (card && !card.classList.contains('expanded')) card.classList.add('expanded');
-                header.parentElement.classList.toggle('collapsed');
+                if (header.parentElement) header.parentElement.classList.toggle('collapsed');
             });
         });
 
