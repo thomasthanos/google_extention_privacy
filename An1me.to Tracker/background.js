@@ -1140,8 +1140,63 @@ async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
 
 // ─── an1me.to anime info fetcher ─────────────────────────────────────────────
 
+function isSeasonLikeSlug(slug) {
+    return /-(?:season-?\d+|(?:\d+)(?:st|nd|rd|th)-season|s\d+|(?:part|cour)-?\d+|(?:ii|iii|iv|v|vi))(?=$|-)/i.test(String(slug || ''));
+}
+
+function toOrdinal(n) {
+    const num = Number(n);
+    if (!Number.isFinite(num)) return null;
+    if (num % 100 >= 11 && num % 100 <= 13) return `${num}th`;
+    if (num % 10 === 1) return `${num}st`;
+    if (num % 10 === 2) return `${num}nd`;
+    if (num % 10 === 3) return `${num}rd`;
+    return `${num}th`;
+}
+
+function buildAnimeInfoSlugCandidates(slug) {
+    const input = String(slug || '').toLowerCase();
+    if (!input) return [];
+
+    const out = [input];
+    const add = (value) => {
+        if (!value || out.includes(value)) return;
+        out.push(value);
+    };
+
+    // season-2 -> 2nd-season
+    add(input.replace(/-season-?(\d+)(?=$|-)/i, (_m, num) => {
+        const ord = toOrdinal(num);
+        return ord ? `-${ord}-season` : _m;
+    }));
+
+    // 2nd-season -> season-2
+    add(input.replace(/-(\d+)(st|nd|rd|th)-season(?=$|-)/i, '-season-$1'));
+
+    // s2 -> season-2
+    add(input.replace(/-s(\d+)(?=$|-)/i, '-season-$1'));
+
+    // Only non-seasonal slugs are allowed to fall back to base slug.
+    // For explicit season slugs, base fallback often maps to a different season.
+    if (!isSeasonLikeSlug(input)) {
+        const base = input.replace(
+            /-(?:season-?\d+|(?:\d+)(?:st|nd|rd|th)-season|s\d+|part-?\d+|cour-?\d+|(?:ii|iii|iv|v|vi))$/i,
+            ''
+        );
+        add(base);
+    }
+
+    return out;
+}
+
 async function fetchAnimePageInfo(slug) {
-    let url = `https://an1me.to/anime/${slug}/`;
+    const candidates = buildAnimeInfoSlugCandidates(slug);
+    if (candidates.length === 0) {
+        throw new Error('Missing slug');
+    }
+
+    let resolvedSlug = candidates[0];
+    let url = `https://an1me.to/anime/${resolvedSlug}/`;
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 15000);
     let response;
@@ -1151,15 +1206,18 @@ async function fetchAnimePageInfo(slug) {
         clearTimeout(timer);
     }
 
-    // If 404, try to find the correct slug via search API
-    // (watch URLs like "jujutsu-kaisen-season-3" may differ from anime page "jujutsu-kaisen")
-    if (!response.ok && response.status === 404) {
-        const searchSlug = slug.replace(/-(?:season-?\d+|(?:\d+)(?:st|nd|rd|th)-season|s\d+|part-?\d+|(?:ii|iii|iv|v|vi))$/i, '');
-        if (searchSlug !== slug) {
+    // If 404, try known slug variants first (e.g. season-2 -> 2nd-season).
+    if (!response.ok && response.status === 404 && candidates.length > 1) {
+        for (const candidateSlug of candidates.slice(1)) {
             const ctrl2 = new AbortController();
             const timer2 = setTimeout(() => ctrl2.abort(), 15000);
             try {
-                response = await fetch(`https://an1me.to/anime/${searchSlug}/`, { signal: ctrl2.signal });
+                const candidateResponse = await fetch(`https://an1me.to/anime/${candidateSlug}/`, { signal: ctrl2.signal });
+                if (candidateResponse.ok) {
+                    response = candidateResponse;
+                    resolvedSlug = candidateSlug;
+                    break;
+                }
             } finally {
                 clearTimeout(timer2);
             }
@@ -1186,12 +1244,14 @@ async function fetchAnimePageInfo(slug) {
     // Always scan episode links on the page for the highest actually available episode.
     let latestEpisode = null;
     {
-        const epPattern = new RegExp(`/watch/${slug}-episode-(\\d+)`, 'gi');
-        let m;
         let maxEp = 0;
-        while ((m = epPattern.exec(html)) !== null) {
-            const n = parseInt(m[1], 10);
-            if (n > maxEp) maxEp = n;
+        for (const watchSlug of new Set([slug, resolvedSlug])) {
+            const epPattern = new RegExp(`/watch/${watchSlug}-episode-(\\d+)`, 'gi');
+            let m;
+            while ((m = epPattern.exec(html)) !== null) {
+                const n = parseInt(m[1], 10);
+                if (n > maxEp) maxEp = n;
+            }
         }
         if (maxEp > 0) latestEpisode = maxEp;
     }
@@ -1254,7 +1314,7 @@ async function fetchAnimePageInfo(slug) {
         || html.match(/showWatchlistModal\(['"]#watchlist-(\d+)['"]\)/);
     if (idMatch) siteAnimeId = parseInt(idMatch[1], 10);
 
-    return { totalEpisodes, status, latestEpisode, coverImage, siteAnimeId };
+    return { totalEpisodes, status, latestEpisode, coverImage, siteAnimeId, resolvedSlug };
 }
 
 // ─── Batch anime info fetcher (runs in background) ──────────────────────────

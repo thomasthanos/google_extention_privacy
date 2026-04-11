@@ -17,9 +17,11 @@ const FirebaseSync = {
     pendingSave: null,
     currentSavePromise: null,
     cloudSaveRetryCount: 0,
+    userDocumentCache: null,
+    USER_DOCUMENT_CACHE_TTL_MS: 5 * 60 * 1000,
 
-    cloneSyncData(data) {
-        if (!data || typeof data !== 'object') return {};
+    cloneAny(data) {
+        if (data === null || typeof data === 'undefined') return null;
         try {
             if (typeof structuredClone === 'function') {
                 return structuredClone(data);
@@ -31,13 +33,61 @@ const FirebaseSync = {
         try {
             return JSON.parse(JSON.stringify(data));
         } catch {
+            if (Array.isArray(data)) return data.slice();
+            if (data && typeof data === 'object') return { ...data };
+            return data;
+        }
+    },
+
+    cloneSyncData(data) {
+        const cloned = this.cloneAny(data);
+        if (!cloned || typeof cloned !== 'object' || Array.isArray(cloned)) {
+            const source = (data && typeof data === 'object') ? data : {};
             return {
-                animeData: data.animeData || {},
-                videoProgress: data.videoProgress || {},
-                deletedAnime: data.deletedAnime || {},
-                groupCoverImages: data.groupCoverImages || {}
+                animeData: source.animeData || {},
+                videoProgress: source.videoProgress || {},
+                deletedAnime: source.deletedAnime || {},
+                groupCoverImages: source.groupCoverImages || {}
             };
         }
+
+        return cloned;
+    },
+
+    clearCachedUserDocument(uid = null) {
+        if (!uid) {
+            this.userDocumentCache = null;
+            return;
+        }
+        if (this.userDocumentCache?.uid === uid) {
+            this.userDocumentCache = null;
+        }
+    },
+
+    getCachedUserDocument(uid) {
+        const cache = this.userDocumentCache;
+        if (!uid || !cache || cache.uid !== uid) {
+            return { hit: false, data: null };
+        }
+
+        if ((Date.now() - cache.cachedAt) > this.USER_DOCUMENT_CACHE_TTL_MS) {
+            this.userDocumentCache = null;
+            return { hit: false, data: null };
+        }
+
+        return {
+            hit: true,
+            data: this.cloneAny(cache.data)
+        };
+    },
+
+    setCachedUserDocument(uid, data) {
+        if (!uid) return;
+        this.userDocumentCache = {
+            uid,
+            cachedAt: Date.now(),
+            data: this.cloneAny(data)
+        };
     },
 
     async hydrateSyncData(data) {
@@ -83,7 +133,11 @@ const FirebaseSync = {
             await FirebaseLib.init();
 
             FirebaseLib.onAuthStateChanged((user) => {
+                const prevUid = this.currentUser?.uid || null;
                 this.currentUser = user;
+                if (!user || prevUid !== user.uid) {
+                    this.clearCachedUserDocument();
+                }
                 if (user) {
                     PopupLogger.log('Firebase', 'User signed in:', user.email);
                     if (onUserSignedIn) onUserSignedIn(user);
@@ -113,6 +167,7 @@ const FirebaseSync = {
     async signOut() {
         await FirebaseLib.signOut();
         this.currentUser = null;
+        this.clearCachedUserDocument();
     },
 
     /**
@@ -181,14 +236,17 @@ const FirebaseSync = {
                     throw new Error('Invalid videoProgress for cloud save');
                 }
 
-                await FirebaseLib.setDocument('users', this.currentUser.uid, {
+                const savedDoc = {
                     animeData: dataToSave.animeData || {},
                     videoProgress: dataToSave.videoProgress || {},
                     deletedAnime: dataToSave.deletedAnime || {},
                     groupCoverImages: dataToSave.groupCoverImages || {},
                     lastUpdated: new Date().toISOString(),
                     email: this.currentUser.email
-                });
+                };
+
+                await FirebaseLib.setDocument('users', this.currentUser.uid, savedDoc);
+                this.setCachedUserDocument(this.currentUser.uid, savedDoc);
                 PopupLogger.log('Firebase', 'Data saved to cloud');
 
                 this.cloudSaveRetryCount = 0;
@@ -260,20 +318,28 @@ const FirebaseSync = {
             // Fetch cloud document once — reuse for both the pre-upload VP merge and
             // the authoritative data merge, eliminating the second GET.
             let cloudData = null;
-            let retryCount = 0;
-            const maxRetries = 3;
+            const { hit: cacheHit, data: cachedCloudData } = this.getCachedUserDocument(this.currentUser.uid);
 
-            while (retryCount < maxRetries) {
-                try {
-                    cloudData = await FirebaseLib.getDocument('users', this.currentUser.uid);
-                    break;
-                } catch (e) {
-                    retryCount++;
-                    if (retryCount < maxRetries) {
-                        PopupLogger.warn('Sync', `Cloud fetch failed, retrying (${retryCount}/${maxRetries})...`);
-                        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
-                    } else {
-                        throw e;
+            if (cacheHit) {
+                cloudData = cachedCloudData;
+                PopupLogger.debug('Sync', 'Using cached cloud user document');
+            } else {
+                let retryCount = 0;
+                const maxRetries = 3;
+
+                while (retryCount < maxRetries) {
+                    try {
+                        cloudData = await FirebaseLib.getDocument('users', this.currentUser.uid);
+                        this.setCachedUserDocument(this.currentUser.uid, cloudData);
+                        break;
+                    } catch (e) {
+                        retryCount++;
+                        if (retryCount < maxRetries) {
+                            PopupLogger.warn('Sync', `Cloud fetch failed, retrying (${retryCount}/${maxRetries})...`);
+                            await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+                        } else {
+                            throw e;
+                        }
                     }
                 }
             }
@@ -379,6 +445,14 @@ const FirebaseSync = {
                         this.pendingSave = this.cloneSyncData(finalData);
                         await this.performCloudSave(elements);
                     } else {
+                        this.setCachedUserDocument(this.currentUser.uid, {
+                            animeData: finalData.animeData || {},
+                            videoProgress: finalData.videoProgress || {},
+                            deletedAnime: finalData.deletedAnime || {},
+                            groupCoverImages: finalData.groupCoverImages || {},
+                            lastUpdated: cloudData?.lastUpdated || null,
+                            email: this.currentUser?.email || cloudData?.email || null
+                        });
                         if (elements?.syncStatus) {
                             elements.syncStatus.classList.add('synced');
                             elements.syncText.textContent = 'Cloud Synced';

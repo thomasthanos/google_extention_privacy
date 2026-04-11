@@ -322,12 +322,13 @@
     function getAnimeStatus(slug, anime) {
         const { FillerService, SeasonGrouping, AnilistService, CONFIG } = AT;
         if (!anime) return AnimeStatus.WATCHING;
+        const listState = String(anime.listState || '').toLowerCase();
 
         // ── On Hold ─────────────────────────────────────────────────────────
-        if (anime.onHoldAt) return AnimeStatus.ON_HOLD;
+        if (anime.onHoldAt || listState === AnimeStatus.ON_HOLD) return AnimeStatus.ON_HOLD;
 
         // ── Dropped ─────────────────────────────────────────────────────────
-        if (anime.droppedAt) return AnimeStatus.DROPPED;
+        if (anime.droppedAt || listState === AnimeStatus.DROPPED) return AnimeStatus.DROPPED;
 
         const watchedCount = anime.episodes?.length || 0;
         const lowerSlug = slug.toLowerCase();
@@ -341,7 +342,7 @@
 
         if (watchedCount === 0) {
             isComplete = false;
-        } else if (anime.completedAt) {
+        } else if (anime.completedAt || listState === AnimeStatus.COMPLETED) {
             isComplete = true;
         } else if (SeasonGrouping.isMovie(slug, anime)) {
             isComplete = true;
@@ -363,6 +364,7 @@
             // Decide whether to show in completed section (aged) or still in main list
             const isAged =
                 anime.completedAt ||
+                listState === AnimeStatus.COMPLETED ||
                 SeasonGrouping.isMovie(slug, anime) ||
                 anilistStatus === 'FINISHED' ||
                 getCalendarDayDiff(anime?.lastWatched) >= CONFIG.COMPLETED_LIST_MIN_DAYS;
@@ -371,7 +373,7 @@
         }
 
         // ── Caught up with airing ───────────────────────────────────────────
-        if (watchedCount > 0 && !anime.completedAt && latestAvailable > 0) {
+        if (watchedCount > 0 && !anime.completedAt && listState !== AnimeStatus.COMPLETED && latestAvailable > 0) {
             const highestWatched = Math.max(0, ...(anime.episodes || []).map(ep => Number(ep.number) || 0));
 
             if (anilistStatus === 'RELEASING' && highestWatched >= latestAvailable) {

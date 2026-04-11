@@ -31,7 +31,7 @@
 
     function getExplicitListState(anime) {
         const state = anime?.listState;
-        return state === 'completed' || state === 'dropped' || state === 'active'
+        return state === 'completed' || state === 'dropped' || state === 'active' || state === 'on_hold'
             ? state
             : null;
     }
@@ -41,8 +41,12 @@
         if (explicitState) return explicitState;
         const completedAt = toMillis(anime?.completedAt);
         const droppedAt = toMillis(anime?.droppedAt);
-        if (!completedAt && !droppedAt) return 'active';
-        return droppedAt > completedAt ? 'dropped' : 'completed';
+        const onHoldAt = toMillis(anime?.onHoldAt);
+        const latestStateTs = Math.max(completedAt, droppedAt, onHoldAt);
+
+        if (!latestStateTs) return 'active';
+        if (onHoldAt === latestStateTs) return 'on_hold';
+        return droppedAt === latestStateTs ? 'dropped' : 'completed';
     }
 
     function getAnimeActivityTimestamp(anime) {
@@ -53,7 +57,8 @@
             toMillis(anime.listStateUpdatedAt),
             toMillis(anime.titleUpdatedAt),
             toMillis(anime.completedAt),
-            toMillis(anime.droppedAt)
+            toMillis(anime.droppedAt),
+            toMillis(anime.onHoldAt)
         );
 
         for (const episode of Array.isArray(anime.episodes) ? anime.episodes : []) {
@@ -93,18 +98,24 @@
 
         delete target.completedAt;
         delete target.droppedAt;
+        delete target.onHoldAt;
         delete target.listState;
         delete target.listStateUpdatedAt;
 
         if (localListTs || cloudListTs) {
             const sourceAnime = cloudListTs > localListTs ? cloudAnime : localAnime;
             const state = getResolvedListState(sourceAnime);
-            const updatedAt = sourceAnime?.listStateUpdatedAt || null;
+            const updatedAt = sourceAnime?.listStateUpdatedAt || pickLatestIso(localAnime?.listStateUpdatedAt, cloudAnime?.listStateUpdatedAt);
 
             if (state === 'completed') {
                 target.completedAt = sourceAnime?.completedAt || pickLatestIso(localAnime?.completedAt, cloudAnime?.completedAt);
             } else if (state === 'dropped') {
                 target.droppedAt = sourceAnime?.droppedAt || pickLatestIso(localAnime?.droppedAt, cloudAnime?.droppedAt);
+            } else if (state === 'on_hold') {
+                target.onHoldAt = sourceAnime?.onHoldAt
+                    || pickLatestIso(localAnime?.onHoldAt, cloudAnime?.onHoldAt)
+                    || updatedAt
+                    || null;
             }
 
             target.listState = state;
@@ -114,15 +125,27 @@
 
         const completedAt = pickLatestIso(localAnime?.completedAt, cloudAnime?.completedAt);
         const droppedAt = pickLatestIso(localAnime?.droppedAt, cloudAnime?.droppedAt);
+        const onHoldAt = pickLatestIso(localAnime?.onHoldAt, cloudAnime?.onHoldAt);
         const completedTs = toMillis(completedAt);
         const droppedTs = toMillis(droppedAt);
+        const onHoldTs = toMillis(onHoldAt);
 
-        if (!completedTs && !droppedTs) return;
+        if (!completedTs && !droppedTs && !onHoldTs) return;
+        if (onHoldTs >= droppedTs && onHoldTs >= completedTs) {
+            target.onHoldAt = onHoldAt;
+            target.listState = 'on_hold';
+            if (onHoldAt) target.listStateUpdatedAt = onHoldAt;
+            return;
+        }
         if (droppedTs > completedTs) {
             target.droppedAt = droppedAt;
+            target.listState = 'dropped';
+            if (droppedAt) target.listStateUpdatedAt = droppedAt;
             return;
         }
         target.completedAt = completedAt;
+        target.listState = 'completed';
+        if (completedAt) target.listStateUpdatedAt = completedAt;
     }
 
     function areEpisodesEqual(aEpisodes, bEpisodes) {
@@ -152,6 +175,7 @@
         if (getSafeString(a.lastWatched) !== getSafeString(b.lastWatched)) return false;
         if (getSafeString(a.completedAt) !== getSafeString(b.completedAt)) return false;
         if (getSafeString(a.droppedAt) !== getSafeString(b.droppedAt)) return false;
+        if (getSafeString(a.onHoldAt) !== getSafeString(b.onHoldAt)) return false;
         if (getSafeString(a.listState) !== getSafeString(b.listState)) return false;
         if (getSafeString(a.listStateUpdatedAt) !== getSafeString(b.listStateUpdatedAt)) return false;
         if (getSafeNumber(Number(a.totalEpisodes)) !== getSafeNumber(Number(b.totalEpisodes))) return false;

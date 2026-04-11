@@ -45,11 +45,26 @@ const AnilistService = {
 
             const result = await Storage.get(keys);
             let loaded = 0;
+            const keysToPurge = [];
+
+            const isSeasonLikeSlug = (slug) =>
+                /-(?:season-?\d+|(?:\d+)(?:st|nd|rd|th)-season|s\d+|(?:part|cour)-?\d+|(?:ii|iii|iv|v|vi))(?=$|-)/i
+                    .test(String(slug || ''));
 
             let needsSave = false;
             for (const [key, value] of Object.entries(result)) {
                 if (!key.startsWith('animeinfo_') || !value) continue;
                 const slug = key.replace('animeinfo_', '');
+
+                // Migration guard:
+                // Older caches may have been resolved via a broad base-slug fallback
+                // (e.g. season-2 pulling season-1 metadata). If a seasonal slug has
+                // no resolvedSlug marker, force one re-fetch with the new resolver.
+                if (!value.notFound && isSeasonLikeSlug(slug) && !value.resolvedSlug) {
+                    keysToPurge.push(key);
+                    continue;
+                }
+
                 this.cache[slug] = value;
                 loaded++;
 
@@ -58,6 +73,10 @@ const AnilistService = {
                     animeData[slug].coverImage = value.coverImage;
                     needsSave = true;
                 }
+            }
+
+            if (keysToPurge.length > 0) {
+                await Storage.remove(keysToPurge);
             }
             if (needsSave) {
                 await Storage.set({ animeData });
