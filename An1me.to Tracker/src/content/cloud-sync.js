@@ -97,27 +97,38 @@
         currentUser  = null;
     }
 
+    // Singleflight: coalesce concurrent refresh calls so we don't burn refresh
+    // tokens or race each other when several code paths need a fresh id token.
+    let _refreshInflight = null;
     async function refreshToken(rt) {
-        try {
-            const res = await fetch(
-                `https://securetoken.googleapis.com/v1/token?key=${FIREBASE_API_KEY}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: rt })
+        if (_refreshInflight) return _refreshInflight;
+        _refreshInflight = (async () => {
+            try {
+                const res = await fetch(
+                    `https://securetoken.googleapis.com/v1/token?key=${FIREBASE_API_KEY}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: rt })
+                    }
+                );
+                if (!res.ok) return null;
+                const data = await res.json();
+                if (data.error) return null;
+                const tokens = {
+                    idToken:      data.id_token,
+                    refreshToken: data.refresh_token,
+                    expiresAt:    Date.now() + parseInt(data.expires_in) * 1000
+                };
+                try { await chrome.storage.local.set({ firebase_tokens: tokens }); } catch (e) {
+                    Logger?.warn(`Failed to persist refreshed token: ${e.message}`);
                 }
-            );
-            if (!res.ok) return null;
-            const data = await res.json();
-            if (data.error) return null;
-            const tokens = {
-                idToken:      data.id_token,
-                refreshToken: data.refresh_token,
-                expiresAt:    Date.now() + parseInt(data.expires_in) * 1000
-            };
-            await chrome.storage.local.set({ firebase_tokens: tokens });
-            return tokens.idToken;
-        } catch { return null; }
+                return tokens.idToken;
+            } catch { return null; }
+        })();
+        const p = _refreshInflight;
+        p.finally(() => { if (_refreshInflight === p) _refreshInflight = null; });
+        return p;
     }
 
     async function getValidToken() {
@@ -164,6 +175,60 @@
     let isPushingProgressDirect = false;
     let progressPushPending     = false;
 
+    // ─── Cloud document cache ────────────────────────────────────────────────
+    // The SSE stream already pushes cloud updates to us, so the cloud state
+    // we last saw is a reliable "current" snapshot. Caching it lets us skip a
+    // per-push GET on every progress flush.
+    let _cloudDocCache     = null;
+    let _cloudDocCacheTime = 0;
+    const _CLOUD_DOC_TTL   = 30000; // 30 s
+
+    function invalidateCloudDocCache() {
+        _cloudDocCache = null;
+        _cloudDocCacheTime = 0;
+    }
+
+    async function getCloudDocCached(token, user) {
+        const now = Date.now();
+        if (_cloudDocCache && (now - _cloudDocCacheTime) < _CLOUD_DOC_TTL) {
+            return _cloudDocCache;
+        }
+        const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
+        try {
+            const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+            if (!r.ok) return null;
+            const doc = fromFSDoc(await r.json());
+            _cloudDocCache = doc;
+            _cloudDocCacheTime = Date.now();
+            return doc;
+        } catch (e) {
+            Logger?.warn(`Cloud fetch failed: ${e.message}`);
+            return null;
+        }
+    }
+
+    // Filter out progress entries for episodes already tracked in animeData —
+    // the background worker (cleanTrackedProgressBg) also does this, but doing
+    // it here cuts payload size and also avoids pushing at all if the filtered
+    // set equals what we already pushed.
+    function filterTrackedFromProgress(videoProgress, animeData) {
+        if (!videoProgress || !animeData) return videoProgress || {};
+        const trackedIds = new Set();
+        for (const [slug, anime] of Object.entries(animeData)) {
+            if (anime?.episodes) {
+                for (const ep of anime.episodes) trackedIds.add(`${slug}__episode-${ep.number}`);
+            }
+        }
+        const out = {};
+        for (const [id, p] of Object.entries(videoProgress)) {
+            if (id === '__slugIndex') continue;
+            if (trackedIds.has(id)) continue;
+            if (p?.deleted) continue;
+            out[id] = p;
+        }
+        return out;
+    }
+
     async function pushProgressDirect(options = {}) {
         const { keepalive = false } = options;
         if (isPushingProgressDirect && !keepalive) {
@@ -176,26 +241,23 @@
         isPushingProgressDirect = true;
 
         try {
-            const localSnapshot = await chrome.storage.local.get(['videoProgress']);
-            const snapshot = JSON.stringify(localSnapshot.videoProgress || {});
+            const localSnapshot = await chrome.storage.local.get(['videoProgress', 'animeData']);
+            const localAnimeData = localSnapshot.animeData || {};
+            const filteredLocalVP = filterTrackedFromProgress(localSnapshot.videoProgress || {}, localAnimeData);
+            const snapshot = JSON.stringify(filteredLocalVP);
             if (snapshot === lastPushedProgress) return;
 
             let cloudVP = {};
             if (!keepalive) {
-                const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
-                try {
-                    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-                    if (r.ok) cloudVP = fromFSDoc(await r.json())?.videoProgress || {};
-                    else if (r.status >= 500) { Logger?.warn('Cloud fetch 5xx, aborting push'); return; }
-                } catch (e) {
-                    Logger?.warn(`Cloud fetch failed, aborting push: ${e.message}`);
-                    return;
-                }
+                // Use cached cloud doc when fresh (avoids redundant GET on every push)
+                const cached = await getCloudDocCached(token, user);
+                cloudVP = cached?.videoProgress || {};
             }
 
-            const latestLocal = keepalive
+            const latestLocalFull = keepalive
                 ? (localSnapshot.videoProgress || {})
                 : ((await chrome.storage.local.get(['videoProgress'])).videoProgress || {});
+            const latestLocal = filterTrackedFromProgress(latestLocalFull, localAnimeData);
             if (!keepalive && JSON.stringify(latestLocal) !== snapshot) {
                 progressPushPending = true;
             }
@@ -207,9 +269,20 @@
                 const mergedCount = Object.keys(mergedVP).length;
                 if (mergedCount > localCount) {
                     csPauseSync();
-                    await chrome.storage.local.set({ videoProgress: mergedVP });
-                    Logger?.info(`Pulled ${mergedCount - localCount} new progress entries from cloud`);
+                    try {
+                        await chrome.storage.local.set({ videoProgress: mergedVP });
+                        Logger?.info(`Pulled ${mergedCount - localCount} new progress entries from cloud`);
+                    } catch (e) {
+                        Logger?.warn(`Failed to merge pulled progress locally: ${e.message}`);
+                    }
                 }
+            }
+
+            // Second chance skip: if filtered merged equals last pushed, no work to do.
+            const mergedSnap = JSON.stringify(mergedVP);
+            if (mergedSnap === lastPushedProgress) {
+                Logger?.debug('Progress push skipped (merged matches last pushed)');
+                return;
             }
 
             const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
@@ -228,11 +301,18 @@
             });
 
             if (res.ok) {
-                lastPushedProgress = JSON.stringify(mergedVP);
+                lastPushedProgress = mergedSnap;
                 lastPushAt = Date.now();
+                // Update cloud cache optimistically so the next push doesn't re-GET
+                if (_cloudDocCache) {
+                    _cloudDocCache = { ..._cloudDocCache, videoProgress: mergedVP };
+                    _cloudDocCacheTime = Date.now();
+                }
                 Logger?.info('videoProgress pushed (merged)');
             } else {
                 Logger?.warn(`Direct progress push failed: ${res.status}`);
+                // Invalidate cache on server error — may be stale
+                if (res.status >= 500) invalidateCloudDocCache();
             }
         } catch (e) {
             Logger?.warn(`Direct progress push error: ${e.message}`);
@@ -267,10 +347,7 @@
             const url     = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
             let cloudData = null;
             if (!keepalive) {
-                try {
-                    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-                    if (r.ok) cloudData = fromFSDoc(await r.json());
-                } catch {}
+                cloudData = await getCloudDocCached(token, user);
             }
 
             const local = keepalive
@@ -345,9 +422,19 @@
             if (res.ok) {
                 lastPushedFullSnap = uploadSnap;
                 lastPushAt = Date.now();
+                // Update cloud cache optimistically
+                _cloudDocCache = {
+                    ...(_cloudDocCache || {}),
+                    animeData:        mergedAnime,
+                    videoProgress:    mergedProgress,
+                    deletedAnime:     mergedDeleted,
+                    groupCoverImages: mergedGroupCovers
+                };
+                _cloudDocCacheTime = Date.now();
                 Logger?.info('Full push to Firestore complete');
             } else {
                 Logger?.warn(`Full push failed: ${res.status}`);
+                if (res.status >= 500) invalidateCloudDocCache();
             }
         } catch (e) {
             Logger?.warn(`Full push error: ${e.message}`);
@@ -390,28 +477,65 @@
     }
 
     // ─── Debounced progress push (Chrome path) ────────────────────────────────
+    //
+    // Progress writes fire every 15–30s while a video plays. A plain debounce
+    // of 20s would reset on every write and never flush until the user paused,
+    // so the popup on another device wouldn't see live updates. We keep the
+    // trailing debounce but also enforce a max-wait ceiling: once the first
+    // write is observed, we guarantee a push within `PROGRESS_MAX_WAIT_MS`
+    // regardless of subsequent resets.
 
-    let progressDebounce = null;
+    let progressDebounce    = null;
+    let progressMaxWaitTimer = null;
+    const PROGRESS_MAX_WAIT_MS = 25000; // cap
+
+    async function flushProgressPush() {
+        if (progressDebounce)    { clearTimeout(progressDebounce);    progressDebounce = null; }
+        if (progressMaxWaitTimer){ clearTimeout(progressMaxWaitTimer); progressMaxWaitTimer = null; }
+        const swAlive = await wakeBackgroundSW('SYNC_PROGRESS_ONLY');
+        if (!swAlive) {
+            Logger?.debug('SW unreachable, pushing progress directly');
+            await pushProgressDirect();
+        }
+    }
 
     function scheduleProgressPush(delay = 20000) {
         if (progressDebounce) clearTimeout(progressDebounce);
-        progressDebounce = setTimeout(async () => {
+        progressDebounce = setTimeout(() => {
             progressDebounce = null;
-            const swAlive = await wakeBackgroundSW('SYNC_PROGRESS_ONLY');
-            if (!swAlive) {
-                Logger?.debug('SW unreachable, pushing progress directly');
-                await pushProgressDirect();
-            }
+            flushProgressPush();
         }, delay);
+        // Start the ceiling on the first observed write; don't reset it on
+        // subsequent calls so that continuous playback still flushes regularly.
+        if (!progressMaxWaitTimer) {
+            progressMaxWaitTimer = setTimeout(() => {
+                progressMaxWaitTimer = null;
+                flushProgressPush();
+            }, PROGRESS_MAX_WAIT_MS);
+        }
     }
 
     // ─── Debounced full push (Orion path) ─────────────────────────────────────
 
-    let fullPushDebounce = null;
+    let fullPushDebounce     = null;
+    let fullPushMaxWaitTimer = null;
+    const FULL_PUSH_MAX_WAIT_MS = 25000;
 
     function scheduleFullPush(delay = 2500) {
         if (fullPushDebounce) clearTimeout(fullPushDebounce);
-        fullPushDebounce = setTimeout(() => { fullPushDebounce = null; pushFullDirect(); }, delay);
+        fullPushDebounce = setTimeout(() => {
+            fullPushDebounce = null;
+            if (fullPushMaxWaitTimer) { clearTimeout(fullPushMaxWaitTimer); fullPushMaxWaitTimer = null; }
+            pushFullDirect();
+        }, delay);
+        // Ceiling so continuous progress activity in Orion mode still flushes
+        if (!fullPushMaxWaitTimer) {
+            fullPushMaxWaitTimer = setTimeout(() => {
+                fullPushMaxWaitTimer = null;
+                if (fullPushDebounce) { clearTimeout(fullPushDebounce); fullPushDebounce = null; }
+                pushFullDirect();
+            }, FULL_PUSH_MAX_WAIT_MS);
+        }
     }
 
     // ─── Periodic forced push ─────────────────────────────────────────────────
@@ -420,12 +544,36 @@
     const PERIODIC_PUSH_INTERVAL = 45000; // 45 s
     let periodicPushTimer = null;
     let lastPushAt = 0;
+    // Tracks what was on disk at the last periodic tick, so we can skip the
+    // push entirely when the user is idle (paused tab, nothing changed).
+    let _lastIdleSnapshot = null;
+
+    async function _currentLocalProgressSnapshot(isOrionMode) {
+        // Cheap hashable snapshot. Full-mode also includes animeData/deleted.
+        try {
+            const keys = isOrionMode
+                ? ['videoProgress', 'animeData', 'deletedAnime', 'groupCoverImages']
+                : ['videoProgress'];
+            const r = await chrome.storage.local.get(keys);
+            return JSON.stringify(r);
+        } catch { return null; }
+    }
 
     function startPeriodicPush(isOrionMode) {
         if (periodicPushTimer) return;
         periodicPushTimer = setInterval(async () => {
             if (csIsSyncPaused()) return;
             if (Date.now() - lastPushAt < PERIODIC_PUSH_INTERVAL * 0.8) return;
+
+            // Idle guard: if nothing changed on disk since the previous tick,
+            // skip the push entirely — no SW wake-up, no fetch, no PATCH.
+            const snap = await _currentLocalProgressSnapshot(isOrionMode);
+            if (snap && snap === _lastIdleSnapshot) {
+                Logger?.debug('Periodic push skipped (idle — no local changes)');
+                return;
+            }
+            _lastIdleSnapshot = snap;
+
             if (isOrionMode) {
                 pushFullDirect().then(() => { lastPushAt = Date.now(); });
             } else {
@@ -452,7 +600,8 @@
             return;
         }
 
-        if (progressDebounce) clearTimeout(progressDebounce);
+        if (progressDebounce)    { clearTimeout(progressDebounce);    progressDebounce = null; }
+        if (progressMaxWaitTimer){ clearTimeout(progressMaxWaitTimer); progressMaxWaitTimer = null; }
         wakeBackgroundSW('SYNC_PROGRESS_ONLY').then(alive => {
             if (!alive) pushProgressDirect({ keepalive: true });
         });
@@ -466,6 +615,9 @@
 
     async function applyCloudUpdate(cloudDoc) {
         if (!cloudDoc) return;
+        // Refresh cloud cache from the stream — always current by definition
+        _cloudDocCache = cloudDoc;
+        _cloudDocCacheTime = Date.now();
         try {
             const local = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
 

@@ -19,6 +19,40 @@ const ProgressTracker = {
     _vpCacheTime: 0,
     _VP_CACHE_TTL: 5000, // 5 seconds
 
+    // In-memory cache for animeData (tracked-episode check)
+    _adCache: null,
+    _adCacheTime: 0,
+    _AD_CACHE_TTL: 15000, // 15 seconds
+
+    /** Keep the current entry + newest N-1. Used when chrome.storage quota is exceeded. */
+    _emergencyPruneProgress(videoProgress, keepId) {
+        const entries = Object.entries(videoProgress);
+        entries.sort((a, b) => {
+            const ta = a[1]?.savedAt ? new Date(a[1].savedAt).getTime() : 0;
+            const tb = b[1]?.savedAt ? new Date(b[1].savedAt).getTime() : 0;
+            return tb - ta;
+        });
+        const MAX = 50;
+        const pruned = {};
+        if (keepId && videoProgress[keepId]) pruned[keepId] = videoProgress[keepId];
+        for (const [id, p] of entries) {
+            if (Object.keys(pruned).length >= MAX) break;
+            pruned[id] = p;
+        }
+        return pruned;
+    },
+
+    _isEpisodeAlreadyTrackedSync(uniqueId, animeData) {
+        if (!uniqueId || !animeData) return false;
+        const m = uniqueId.match(/^(.+)__episode-(\d+)$/);
+        if (!m) return false;
+        const slug = m[1];
+        const num  = parseInt(m[2], 10);
+        const anime = animeData[slug];
+        if (!anime || !Array.isArray(anime.episodes)) return false;
+        return anime.episodes.some(ep => Number(ep?.number) === num);
+    },
+
     /** Compact ISO timestamp without milliseconds */
     _compactNow() {
         return new Date().toISOString().split('.')[0] + 'Z';
@@ -210,13 +244,31 @@ const ProgressTracker = {
 
             const now = Date.now();
             let videoProgress;
+            let animeData;
 
-            // Use cached videoProgress if fresh enough
-            if (this._vpCache && (now - this._vpCacheTime) < this._VP_CACHE_TTL) {
+            // Use cached reads when fresh enough
+            const vpCacheHit = this._vpCache && (now - this._vpCacheTime) < this._VP_CACHE_TTL;
+            const adCacheHit = this._adCache && (now - this._adCacheTime) < this._AD_CACHE_TTL;
+
+            if (vpCacheHit && adCacheHit) {
                 videoProgress = this._vpCache;
+                animeData = this._adCache;
             } else {
-                const result = await Storage.get(['videoProgress']);
-                videoProgress = result.videoProgress || {};
+                const keys = [];
+                if (!vpCacheHit) keys.push('videoProgress');
+                if (!adCacheHit) keys.push('animeData');
+                const result = await Storage.get(keys);
+                videoProgress = vpCacheHit ? this._vpCache : (result.videoProgress || {});
+                animeData     = adCacheHit ? this._adCache : (result.animeData || {});
+                if (!adCacheHit) { this._adCache = animeData; this._adCacheTime = now; }
+            }
+
+            // Skip entirely if this episode is already tracked in animeData —
+            // cleanTrackedProgressBg would strip it anyway, and writing causes
+            // an unnecessary cloud push.
+            if (this._isEpisodeAlreadyTrackedSync(uniqueId, animeData)) {
+                Logger.debug('Skip progress save: episode already tracked', uniqueId);
+                return;
             }
 
             if (typeof videoProgress !== 'object' || Array.isArray(videoProgress)) {
@@ -228,8 +280,23 @@ const ProgressTracker = {
 
             const existingProgress = videoProgress[uniqueId];
             const newCurrentTime = Math.floor(currentTime);
+            const newDuration = Math.floor(duration);
+            const newPercentage = Math.floor((currentTime / duration) * 100);
 
             if (existingProgress && existingProgress.currentTime > newCurrentTime) {
+                return;
+            }
+
+            // Skip writes that represent <3s of real forward motion.
+            // Rationale: rapid pause/unpause cycles (and seek-wobble) advance
+            // currentTime by tiny amounts and would otherwise each produce a
+            // storage.set → chrome.storage.onChanged → cloud push cycle.
+            // 3s is well below the resume-prompt usefulness threshold but far
+            // enough above timeupdate noise to matter.
+            const MIN_ADVANCE_SECONDS = 3;
+            if (existingProgress &&
+                existingProgress.duration === newDuration &&
+                (newCurrentTime - existingProgress.currentTime) < MIN_ADVANCE_SECONDS) {
                 return;
             }
 
@@ -240,14 +307,32 @@ const ProgressTracker = {
             const nowIso = this._compactNow();
             videoProgress[uniqueId] = {
                 currentTime: newCurrentTime,
-                duration: Math.floor(duration),
+                duration: newDuration,
                 savedAt: nowIso,
-                percentage: Math.floor((currentTime / duration) * 100),
+                percentage: newPercentage,
                 watchedAt: existingProgress?.watchedAt || nowIso,
                 coverImage: coverImage || undefined
             };
 
-            await Storage.set({ videoProgress });
+            try {
+                await Storage.set({ videoProgress });
+            } catch (err) {
+                // Storage quota protection: on quota-exceeded, aggressively prune and retry once.
+                const msg = (err && err.message) || '';
+                if (msg.includes('QUOTA') || msg.includes('quota')) {
+                    Logger.warn('Storage quota hit — pruning videoProgress and retrying');
+                    const pruned = this._emergencyPruneProgress(videoProgress, uniqueId);
+                    try {
+                        await Storage.set({ videoProgress: pruned });
+                        videoProgress = pruned;
+                    } catch (err2) {
+                        Logger.error('Retry after prune failed:', err2);
+                        throw err2;
+                    }
+                } else {
+                    throw err;
+                }
+            }
             // Update cache after successful write
             this._vpCache = videoProgress;
             this._vpCacheTime = Date.now();
@@ -564,6 +649,8 @@ const ProgressTracker = {
         this.lastSaveTime = 0;
         this._vpCache = null;
         this._vpCacheTime = 0;
+        this._adCache = null;
+        this._adCacheTime = 0;
         this._watchlistSynced = false;
     }
 };

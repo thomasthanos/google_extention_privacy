@@ -489,20 +489,31 @@
         // Remove previous listener to prevent leaks on SPA navigation
         clearHighlightStorageListener();
 
+        injectEpisodeBadgeStyles();
+
         function applyHighlights(watchedSet) {
             const items = document.querySelectorAll('.episode-list-item[data-episode-search-query]');
             let highlighted = 0;
             for (const item of items) {
                 const epNum = parseInt(item.getAttribute('data-episode-search-query'), 10);
                 if (isNaN(epNum)) continue;
-                if (item.classList.contains('current-episode')) continue;
                 if (watchedSet.has(epNum)) {
-                    item.style.opacity = '0.5';
-                    item.style.color = 'rgb(233, 171, 56)';
-                    highlighted++;
-                } else {
+                    // Clear legacy inline styles in case they were applied earlier
                     item.style.opacity = '';
                     item.style.color = '';
+                    if (!item.classList.contains('at-watched-episode')) {
+                        item.classList.add('at-watched-episode');
+                        if (!item.querySelector('.at-watched-badge')) {
+                            const badge = document.createElement('span');
+                            badge.className = 'at-watched-badge';
+                            badge.textContent = 'WATCHED';
+                            item.appendChild(badge);
+                        }
+                    }
+                    highlighted++;
+                } else if (item.classList.contains('at-watched-episode')) {
+                    item.classList.remove('at-watched-episode');
+                    item.querySelector('.at-watched-badge')?.remove();
                 }
             }
             return highlighted;
@@ -549,6 +560,128 @@
         };
 
         chrome.storage.onChanged.addListener(_highlightStorageListener);
+    }
+
+    // ── Episode badges (watched + filler) ─────────────────────────────────
+    // Unified styles for the sidebar episode list. Filler is purple (the
+    // community convention), watched is gold. Both use a left accent bar +
+    // subtle gradient + a compact pill badge.
+    function injectEpisodeBadgeStyles() {
+        if (document.querySelector('#anime-tracker-episode-styles')) return;
+        const style = document.createElement('style');
+        style.id = 'anime-tracker-episode-styles';
+        style.textContent = `
+            /* ── Watched ── */
+            .episode-list-item.at-watched-episode {
+                border: 1px solid rgba(233, 171, 56, 0.22) !important;
+                border-left: 3px solid #e9ab38 !important;
+                border-radius: 4px !important;
+            }
+            .episode-list-item.at-watched-episode:not(.current-episode) {
+                opacity: 0.78 !important;
+                background: linear-gradient(90deg, rgba(233, 171, 56, 0.12), transparent 70%) !important;
+            }
+            .episode-list-item.at-watched-episode .episode-list-item-title,
+            .episode-list-item.at-watched-episode .episode-list-item-number {
+                color: #e9ab38 !important;
+            }
+            .episode-list-item.at-watched-episode .at-watched-badge {
+                display: inline-block;
+                margin-left: 6px;
+                padding: 1px 6px;
+                font-size: 10px;
+                font-weight: 700;
+                line-height: 1.2;
+                color: #1a1a1a;
+                background: linear-gradient(135deg, #f5c66e, #e9ab38);
+                border-radius: 4px;
+                letter-spacing: 0.3px;
+                vertical-align: middle;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+            }
+
+            /* ── Filler (purple, community convention) ── */
+            .episode-list-item.at-filler-episode {
+                border: 1px solid rgba(168, 85, 247, 0.22) !important;
+                border-left: 3px solid #a855f7 !important;
+                border-radius: 4px !important;
+            }
+            .episode-list-item.at-filler-episode:not(.current-episode) {
+                background: linear-gradient(90deg, rgba(168, 85, 247, 0.12), transparent 70%) !important;
+            }
+            .episode-list-item.at-filler-episode .at-filler-badge {
+                display: inline-block;
+                margin-left: 6px;
+                padding: 1px 6px;
+                font-size: 10px;
+                font-weight: 700;
+                line-height: 1.2;
+                color: #fff;
+                background: linear-gradient(135deg, #c084fc, #a855f7);
+                border-radius: 4px;
+                letter-spacing: 0.3px;
+                vertical-align: middle;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+            }
+
+            /* When an episode is both watched and filler, keep filler accent
+               on the left bar but still show both badges. */
+            .episode-list-item.at-watched-episode.at-filler-episode {
+                border-left-color: #a855f7 !important;
+            }
+        `;
+        (document.head || document.documentElement).appendChild(style);
+    }
+
+    function highlightFillerEpisodes(slug) {
+        const { Logger } = AT;
+        if (!slug) return;
+
+        try {
+            chrome.runtime.sendMessage({ type: 'GET_FILLER_EPISODES', animeSlug: slug }, (response) => {
+                if (chrome.runtime.lastError || !response?.fillers) return;
+                const fillerSet = new Set(response.fillers.map(Number).filter(n => Number.isFinite(n)));
+                if (fillerSet.size === 0) return;
+
+                injectEpisodeBadgeStyles();
+
+                const applyFiller = () => {
+                    const items = document.querySelectorAll('.episode-list-item[data-episode-search-query]');
+                    let tagged = 0;
+                    for (const item of items) {
+                        const epNum = parseInt(item.getAttribute('data-episode-search-query'), 10);
+                        if (!Number.isFinite(epNum)) continue;
+                        const isFiller = fillerSet.has(epNum);
+                        if (isFiller && !item.classList.contains('at-filler-episode')) {
+                            item.classList.add('at-filler-episode');
+                            if (!item.querySelector('.at-filler-badge')) {
+                                const badge = document.createElement('span');
+                                badge.className = 'at-filler-badge';
+                                badge.textContent = 'FILLER';
+                                item.appendChild(badge);
+                            }
+                            tagged++;
+                        } else if (!isFiller && item.classList.contains('at-filler-episode')) {
+                            item.classList.remove('at-filler-episode');
+                            item.querySelector('.at-filler-badge')?.remove();
+                        }
+                    }
+                    return tagged;
+                };
+
+                if (applyFiller() === 0) {
+                    // Episode list may not be in DOM yet — observe briefly
+                    const target = document.querySelector('.episode-list-display-box') || document.body;
+                    const obs = new MutationObserver(() => { if (applyFiller() > 0) obs.disconnect(); });
+                    obs.observe(target, { childList: true, subtree: true });
+                    setTimeout(() => obs.disconnect(), 10000);
+                } else {
+                    Logger.debug(`Tagged filler episodes for ${slug}`);
+                }
+            });
+        } catch (e) {
+            Logger.debug('Filler coloring failed:', e.message);
+        }
     }
 
     async function init() {
@@ -675,6 +808,9 @@
 
         // ── Highlight watched episodes in the episode list ──
         highlightWatchedEpisodes(animeInfo.animeSlug);
+
+        // ── Color filler episodes in the sidebar (read-only, zero writes) ──
+        highlightFillerEpisodes(animeInfo.animeSlug);
 
         const alreadyTracked = await ProgressTracker.isEpisodeTracked(animeInfo.uniqueId);
         if (alreadyTracked) {

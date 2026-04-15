@@ -401,32 +401,41 @@ async function getFirebaseToken() {
     }
 }
 
+// Singleflight guard: concurrent sync paths (progress + full + SSE) must not
+// race each other for a refresh. We coalesce them into a single network call.
+let _bgRefreshInflight = null;
 async function refreshFirebaseToken(refreshToken) {
     if (!refreshToken) return null;
-    try {
-        const response = await fetch(
-            `https://securetoken.googleapis.com/v1/token?key=${FIREBASE_API_KEY}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: refreshToken })
-            }
-        );
-        if (!response.ok) return null;
-        const data = await response.json();
-        if (data.error) return null;
-        const tokens = {
-            idToken:      data.id_token,
-            refreshToken: data.refresh_token,
-            expiresAt:    Date.now() + parseInt(data.expires_in) * 1000
-        };
-        await bgStorageSet({ firebase_tokens: tokens });
-        console.log('[BG] Token refreshed');
-        return tokens;
-    } catch (e) {
-        console.error('[BG] Token refresh failed:', e);
-        return null;
-    }
+    if (_bgRefreshInflight) return _bgRefreshInflight;
+    const p = (async () => {
+        try {
+            const response = await fetch(
+                `https://securetoken.googleapis.com/v1/token?key=${FIREBASE_API_KEY}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: refreshToken })
+                }
+            );
+            if (!response.ok) return null;
+            const data = await response.json();
+            if (data.error) return null;
+            const tokens = {
+                idToken:      data.id_token,
+                refreshToken: data.refresh_token,
+                expiresAt:    Date.now() + parseInt(data.expires_in) * 1000
+            };
+            await bgStorageSet({ firebase_tokens: tokens });
+            console.log('[BG] Token refreshed');
+            return tokens;
+        } catch (e) {
+            console.error('[BG] Token refresh failed:', e);
+            return null;
+        }
+    })();
+    _bgRefreshInflight = p;
+    p.finally(() => { if (_bgRefreshInflight === p) _bgRefreshInflight = null; });
+    return p;
 }
 
 async function getFirebaseUser() {
@@ -496,6 +505,31 @@ async function fetchCloudData(user, token) {
     }
 }
 
+// ─── Cloud doc cache ─────────────────────────────────────────────────────────
+// The SSE listener keeps our view of cloud state fresh, so a short TTL cache
+// lets syncToFirebase skip a GET on back-to-back pushes.
+let _bgCloudDocCache     = null;
+let _bgCloudDocCacheTime = 0;
+const _BG_CLOUD_TTL      = 30000; // 30 s
+
+function invalidateBgCloudDocCache() {
+    _bgCloudDocCache = null;
+    _bgCloudDocCacheTime = 0;
+}
+
+async function fetchCloudDataCached(user, token) {
+    const now = Date.now();
+    if (_bgCloudDocCache && (now - _bgCloudDocCacheTime) < _BG_CLOUD_TTL) {
+        return _bgCloudDocCache;
+    }
+    const doc = await fetchCloudData(user, token);
+    if (doc) {
+        _bgCloudDocCache = doc;
+        _bgCloudDocCacheTime = Date.now();
+    }
+    return doc;
+}
+
 // ─── Push: videoProgress only (merged PATCH) ─────────────────────────────────
 
 let progressSyncInProgress = false;
@@ -537,8 +571,15 @@ async function syncProgressOnly() {
 
         if (response.ok) {
             lastPushedProgressBG = JSON.parse(JSON.stringify(localVP));
+            // Refresh cached cloud doc optimistically so the next full sync
+            // doesn't re-GET to discover our own write.
+            if (_bgCloudDocCache) {
+                _bgCloudDocCache = { ..._bgCloudDocCache, videoProgress: localVP };
+                _bgCloudDocCacheTime = Date.now();
+            }
         } else {
             console.warn('[BG] Progress sync failed:', response.status);
+            if (response.status >= 500) invalidateBgCloudDocCache();
         }
     } catch (error) {
         console.error('[BG] Progress sync error:', error);
@@ -563,7 +604,7 @@ async function syncToFirebase() {
 
     syncInProgress = true;
     try {
-        const cloudDoc = await fetchCloudData(user, token);
+        const cloudDoc = await fetchCloudDataCached(user, token);
 
         // Single read after cloud fetch to get the freshest local state
         const result = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
@@ -631,9 +672,18 @@ async function syncToFirebase() {
         });
 
         if (response.ok) {
-            // sync successful
+            // Refresh cached cloud doc with what we just wrote
+            _bgCloudDocCache = {
+                ...(_bgCloudDocCache || {}),
+                animeData:        mergedAnime,
+                videoProgress:    mergedProgress,
+                deletedAnime:     mergedDeleted,
+                groupCoverImages: mergedGroup
+            };
+            _bgCloudDocCacheTime = Date.now();
         } else {
             console.error('[BG] Sync failed:', response.status);
+            if (response.status >= 500) invalidateBgCloudDocCache();
         }
     } catch (error) {
         console.error('[BG] Sync error:', error);
@@ -654,6 +704,10 @@ const _MAX_CLOUD_UPDATE_WAITERS = 100;
 
 async function applyCloudUpdate(cloudDoc) {
     if (!cloudDoc) return;
+
+    // Stream gives us the authoritative cloud state — refresh the cache
+    _bgCloudDocCache     = cloudDoc;
+    _bgCloudDocCacheTime = Date.now();
 
     // Debounce rapid SSE updates (e.g. multiple field changes in quick succession)
     _applyCloudUpdateDoc = cloudDoc;
