@@ -386,6 +386,14 @@
                         </svg>
                         Movies
                     </button>
+                    <button class="category-tab" data-category="stats" title="Statistics &amp; activity">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="20" x2="18" y2="10"/>
+                            <line x1="12" y1="20" x2="12" y2="4"/>
+                            <line x1="6" y1="20" x2="6" y2="14"/>
+                        </svg>
+                        Stats
+                    </button>
                 </div>
 
                 <div class="toolbar">
@@ -451,6 +459,11 @@
                 <!-- Anime List -->
                 <div class="anime-list" id="animeList">
                     <!-- Cards will be inserted here -->
+                </div>
+
+                <!-- Stats Dashboard (hidden by default) -->
+                <div class="stats-view" id="statsView" hidden>
+                    <!-- Rendered by stats-view.js -->
                 </div>
 
                 <!-- Empty State -->
@@ -606,6 +619,9 @@
     <script src="src/popup/merge-utils.js"></script>
     <script src="src/popup/progress-manager.js"></script>
     <script src="src/popup/firebase-sync.js"></script>
+    <script src="src/popup/stats-engine.js"></script>
+    <script src="src/popup/stats-view.js"></script>
+    <script src="src/popup/share-card.js"></script>
     <script src="src/popup/anime-card.js"></script>
     <script src="src/popup/main.js"></script>
 </body>

@@ -556,6 +556,9 @@
             return true;
         };
 
+        // Expose current animeData ref so other modules (e.g. anime-card ETA badge) can read it
+        window.AnimeTracker._animeDataRef = animeData;
+
         const entries = Object.entries(animeData)
             .filter(([slug, anime]) => {
                 const matchesSearch = !filter || anime.title.toLowerCase().includes(filter.toLowerCase());
@@ -2722,10 +2725,33 @@
 
             elements.categoryTabs.querySelectorAll('.category-tab').forEach(tab => {
                 tab.addEventListener('click', async () => {
-                    currentCategory = normalizeCategory(tab.dataset.category);
+                    const rawCat = tab.dataset.category;
                     elements.categoryTabs.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
                     tab.classList.add('active');
-                    moveSlider(tab, false);
+
+                    const statsView = document.getElementById('statsView');
+                    const appRoot   = document.querySelector('.app');
+
+                    if (rawCat === 'stats') {
+                        if (appRoot) appRoot.classList.add('stats-mode');
+                        // Recompute slider AFTER layout shift caused by stats-mode class
+                        requestAnimationFrame(() => moveSlider(tab, false));
+                        if (statsView) {
+                            try {
+                                window.AnimeTracker.StatsView.render(statsView, animeData);
+                            } catch (e) {
+                                console.error('[StatsView] render failed:', e);
+                                statsView.textContent = 'Stats unavailable.';
+                            }
+                        }
+                        return;
+                    }
+
+                    // Switch back to list view
+                    if (appRoot) appRoot.classList.remove('stats-mode');
+                    requestAnimationFrame(() => moveSlider(tab, false));
+
+                    currentCategory = normalizeCategory(rawCat);
                     if (elements.searchInput) renderAnimeList(elements.searchInput.value);
                     await chrome.storage.local.set({ userPreferences: { sort: currentSort, category: currentCategory } });
                 });
@@ -2746,6 +2772,13 @@
                 animeData = changes.animeData.newValue || {};
                 needsFullRender = true;
                 if (!isOwn) isExternalUpdate = true;
+                // Invalidate stats cache so ETA + dashboard reflect the new data
+                try { window.AnimeTracker?.StatsEngine?.invalidate(); } catch {}
+                const statsView = document.getElementById('statsView');
+                const appRoot = document.querySelector('.app');
+                if (statsView && appRoot && appRoot.classList.contains('stats-mode')) {
+                    try { window.AnimeTracker.StatsView.render(statsView, animeData); } catch {}
+                }
             }
             if (changes.groupCoverImages) {
                 window.AnimeTracker.groupCoverImages = changes.groupCoverImages.newValue || {};

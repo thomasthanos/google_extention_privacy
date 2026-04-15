@@ -277,6 +277,30 @@ const AnimeCardRenderer = {
             ? `<span class="meta-badge meta-badge-airing" title="Currently airing">⬤ Airing</span>`
             : '';
 
+        // ── Completion prediction (AI-lite) ──
+        // Shows an ETA badge when we have enough data to project a finish date.
+        // Only for in-progress series where we know the total episode count.
+        let etaBadge = '';
+        try {
+            const StatsEngine = window.AnimeTracker?.StatsEngine;
+            if (StatsEngine && !isCardComplete && !isDropped && anime.totalEpisodes > 0) {
+                const allAnime = (window.AnimeTracker && window.AnimeTracker._animeDataRef) || null;
+                const idx = allAnime ? StatsEngine.buildWatchIndex(allAnime) : null;
+                const pred = idx ? StatsEngine.predictCompletion({ ...anime, slug }, idx) : null;
+                if (pred) {
+                    const eta = pred.etaDate;
+                    const label = eta.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                    const tipRate = pred.epsPerDay >= 1
+                        ? `${pred.epsPerDay.toFixed(1)} ep/day`
+                        : `1 ep every ${Math.round(1 / pred.epsPerDay)} days`;
+                    const tip = `At ${tipRate}, you'll finish around ${eta.toLocaleDateString()} (${pred.remaining} left · ${pred.confidence} confidence)`;
+                    etaBadge = `<span class="meta-badge meta-badge-eta eta-${pred.confidence}" title="${UIHelpers.escapeHtml(tip)}">⏱ ~${UIHelpers.escapeHtml(label)}</span>`;
+                }
+            }
+        } catch (e) {
+            // Non-critical — skip ETA on error
+        }
+
         const headerActionsHtml = `
             <div class="anime-header-actions">
                 <button class="anime-edit-title" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
@@ -284,7 +308,7 @@ const AnimeCardRenderer = {
             </div>`;
         const metaRowHtml = `
             <div class="anime-meta-row-wrap">
-                <div class="anime-meta-row">${progressBadge}${statusBadge}${airingBadge}</div>
+                <div class="anime-meta-row">${progressBadge}${statusBadge}${airingBadge}${etaBadge}</div>
                 <div class="anime-header-controls">
                     ${headerActionsHtml}
                     <div class="anime-expand-icon">${UIHelpers.createIcon('chevron')}</div>
