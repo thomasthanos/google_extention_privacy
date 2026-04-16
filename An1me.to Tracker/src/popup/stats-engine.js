@@ -51,10 +51,11 @@
     let _cache = null;
 
     function signatureOf(animeData) {
-        if (!animeData) return '0|0|';
+        if (!animeData) return '0|0||';
         let slugs = 0;
         let eps = 0;
         let maxLast = '';
+        let maxStateTs = '';
         for (const slug in animeData) {
             if (!Object.prototype.hasOwnProperty.call(animeData, slug)) continue;
             const a = animeData[slug];
@@ -62,8 +63,12 @@
             slugs++;
             if (Array.isArray(a.episodes)) eps += a.episodes.length;
             if (a.lastWatched && a.lastWatched > maxLast) maxLast = a.lastWatched;
+            // Include listState transitions (completed/dropped/onHold) so the
+            // dashboard buckets refresh even when no new episode is added.
+            const stateTs = a.listStateUpdatedAt || a.completedAt || a.droppedAt || a.onHoldAt || '';
+            if (stateTs && stateTs > maxStateTs) maxStateTs = stateTs;
         }
-        return `${slugs}|${eps}|${maxLast}`;
+        return `${slugs}|${eps}|${maxLast}|${maxStateTs}`;
     }
 
     // ── Core index builder ──
@@ -187,8 +192,12 @@
                 else break;
             }
         } else {
-            // Streak already broken — report the day after last as the break
-            const d = new Date(lastKey);
+            // Streak already broken — report the day after last as the break.
+            // Parse lastKey as LOCAL time (not UTC) to match dayKey()'s local-time
+            // formatting. `new Date("YYYY-MM-DD")` parses as UTC midnight, which
+            // shifts the date by one day in negative-UTC timezones.
+            const [ly, lm, ld] = lastKey.split('-').map(Number);
+            const d = new Date(ly, lm - 1, ld);
             d.setDate(d.getDate() + 1);
             brokenOn = dayKey(d);
         }

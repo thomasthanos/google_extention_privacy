@@ -352,7 +352,9 @@ const FirebaseSync = {
                 'groupCoverImages'
             ]);
 
-            const localDataForPreUpload = await readLocalSyncData();
+            // Read local once and reuse for both the pre-upload VP merge and
+            // the authoritative merge below — saves a redundant chrome.storage read.
+            const localData = await readLocalSyncData();
 
             // On Orion/mobile (no SW), merge local videoProgress into the cloud doc
             // before proceeding, to avoid losing progress saved by content scripts.
@@ -360,18 +362,17 @@ const FirebaseSync = {
             // main merge below sees the combined VP. We do NOT write to the cloud here
             // to avoid overwriting animeData with stale cloud-only values; the final
             // cloud write after the full merge handles everything.
-            if (cloudData && localDataForPreUpload.userId === this.currentUser.uid &&
-                    localDataForPreUpload.videoProgress && Object.keys(localDataForPreUpload.videoProgress).length > 0) {
+            if (cloudData && localData.userId === this.currentUser.uid &&
+                    localData.videoProgress && Object.keys(localData.videoProgress).length > 0) {
                 try {
                     const cloudVP = cloudData.videoProgress || {};
-                    const localVP = localDataForPreUpload.videoProgress;
+                    const localVP = localData.videoProgress;
                     const merged = AnimeTracker.MergeUtils.mergeVideoProgress(localVP, cloudVP);
                     cloudData = { ...cloudData, videoProgress: merged };
                 } catch (e) {
                     PopupLogger.warn('Sync', 'Pre-merge VP patch failed (non-critical):', e.message);
                 }
             }
-            const localData = await readLocalSyncData();
             let finalData;
 
             if (cloudData) {
@@ -420,13 +421,28 @@ const FirebaseSync = {
                 finalData.videoProgress = cleanedProgress;
 
                 finalData.groupCoverImages = mergedGroupCovers;
-                await Storage.set({
-                    animeData: finalData.animeData,
-                    videoProgress: finalData.videoProgress,
-                    deletedAnime: mergedDeletedAnime,
-                    groupCoverImages: mergedGroupCovers,
-                    userId: this.currentUser.uid
-                });
+
+                // Only write to local storage when the merged result actually
+                // differs from what's already on disk. An unconditional Storage.set
+                // fires chrome.storage.onChanged, which wakes the SW and triggers
+                // a redundant cloud sync — turning every popup open into 2 reads
+                // + 1 write even when nothing changed.
+                const needsLocalWrite =
+                    !AnimeTracker.MergeUtils.areAnimeDataMapsEqual(finalData.animeData || {}, localData.animeData || {}) ||
+                    !areProgressMapsEqual(finalData.videoProgress || {}, localData.videoProgress || {}) ||
+                    !shallowEqualDeletedAnime(finalData.deletedAnime || {}, localData.deletedAnime || {}) ||
+                    !shallowEqualObjectMap(finalData.groupCoverImages || {}, localData.groupCoverImages || {}) ||
+                    localData.userId !== this.currentUser.uid;
+
+                if (needsLocalWrite) {
+                    await Storage.set({
+                        animeData: finalData.animeData,
+                        videoProgress: finalData.videoProgress,
+                        deletedAnime: mergedDeletedAnime,
+                        groupCoverImages: mergedGroupCovers,
+                        userId: this.currentUser.uid
+                    });
+                }
 
                 if (shouldMerge) {
                     // Only push back to cloud if the merged result actually differs

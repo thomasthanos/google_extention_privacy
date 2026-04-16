@@ -271,6 +271,21 @@ const ProgressTracker = {
                 return;
             }
 
+            // ── New-anime grace period ──────────────────────────────────────
+            // If this anime isn't in animeData yet, don't persist anything for
+            // the first NEW_ANIME_GRACE_SECONDS of playback. This stops misclicks
+            // and quick-bail "I didn't like it" sessions from polluting the
+            // in-progress list and forcing manual drops afterwards.
+            const graceSeconds = Number(CONFIG.NEW_ANIME_GRACE_SECONDS) || 0;
+            if (graceSeconds > 0 && currentTime < graceSeconds) {
+                const slugMatch = uniqueId.match(/^(.+)__episode-\d+$/);
+                const slug = slugMatch ? slugMatch[1] : null;
+                if (slug && !animeData[slug]) {
+                    Logger.debug(`Skip new-anime save (<${graceSeconds}s): ${uniqueId} @ ${Math.floor(currentTime)}s`);
+                    return;
+                }
+            }
+
             if (typeof videoProgress !== 'object' || Array.isArray(videoProgress)) {
                 Logger.warn('Invalid videoProgress structure, resetting');
                 videoProgress = {};
@@ -304,6 +319,21 @@ const ProgressTracker = {
             // Tracked anime already have coverImage in animeData.
             const coverImage = !existingProgress?.coverImage ? this.getCoverImageUrl() : existingProgress.coverImage;
 
+            // Capture the page path slug ONLY when it differs from the default
+            // <animeSlug>-episode-<num> pattern (e.g. movies/specials whose URL
+            // is just /watch/<slug>/ with no episode suffix). The popup uses
+            // this to build a correct "Continue" link instead of guessing.
+            let pagePath = existingProgress?.pagePath;
+            try {
+                const pathMatch = (window.location?.pathname || '').match(/\/watch\/([^/?#]+)/);
+                const currentPathSlug = pathMatch ? pathMatch[1] : '';
+                const idMatch = uniqueId.match(/^(.+)__episode-(\d+)$/);
+                if (currentPathSlug && idMatch) {
+                    const defaultPathSlug = `${idMatch[1]}-episode-${idMatch[2]}`;
+                    pagePath = currentPathSlug === defaultPathSlug ? undefined : currentPathSlug;
+                }
+            } catch { /* ignore */ }
+
             const nowIso = this._compactNow();
             videoProgress[uniqueId] = {
                 currentTime: newCurrentTime,
@@ -311,7 +341,8 @@ const ProgressTracker = {
                 savedAt: nowIso,
                 percentage: newPercentage,
                 watchedAt: existingProgress?.watchedAt || nowIso,
-                coverImage: coverImage || undefined
+                coverImage: coverImage || undefined,
+                pagePath: pagePath || undefined
             };
 
             try {

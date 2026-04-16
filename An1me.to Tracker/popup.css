@@ -677,6 +677,62 @@ body {
 /* ─── Anime List ─────────────────────────────────────────────── */
 .anime-list { display: flex; flex-direction: column; gap: 8px; }
 .anime-list.no-transition * { transition: none !important; }
+
+.status-chip-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 2px 2px 0;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--t2);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color var(--tn), border-color var(--tn), background var(--tn);
+}
+.status-chip:hover {
+  color: var(--t1);
+  background: rgba(255,255,255,0.04);
+}
+.status-chip.active {
+  color: var(--t1);
+  background: rgba(255,255,255,0.06);
+}
+.status-chip .status-chip-count {
+  color: var(--t3);
+  font-weight: 700;
+}
+.status-chip.active .status-chip-count {
+  color: currentColor;
+}
+.status-chip.airing { color: #64b5f6; }
+.status-chip.on-hold { color: #ffb74d; }
+.status-chip.completed { color: var(--green); }
+.status-chip.dropped { color: #e57373; }
+.status-chip.airing.active { border-color: rgba(100,181,246,0.35); background: rgba(100,181,246,0.12); }
+.status-chip.on-hold.active { border-color: rgba(255,183,77,0.35); background: rgba(255,183,77,0.12); }
+.status-chip.completed.active { border-color: rgba(76,175,130,0.35); background: rgba(76,175,130,0.12); }
+.status-chip.dropped.active { border-color: rgba(229,115,115,0.35); background: rgba(229,115,115,0.12); }
+.status-chip-sep {
+  color: var(--t3);
+  font-size: 10px;
+  line-height: 1;
+  user-select: none;
+}
+
 .completed-list-section {
   display: flex;
   flex-direction: column;
@@ -692,7 +748,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 9px 12px;
   cursor: pointer;
   user-select: none;
   background: rgba(76,175,130,0.04);

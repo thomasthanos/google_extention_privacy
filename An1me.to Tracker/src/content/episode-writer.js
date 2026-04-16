@@ -137,7 +137,6 @@ const EpisodeWriter = {
             duration: validDuration,
             durationSource: 'video'
         });
-        animeData[slug].totalWatchTime = (animeData[slug].totalWatchTime || 0) + validDuration;
 
         if (info.isDoubleEpisode && info.secondEpisodeNumber) {
             const secondEpisodeNumber = this._normalizeEpisodeNumber(info.secondEpisodeNumber);
@@ -153,6 +152,9 @@ const EpisodeWriter = {
             }
         }
 
+        // Recompute from episodes so double-episode pushes are counted correctly.
+        animeData[slug].totalWatchTime = animeData[slug].episodes
+            .reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
         animeData[slug].lastWatched = this._compactNow();
         animeData[slug].episodes.sort((a, b) => (Number(a?.number) || 0) - (Number(b?.number) || 0));
         return { changed: true, changeType: 'added-episode', createdAnime };

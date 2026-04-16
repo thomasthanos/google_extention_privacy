@@ -350,7 +350,8 @@ const ProgressManager = {
                 duration: progress.duration,
                 percentage: progress.percentage,
                 savedAt: progress.savedAt,
-                watchedAt: progress.watchedAt || progress.savedAt // watchedAt is when first started
+                watchedAt: progress.watchedAt || progress.savedAt, // watchedAt is when first started
+                pagePath: progress.pagePath || null // original URL slug when it deviates from <slug>-episode-<n>
             });
 
             if (progress.savedAt && progress.savedAt > existing.lastProgress) {

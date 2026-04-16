@@ -43,7 +43,9 @@ const AnimeCardRenderer = {
 
         for (const [uniqueId, progress] of progressEntries) {
             if (uniqueId === '__slugIndex') continue;
-            const parts = uniqueId.split('episode-');
+            // Split on '__episode-' (not 'episode-') so slugs that contain the
+            // substring "episode-" (e.g. "one-piece-episode-of-east-blue") parse correctly.
+            const parts = uniqueId.split('__episode-');
             if (parts.length !== 2 || !parts[1]) continue;
 
             const epNum = parseInt(parts[1], 10);
@@ -518,7 +520,13 @@ const AnimeCardRenderer = {
             watchedDateStr = watchedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         }
 
-        const continueUrl = `https://an1me.to/watch/${UIHelpers.escapeHtml(anime.slug)}-episode-${latestEp.number}`;
+        // Prefer the original page path when it was captured (movies/specials
+        // whose URL has no -episode-N suffix); fall back to the standard
+        // <slug>-episode-N pattern for regular series.
+        const continuePathSlug = latestEp.pagePath
+            ? UIHelpers.escapeHtml(latestEp.pagePath)
+            : `${UIHelpers.escapeHtml(anime.slug)}-episode-${latestEp.number}`;
+        const continueUrl = `https://an1me.to/watch/${continuePathSlug}`;
 
         return `
             <div class="${cardClass}" data-slug="${safeSlug}">
@@ -761,7 +769,8 @@ const AnimeCardRenderer = {
                 const inProgressEps = [];
                 Object.entries(videoProgress).forEach(([uid, prog]) => {
                     if (!uid.startsWith(slug + '__episode-')) return;
-                    const epNum = parseInt(uid.split('episode-')[1], 10);
+                    // Use '__episode-' so slugs containing 'episode-' parse correctly.
+                    const epNum = parseInt(uid.split('__episode-')[1], 10);
                     if (isNaN(epNum) || trackedEpNums.has(epNum)) return;
                     if (prog.deleted) return;
                     if (prog.percentage >= CONFIG.COMPLETED_PERCENTAGE) return;

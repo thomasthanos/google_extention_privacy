@@ -506,11 +506,13 @@ async function fetchCloudData(user, token) {
 }
 
 // ─── Cloud doc cache ─────────────────────────────────────────────────────────
-// The SSE listener keeps our view of cloud state fresh, so a short TTL cache
-// lets syncToFirebase skip a GET on back-to-back pushes.
+// The SSE listener pushes the authoritative cloud state to us in real-time
+// (applyCloudUpdate refreshes _bgCloudDocCache directly), so we can keep a
+// long TTL safely. The SSE stream is the source of truth for invalidation;
+// a periodic GET is a fallback in case the stream is down.
 let _bgCloudDocCache     = null;
 let _bgCloudDocCacheTime = 0;
-const _BG_CLOUD_TTL      = 30000; // 30 s
+const _BG_CLOUD_TTL      = 5 * 60 * 1000; // 5 min
 
 function invalidateBgCloudDocCache() {
     _bgCloudDocCache = null;
@@ -649,6 +651,27 @@ async function syncToFirebase() {
                 deletedAnime:     mergedDeleted,
                 groupCoverImages: mergedGroup
             });
+        }
+
+        // Skip the cloud PATCH when the merged result already matches what's
+        // in the cloud. Without this gate, every storage.onChanged event
+        // (including those caused by SSE applying remote updates back to local)
+        // produces a redundant write — a major source of Firestore write traffic.
+        const cloudAnimeRef    = cloudDoc?.animeData        || {};
+        const cloudProgressRef = cloudDoc?.videoProgress    || {};
+        const cloudDeletedRef  = cloudDoc?.deletedAnime     || {};
+        const cloudGroupRef    = cloudDoc?.groupCoverImages || {};
+        const needsCloudWrite =
+            !areAnimeDataMapsEqual(mergedAnime, cloudAnimeRef) ||
+            !areProgressMapsEqual(mergedProgress, cloudProgressRef) ||
+            !shallowEqualDeletedAnime(mergedDeleted, cloudDeletedRef) ||
+            !shallowEqualObjectMap(mergedGroup, cloudGroupRef);
+
+        if (!needsCloudWrite) {
+            // Nothing to push — refresh the cache timestamp so we don't re-fetch
+            // immediately, and return early.
+            _bgCloudDocCacheTime = Date.now();
+            return;
         }
 
         const url       = `${FIRESTORE_BASE}/documents/users/${user.uid}`;

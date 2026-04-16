@@ -14,6 +14,8 @@
     let videoProgress = {};
     let currentSort = 'date';
     let currentCategory = 'all'; // 'all', 'series', 'movies'
+    let currentCompactStatus = 'airing'; // 'airing', 'on_hold', 'completed', 'dropped'
+    let currentCompactStatusOpen = false;
     const COPY_GUARD_STORAGE_KEY = 'copyGuardEnabled';
 
     // DOM Elements
@@ -301,6 +303,11 @@
         return allowed.has(value) ? value : 'all';
     }
 
+    function normalizeCompactStatus(value) {
+        const allowed = new Set(['airing', 'on_hold', 'completed', 'dropped']);
+        return allowed.has(value) ? value : 'airing';
+    }
+
     function getCalendarDayDiff(isoString) {
         if (!isoString) return 0;
         const target = new Date(isoString);
@@ -541,10 +548,6 @@
         elements.animeList.querySelectorAll('.anime-movie-group.expanded').forEach(g => {
             if (g.dataset.baseSlug) expandedMovieGroups.add(g.dataset.baseSlug);
         });
-        const completedWasOpen = elements.animeList.querySelector('.completed-list-cards')?.classList.contains('open') ?? false;
-        const droppedWasOpen = elements.animeList.querySelector('.dropped-list-cards')?.classList.contains('open') ?? false;
-        const airingWasOpen = elements.animeList.querySelector('.airing-list-cards')?.classList.contains('open') ?? false;
-        const onHoldWasOpen = elements.animeList.querySelector('.onhold-list-cards')?.classList.contains('open') ?? false;
         const ipGroupWasOpen = elements.animeList.querySelector('.ip-group-content')?.classList.contains('open') ?? false;
 
         // Filter by category
@@ -729,11 +732,11 @@
                             <span class="completed-list-label-title">COMPLETED LIST</span>
                             <span class="completed-list-label-sub">${AT.CONFIG.COMPLETED_LIST_MIN_DAYS}+ days since last watch</span>
                         </div>
-                        <svg class="completed-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: ${completedWasOpen ? 'rotate(0deg)' : 'rotate(-90deg)'}">
+                        <svg class="completed-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: ${currentCompactStatusOpen ? 'rotate(0deg)' : 'rotate(-90deg)'}">
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     </div>
-                    <div class="completed-list-cards${completedWasOpen ? ' open' : ''}">
+                    <div class="completed-list-cards${currentCompactStatusOpen ? ' open' : ''}">
                         <div class="list-inner">
                             ${completedCardsHtml}
                         </div>
@@ -750,11 +753,11 @@
                             <span class="dropped-list-label-title">DROPPED LIST</span>
                             <span class="dropped-list-label-sub">${droppedEntries.length} anime</span>
                         </div>
-                        <svg class="dropped-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: ${droppedWasOpen ? 'rotate(0deg)' : 'rotate(-90deg)'}">
+                        <svg class="dropped-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: ${currentCompactStatusOpen ? 'rotate(0deg)' : 'rotate(-90deg)'}">
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     </div>
-                    <div class="dropped-list-cards${droppedWasOpen ? ' open' : ''}">
+                    <div class="dropped-list-cards${currentCompactStatusOpen ? ' open' : ''}">
                         <div class="list-inner">
                             ${droppedCardsHtml}
                         </div>
@@ -771,11 +774,11 @@
                             <span class="airing-list-label-title">⬤ AIRING LIST</span>
                             <span class="airing-list-label-sub">${airingEntries.length} anime · Caught up</span>
                         </div>
-                        <svg class="airing-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: ${airingWasOpen ? 'rotate(0deg)' : 'rotate(-90deg)'}">
+                        <svg class="airing-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: ${currentCompactStatusOpen ? 'rotate(0deg)' : 'rotate(-90deg)'}">
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     </div>
-                    <div class="airing-list-cards${airingWasOpen ? ' open' : ''}">
+                    <div class="airing-list-cards${currentCompactStatusOpen ? ' open' : ''}">
                         <div class="list-inner">
                             ${airingCardsHtml}
                         </div>
@@ -792,11 +795,11 @@
                             <span class="onhold-list-label-title">ON HOLD</span>
                             <span class="onhold-list-label-sub">${onHoldEntries.length} anime</span>
                         </div>
-                        <svg class="onhold-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: ${onHoldWasOpen ? 'rotate(0deg)' : 'rotate(-90deg)'}">
+                        <svg class="onhold-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: ${currentCompactStatusOpen ? 'rotate(0deg)' : 'rotate(-90deg)'}">
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     </div>
-                    <div class="onhold-list-cards${onHoldWasOpen ? ' open' : ''}">
+                    <div class="onhold-list-cards${currentCompactStatusOpen ? ' open' : ''}">
                         <div class="list-inner">
                             ${onHoldCardsHtml}
                         </div>
@@ -805,9 +808,42 @@
             `
             : '';
 
+        const compactStatusItems = [
+            { key: 'airing', label: 'Airing', count: airingEntries.length, sectionHtml: airingGroupHtml },
+            { key: 'on_hold', label: 'Hold', count: onHoldEntries.length, sectionHtml: onHoldGroupHtml },
+            { key: 'completed', label: 'Completed', count: completedEntries.length, sectionHtml: completedGroupHtml },
+            { key: 'dropped', label: 'Dropped', count: droppedEntries.length, sectionHtml: droppedGroupHtml }
+        ].filter(item => item.count > 0);
+
+        if (compactStatusItems.length > 0) {
+            currentCompactStatus = normalizeCompactStatus(currentCompactStatus);
+            if (!compactStatusItems.some(item => item.key === currentCompactStatus)) {
+                currentCompactStatus = compactStatusItems[0].key;
+            }
+        }
+
+        const activeCompactItem = compactStatusItems.find(item => item.key === currentCompactStatus) || null;
+        const chipsHtml = compactStatusItems.length > 0
+            ? `
+                <div class="status-chip-row" role="tablist" aria-label="Quick status lists">
+                    ${compactStatusItems.map((item, index) => `
+                        <button
+                            type="button"
+                            class="status-chip${item.key === currentCompactStatus ? ' active' : ''} ${item.key.replace('_', '-')}"
+                            data-compact-status="${item.key}"
+                            aria-pressed="${item.key === currentCompactStatus ? 'true' : 'false'}">
+                            <span class="status-chip-label">${item.label}</span>
+                            <span class="status-chip-count">${item.count}</span>
+                        </button>${index < compactStatusItems.length - 1 ? '<span class="status-chip-sep">•</span>' : ''}
+                    `).join('')}
+                </div>
+            `
+            : '';
+        const activeCompactSectionHtml = activeCompactItem ? activeCompactItem.sectionHtml : '';
+
         // Disable transitions during render to prevent flicker
         elements.animeList.classList.add('no-transition');
-        elements.animeList.innerHTML = inProgressHtml + trackedHtml + airingGroupHtml + onHoldGroupHtml + completedGroupHtml + droppedGroupHtml;
+        elements.animeList.innerHTML = inProgressHtml + trackedHtml + chipsHtml + activeCompactSectionHtml;
 
         // Restore expanded state
         elements.animeList.querySelectorAll('.anime-card').forEach(card => {
@@ -948,8 +984,17 @@
             if (header) header.addEventListener('click', () => group.classList.toggle('expanded'));
         });
 
-        // List section toggle helper
-        function setupListToggle(toggleId, chevronClass) {
+        elements.animeList.querySelectorAll('[data-compact-status]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const nextStatus = normalizeCompactStatus(btn.dataset.compactStatus || '');
+                if (nextStatus === currentCompactStatus) return;
+                currentCompactStatus = nextStatus;
+                renderAnimeList(getActiveFilter());
+            });
+        });
+
+        function setupCompactSectionToggle(toggleId, chevronClass) {
             const toggle = elements.animeList.querySelector(`#${toggleId}`);
             if (!toggle) return;
 
@@ -966,14 +1011,17 @@
                 const cards = toggle.nextElementSibling;
                 if (!cards) return;
                 cards.classList.toggle('open');
+                currentCompactStatusOpen = cards.classList.contains('open');
                 updateChevron();
             });
+
             updateChevron();
         }
-        setupListToggle('completedListToggle', 'completed-chevron');
-        setupListToggle('droppedListToggle', 'dropped-chevron');
-        setupListToggle('airingListToggle', 'airing-chevron');
-        setupListToggle('onHoldListToggle', 'onhold-chevron');
+
+        setupCompactSectionToggle('airingListToggle', 'airing-chevron');
+        setupCompactSectionToggle('onHoldListToggle', 'onhold-chevron');
+        setupCompactSectionToggle('completedListToggle', 'completed-chevron');
+        setupCompactSectionToggle('droppedListToggle', 'dropped-chevron');
 
         elements.animeList.querySelectorAll('.movie-edit-btn').forEach(btn => {
             btn.addEventListener('click', (e) => { e.stopPropagation(); editAnimeTitle(btn.dataset.slug); });
@@ -1394,8 +1442,13 @@
     /**
      * Delete anime
      */
+    // Tracks slugs whose delete is currently in flight to block double-click races.
+    const _deletingSlugs = new Set();
+
     async function deleteAnime(slug) {
         const { Storage, FirebaseSync } = AT;
+        if (_deletingSlugs.has(slug)) return;
+        _deletingSlugs.add(slug);
         const wasInAnimeData = !!animeData[slug];
         const siteAnimeId = animeData[slug]?.siteAnimeId;
         if (wasInAnimeData) delete animeData[slug];
@@ -1445,6 +1498,8 @@
         } catch (e) {
             PopupLogger.error('Delete', 'Error:', e);
             alert('Failed to delete anime. Please try again.');
+        } finally {
+            _deletingSlugs.delete(slug);
         }
     }
 
