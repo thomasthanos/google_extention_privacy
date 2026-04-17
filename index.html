@@ -1132,26 +1132,37 @@
 
         <div class="gallery-layout">
           <div class="gallery-stage">
-            <div class="gallery-frame" id="galleryFrame"></div>
+            <div class="gallery-frame" id="galleryFrame">
+              <img src="./An1me_tracker/screenshots/screenshot-main.png" alt="Preview of the An1me Tracker extension interface">
+            </div>
             <div class="gallery-caption">
               <div>
                 <strong id="galleryCaptionTitle">An1me Tracker</strong>
                 <div id="galleryCaptionText">Workspace-first spotlight for the anime tracker project.</div>
               </div>
-              <div id="galleryMeta">Preview 1 of 1</div>
+              <div id="galleryMeta">Preview 1 of 4</div>
             </div>
-            <div class="thumb-row" id="galleryThumbs"></div>
+            <div class="thumb-row" id="galleryThumbs">
+              <button class="thumb-chip active" type="button">Main view</button>
+              <button class="thumb-chip" type="button">Expanded panel</button>
+              <button class="thumb-chip" type="button">Collapsed panel</button>
+              <button class="thumb-chip" type="button">Settings</button>
+            </div>
           </div>
 
           <aside class="gallery-copy">
             <div class="section-label" style="margin-bottom: 0;">Current Focus</div>
             <h3 id="galleryTitle">An1me Tracker</h3>
             <p id="galleryDescription">
-              Use this panel to frame the project in plain language before someone clicks into the source tree.
+              Frame this as the core project in the repo: anime progress memory, list states, popup tooling, and a stronger long-term product story than a simple utility extension.
             </p>
-            <ul class="bullet-column" id="galleryBullets"></ul>
+            <ul class="bullet-column" id="galleryBullets">
+              <li>Automatic anime progress tracking on an1me.to with a richer popup experience.</li>
+              <li>Watch states, cloud sync, notifications, and popup management are all part of the same extension flow.</li>
+              <li>The gallery uses the real tracker screenshots from the local screenshots folder.</li>
+            </ul>
             <div class="project-actions">
-              <a class="button primary" id="gallerySourceLink" href="https://github.com/thomasthanos/google_extention_privacy" target="_blank" rel="noreferrer">Open source folder</a>
+              <a class="button primary" id="gallerySourceLink" href="https://github.com/thomasthanos/google_extention_privacy/tree/main/An1me_tracker" target="_blank" rel="noreferrer">Open source folder</a>
               <a class="button ghost" id="galleryHostLink" href="#install">Jump to install</a>
             </div>
           </aside>
@@ -1564,8 +1575,22 @@
       }
     });
 
-    renderGallery("tracker");
-    renderInstall("tracker");
+    function initializePage() {
+      try {
+        renderGallery("tracker");
+        renderInstall("tracker");
+      } catch (error) {
+        console.error("Initialization error:", error);
+      }
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initializePage, { once: true });
+    } else {
+      initializePage();
+    }
+
+    window.addEventListener("load", initializePage, { once: true });
   </script>
 </body>
 </html>
