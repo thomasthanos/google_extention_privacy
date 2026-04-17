@@ -7,12 +7,16 @@
 const STORAGE_SLUG_NORMALIZATION = {
     'bleach-sennen-kessen-hen-ketsubetsu-tan': 'bleach-sennen-kessen-hen',
     'bleach-sennen-kessen-hen-soukoku-tan': 'bleach-sennen-kessen-hen',
+    'fate-zero-season-2': 'fate-zero',
+    'fate-zero-2nd-season': 'fate-zero',
 };
 
 // Episode offsets for multi-part anime (migration)
 const STORAGE_EPISODE_OFFSET_MAPPING = {
     'bleach-sennen-kessen-hen-ketsubetsu-tan': 13,
     'bleach-sennen-kessen-hen-soukoku-tan': 26,
+    'fate-zero-season-2': 13,
+    'fate-zero-2nd-season': 13,
 };
 
 const LEGACY_SYNC_KEYS = new Set(['animeData', 'trackedEpisodes', 'videoProgress']);
@@ -198,6 +202,8 @@ const Storage = {
 
                 const getCanonicalSlugFromTitle = (slug, title) =>
                     window.AnimeTracker.SlugUtils.getCanonicalSlug(slug, title);
+                const getCanonicalTitle = (slug, title) =>
+                    window.AnimeTracker.SlugUtils.getCanonicalTitle(slug, title);
 
                 const normalizeStoredTitle = (title) => {
                     if (typeof title !== 'string') return title;
@@ -218,7 +224,10 @@ const Storage = {
 
                     if (!animeData[newSlug]) {
                         const migratedTitle = normalizeStoredTitle(
-                            (titleTransform ? titleTransform(oldEntry.title || '') : oldEntry.title) || ''
+                            getCanonicalTitle(
+                                newSlug,
+                                (titleTransform ? titleTransform(oldEntry.title || '') : oldEntry.title) || ''
+                            ) || ''
                         );
                         animeData[newSlug] = {
                             title: migratedTitle || newSlug,
@@ -237,7 +246,10 @@ const Storage = {
                     if (!newEntry.coverImage && oldEntry.coverImage) newEntry.coverImage = oldEntry.coverImage;
                     if ((!newEntry.title || newEntry.title.trim() === '') && oldEntry.title) {
                         const migratedTitle = normalizeStoredTitle(
-                            titleTransform ? titleTransform(oldEntry.title) : oldEntry.title
+                            getCanonicalTitle(
+                                newSlug,
+                                titleTransform ? titleTransform(oldEntry.title) : oldEntry.title
+                            )
                         );
                         if (migratedTitle) {
                             newEntry.title = migratedTitle;
@@ -356,7 +368,7 @@ const Storage = {
 
                 for (const [slug, entry] of Object.entries(animeData)) {
                     if (!entry?.title) continue;
-                    const cleaned = normalizeStoredTitle(entry.title);
+                    const cleaned = normalizeStoredTitle(getCanonicalTitle(slug, entry.title));
                     if (cleaned && cleaned !== entry.title) {
                         entry.title = cleaned;
                         migrated = true;

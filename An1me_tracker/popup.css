@@ -592,9 +592,13 @@ body {
   background: var(--bg-4);
   border: 1px solid rgba(79,195,247,0.2);
   box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-  transition: transform 0.35s cubic-bezier(0.4, 0, 0.15, 1), width 0.3s cubic-bezier(0.4, 0, 0.15, 1);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.15, 1), width 0.3s cubic-bezier(0.4, 0, 0.15, 1), opacity 0.18s ease;
   z-index: 0;
   pointer-events: none;
+  opacity: 0;
+}
+.category-tabs-slider.is-ready {
+  opacity: 1;
 }
 .category-tab {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
@@ -607,6 +611,10 @@ body {
 .category-tab:hover { color: var(--t1); }
 .category-tab.active {
   color: var(--cyan); font-weight: 700; background: transparent; border: none; outline: none;
+}
+.category-tabs:not(.slider-ready) .category-tab.active {
+  background: var(--bg-4);
+  box-shadow: inset 0 0 0 1px rgba(79,195,247,0.2);
 }
 
 /* ─── Toolbar ───────────────────────────────────────────────── */
@@ -1534,6 +1542,9 @@ body {
 .anime-season-group.expanded .season-group-expand-icon { color: var(--cyan); }
 .season-group-content { display: flex; flex-direction: column; gap: 4px; max-height: 0; overflow: hidden; opacity: 0; margin-top: 0; transition: all var(--tn); }
 .anime-season-group.expanded .season-group-content { max-height: 460px; opacity: 1; margin-top: 8px; }
+.season-chronology-separator { display: flex; align-items: center; gap: 10px; margin: 8px 2px 2px; }
+.season-chronology-line { flex: 1; height: 1px; background: linear-gradient(90deg, rgba(79,195,247,0.04), rgba(79,195,247,0.28), rgba(79,195,247,0.04)); }
+.season-chronology-label { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: rgba(79,195,247,0.85); white-space: nowrap; }
 
 .season-item { display: flex; flex-direction: column; padding: 7px 9px; background: var(--bg-3); border: 1px solid var(--b1); border-radius: var(--r-sm); transition: all var(--tf); }
 .season-item:hover { background: var(--bg-4); border-color: var(--b2); }
@@ -1685,9 +1696,46 @@ body {
 .meta-badge-watching   { color: var(--amber); background: rgba(240,192,64,0.1);  border: 1px solid rgba(240,192,64,0.22); }
 .meta-badge-complete   { color: var(--green); background: rgba(76,175,130,0.1);  border: 1px solid rgba(76,175,130,0.22); }
 .meta-badge-notstarted { color: var(--t3);    background: rgba(255,255,255,0.03); border: 1px solid var(--b0); }
+.meta-badge-onhold     { color: #ffb74d;      background: rgba(255,183,77,0.1);  border: 1px solid rgba(255,183,77,0.25); }
 .meta-badge-dropped    { color: #e57373;      background: rgba(229,115,115,0.1);  border: 1px solid rgba(229,115,115,0.25); }
 .meta-badge-airing     { color: #ff6b6b;      background: rgba(255,107,107,0.1);  border: 1px solid rgba(255,107,107,0.3); }
-.meta-time { display: block; font-size: 9px; color: var(--t3); white-space: nowrap; margin-top: 2px; }
+.meta-time-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+  min-width: 0;
+}
+.meta-time {
+  display: block;
+  font-size: 9px;
+  color: var(--t3);
+  white-space: nowrap;
+}
+.meta-time-eta {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+.meta-time-eta-ai {
+  color: rgba(232, 237, 248, 0.84);
+}
+.meta-time-eta-ai.meta-time-eta-low {
+  opacity: 0.68;
+}
+.meta-time-eta-ai.meta-time-eta-medium {
+  opacity: 0.84;
+}
+.meta-time-eta-ai.meta-time-eta-high {
+  opacity: 1;
+}
+.meta-time-eta-site {
+  color: var(--cyan);
+}
 
 /* ─── Export token ──────────────────────────────────────────── */
 .export-token-overlay {
@@ -1833,16 +1881,6 @@ body {
   .category-tab { padding: 9px 0; font-size: 12px; }
   .stats-bar { padding: 12px 16px; }
 }
-
-/* ─── Completion prediction badge (ETA) ───────────────────────── */
-.meta-badge.meta-badge-eta {
-  background: rgba(155, 106, 255, 0.1);
-  border: 1px solid rgba(155, 106, 255, 0.25);
-  color: var(--purple);
-}
-.meta-badge.meta-badge-eta.eta-low    { opacity: 0.7; }
-.meta-badge.meta-badge-eta.eta-medium { opacity: 0.9; }
-.meta-badge.meta-badge-eta.eta-high   { opacity: 1; }
 
 /* ─── Stats Dashboard ─────────────────────────────────────────── */
 .stats-view {

@@ -211,26 +211,42 @@ const VideoMonitor = {
         }
 
         let _lastSavedTime = -1;
-        this.progressSaveInterval = setInterval(() => {
-            // Idle guard: if tab isn't visible, user isn't watching → skip.
-            if (typeof document !== 'undefined'
-                && document.visibilityState && document.visibilityState !== 'visible') return;
+        const tickSave = () => {
             if (this.videoElement && animeInfo && !video.paused) {
                 const currentTime = this.videoElement.currentTime;
                 const duration = this.videoElement.duration;
-                // Skip write if playhead hasn't moved since last interval tick.
                 if (currentTime > 0 && duration > 0 && Math.floor(currentTime) !== _lastSavedTime) {
                     _lastSavedTime = Math.floor(currentTime);
                     ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration);
                 }
             }
-        }, CONFIG.PROGRESS_SAVE_INTERVAL);
+        };
 
-        this.addCleanup(() => {
+        const startSaveInterval = () => {
+            if (this.progressSaveInterval) return;
+            this.progressSaveInterval = setInterval(tickSave, CONFIG.PROGRESS_SAVE_INTERVAL);
+        };
+        const stopSaveInterval = () => {
             if (this.progressSaveInterval) {
                 clearInterval(this.progressSaveInterval);
                 this.progressSaveInterval = null;
             }
+        };
+
+        // Only run the interval while the tab is visible — full stop when
+        // hidden (no wasted callback wakeups on mobile battery saver).
+        if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+            startSaveInterval();
+        }
+        const visibilityHandler = () => {
+            if (document.visibilityState === 'visible') startSaveInterval();
+            else stopSaveInterval();
+        };
+        document.addEventListener('visibilitychange', visibilityHandler);
+
+        this.addCleanup(() => {
+            stopSaveInterval();
+            document.removeEventListener('visibilitychange', visibilityHandler);
         });
 
         Logger.success('Video monitoring active');
@@ -279,7 +295,9 @@ const VideoMonitor = {
                 }
             });
 
-            // MutationObserver for dynamic content
+            // MutationObserver for dynamic content — self-disconnects after
+            // MAX_RETRIES window so we don't observe document.body subtree
+            // forever on pages where the video never loads (battery drain).
             let observerTimeout;
             const observer = new MutationObserver(() => {
                 clearTimeout(observerTimeout);
@@ -297,7 +315,18 @@ const VideoMonitor = {
                 subtree: true
             });
 
-            this.addCleanup(() => observer.disconnect());
+            const observerBudgetMs = CONFIG.VIDEO_CHECK_INTERVAL * CONFIG.MAX_RETRIES;
+            const observerWatchdog = setTimeout(() => {
+                observer.disconnect();
+                clearTimeout(observerTimeout);
+                Logger.debug('Video observer watchdog — disconnected after budget elapsed');
+            }, observerBudgetMs);
+
+            this.addCleanup(() => {
+                observer.disconnect();
+                clearTimeout(observerTimeout);
+                clearTimeout(observerWatchdog);
+            });
         }
     },
 

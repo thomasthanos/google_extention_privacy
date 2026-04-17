@@ -20,7 +20,30 @@ const SlugUtils = {
             return 'jujutsu-kaisen';
         }
 
+        if (safeSlug.startsWith('fate-zero') || safeTitle.includes('fate/zero') || safeTitle.includes('fate zero')) {
+            return 'fate-zero';
+        }
+
         return slug;
+    },
+
+    getCanonicalTitle(slug, title = '') {
+        const canonicalSlug = this.getCanonicalSlug(slug, title);
+        const rawTitle = String(title || '').trim();
+        if (!rawTitle) return rawTitle;
+
+        if (canonicalSlug === 'fate-zero') {
+            const cleaned = rawTitle
+                .replace(/\s+(?:season\s*2|2nd\s*season|second\s*season)\s*$/i, '')
+                .trim();
+            const lower = cleaned.toLowerCase();
+            if (lower === 'fate zero' || lower === 'fate/zero') {
+                return 'Fate/Zero';
+            }
+            return cleaned;
+        }
+
+        return rawTitle;
     }
 };
 

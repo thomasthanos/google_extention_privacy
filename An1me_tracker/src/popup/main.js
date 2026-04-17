@@ -1229,15 +1229,6 @@
         const { Storage, ProgressManager, FillerService, UIHelpers } = AT;
 
         try {
-            const cachedResult = await Storage.get(['cachedStats']);
-            if (cachedResult.cachedStats) {
-                const stats = cachedResult.cachedStats;
-                if (elements.totalAnime) elements.totalAnime.textContent = stats.totalAnime || 0;
-                if (elements.totalMovies) elements.totalMovies.textContent = stats.totalMovies || 0;
-                if (elements.totalEpisodes) elements.totalEpisodes.textContent = stats.totalEpisodes || 0;
-                if (elements.totalTime) elements.totalTime.textContent = stats.totalTime || '0h';
-            }
-
             if (shouldRunMaintenance('migrateMultiPartAnime')) {
                 await Storage.migrateMultiPartAnime();
             }
@@ -1250,11 +1241,8 @@
             videoProgress = normalized.videoProgress || {};
             window.AnimeTracker.groupCoverImages = result.groupCoverImages || {};
 
-            const cleanedData = ProgressManager.removeDuplicateEpisodes(animeData);
-            const runRepair = shouldRunMaintenance('repairLikelyMissedEpisodes');
-            const { repairedData, repairedCount } = runRepair
-                ? ProgressManager.repairLikelyMissedEpisodes(cleanedData)
-                : { repairedData: cleanedData, repairedCount: 0 };
+            const withoutAutoRepaired = ProgressManager.removeAutoRepairedEpisodes(animeData);
+            const repairedData = ProgressManager.removeDuplicateEpisodes(withoutAutoRepaired.cleanedData);
             const rawProgressForDurations = videoProgress || {};
             const { cleaned: cleanedProgress, removedCount: progressRemoved } =
                 ProgressManager.cleanTrackedProgress(repairedData, videoProgress);
@@ -1271,8 +1259,8 @@
                 )
                 : { changed: false, deletedAnime: normalized.deletedAnime || result.deletedAnime || {} };
             const needsSave =
-                (originalCount !== cleanedCount) || (progressRemoved > 0) ||
-                (repairedCount > 0) || durationFix.changed || normalized.changed || phantomCleanup.changed;
+                (originalCount !== cleanedCount) || (withoutAutoRepaired.removedCount > 0) || (progressRemoved > 0) ||
+                durationFix.changed || normalized.changed || phantomCleanup.changed;
 
             if (needsSave) {
                 animeData = repairedData;
@@ -1324,15 +1312,6 @@
         const { Storage, FirebaseSync, FillerService, ProgressManager } = AT;
 
         try {
-            const cachedResult = await Storage.get(['cachedStats']);
-            if (cachedResult.cachedStats) {
-                const stats = cachedResult.cachedStats;
-                if (elements.totalAnime) elements.totalAnime.textContent = stats.totalAnime || 0;
-                if (elements.totalMovies) elements.totalMovies.textContent = stats.totalMovies || 0;
-                if (elements.totalEpisodes) elements.totalEpisodes.textContent = stats.totalEpisodes || 0;
-                if (elements.totalTime) elements.totalTime.textContent = stats.totalTime || '0h';
-            }
-
             const prefs = await chrome.storage.local.get(['userPreferences']);
             if (prefs.userPreferences) {
                 currentSort = prefs.userPreferences.sort || 'date';
@@ -1363,7 +1342,7 @@
 
             // Fast path: render from local storage immediately so the popup
             // doesn't show a blank list while waiting for Firebase round-trips.
-            // (loadData() internally runs migrateMultiPartAnime when due.)
+            // Especially important on slow mobile networks.
             await loadData();
 
             const data = await FirebaseSync.loadAndSyncData(elements);
@@ -1371,11 +1350,8 @@
                 const normalized = ProgressManager.normalizeCanonicalSlugs(
                     data.animeData || {}, data.videoProgress || {}, data.deletedAnime || {}
                 );
-                const deduped = ProgressManager.removeDuplicateEpisodes(normalized.animeData || {});
-                const runRepair2 = shouldRunMaintenance('repairLikelyMissedEpisodes_postSync');
-                const { repairedData, repairedCount } = runRepair2
-                    ? ProgressManager.repairLikelyMissedEpisodes(deduped)
-                    : { repairedData: deduped, repairedCount: 0 };
+                const withoutAutoRepaired = ProgressManager.removeAutoRepairedEpisodes(normalized.animeData || {});
+                const repairedData = ProgressManager.removeDuplicateEpisodes(withoutAutoRepaired.cleanedData);
                 const rawProgressForDurations = normalized.videoProgress || {};
                 const { cleaned: cleanedProgress, removedCount: progressRemoved } =
                     ProgressManager.cleanTrackedProgress(repairedData, rawProgressForDurations);
@@ -1393,7 +1369,7 @@
                 videoProgress = cleanedProgress;
                 window.AnimeTracker.groupCoverImages = data.groupCoverImages || {};
 
-                if (repairedCount > 0 || progressRemoved > 0 || durationFix.changed || normalized.changed || phantomCleanup.changed) {
+                if (withoutAutoRepaired.removedCount > 0 || progressRemoved > 0 || durationFix.changed || normalized.changed || phantomCleanup.changed) {
                     const payload = { animeData: repairedData, videoProgress: cleanedProgress };
                     if (normalized.changed || phantomCleanup.changed) payload.deletedAnime = phantomCleanup.deletedAnime;
                     markInternalSave(payload);
@@ -2810,6 +2786,8 @@
                 const offsetX = tabRect.left - containerRect.left - 4; // 4px padding
                 slider.style.width = tabRect.width + 'px';
                 slider.style.transform = `translateX(${offsetX}px)`;
+                slider.classList.add('is-ready');
+                elements.categoryTabs.classList.add('slider-ready');
                 if (instant) {
                     slider.style.transition = 'none';
                     slider.offsetHeight; // force reflow
@@ -3059,19 +3037,6 @@
             await Storage.invalidateCachedStats(manifest?.version || '');
         } catch (e) {
             PopupLogger.warn('Init', 'Could not check cachedStats version:', e);
-        }
-
-        try {
-            const cachedResult = await Storage.get(['cachedStats']);
-            if (cachedResult.cachedStats) {
-                const stats = cachedResult.cachedStats;
-                if (elements.totalAnime) elements.totalAnime.textContent = stats.totalAnime || 0;
-                if (elements.totalMovies) elements.totalMovies.textContent = stats.totalMovies || 0;
-                if (elements.totalEpisodes) elements.totalEpisodes.textContent = stats.totalEpisodes || 0;
-                if (elements.totalTime) elements.totalTime.textContent = stats.totalTime || '0h';
-            }
-        } catch (e) {
-            PopupLogger.error('Init', 'Failed to load cached stats:', e);
         }
 
         try {

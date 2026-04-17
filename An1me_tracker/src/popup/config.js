@@ -38,6 +38,10 @@ const DONATE_LINKS = {
 
 // Parts display configuration for multi-part anime
 const ANIME_PARTS_CONFIG = {
+    'fate-zero': [
+        { name: 'Fate/Zero S1', start: 1, end: 13, displayStart: 1, displayEnd: 13 },
+        { name: 'Fate/Zero S2', start: 14, end: 25, displayStart: 1, displayEnd: 12 }
+    ],
     'bleach-sennen-kessen-hen': [
         { name: 'Part 1', start: 1, end: 13 },
         { name: 'Part 2: Ketsubetsu-tan', start: 14, end: 26 },
@@ -45,17 +49,29 @@ const ANIME_PARTS_CONFIG = {
     ],
 };
 
+const CANONICAL_EPISODE_OFFSET_MAPPING = {
+    'bleach-sennen-kessen-hen-ketsubetsu-tan': 13,
+    'bleach-sennen-kessen-hen-soukoku-tan': 26,
+    'fate-zero-season-2': 13,
+    'fate-zero-2nd-season': 13,
+};
+
 
 // Base series slugs whose movie entries should be merged INTO the series season group
 // instead of shown in a separate movie group.
 const SERIES_MOVIE_MERGE_SLUGS = new Set([
     'trinity-seven',
+    'fate',
 ]);
 
 /**
  * Season Grouping Utility
  */
 const SeasonGrouping = {
+    isChronologyGroup(baseSlug) {
+        return baseSlug === 'fate';
+    },
+
     isMovie(slug, anime = null) {
         const lowerSlug = String(slug || '').toLowerCase();
         if (!lowerSlug) return false;
@@ -170,6 +186,7 @@ const SeasonGrouping = {
     },
 
     getMovieBaseSlug(slug) {
+        if (slug.startsWith('fate-zero') || slug.startsWith('fate-stay-night')) return 'fate';
         if (slug.startsWith('trinity-seven-nanatsu')) return 'trinity-seven';
         if (slug.startsWith('kimetsu-no-yaiba')) return 'kimetsu-no-yaiba';
         if (slug.startsWith('higashi-no-eden')) return 'higashi-no-eden';
@@ -190,6 +207,7 @@ const SeasonGrouping = {
             return this.getMovieBaseSlug(slug);
         }
 
+        if (slug.startsWith('fate-zero') || slug.startsWith('fate-stay-night')) return 'fate';
         if (slug.startsWith('naruto')) return 'naruto';
         if (slug.startsWith('one-punch-man')) return 'one-punch-man';
         if (slug.startsWith('one-piece')) return 'one-piece';
@@ -206,6 +224,96 @@ const SeasonGrouping = {
             .replace(/-20\d{2}$/i, '')
             .replace(/-(ii|iii|iv|v|vi)$/i, '')
             .replace(/-[a-z]+-hen$/i, '');
+    },
+
+    getChronologyInfo(baseSlug, slug, title = '') {
+        if (baseSlug !== 'fate') return null;
+
+        const lowerSlug = String(slug || '').toLowerCase();
+        const rawTitle = String(title || '').trim();
+
+        if (lowerSlug.startsWith('fate-zero')) {
+            return {
+                order: 10,
+                separatorLabel: '1994',
+                itemLabel: 'Fate/Zero'
+            };
+        }
+
+        if (lowerSlug === 'fate-stay-night') {
+            return {
+                order: 20,
+                separatorLabel: '2004',
+                itemLabel: 'Fate/stay night'
+            };
+        }
+
+        if (lowerSlug.includes('unlimited-blade-works-prologue')) {
+            return {
+                order: 30,
+                separatorLabel: '2004',
+                itemLabel: 'Unlimited Blade Works - Prologue'
+            };
+        }
+
+        if (lowerSlug.includes('unlimited-blade-works-season-2')) {
+            return {
+                order: 40,
+                separatorLabel: '2004',
+                itemLabel: 'Unlimited Blade Works Season 2'
+            };
+        }
+
+        if (lowerSlug.includes('unlimited-blade-works')) {
+            return {
+                order: 35,
+                separatorLabel: '2004',
+                itemLabel: 'Unlimited Blade Works'
+            };
+        }
+
+        if (lowerSlug.includes('heavens-feel-1')) {
+            return {
+                order: 50,
+                separatorLabel: '2004',
+                itemLabel: 'Heaven\'s Feel I: Presage Flower'
+            };
+        }
+
+        if (lowerSlug.includes('heavens-feel-2')) {
+            return {
+                order: 51,
+                separatorLabel: '2004',
+                itemLabel: 'Heaven\'s Feel II: Lost Butterfly'
+            };
+        }
+
+        if (lowerSlug.includes('heavens-feel-3')) {
+            return {
+                order: 52,
+                separatorLabel: '2004',
+                itemLabel: 'Heaven\'s Feel III: Spring Song'
+            };
+        }
+
+        if (lowerSlug.includes('heavens-feel')) {
+            return {
+                order: 50,
+                separatorLabel: '2004',
+                itemLabel: rawTitle || 'Heaven\'s Feel'
+            };
+        }
+
+        return {
+            order: 900,
+            separatorLabel: 'Other',
+            itemLabel: rawTitle || slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+        };
+    },
+
+    getGroupDisplayTitle(baseSlug, fallbackTitle = '') {
+        if (baseSlug === 'fate') return 'Fate';
+        return fallbackTitle;
     },
 
     getSeasonNumber(slug) {
@@ -413,6 +521,7 @@ const SeasonGrouping = {
         for (const [slug, anime] of animeEntries) {
             const isMovie = this.isMovie(slug, anime);
             const baseSlug = this.getBaseSlug(slug, anime);
+            const chronologyInfo = this.getChronologyInfo(baseSlug, slug, anime?.title || '');
 
             if (isMovie) {
                 const movieGroupKey = baseSlug + '__movies';
@@ -420,11 +529,20 @@ const SeasonGrouping = {
                 movieGroups.get(movieGroupKey).push({
                     slug, anime,
                     movieNum: this.getMovieNumber(slug),
+                    seasonNum: chronologyInfo?.order ?? this.getMovieNumber(slug),
+                    chronologyLabel: chronologyInfo?.separatorLabel || null,
+                    chronologyItemLabel: chronologyInfo?.itemLabel || null,
                     isMovie: true
                 });
             } else {
                 if (!groups.has(baseSlug)) groups.set(baseSlug, []);
-                groups.get(baseSlug).push({ slug, anime, seasonNum: this.getSeasonNumber(slug) });
+                groups.get(baseSlug).push({
+                    slug,
+                    anime,
+                    seasonNum: chronologyInfo?.order ?? this.getSeasonNumber(slug),
+                    chronologyLabel: chronologyInfo?.separatorLabel || null,
+                    chronologyItemLabel: chronologyInfo?.itemLabel || null
+                });
             }
         }
 
@@ -435,6 +553,11 @@ const SeasonGrouping = {
         }
 
         for (const [, entries] of movieGroups) {
+            if (entries.length > 0 && this.isChronologyGroup(this.getBaseSlug(entries[0].slug, entries[0].anime))) {
+                entries.sort((a, b) => (a.seasonNum || 0) - (b.seasonNum || 0));
+                continue;
+            }
+
             entries.sort((a, b) => {
                 if (a.movieNum !== b.movieNum) return a.movieNum - b.movieNum;
                 const aExplicit = /-movie-0?\d+/i.test(a.slug) ? 0 : 1;
@@ -456,11 +579,24 @@ const SeasonGrouping = {
                     seriesGroup.push({
                         slug: entry.slug,
                         anime: entry.anime,
-                        seasonNum: maxSeasonNum + 1 + i,
+                        seasonNum: this.isChronologyGroup(baseSlug)
+                            ? (entry.seasonNum || (maxSeasonNum + 1 + i))
+                            : (maxSeasonNum + 1 + i),
+                        chronologyLabel: entry.chronologyLabel || null,
+                        chronologyItemLabel: entry.chronologyItemLabel || null,
                         isMovie: true
                     });
                 });
                 seriesGroup.sort((a, b) => (a.seasonNum || 0) - (b.seasonNum || 0));
+            } else if (this.isChronologyGroup(baseSlug)) {
+                groups.set(baseSlug, entries.map(entry => ({
+                    slug: entry.slug,
+                    anime: entry.anime,
+                    seasonNum: entry.seasonNum || 0,
+                    chronologyLabel: entry.chronologyLabel || null,
+                    chronologyItemLabel: entry.chronologyItemLabel || null,
+                    isMovie: false
+                })));
             } else {
                 groups.set(groupKey, entries);
             }
@@ -514,5 +650,6 @@ window.AnimeTracker = window.AnimeTracker || {};
 window.AnimeTracker.CONFIG = CONFIG;
 window.AnimeTracker.DONATE_LINKS = DONATE_LINKS;
 window.AnimeTracker.ANIME_PARTS_CONFIG = ANIME_PARTS_CONFIG;
+window.AnimeTracker.CANONICAL_EPISODE_OFFSET_MAPPING = CANONICAL_EPISODE_OFFSET_MAPPING;
 window.AnimeTracker.SERIES_MOVIE_MERGE_SLUGS = SERIES_MOVIE_MERGE_SLUGS;
 window.AnimeTracker.SeasonGrouping = SeasonGrouping;

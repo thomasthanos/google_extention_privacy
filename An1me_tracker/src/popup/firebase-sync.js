@@ -356,29 +356,15 @@ const FirebaseSync = {
             // the authoritative merge below — saves a redundant chrome.storage read.
             const localData = await readLocalSyncData();
 
-            // On Orion/mobile (no SW), merge local videoProgress into the cloud doc
-            // before proceeding, to avoid losing progress saved by content scripts.
-            // Pre-merge: patch in-memory cloudData with local videoProgress so the
-            // main merge below sees the combined VP. We do NOT write to the cloud here
-            // to avoid overwriting animeData with stale cloud-only values; the final
-            // cloud write after the full merge handles everything.
-            if (cloudData && localData.userId === this.currentUser.uid &&
-                    localData.videoProgress && Object.keys(localData.videoProgress).length > 0) {
-                try {
-                    const cloudVP = cloudData.videoProgress || {};
-                    const localVP = localData.videoProgress;
-                    const merged = AnimeTracker.MergeUtils.mergeVideoProgress(localVP, cloudVP);
-                    cloudData = { ...cloudData, videoProgress: merged };
-                } catch (e) {
-                    PopupLogger.warn('Sync', 'Pre-merge VP patch failed (non-critical):', e.message);
-                }
-            }
+            // Note: videoProgress merge happens once in the main merge block
+            // below (line ~389). No pre-merge needed — the main merge already
+            // handles the local/cloud combination correctly.
             let finalData;
 
             if (cloudData) {
                 const shouldMerge = localData.userId === this.currentUser.uid;
 
-                const mergedDeletedAnime = AnimeTracker.MergeUtils.mergeDeletedAnime(
+                let mergedDeletedAnime = AnimeTracker.MergeUtils.mergeDeletedAnime(
                     localData.deletedAnime || {},
                     cloudData.deletedAnime || {}
                 );
@@ -400,6 +386,16 @@ const FirebaseSync = {
                 const localGroupCovers = localData.groupCoverImages || {};
                 const cloudGroupCovers = cloudData.groupCoverImages || {};
                 const mergedGroupCovers = AnimeTracker.MergeUtils.mergeGroupCoverImages(localGroupCovers, cloudGroupCovers);
+
+                const normalized = ProgressManager.normalizeCanonicalSlugs(
+                    finalData.animeData || {},
+                    finalData.videoProgress || {},
+                    mergedDeletedAnime || {}
+                );
+                const withoutAutoRepaired = ProgressManager.removeAutoRepairedEpisodes(normalized.animeData || {});
+                finalData.animeData = ProgressManager.removeDuplicateEpisodes(withoutAutoRepaired.cleanedData);
+                finalData.videoProgress = normalized.videoProgress || {};
+                mergedDeletedAnime = normalized.deletedAnime || {};
 
                 AnimeTracker.MergeUtils.applyDeletedAnime(finalData.animeData, mergedDeletedAnime);
 
@@ -477,10 +473,17 @@ const FirebaseSync = {
                 }
             } else {
                 if (localData.userId === this.currentUser.uid && localData.animeData && Object.keys(localData.animeData).length > 0) {
+                    const normalized = ProgressManager.normalizeCanonicalSlugs(
+                        localData.animeData || {},
+                        localData.videoProgress || {},
+                        localData.deletedAnime || {}
+                    );
+                    const withoutAutoRepaired = ProgressManager.removeAutoRepairedEpisodes(normalized.animeData || {});
+
                     finalData = {
-                        animeData: ProgressManager.removeDuplicateEpisodes(localData.animeData || {}),
-                        videoProgress: localData.videoProgress || {},
-                        deletedAnime: localData.deletedAnime || {},
+                        animeData: ProgressManager.removeDuplicateEpisodes(withoutAutoRepaired.cleanedData),
+                        videoProgress: normalized.videoProgress || {},
+                        deletedAnime: normalized.deletedAnime || {},
                         groupCoverImages: localData.groupCoverImages || {}
                     };
 

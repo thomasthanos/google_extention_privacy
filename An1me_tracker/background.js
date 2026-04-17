@@ -578,13 +578,14 @@ async function syncProgressOnly() {
         // This reduces 3 reads + 1 write → 0 reads + 1 write per progress sync.
         const url       = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         const fieldMask = 'updateMask.fieldPaths=videoProgress&updateMask.fieldPaths=lastUpdated';
+        const pushedAt = new Date().toISOString();
         const response  = await fetch(`${url}?${fieldMask}`, {
             method:  'PATCH',
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
             body:    JSON.stringify({
                 fields: jsonToFirestoreFields({
                     videoProgress: localVP,
-                    lastUpdated:   new Date().toISOString()
+                    lastUpdated:   pushedAt
                 })
             })
         });
@@ -594,9 +595,11 @@ async function syncProgressOnly() {
             // Refresh cached cloud doc optimistically so the next full sync
             // doesn't re-GET to discover our own write.
             if (_bgCloudDocCache) {
-                _bgCloudDocCache = { ..._bgCloudDocCache, videoProgress: localVP };
+                _bgCloudDocCache = { ..._bgCloudDocCache, videoProgress: localVP, lastUpdated: pushedAt };
                 _bgCloudDocCacheTime = Date.now();
             }
+            _lastAppliedCloudUpdatedAt = pushedAt;
+            bgRememberOwnWrite(pushedAt);
         } else {
             console.warn('[BG] Progress sync failed:', response.status);
             if (response.status >= 500) invalidateBgCloudDocCache();
@@ -697,6 +700,7 @@ async function syncToFirebase() {
             'animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'lastUpdated', 'email'
         ].map(f => `updateMask.fieldPaths=${f}`).join('&');
 
+        const pushedAt = new Date().toISOString();
         const response = await fetch(`${url}?${fieldMask}`, {
             method:  'PATCH',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -706,7 +710,7 @@ async function syncToFirebase() {
                     videoProgress:    mergedProgress,
                     deletedAnime:     mergedDeleted,
                     groupCoverImages: mergedGroup,
-                    lastUpdated:      new Date().toISOString(),
+                    lastUpdated:      pushedAt,
                     email:            user.email
                 })
             })
@@ -719,9 +723,12 @@ async function syncToFirebase() {
                 animeData:        mergedAnime,
                 videoProgress:    mergedProgress,
                 deletedAnime:     mergedDeleted,
-                groupCoverImages: mergedGroup
+                groupCoverImages: mergedGroup,
+                lastUpdated:      pushedAt
             };
             _bgCloudDocCacheTime = Date.now();
+            _lastAppliedCloudUpdatedAt = pushedAt;
+            bgRememberOwnWrite(pushedAt);
         } else {
             console.error('[BG] Sync failed:', response.status);
             if (response.status >= 500) invalidateBgCloudDocCache();
@@ -787,15 +794,29 @@ async function _drainCloudUpdates() {
     }
 }
 
+// Track own recent writes to drop SSE self-echo without rejecting legitimate
+// remote updates from devices with clock skew.
+const _bgRecentOwnWrites = [];
+const _BG_MAX_RECENT_OWN_WRITES = 20;
+function bgRememberOwnWrite(ts) {
+    if (!ts) return;
+    _bgRecentOwnWrites.push(ts);
+    if (_bgRecentOwnWrites.length > _BG_MAX_RECENT_OWN_WRITES) _bgRecentOwnWrites.shift();
+}
+function bgIsOwnEcho(ts) {
+    return !!ts && _bgRecentOwnWrites.includes(ts);
+}
+
 async function _doApplyCloudUpdate(cloudDoc) {
     if (!cloudDoc) return;
 
     // Skip while a full sync is in progress — it already merges cloud data
     if (syncInProgress) return;
 
-    // Dedup by cloud lastUpdated — avoid re-merging an already-applied snapshot
+    // Drop self-echo (our own write coming back via SSE). Remote updates with
+    // earlier timestamps (clock skew) pass through.
     const cloudUpdatedAt = cloudDoc.lastUpdated || null;
-    if (cloudUpdatedAt && cloudUpdatedAt === _lastAppliedCloudUpdatedAt) {
+    if (cloudUpdatedAt && bgIsOwnEcho(cloudUpdatedAt)) {
         return;
     }
 
@@ -848,8 +869,18 @@ async function _doApplyCloudUpdate(cloudDoc) {
 
 async function startRealtimeListener() {
     if (rtConsecutiveFailures >= RT_MAX_FAILURES) {
-        console.warn(`[BG-RT] ${RT_MAX_FAILURES} consecutive failures — pausing listener. Will retry on next alarm.`);
-        return;
+        const now = Date.now();
+        if (!rtPausedAt) rtPausedAt = now;
+        // After 10 minutes of paused state, clear the circuit breaker once
+        // and try again — the root cause may have been transient (poor signal,
+        // server hiccup, token refresh glitch).
+        if (now - rtPausedAt < RT_PAUSE_AFTER_MAX_MS) {
+            console.warn(`[BG-RT] paused (${rtConsecutiveFailures} fails) — retrying in ${Math.round((RT_PAUSE_AFTER_MAX_MS - (now - rtPausedAt))/1000)}s`);
+            return;
+        }
+        console.warn('[BG-RT] pause window elapsed, attempting recovery');
+        rtConsecutiveFailures = 0;
+        rtPausedAt = 0;
     }
 
     if (rtListenAbort) rtListenAbort.abort();
@@ -955,6 +986,7 @@ async function startRealtimeListener() {
     const uptimeMs = streamOpenedAt > 0 ? Date.now() - streamOpenedAt : 0;
     if (streamSucceeded && uptimeMs >= 15000) {
         rtConsecutiveFailures = 0;
+        rtPausedAt = 0;
         rtReconnectDelay = 5000;
     } else {
         rtConsecutiveFailures++;
@@ -1412,6 +1444,24 @@ async function fetchAnimePageInfo(slug) {
         status = 'RELEASING';
     }
 
+    // ── Next scheduled episode countdown ───────────────────────────────────
+    let nextEpisodeAt = null;
+    let nextEpisodeTimezone = null;
+    const countdownMatch = html.match(
+        /<div[^>]+class=["'][^"']*next-scheduled-episode[^"']*["'][\s\S]*?<span[^>]+data-timezone=["']([^"']+)["'][^>]+data-countdown=["']([^"']+)["']/i
+    ) || html.match(
+        /<span[^>]+data-timezone=["']([^"']+)["'][^>]+data-countdown=["']([^"']+)["'][^>]*>/i
+    );
+    if (countdownMatch) {
+        nextEpisodeTimezone = countdownMatch[1] || null;
+        const rawCountdown = countdownMatch[2] || '';
+        const normalizedCountdown = rawCountdown.trim().replace(' ', 'T');
+        const parsedCountdown = new Date(normalizedCountdown);
+        if (Number.isFinite(parsedCountdown.getTime())) {
+            nextEpisodeAt = parsedCountdown.toISOString();
+        }
+    }
+
     // ── Cover image ─────────────────────────────────────────────────────────
     // Try multiple selectors: the site uses class="anime-main-image" on the
     // /anime/{slug}/ page. Fall back to OG/meta image or schema.org image.
@@ -1434,7 +1484,16 @@ async function fetchAnimePageInfo(slug) {
         || html.match(/showWatchlistModal\(['"]#watchlist-(\d+)['"]\)/);
     if (idMatch) siteAnimeId = parseInt(idMatch[1], 10);
 
-    return { totalEpisodes, status, latestEpisode, coverImage, siteAnimeId, resolvedSlug };
+    return {
+        totalEpisodes,
+        status,
+        latestEpisode,
+        nextEpisodeAt,
+        nextEpisodeTimezone,
+        coverImage,
+        siteAnimeId,
+        resolvedSlug
+    };
 }
 
 // ─── Batch anime info fetcher (runs in background) ──────────────────────────

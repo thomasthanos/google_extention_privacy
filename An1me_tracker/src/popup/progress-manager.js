@@ -8,6 +8,10 @@ const ProgressManager = {
         return window.AnimeTracker.SlugUtils.getCanonicalSlug(slug, title);
     },
 
+    getCanonicalTitle(slug, title = '') {
+        return window.AnimeTracker.SlugUtils.getCanonicalTitle(slug, title);
+    },
+
     /**
      * Merge known slug aliases into canonical slugs (anime + progress + deleted markers).
      */
@@ -15,6 +19,7 @@ const ProgressManager = {
         const normalizedAnime = { ...(animeData || {}) };
         const normalizedProgress = { ...(videoProgress || {}) };
         const normalizedDeleted = { ...(deletedAnime || {}) };
+        const canonicalEpisodeOffsets = window.AnimeTracker?.CANONICAL_EPISODE_OFFSET_MAPPING || {};
         let changed = false;
 
         const pickNewerEpisode = (current, candidate) => {
@@ -71,6 +76,7 @@ const ProgressManager = {
             const oldAnime = normalizedAnime[oldSlug];
             const canonicalSlug = this.getCanonicalSlug(oldSlug, oldAnime?.title || '');
             if (!canonicalSlug || canonicalSlug === oldSlug) continue;
+            const episodeOffset = Number(canonicalEpisodeOffsets[oldSlug]) || 0;
 
             changed = true;
             const target = ensureTarget(canonicalSlug, oldAnime);
@@ -81,21 +87,25 @@ const ProgressManager = {
                 if (num > 0) episodeMap.set(num, ep);
             }
             for (const ep of oldAnime?.episodes || []) {
-                const num = Number(ep?.number) || 0;
+                const num = (Number(ep?.number) || 0) + episodeOffset;
                 if (num <= 0) continue;
-                episodeMap.set(num, pickNewerEpisode(episodeMap.get(num), ep));
+                episodeMap.set(num, pickNewerEpisode(episodeMap.get(num), { ...ep, number: num }));
             }
             target.episodes = Array.from(episodeMap.values()).sort((a, b) => a.number - b.number);
             target.totalWatchTime = target.episodes.reduce((sum, ep) => sum + (Number(ep.duration) || 0), 0);
 
             if (!target.coverImage && oldAnime?.coverImage) target.coverImage = oldAnime.coverImage;
-            if ((!target.title || target.title.trim() === '') && oldAnime?.title) target.title = oldAnime.title;
+            if ((!target.title || target.title.trim() === '') && oldAnime?.title) {
+                target.title = this.getCanonicalTitle(canonicalSlug, oldAnime.title);
+            } else if (target.title) {
+                target.title = this.getCanonicalTitle(canonicalSlug, target.title);
+            }
 
             const oldLast = new Date(oldAnime?.lastWatched || 0).getTime();
             const targetLast = new Date(target?.lastWatched || 0).getTime();
             if (oldLast > targetLast) target.lastWatched = oldAnime.lastWatched;
 
-            const oldTotal = Number.isFinite(oldAnime?.totalEpisodes) ? oldAnime.totalEpisodes : null;
+            const oldTotal = Number.isFinite(oldAnime?.totalEpisodes) ? oldAnime.totalEpisodes + episodeOffset : null;
             const targetTotal = Number.isFinite(target?.totalEpisodes) ? target.totalEpisodes : null;
             const maxTracked = target.episodes.reduce((m, ep) => Math.max(m, Number(ep?.number) || 0), 0);
             target.totalEpisodes = [oldTotal, targetTotal, maxTracked].filter(n => Number.isFinite(n) && n > 0).reduce((m, n) => Math.max(m, n), null);
@@ -108,7 +118,7 @@ const ProgressManager = {
                     delete normalizedProgress[key];
                     continue;
                 }
-                const epNum = parseInt(match[1], 10);
+                const epNum = parseInt(match[1], 10) + episodeOffset;
                 const newKey = `${canonicalSlug}__episode-${epNum}`;
                 normalizedProgress[newKey] = pickNewerProgress(normalizedProgress[newKey], normalizedProgress[key]);
                 if (newKey !== key) delete normalizedProgress[key];
@@ -178,6 +188,40 @@ const ProgressManager = {
         }
 
         return cleaned;
+    },
+
+    /**
+     * Remove previously auto-repaired episodes so totals only reflect
+     * explicitly tracked watches.
+     */
+    removeAutoRepairedEpisodes(animeData) {
+        if (!animeData || typeof animeData !== 'object') {
+            return { cleanedData: {}, removedCount: 0 };
+        }
+
+        const cleanedData = { ...animeData };
+        let removedCount = 0;
+
+        for (const [slug, anime] of Object.entries(cleanedData)) {
+            if (!anime || !Array.isArray(anime.episodes)) continue;
+
+            const originalEpisodes = anime.episodes;
+            const filteredEpisodes = originalEpisodes.filter(ep => !ep?.autoRepaired);
+
+            if (filteredEpisodes.length === originalEpisodes.length) continue;
+
+            removedCount += originalEpisodes.length - filteredEpisodes.length;
+            anime.episodes = filteredEpisodes.sort((a, b) => (Number(a?.number) || 0) - (Number(b?.number) || 0));
+            anime.totalWatchTime = anime.episodes.reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
+
+            const latestWatchedAt = anime.episodes.reduce((latest, ep) => {
+                const ts = new Date(ep?.watchedAt || 0).getTime();
+                return ts > latest ? ts : latest;
+            }, 0);
+            anime.lastWatched = latestWatchedAt > 0 ? new Date(latestWatchedAt).toISOString() : null;
+        }
+
+        return { cleanedData, removedCount };
     },
 
     /**

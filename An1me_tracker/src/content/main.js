@@ -320,7 +320,9 @@
         const videoElement = VideoMonitor.getVideoElement();
 
         if (animeInfo && trackingState !== TrackingState.COMPLETED && videoElement && videoElement.currentTime > 0) {
-            ProgressTracker.saveVideoProgress(animeInfo.uniqueId, videoElement.currentTime, videoElement.duration, false);
+            // force=true → use PAUSE_WRITE_THROTTLE_MS (15s) so seeks don't
+            // get lost if the user closes the tab right after scrubbing.
+            ProgressTracker.saveVideoProgress(animeInfo.uniqueId, videoElement.currentTime, videoElement.duration, true, false);
         }
     };
 

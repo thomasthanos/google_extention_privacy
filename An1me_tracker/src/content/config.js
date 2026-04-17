@@ -7,8 +7,8 @@ const ContentConfig = {
     DEBOUNCE_DELAY: 300,             // Faster debounce for quicker detection
     VIDEO_CHECK_INTERVAL: 1500,      // Check more frequently
     MAX_RETRIES: 60,
-    PROGRESS_SAVE_INTERVAL: 45000,   // Probe video every 45s while playing (write may still be throttled below)
-    PROGRESS_WRITE_THROTTLE_MS: 45000, // Local storage write throttle while playing — reduces write volume
+    PROGRESS_SAVE_INTERVAL: 60000,   // Probe video every 60s while playing
+    PROGRESS_WRITE_THROTTLE_MS: 90000, // Local storage write throttle while playing — 90s keeps Firestore write volume low
     PAUSE_WRITE_THROTTLE_MS: 15000,  // Throttle for pause/seek saves — medium responsiveness
     FORCED_PROGRESS_WRITE_THROTTLE_MS: 3000, // Throttle for urgent saves (tab change / pagehide) — snapshot fast before tab hides
     MIN_PROGRESS_TO_SAVE: 5,
@@ -30,6 +30,10 @@ const EPISODE_OFFSET_MAPPING = {
     // Bleach TYBW - Part 3 starts at episode 27 (after 13 + 13 episodes)
     'bleach-sennen-kessen-hen-soukoku-tan': 26,
 
+    // Fate/Zero split-cour second half continues from episode 14.
+    'fate-zero-season-2': 13,
+    'fate-zero-2nd-season': 13,
+
     // Add more multi-part anime here as needed
 };
 
@@ -38,6 +42,10 @@ const SLUG_NORMALIZATION = {
     // Bleach TYBW - all parts save to the same base slug
     'bleach-sennen-kessen-hen-ketsubetsu-tan': 'bleach-sennen-kessen-hen',
     'bleach-sennen-kessen-hen-soukoku-tan': 'bleach-sennen-kessen-hen',
+
+    // Fate/Zero is one 25-episode series split into two cours on the site.
+    'fate-zero-season-2': 'fate-zero',
+    'fate-zero-2nd-season': 'fate-zero',
 
     // Add more multi-part anime here as needed
 };

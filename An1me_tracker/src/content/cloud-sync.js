@@ -182,7 +182,21 @@
     // per-push GET on every progress flush.
     let _cloudDocCache     = null;
     let _cloudDocCacheTime = 0;
-    const _CLOUD_DOC_TTL   = 30000; // 30 s
+    let _lastAppliedCloudUpdatedAt = null;
+    const _CLOUD_DOC_TTL   = 120000; // 2 min — SSE stream keeps us fresh, GET is just a fallback
+
+    // Track our own recent writes so we can drop the SSE self-echo without
+    // discarding legitimate updates from other devices with clock skew.
+    const _recentOwnWrites = [];
+    const _MAX_RECENT_OWN_WRITES = 20;
+    function rememberOwnWrite(ts) {
+        if (!ts) return;
+        _recentOwnWrites.push(ts);
+        if (_recentOwnWrites.length > _MAX_RECENT_OWN_WRITES) _recentOwnWrites.shift();
+    }
+    function isOwnEcho(ts) {
+        return !!ts && _recentOwnWrites.includes(ts);
+    }
 
     function invalidateCloudDocCache() {
         _cloudDocCache = null;
@@ -288,10 +302,11 @@
 
             const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
             const updateMask = 'updateMask.fieldPaths=videoProgress&updateMask.fieldPaths=lastUpdated';
+            const pushedAt = new Date().toISOString();
             const body = JSON.stringify({
                 fields: toFSFields({
                     videoProgress: mergedVP,
-                    lastUpdated:   new Date().toISOString()
+                    lastUpdated:   pushedAt
                 })
             });
             const res = await fetch(`${url}?${updateMask}`, {
@@ -306,9 +321,11 @@
                 lastPushAt = Date.now();
                 // Update cloud cache optimistically so the next push doesn't re-GET
                 if (_cloudDocCache) {
-                    _cloudDocCache = { ..._cloudDocCache, videoProgress: mergedVP };
+                    _cloudDocCache = { ..._cloudDocCache, videoProgress: mergedVP, lastUpdated: pushedAt };
                     _cloudDocCacheTime = Date.now();
                 }
+                _lastAppliedCloudUpdatedAt = pushedAt;
+                rememberOwnWrite(pushedAt);
                 Logger?.info('videoProgress pushed (merged)');
             } else {
                 Logger?.warn(`Direct progress push failed: ${res.status}`);
@@ -398,13 +415,14 @@
                 return;
             }
 
+            const pushedAt = new Date().toISOString();
             const body = JSON.stringify({
                 fields: toFSFields({
                     animeData:        mergedAnime,
                     videoProgress:    mergedProgress,
                     deletedAnime:     mergedDeleted,
                     groupCoverImages: mergedGroupCovers,
-                    lastUpdated:      new Date().toISOString(),
+                    lastUpdated:      pushedAt,
                     email:            user.email
                 })
             });
@@ -429,9 +447,12 @@
                     animeData:        mergedAnime,
                     videoProgress:    mergedProgress,
                     deletedAnime:     mergedDeleted,
-                    groupCoverImages: mergedGroupCovers
+                    groupCoverImages: mergedGroupCovers,
+                    lastUpdated:      pushedAt
                 };
                 _cloudDocCacheTime = Date.now();
+                _lastAppliedCloudUpdatedAt = pushedAt;
+                rememberOwnWrite(pushedAt);
                 Logger?.info('Full push to Firestore complete');
             } else {
                 Logger?.warn(`Full push failed: ${res.status}`);
@@ -488,7 +509,7 @@
 
     let progressDebounce    = null;
     let progressMaxWaitTimer = null;
-    const PROGRESS_MAX_WAIT_MS = 25000; // cap
+    const PROGRESS_MAX_WAIT_MS = 90000; // 90s cap — balances live cross-device sync vs Firestore write quota
 
     async function flushProgressPush() {
         if (progressDebounce)    { clearTimeout(progressDebounce);    progressDebounce = null; }
@@ -500,7 +521,7 @@
         }
     }
 
-    function scheduleProgressPush(delay = 20000) {
+    function scheduleProgressPush(delay = 60000) {
         if (progressDebounce) clearTimeout(progressDebounce);
         progressDebounce = setTimeout(() => {
             progressDebounce = null;
@@ -542,7 +563,7 @@
     // ─── Periodic forced push ─────────────────────────────────────────────────
     // The debounce pattern avoids excessive cloud writes while playback is active.
     // A periodic push still guarantees progress reaches the cloud reliably.
-    const PERIODIC_PUSH_INTERVAL = 45000; // 45 s
+    const PERIODIC_PUSH_INTERVAL = 120000; // 2 min — storage.onChanged already schedules pushes; this is a fallback
     let periodicPushTimer = null;
     let lastPushAt = 0;
     // Tracks what was on disk at the last periodic tick, so we can skip the
@@ -616,6 +637,11 @@
 
     async function applyCloudUpdate(cloudDoc) {
         if (!cloudDoc) return;
+        const cloudUpdatedAt = cloudDoc.lastUpdated || null;
+        if (cloudUpdatedAt && isOwnEcho(cloudUpdatedAt)) {
+            Logger?.debug(`Ignoring own-echo cloud update (${cloudUpdatedAt})`);
+            return;
+        }
         // Refresh cloud cache from the stream — always current by definition
         _cloudDocCache = cloudDoc;
         _cloudDocCacheTime = Date.now();
@@ -654,6 +680,7 @@
                 });
                 Logger?.info(`Cloud update applied (eps: ${localEps}→${mergedEps})`);
             }
+            if (cloudUpdatedAt) _lastAppliedCloudUpdatedAt = cloudUpdatedAt;
         } catch (e) {
             Logger?.warn(`Apply cloud update failed: ${e.message}`);
         }
@@ -849,7 +876,7 @@
                 if (isOrionMode) {
                     scheduleFullPush(3000);
                 } else {
-                    scheduleProgressPush(20000);
+                    scheduleProgressPush(60000);
                 }
             }
         });

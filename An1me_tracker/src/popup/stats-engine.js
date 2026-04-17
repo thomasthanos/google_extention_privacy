@@ -214,34 +214,119 @@
     // Returns { etaDate, epsPerDay, remaining, confidence } or null if not predictable.
     function predictCompletion(anime, index) {
         if (!anime || !Array.isArray(anime.episodes) || anime.episodes.length < 3) return null;
-        const total = Number(anime.totalEpisodes) || 0;
-        if (!total || total <= anime.episodes.length) return null;
+
+        const watchedSet = new Set(
+            anime.episodes
+                .map(ep => Number(ep?.number))
+                .filter(n => Number.isFinite(n) && n > 0)
+        );
+        const watchedCount = watchedSet.size;
+        if (watchedCount < 3) return null;
+
+        const anilist = window.AnimeTracker?.AnilistService;
+        const configuredTarget = Number(anime.targetEpisodes) || 0;
+        const total = configuredTarget || Number(anime.totalEpisodes) || Number(anilist?.getTotalEpisodes?.(anime.slug)) || 0;
+        const allowSingleEpisodeForecast = !!anime.allowSingleEpisodeForecast;
+        if (!total) return null;
 
         const slug = anime.slug;
-        const meta = index?.perAnime?.get(slug);
-        if (!meta || meta.distinctDays < 3) return null;
+        const meta = index?.perAnime?.get(slug) || null;
 
-        const rate = meta.rateEpsPerDay; // eps/day over the user's watching span
+        const byDay = new Map();
+        let firstWatch = null;
+        let mostRecentWatch = null;
+        for (const ep of anime.episodes) {
+            const d = parseDate(ep?.watchedAt);
+            if (!d) continue;
+            const dk = dayKey(d);
+            byDay.set(dk, (byDay.get(dk) || 0) + 1);
+            if (!firstWatch || d < firstWatch) firstWatch = d;
+            if (!mostRecentWatch || d > mostRecentWatch) mostRecentWatch = d;
+        }
+
+        const countEpisodesInWindow = (days) => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            let count = 0;
+
+            for (let i = 0; i < days; i++) {
+                const d = new Date(today);
+                d.setDate(today.getDate() - i);
+                count += byDay.get(dayKey(d)) || 0;
+            }
+
+            return count;
+        };
+
+        const fallbackSpanDays = (firstWatch && mostRecentWatch)
+            ? Math.max(1, daysBetween(dayKey(firstWatch), dayKey(mostRecentWatch)) + 1)
+            : Math.max(3, Math.min(21, watchedCount));
+        const fallbackDistinctDays = Math.max(1, byDay.size);
+        const spanRate = meta?.rateEpsPerDay || (watchedCount / fallbackSpanDays);
+        const distinctDays = meta?.distinctDays || fallbackDistinctDays;
+        const activeDayRate = watchedCount / Math.max(1, distinctDays);
+        const recent7Count = countEpisodesInWindow(7);
+        const recent14Count = countEpisodesInWindow(14);
+        const recent7Rate = recent7Count / 7;
+        const recent14Rate = recent14Count / 14;
+
+        let rate = (spanRate * 0.2) + (recent14Rate * 0.35) + (recent7Rate * 0.45);
+        if (recent14Count === 0) {
+            rate = (spanRate * 0.65) + (Math.min(activeDayRate, spanRate * 1.5) * 0.35);
+        }
+        if (!meta || distinctDays < 2) {
+            const conservativeFallback = Math.min(2.5, Math.max(0.4, watchedCount / Math.max(7, fallbackSpanDays)));
+            rate = Math.max(rate || 0, conservativeFallback);
+        }
+
+        if (mostRecentWatch) {
+            const daysSinceLastWatch = Math.max(0, daysBetween(dayKey(mostRecentWatch), dayKey(new Date())));
+            if (daysSinceLastWatch >= 7) rate *= 0.8;
+            if (daysSinceLastWatch >= 14) rate *= 0.7;
+        }
+
+        rate = Math.max(rate, 1 / 45);
         if (!rate || !Number.isFinite(rate) || rate <= 0) return null;
 
-        const remaining = total - anime.episodes.length;
-        const daysLeft = remaining / rate;
+        const remaining = Math.max(0, total - watchedCount);
+        if (remaining <= 0 && !allowSingleEpisodeForecast) return null;
+        let daysLeft = remaining / rate;
+        if (remaining <= 0 && allowSingleEpisodeForecast) {
+            daysLeft = Math.max(1 / rate, 0.25);
+        }
+
+        const anilistStatus = anilist?.getStatus?.(slug);
+        const latestAvailable = Number(anilist?.getLatestEpisode?.(slug)) || 0;
+        const releaseFloorDays = !configuredTarget && anilistStatus === 'RELEASING' && total > latestAvailable && latestAvailable > 0
+            ? (total - latestAvailable) * 7
+            : 0;
+
+        daysLeft = Math.max(daysLeft, releaseFloorDays);
         if (!Number.isFinite(daysLeft) || daysLeft <= 0 || daysLeft > 365 * 10) return null;
 
         const eta = new Date();
         eta.setDate(eta.getDate() + Math.ceil(daysLeft));
 
-        // Confidence: more distinct days + more episodes = higher
         let confidence = 'low';
-        if (meta.distinctDays >= 7 && anime.episodes.length >= 6) confidence = 'medium';
-        if (meta.distinctDays >= 14 && anime.episodes.length >= 12) confidence = 'high';
+        if (distinctDays >= 6 && watchedCount >= 5 && recent14Count >= 3) confidence = 'medium';
+        if (distinctDays >= 12 && watchedCount >= 10 && recent14Count >= 6) confidence = 'high';
+        if (recent14Count === 0) confidence = 'low';
+        if (!meta || distinctDays < 2) confidence = 'low';
+        if (releaseFloorDays > 0 && confidence === 'high') confidence = 'medium';
 
         return {
             etaDate: eta,
             epsPerDay: rate,
             remaining,
             daysLeft: Math.ceil(daysLeft),
-            confidence
+            confidence,
+            model: remaining <= 0 && allowSingleEpisodeForecast
+                ? 'next-drop-pace'
+                : (releaseFloorDays > 0 ? 'release-aware' : (configuredTarget ? 'catch-up-aware' : 'pace-aware')),
+            releaseFloorDays,
+            recent7Rate,
+            recent14Rate,
+            spanRate
         };
     }
 

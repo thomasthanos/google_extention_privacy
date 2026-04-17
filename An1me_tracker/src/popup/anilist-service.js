@@ -33,6 +33,13 @@ const AnilistService = {
         return data.latestEpisode;
     },
 
+    /** Returns the estimated next-episode date from an1me.to, or null. */
+    getNextEpisodeAt(slug) {
+        const data = this.cache[slug];
+        if (!data || !data.nextEpisodeAt) return null;
+        return data.nextEpisodeAt;
+    },
+
     // ── Cache management ────────────────────────────────────────────────────────
 
     /** Load previously cached entries from chrome.storage. */
@@ -119,7 +126,9 @@ const AnilistService = {
             // Collect slugs that need fetching
             const slugsToFetch = Object.keys(animeData).filter(slug => {
                 const cached = this.cache[slug];
-                return !cached || !cached.cachedAt;
+                if (!cached || !cached.cachedAt) return true;
+                if (cached.status === 'RELEASING' && !cached.nextEpisodeAt) return true;
+                return false;
             });
 
             if (slugsToFetch.length === 0) {

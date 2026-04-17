@@ -236,8 +236,9 @@ const AnimeCardRenderer = {
         const totalProgressText = displayTotal > 0 ? `${currentEpisode}/${displayTotal}` : `${currentEpisode}`;
         const episodeProgressText = currentEpisode > 0 ? `Ep ${totalProgressText}` : '';
         const isDropped = !!anime.droppedAt;
+        const isOnHold = !!anime.onHoldAt;
         // Detect "caught up with airing" — user watched everything available on site
-        const _isCaughtUpAiring = !isDropped && !isCardComplete && totalWatchedEpisodes > 0
+        const _isCaughtUpAiring = !isDropped && !isOnHold && !isCardComplete && totalWatchedEpisodes > 0
             && _hasAnilistData && _latestAvail > 0
             && highestCompletedEp >= _latestAvail
             && (anilistStatusForProgress === 'RELEASING' || _isPartiallyUploaded);
@@ -245,6 +246,8 @@ const AnimeCardRenderer = {
         let statusTextCard = '';
         if (isDropped) {
             statusTextCard = 'Dropped';
+        } else if (isOnHold) {
+            statusTextCard = 'On hold';
         } else if (totalWatchedEpisodes === 0) {
             statusTextCard = 'Not started';
         } else if (_isCaughtUpAiring) {
@@ -266,37 +269,83 @@ const AnimeCardRenderer = {
         } else {
             timeAgoText = anime.lastWatched ? UIHelpers.formatDate(anime.lastWatched) : 'Never';
         }
-        const progressBadge = !isCardComplete && !isDropped && episodeProgressText
+        const progressBadge = !isCardComplete && !isDropped && !isOnHold && episodeProgressText
             ? `<span class="meta-badge meta-badge-progress">${episodeProgressText}</span>`
             : '';
-        const statusBadgeClass = isDropped ? 'meta-badge-dropped' : (isCardComplete ? 'meta-badge-complete' : (_isCaughtUpAiring ? 'meta-badge-airing' : (totalWatchedEpisodes > 0 ? 'meta-badge-watching' : 'meta-badge-notstarted')));
-        const statusBadgeIcon = isDropped ? '⏸' : (isCardComplete ? '✓' : (_isCaughtUpAiring ? '⊙' : '⊙'));
+        const statusBadgeClass = isDropped
+            ? 'meta-badge-dropped'
+            : (isOnHold
+                ? 'meta-badge-onhold'
+                : (isCardComplete
+                    ? 'meta-badge-complete'
+                    : (_isCaughtUpAiring ? 'meta-badge-airing' : (totalWatchedEpisodes > 0 ? 'meta-badge-watching' : 'meta-badge-notstarted'))));
+        const statusBadgeIcon = isDropped ? '⏸' : (isOnHold ? '⏸' : (isCardComplete ? '✓' : (_isCaughtUpAiring ? '⊙' : '⊙')));
         const statusBadge = `<span class="meta-badge ${statusBadgeClass}">${statusBadgeIcon} ${statusTextCard}</span>`;
 
         const anilistStatus = AnilistService?.getStatus(slug);
         // Show separate airing badge only if the card status doesn't already say "Airing"
-        const airingBadge = anilistStatus === 'RELEASING' && !_isCaughtUpAiring
+        const airingBadge = anilistStatus === 'RELEASING' && !isDropped && !isOnHold && !_isCaughtUpAiring
             ? `<span class="meta-badge meta-badge-airing" title="Currently airing">⬤ Airing</span>`
             : '';
 
         // ── Completion prediction (AI-lite) ──
         // Shows an ETA badge when we have enough data to project a finish date.
         // Only for in-progress series where we know the total episode count.
-        let etaBadge = '';
+        let inlineEtaHtml = '';
         try {
             const StatsEngine = window.AnimeTracker?.StatsEngine;
-            if (StatsEngine && !isCardComplete && !isDropped && anime.totalEpisodes > 0) {
+            const knownTotalEpisodes = Number(anime.totalEpisodes) || Number(AnilistService?.getTotalEpisodes(slug)) || 0;
+            const nextEpisodeAtRaw = AnilistService?.getNextEpisodeAt(slug);
+            const nextEpisodeAt = nextEpisodeAtRaw ? new Date(nextEpisodeAtRaw) : null;
+            const hasUpcomingCountdown = !!nextEpisodeAt && Number.isFinite(nextEpisodeAt.getTime()) && nextEpisodeAt.getTime() > Date.now();
+
+            if (_isCaughtUpAiring && hasUpcomingCountdown) {
+                const diffMs = nextEpisodeAt.getTime() - Date.now();
+                const totalMinutes = Math.max(1, Math.floor(diffMs / 60000));
+                const days = Math.floor(totalMinutes / (60 * 24));
+                const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+                const minutes = totalMinutes % 60;
+                const countdownLabel = days > 0
+                    ? `${days}d ${hours}h`
+                    : `${hours}h ${minutes}m`;
+                const tip = `Estimated time until the next episode on an1me.to: ${nextEpisodeAt.toLocaleString()}`;
+                inlineEtaHtml = `<span class="meta-time-eta meta-time-eta-site" title="${UIHelpers.escapeHtml(tip)}">🚀 ${UIHelpers.escapeHtml(countdownLabel)}</span>`;
+            } else if (StatsEngine && !isCardComplete && !isDropped && !isOnHold && knownTotalEpisodes > 0) {
                 const allAnime = (window.AnimeTracker && window.AnimeTracker._animeDataRef) || null;
                 const idx = allAnime ? StatsEngine.buildWatchIndex(allAnime) : null;
-                const pred = idx ? StatsEngine.predictCompletion({ ...anime, slug }, idx) : null;
+                const isAiringLike = anilistStatus === 'RELEASING' || _isPartiallyUploaded;
+                const watchedEpisodes = Math.max(totalWatchedEpisodes, highestCompletedEp, currentEpisode);
+                const targetEpisodes = isAiringLike
+                    ? Math.max(_latestAvail || 0, watchedEpisodes, 0)
+                    : knownTotalEpisodes;
+                const pred = idx ? StatsEngine.predictCompletion({
+                    ...anime,
+                    slug,
+                    totalEpisodes: knownTotalEpisodes,
+                    targetEpisodes: targetEpisodes > 0 ? targetEpisodes : knownTotalEpisodes,
+                    allowSingleEpisodeForecast: !!(_isCaughtUpAiring && isAiringLike)
+                }, idx) : null;
                 if (pred) {
                     const eta = pred.etaDate;
-                    const label = eta.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                    let label = eta.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
                     const tipRate = pred.epsPerDay >= 1
                         ? `${pred.epsPerDay.toFixed(1)} ep/day`
-                        : `1 ep every ${Math.round(1 / pred.epsPerDay)} days`;
-                    const tip = `At ${tipRate}, you'll finish around ${eta.toLocaleDateString()} (${pred.remaining} left · ${pred.confidence} confidence)`;
-                    etaBadge = `<span class="meta-badge meta-badge-eta eta-${pred.confidence}" title="${UIHelpers.escapeHtml(tip)}">⏱ ~${UIHelpers.escapeHtml(label)}</span>`;
+                        : `1 ep every ${Math.max(1, Math.round(1 / pred.epsPerDay))} days`;
+                    let modelPrefix = 'Based on your recent watching pace';
+                    if (pred.model === 'release-aware') {
+                        modelPrefix = 'Based on your recent pace and weekly airing cadence';
+                    } else if (pred.model === 'catch-up-aware') {
+                        modelPrefix = 'Based on how fast you usually catch up on this anime';
+                    } else if (pred.model === 'next-drop-pace') {
+                        modelPrefix = 'Based on how fast you usually clear a new episode of this anime';
+                    }
+                    const remainingText = pred.remaining > 0
+                        ? `${pred.daysLeft} days left · ${pred.remaining} left`
+                        : `${pred.daysLeft} day${pred.daysLeft === 1 ? '' : 's'} after a new drop`;
+                    const tip = `${modelPrefix}: about ${tipRate}, ${pred.model === 'next-drop-pace' ? 'you usually catch up' : 'you should be caught up'} around ${eta.toLocaleDateString()} (${remainingText} · ${pred.confidence} confidence)`;
+                    if (pred.model !== 'next-drop-pace') {
+                        inlineEtaHtml = `<span class="meta-time-eta meta-time-eta-ai meta-time-eta-${pred.confidence}" title="${UIHelpers.escapeHtml(tip)}">~${UIHelpers.escapeHtml(label)}</span>`;
+                    }
                 }
             }
         } catch (e) {
@@ -310,13 +359,16 @@ const AnimeCardRenderer = {
             </div>`;
         const metaRowHtml = `
             <div class="anime-meta-row-wrap">
-                <div class="anime-meta-row">${progressBadge}${statusBadge}${airingBadge}${etaBadge}</div>
+                <div class="anime-meta-row">${progressBadge}${statusBadge}${airingBadge}</div>
                 <div class="anime-header-controls">
                     ${headerActionsHtml}
                     <div class="anime-expand-icon">${UIHelpers.createIcon('chevron')}</div>
                 </div>
             </div>
-            <span class="meta-time">${timeAgoText}</span>`;
+            <div class="meta-time-row">
+                <span class="meta-time">${timeAgoText}</span>
+                ${inlineEtaHtml}
+            </div>`;
 
         return `
             <div class="anime-card" data-slug="${slug}">
@@ -604,11 +656,25 @@ const AnimeCardRenderer = {
      * Create a season group box containing multiple seasons of the same anime
      */
     createSeasonGroup(baseSlug, seasons, videoProgress = {}) {
-        const { UIHelpers, SeasonGrouping, FillerService } = window.AnimeTracker;
+        const { UIHelpers, SeasonGrouping, FillerService, ANIME_PARTS_CONFIG, SlugUtils } = window.AnimeTracker;
+        const isChronologyGroup = SeasonGrouping.isChronologyGroup(baseSlug);
+        const canonicalPartParents = new Set(
+            seasons
+                .filter((season) => (ANIME_PARTS_CONFIG?.[season.slug] || []).length > 0)
+                .map((season) => season.slug)
+        );
+        const filteredSeasons = seasons.filter((season) => {
+            if (canonicalPartParents.size === 0) return true;
+            const canonicalSlug = SlugUtils?.getCanonicalSlug?.(season.slug, season.anime?.title || '') || season.slug;
+            return !canonicalPartParents.has(canonicalSlug) || season.slug === canonicalSlug;
+        });
 
         // Get the base title from the first season (usually Season 1)
-        const firstSeason = seasons[0];
-        const baseTitle = this.extractBaseTitle(firstSeason.anime.title);
+        const firstSeason = filteredSeasons[0] || seasons[0];
+        const baseTitle = SeasonGrouping.getGroupDisplayTitle(
+            baseSlug,
+            this.extractBaseTitle(firstSeason.anime.title)
+        );
 
         // ── Determine a cover image or placeholder for the season group ──
         // Use the coverImage of the first season's anime if available. Otherwise,
@@ -635,7 +701,7 @@ const AnimeCardRenderer = {
         // Calculate total stats across all seasons
         let latestWatched = null;
 
-        seasons.forEach(({ anime }) => {
+        filteredSeasons.forEach(({ anime }) => {
             if (anime.lastWatched) {
                 const date = new Date(anime.lastWatched);
                 if (!latestWatched || date > latestWatched) {
@@ -646,13 +712,13 @@ const AnimeCardRenderer = {
 
         // Expand parts-based anime into individual season items
         const expandedSeasons = [];
-        for (const season of seasons) {
-            const { ANIME_PARTS_CONFIG } = window.AnimeTracker;
+        for (const season of filteredSeasons) {
             const partsConfig = ANIME_PARTS_CONFIG?.[season.slug];
             if (partsConfig && partsConfig.length > 0) {
                 // Split into one entry per part
                 partsConfig.forEach((part, partIndex) => {
                     expandedSeasons.push({
+                        ...season,
                         slug: season.slug,
                         anime: season.anime,
                         seasonNum: season.seasonNum,
@@ -669,12 +735,18 @@ const AnimeCardRenderer = {
         const seasonData = expandedSeasons.map(({ slug, anime, partConfig }, index) => {
             const { CONFIG } = window.AnimeTracker;
             const episodeCount = anime.episodes?.length || 0;
+            const chronologyInfo = isChronologyGroup
+                ? SeasonGrouping.getChronologyInfo(baseSlug, slug, anime.title)
+                : null;
+            const separatorLabel = chronologyInfo?.separatorLabel || null;
 
             // For Naruto group with multiple seasons, use index to determine which season
             let seasonLabel;
             if (partConfig) {
                 // Part-based: label is the part name
                 seasonLabel = partConfig.name;
+            } else if (isChronologyGroup) {
+                seasonLabel = chronologyInfo?.itemLabel || anime.title || slug;
             } else if (baseSlug === 'naruto' && seasons.length > 1) {
                 if (index === 0) seasonLabel = 'Naruto';
                 else if (index === 1) seasonLabel = 'Shippuden';
@@ -720,13 +792,19 @@ const AnimeCardRenderer = {
 
                 if (partConfig) {
                     // Part-specific progress
+                    const displayStart = Number.isFinite(partConfig.displayStart) ? partConfig.displayStart : partConfig.start;
+                    const displayEnd = Number.isFinite(partConfig.displayEnd) ? partConfig.displayEnd : partConfig.end;
+                    const toDisplayEpisodeNumber = (episodeNumber) =>
+                        Number.isFinite(partConfig.displayStart)
+                            ? (episodeNumber - partConfig.start) + displayStart
+                            : episodeNumber;
                     const partProgress = (watchedInPart / partEpisodeCount) * 100;
                     progressPercent = Math.round(partProgress);
                     isComplete = watchedInPart >= partEpisodeCount;
                     hasProgress = watchedInPart > 0;
                     statusClass = isComplete ? 'complete' : (hasProgress ? 'in-progress' : 'not-started');
                     statusIcon = isComplete ? '✓' : (hasProgress ? '▶' : '○');
-                    episodeBadgeText = `Ep ${partConfig.start}-${partConfig.end}`;
+                    episodeBadgeText = `Ep ${displayStart}-${displayEnd}`;
 
                     progressInfoHTML = `
                         <div class="progress-info">
@@ -744,11 +822,11 @@ const AnimeCardRenderer = {
                     const hiddenPartEps = sortedPartEps.slice(CONFIG.VISIBLE_EPISODES_LIMIT);
                     const partEpTags = visiblePartEps.map(ep => {
                         const isFiller = FillerService.isFillerEpisode(slug, ep.number);
-                        return `<span class="episode-tag${isFiller ? ' filler watched-filler' : ''}">Ep ${ep.number}</span>`;
+                        return `<span class="episode-tag${isFiller ? ' filler watched-filler' : ''}">Ep ${toDisplayEpisodeNumber(ep.number)}</span>`;
                     }).join('');
                     const partHiddenTags = hiddenPartEps.map(ep => {
                         const isFiller = FillerService.isFillerEpisode(slug, ep.number);
-                        return `<span class="episode-tag${isFiller ? ' filler watched-filler' : ''}">Ep ${ep.number}</span>`;
+                        return `<span class="episode-tag${isFiller ? ' filler watched-filler' : ''}">Ep ${toDisplayEpisodeNumber(ep.number)}</span>`;
                     }).join('');
                     const partMoreEps = hiddenPartEps.length > 0
                         ? `<div class="hidden-episodes">${partHiddenTags}</div><span class="episode-tag show-more-episodes" data-more-text="+${hiddenPartEps.length} more" data-less-text="Show less">+${hiddenPartEps.length} more</span>`
@@ -976,17 +1054,34 @@ const AnimeCardRenderer = {
                 </div>
             `;
 
-            return { html, isComplete };
+            return { html, isComplete, separatorLabel };
         });
 
-        const seasonItemsHTML = seasonData.map(d => d.html).join('');
+        let lastSeparatorLabel = null;
+        const seasonItemsHTML = seasonData.map((item) => {
+            const shouldRenderSeparator = item.separatorLabel && item.separatorLabel !== lastSeparatorLabel;
+            if (item.separatorLabel) {
+                lastSeparatorLabel = item.separatorLabel;
+            }
+
+            const separatorHtml = shouldRenderSeparator
+                ? `
+                    <div class="season-chronology-separator" role="separator" aria-label="Chronology ${UIHelpers.escapeHtml(item.separatorLabel)}">
+                        <span class="season-chronology-line"></span>
+                        <span class="season-chronology-label">${UIHelpers.escapeHtml(item.separatorLabel)}</span>
+                        <span class="season-chronology-line"></span>
+                    </div>`
+                : '';
+
+            return `${separatorHtml}${item.html}`;
+        }).join('');
         const allSeasonsComplete = seasonData.every(d => d.isComplete);
 
         // Compute date display: date range for completed groups, relative for others
         let lastWatchedText;
-        if (allSeasonsComplete && seasons.some(({ anime }) => (anime.episodes?.length || 0) > 0)) {
+        if (allSeasonsComplete && filteredSeasons.some(({ anime }) => (anime.episodes?.length || 0) > 0)) {
             let earliestStart = null;
-            seasons.forEach(({ anime }) => {
+            filteredSeasons.forEach(({ anime }) => {
                 const started = UIHelpers.getStartedDate(anime);
                 if (started) {
                     const t = new Date(started).getTime();
@@ -1003,11 +1098,13 @@ const AnimeCardRenderer = {
             lastWatchedText = latestWatched ? UIHelpers.formatDate(latestWatched.toISOString()) : 'Never';
         }
         const itemCount = expandedSeasons.length;
-        const itemLabel = itemCount === seasons.length ? `${itemCount} seasons` : `${itemCount} parts`;
+        const itemLabel = isChronologyGroup
+            ? `${itemCount} titles`
+            : (itemCount === filteredSeasons.length ? `${itemCount} seasons` : `${itemCount} parts`);
 
         // Compute meta information for season group. Show number of seasons watched vs total,
         // overall status, and last watched relative time.
-        const anyStarted = seasons.some(({ anime }) =>
+        const anyStarted = filteredSeasons.some(({ anime }) =>
             (anime.episodes?.length || 0) > 0 || (anime.totalWatchTime || 0) > 0
         );
         let statusGroup;
