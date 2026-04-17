@@ -23,7 +23,7 @@
     }
   ],
   "action": {
-    "default_popup": "popup-ui/popup.html",
+    "default_popup": "popup/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon32.png",
