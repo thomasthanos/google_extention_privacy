@@ -17,8 +17,10 @@ const WatchlistSync = {
      * Update the anime's watchlist status on an1me.to.
      * @param {number} animeId - The site's numeric anime ID (current_anime_id)
      * @param {'plan_to_watch'|'watching'|'completed'|'on_hold'|'dropped'|'remove'} type
+     * @param {string|null} animeSlug - Optional slug; enables cross-reload dedup
+     *        (skip POST if animeData[slug].watchlistSyncedType already === type).
      */
-    async updateStatus(animeId, type) {
+    async updateStatus(animeId, type, animeSlug = null) {
         const { Logger } = window.AnimeTrackerContent;
 
         if (!animeId || !type) {
@@ -30,6 +32,20 @@ const WatchlistSync = {
         if (!this._isLoggedIn()) {
             Logger.debug('WatchlistSync: user not logged in on site, skipping');
             return;
+        }
+
+        // Dedup: avoid re-posting the same type over and over across page
+        // reloads / episode switches. Server accepts it but returns
+        // "Already added!" — wasteful noise.
+        if (animeSlug && type !== 'remove') {
+            try {
+                const { animeData = {} } = await chrome.storage.local.get(['animeData']);
+                const entry = animeData[animeSlug];
+                if (entry && entry.watchlistSyncedType === type) {
+                    Logger.debug(`WatchlistSync: ${type} already synced for ${animeSlug}, skip`);
+                    return true;
+                }
+            } catch { /* fall through and post anyway */ }
         }
 
         const action = type === 'remove' ? 'remove_from_watchlist' : 'add_to_watchlist';
@@ -55,21 +71,35 @@ const WatchlistSync = {
                 const text = await res.text();
                 Logger.info(`WatchlistSync: ✓ response: ${text.substring(0, 300)}`);
 
-                // Try to parse as JSON
+                let success = true;
                 try {
                     const data = JSON.parse(text);
                     if (data && data.data && data.data.message) {
                         Logger.info(`WatchlistSync: ✓ ${data.data.message}`);
                     }
-                    return true;
                 } catch {
-                    // Response might not be JSON, check if it's "0" (WP failure)
                     if (text === '0' || text === '-1') {
                         Logger.warn('WatchlistSync: ✗ WP returned failure');
-                        return false;
+                        success = false;
                     }
-                    return true;
                 }
+
+                // Persist the synced type so we skip future identical posts
+                if (success && animeSlug) {
+                    try {
+                        const { animeData = {} } = await chrome.storage.local.get(['animeData']);
+                        if (animeData[animeSlug]) {
+                            if (type === 'remove') {
+                                delete animeData[animeSlug].watchlistSyncedType;
+                            } else {
+                                animeData[animeSlug].watchlistSyncedType = type;
+                            }
+                            await chrome.storage.local.set({ animeData });
+                        }
+                    } catch { /* non-critical */ }
+                }
+
+                return success;
             } else {
                 Logger.warn(`WatchlistSync: ✗ HTTP ${res.status}`);
                 return false;

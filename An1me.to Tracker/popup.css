@@ -5,6 +5,23 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Bebas+Neue&display=swap');
 
+/* ─── Custom fonts (bundled) ───────────────────────────────── */
+/* PROXON → titles / headings. ComicSans → numeric displays (stats, streaks). */
+@font-face {
+  font-family: 'PROXON';
+  src: url('src/fonts/PROXON.ttf') format('truetype');
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'ComicSans';
+  src: url('src/fonts/comic_sans.ttf') format('truetype');
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ─── Design Tokens ─────────────────────────────────────────── */
 :root {
   /* Deep dark base */
@@ -336,7 +353,7 @@ body {
   50%      { filter: drop-shadow(0 0 9px rgba(79,195,247,0.65)); }
 }
 .logo h1 {
-  font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2.5px;
+  font-family: 'PROXON', 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 2px;
   background: var(--grad-cyan); -webkit-background-clip: text;
   -webkit-text-fill-color: transparent; background-clip: text;
 }
@@ -381,7 +398,8 @@ body {
 }
 
 #statsBar .stat-value {
-  font-size: 20px;
+  font-family: 'ComicSans', 'Bebas Neue', sans-serif;
+  font-size: 24px;
   font-weight: 800;
   line-height: 1;
   color: var(--cyan);
@@ -1028,8 +1046,8 @@ body {
   box-shadow: 0 3px 10px rgba(0,0,0,0.55);
 }
 
-.anime-title { font-size: 14px; font-weight: 700; color: var(--t1); flex: 1; display: flex; align-items: center; gap: 5px; overflow: hidden; }
-.anime-title-text { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 200px; font-size: 14px; font-weight: 700; }
+.anime-title { font-family: 'PROXON', 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 15px; font-weight: 600; letter-spacing: 0.3px; color: var(--t1); flex: 1; display: flex; align-items: center; gap: 5px; overflow: hidden; }
+.anime-title-text { font-family: 'PROXON', 'Inter', 'Segoe UI', system-ui, sans-serif; flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 200px; font-size: 15px; font-weight: 600; letter-spacing: 0.3px; }
 
 .anime-expand-icon {
   width: 24px; height: 24px; min-width: 24px;
@@ -1882,9 +1900,9 @@ body {
   line-height: 1;
 }
 .streak-hero-num {
-  font-size: 44px;
+  font-size: 48px;
   font-weight: 800;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'ComicSans', 'Bebas Neue', sans-serif;
   color: #ff8a5c;
   letter-spacing: 1px;
   line-height: 0.9;
@@ -1945,9 +1963,9 @@ body {
 }
 .stats-tile-icon { font-size: 16px; margin-bottom: 3px; }
 .stats-tile-value {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'ComicSans', 'Bebas Neue', sans-serif;
   color: var(--t1);
   letter-spacing: 0.5px;
   line-height: 1;

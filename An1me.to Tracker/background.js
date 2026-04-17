@@ -31,6 +31,7 @@ const isLikelyMovieSlug      = sharedMergeUtils.isLikelyMovieSlug      || missin
 
 const COMPLETED_PERCENTAGE = 85;
 const DELETED_ANIME_MAX_AGE_MS = 10 * 24 * 60 * 60 * 1000; // 10 days
+const MAX_PROGRESS_ENTRIES = 200;
 
 /**
  * Lightweight version of ProgressManager.cleanTrackedProgress for background.
@@ -76,6 +77,21 @@ function cleanTrackedProgressBg(animeData, videoProgress) {
         }
 
         cleaned[id] = progress;
+    }
+
+    // Cap total entries — keep most recent by savedAt/lastPlayedAt
+    const entries = Object.entries(cleaned);
+    if (entries.length > MAX_PROGRESS_ENTRIES) {
+        const getTs = (p) => {
+            const t = p?.savedAt || p?.lastPlayedAt || 0;
+            return t ? new Date(t).getTime() : 0;
+        };
+        entries.sort((a, b) => getTs(b[1]) - getTs(a[1]));
+        const capped = {};
+        for (let i = 0; i < MAX_PROGRESS_ENTRIES; i++) {
+            capped[entries[i][0]] = entries[i][1];
+        }
+        return capped;
     }
     return cleaned;
 }
@@ -722,6 +738,7 @@ let _applyCloudUpdateDoc     = null;
 let _applyCloudDebounce      = null;
 let _applyCloudUpdateQueue   = Promise.resolve();
 let _applyCloudUpdateWaiters = [];
+let _lastAppliedCloudUpdatedAt = null;
 
 const _MAX_CLOUD_UPDATE_WAITERS = 100;
 
@@ -774,6 +791,12 @@ async function _doApplyCloudUpdate(cloudDoc) {
     // Skip while a full sync is in progress — it already merges cloud data
     if (syncInProgress) return;
 
+    // Dedup by cloud lastUpdated — avoid re-merging an already-applied snapshot
+    const cloudUpdatedAt = cloudDoc.lastUpdated || null;
+    if (cloudUpdatedAt && cloudUpdatedAt === _lastAppliedCloudUpdatedAt) {
+        return;
+    }
+
     try {
         // Single read: get the latest local state
         const local = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
@@ -815,6 +838,7 @@ async function _doApplyCloudUpdate(cloudDoc) {
             });
             console.log(`[BG-RT] ← Cloud update applied (eps: ${localEps}→${mergedEps})`);
         }
+        if (cloudUpdatedAt) _lastAppliedCloudUpdatedAt = cloudUpdatedAt;
     } catch (e) {
         console.warn('[BG-RT] Apply update failed:', e.message);
     }
@@ -2352,14 +2376,31 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
 
     if (message.type === 'GET_FILLER_EPISODES') {
-        // Content script asks for filler data for a specific slug
+        // Content script asks for filler data for a specific slug.
+        // If we have it cached, return immediately. Otherwise do an
+        // on-demand fetch so unwatched/untracked anime still get the
+        // filler UI in the episode list.
         if (!message.animeSlug) { sendResponse({ fillers: null }); return true; }
-        bgStorageGet([`episodeTypes_${message.animeSlug}`])
-            .then(result => {
-                const data = result[`episodeTypes_${message.animeSlug}`];
-                sendResponse({ fillers: data?.filler || null });
-            })
-            .catch(() => sendResponse({ fillers: null }));
+        const slug = message.animeSlug;
+        const title = message.animeTitle || null;
+        const key = `episodeTypes_${slug}`;
+        (async () => {
+            try {
+                const stored = await bgStorageGet([key]);
+                const cached = stored[key];
+                if (cached && isEpisodeTypesCacheFresh(cached)) {
+                    sendResponse({ fillers: cached?.notFound ? null : (cached?.filler || null) });
+                    return;
+                }
+                // Cache missing/stale → fetch on demand (cheap: HEAD + page parse,
+                // results persisted so subsequent calls are instant).
+                const result = await repairEpisodeTypesCache(slug, title, false);
+                const fillers = result?.entry?.notFound ? null : (result?.entry?.filler || null);
+                sendResponse({ fillers });
+            } catch {
+                sendResponse({ fillers: null });
+            }
+        })();
         return true;
     }
 

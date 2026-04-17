@@ -7,9 +7,10 @@ const ContentConfig = {
     DEBOUNCE_DELAY: 300,             // Faster debounce for quicker detection
     VIDEO_CHECK_INTERVAL: 1500,      // Check more frequently
     MAX_RETRIES: 60,
-    PROGRESS_SAVE_INTERVAL: 10000,   // Probe video every 10s while playing (write may still be throttled below)
-    PROGRESS_WRITE_THROTTLE_MS: 5000, // Local storage write throttle while playing — more real-time UX
-    FORCED_PROGRESS_WRITE_THROTTLE_MS: 3000, // Throttle for force saves (pause/seek/blur)
+    PROGRESS_SAVE_INTERVAL: 45000,   // Probe video every 45s while playing (write may still be throttled below)
+    PROGRESS_WRITE_THROTTLE_MS: 45000, // Local storage write throttle while playing — reduces write volume
+    PAUSE_WRITE_THROTTLE_MS: 15000,  // Throttle for pause/seek saves — medium responsiveness
+    FORCED_PROGRESS_WRITE_THROTTLE_MS: 3000, // Throttle for urgent saves (tab change / pagehide) — snapshot fast before tab hides
     MIN_PROGRESS_TO_SAVE: 5,
     NEW_ANIME_GRACE_SECONDS: 120, // Don't persist anything for an anime not yet in animeData until 2 min watched. Stops "false" anime from misclicks/quick-bail.
     MIN_WATCH_SECONDS_BEFORE_COMPLETE: 120, // minimum real playback seconds before allowing completion (misclick guard)

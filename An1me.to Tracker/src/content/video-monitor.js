@@ -212,6 +212,9 @@ const VideoMonitor = {
 
         let _lastSavedTime = -1;
         this.progressSaveInterval = setInterval(() => {
+            // Idle guard: if tab isn't visible, user isn't watching → skip.
+            if (typeof document !== 'undefined'
+                && document.visibilityState && document.visibilityState !== 'visible') return;
             if (this.videoElement && animeInfo && !video.paused) {
                 const currentTime = this.videoElement.currentTime;
                 const duration = this.videoElement.duration;

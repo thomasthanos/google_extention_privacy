@@ -385,7 +385,7 @@ const ProgressTracker = {
                             if (pageId) {
                                 // First episode → plan_to_watch, otherwise → watching
                                 const isFirst = !ad[slug] || !ad[slug].episodes || ad[slug].episodes.length === 0;
-                                WatchlistSync.updateStatus(pageId, isFirst ? 'plan_to_watch' : 'watching');
+                                WatchlistSync.updateStatus(pageId, isFirst ? 'plan_to_watch' : 'watching', slug);
                             }
                         }
                     }
@@ -408,22 +408,31 @@ const ProgressTracker = {
         }
     },
 
-    saveVideoProgress(uniqueId, currentTime, duration, force = false) {
+    saveVideoProgress(uniqueId, currentTime, duration, force = false, urgent = false) {
         const { CONFIG, Logger } = window.AnimeTrackerContent;
 
         if (currentTime < CONFIG.MIN_PROGRESS_TO_SAVE) return;
+
+        // Idle guard: if tab isn't visible, don't record ambient progress.
+        // Urgent/force saves (pause, visibilitychange, pagehide) are still
+        // allowed — those ARE the snapshot when the user stops watching.
+        if (!force && typeof document !== 'undefined'
+            && document.visibilityState && document.visibilityState !== 'visible') {
+            return;
+        }
 
         // If past completion threshold but not enough real playback, skip save.
         // This prevents seek-to-end from creating ghost progress entries.
         if (this.shouldMarkComplete(currentTime, duration)) return;
 
         const now = Date.now();
-        const regularThrottleMs = Math.max(5000, Number(CONFIG.PROGRESS_WRITE_THROTTLE_MS) || 15000);
-        const forcedThrottleMs = Math.max(1000, Number(CONFIG.FORCED_PROGRESS_WRITE_THROTTLE_MS) || 3000);
-        const throttleMs = force ? forcedThrottleMs : regularThrottleMs;
+        const regularThrottleMs = Math.max(5000, Number(CONFIG.PROGRESS_WRITE_THROTTLE_MS) || 45000);
+        const pauseThrottleMs = Math.max(1000, Number(CONFIG.PAUSE_WRITE_THROTTLE_MS) || 15000);
+        const urgentThrottleMs = Math.max(500, Number(CONFIG.FORCED_PROGRESS_WRITE_THROTTLE_MS) || 3000);
+        const throttleMs = !force ? regularThrottleMs : (urgent ? urgentThrottleMs : pauseThrottleMs);
 
         if ((now - this.lastSaveTime) < throttleMs) {
-            this.pendingSeekSave = { uniqueId, currentTime, duration };
+            this.pendingSeekSave = { uniqueId, currentTime, duration, urgent };
 
             if (this.seekSaveTimeout) {
                 clearTimeout(this.seekSaveTimeout);
@@ -432,9 +441,9 @@ const ProgressTracker = {
             this.seekSaveTimeout = setTimeout(() => {
                 this.seekSaveTimeout = null;
                 if (this.pendingSeekSave) {
-                    const { uniqueId: id, currentTime: time, duration: dur } = this.pendingSeekSave;
+                    const { uniqueId: id, currentTime: time, duration: dur, urgent: u } = this.pendingSeekSave;
                     this.pendingSeekSave = null;
-                    this.saveVideoProgress(id, time, dur, true);
+                    this.saveVideoProgress(id, time, dur, true, u);
                 }
             }, throttleMs);
             return;
@@ -652,10 +661,10 @@ const ProgressTracker = {
 
                     if (totalEps && watchedEps >= totalEps) {
                         // All episodes watched → completed
-                        WatchlistSync.updateStatus(siteId, 'completed');
+                        WatchlistSync.updateStatus(siteId, 'completed', info.animeSlug);
                     } else {
                         // Any episode completed → watching
-                        WatchlistSync.updateStatus(siteId, 'watching');
+                        WatchlistSync.updateStatus(siteId, 'watching', info.animeSlug);
                     }
                 }
             } catch { /* watchlist sync is non-critical */ }

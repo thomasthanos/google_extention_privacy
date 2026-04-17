@@ -104,6 +104,23 @@
                 Logger.success('✓ Immediate track successful');
                 Notifications.showCompletion(animeInfo);
 
+                // ── Watchlist sync: completed if last episode, else watching ──
+                try {
+                    const { WatchlistSync } = AT;
+                    const slug = animeInfo.animeSlug;
+                    const entry = animeData[slug];
+                    const siteId = entry?.siteAnimeId || animeInfo.siteAnimeId;
+                    if (WatchlistSync && siteId) {
+                        const watchedEps = entry?.episodes?.length || 0;
+                        const totalEps = entry?.totalEpisodes;
+                        if (totalEps && watchedEps >= totalEps) {
+                            WatchlistSync.updateStatus(siteId, 'completed', slug);
+                        } else {
+                            WatchlistSync.updateStatus(siteId, 'watching', slug);
+                        }
+                    }
+                } catch { /* non-critical */ }
+
                 try {
                     const progressResult = await chrome.storage.local.get(['videoProgress']);
                     const videoProgress = progressResult.videoProgress || {};
@@ -289,7 +306,8 @@
         const videoElement = VideoMonitor.getVideoElement();
 
         if (animeInfo && trackingState !== TrackingState.COMPLETED && videoElement && videoElement.currentTime > 0) {
-            ProgressTracker.saveVideoProgress(animeInfo.uniqueId, videoElement.currentTime, videoElement.duration, true);
+            // force=true, urgent=false → pause throttle (15s)
+            ProgressTracker.saveVideoProgress(animeInfo.uniqueId, videoElement.currentTime, videoElement.duration, true, false);
         }
     };
 
@@ -361,7 +379,8 @@
                 const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
                 if (accumulatedPlaybackSeconds < minWatch) {
                     Logger.debug(`Visibility change: only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), saving progress instead`);
-                    ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration, true);
+                    // urgent: tab hidden, snapshot fast
+                    ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration, true, true);
                     return;
                 }
                 trackingState = TrackingState.TRACKING;
@@ -388,7 +407,8 @@
                     }
                 }
             } else {
-                ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration, true);
+                // urgent: tab hidden, snapshot fast
+                ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration, true, true);
             }
         }
     };
@@ -408,7 +428,8 @@
             // Misclick guard
             const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
             if (accumulatedPlaybackSeconds < minWatch) {
-                ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration, true);
+                // urgent: page unloading, snapshot fast
+                ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration, true, true);
                 return;
             }
 
@@ -431,7 +452,8 @@
                 }, () => { void chrome.runtime.lastError; });
             } catch {}
         } else {
-            ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration, true);
+            // urgent: page unloading, snapshot fast
+            ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration, true, true);
         }
     };
 
@@ -568,9 +590,33 @@
     // subtle gradient + a compact pill badge.
     function injectEpisodeBadgeStyles() {
         if (document.querySelector('#anime-tracker-episode-styles')) return;
+
+        // Load bundled fonts via extension URL so they can render on an1me.to.
+        // These must be listed in manifest.web_accessible_resources.
+        let proxonUrl = '';
+        let comicSansUrl = '';
+        try {
+            proxonUrl = chrome.runtime.getURL('src/fonts/PROXON.ttf');
+            comicSansUrl = chrome.runtime.getURL('src/fonts/comic_sans.ttf');
+        } catch { /* context invalidated — fonts just won't render */ }
+
         const style = document.createElement('style');
         style.id = 'anime-tracker-episode-styles';
         style.textContent = `
+            /* ── Bundled fonts (only applied to extension-injected UI) ── */
+            @font-face {
+                font-family: 'AT-PROXON';
+                src: url('${proxonUrl}') format('truetype');
+                font-weight: 400 900;
+                font-display: swap;
+            }
+            @font-face {
+                font-family: 'AT-ComicSans';
+                src: url('${comicSansUrl}') format('truetype');
+                font-weight: 400 900;
+                font-display: swap;
+            }
+
             /* ── Watched ── */
             .episode-list-item.at-watched-episode {
                 border: 1px solid rgba(233, 171, 56, 0.22) !important;
@@ -584,6 +630,13 @@
             .episode-list-item.at-watched-episode .episode-list-item-title,
             .episode-list-item.at-watched-episode .episode-list-item-number {
                 color: #e9ab38 !important;
+            }
+            .episode-list-item.at-watched-episode .episode-list-item-title {
+                font-family: 'AT-PROXON', inherit !important;
+                letter-spacing: 0.3px !important;
+            }
+            .episode-list-item.at-watched-episode .episode-list-item-number {
+                font-family: 'AT-ComicSans', inherit !important;
             }
             .episode-list-item.at-watched-episode .at-watched-badge {
                 display: inline-block;
@@ -629,16 +682,129 @@
             .episode-list-item.at-watched-episode.at-filler-episode {
                 border-left-color: #a855f7 !important;
             }
+
+            /* ── Current episode (the one being watched now) ── */
+            /* Neutralize an1me.to's native current-episode styles (accent-2
+               text color + arrow indicator on :after) so our cyan theme and
+               "NOW" badge are the only current-episode signal. */
+            .episode-head .episode-list-display-box .episode-list-item.current-episode,
+            .episode-list-item.current-episode {
+                color: inherit !important;
+            }
+            .episode-head .episode-list-display-box .episode-list-item.current-episode::after,
+            .episode-list-item.current-episode::after,
+            .episode-head .episode-list-display-box .episode-list-item.current-episode::before,
+            .episode-list-item.current-episode::before {
+                content: none !important;
+                display: none !important;
+                background-color: transparent !important;
+                border: 0 !important;
+                width: 0 !important;
+                height: 0 !important;
+            }
+            /* Cyan accent to match the extension's primary color. Uses the
+               same visual language as watched/filler: left bar + gradient +
+               pill badge. Takes precedence over watched/filler accents. */
+            .episode-list-item.current-episode {
+                border: 1px solid rgba(79, 195, 247, 0.38) !important;
+                border-left: 3px solid #4fc3f7 !important;
+                border-radius: 4px !important;
+                background: linear-gradient(90deg, rgba(79, 195, 247, 0.22), rgba(79, 195, 247, 0.05) 70%) !important;
+                box-shadow: 0 0 0 1px rgba(79, 195, 247, 0.18), 0 2px 12px rgba(79, 195, 247, 0.15) !important;
+                position: relative !important;
+            }
+            .episode-list-item.current-episode .episode-list-item-title {
+                color: #e8f6ff !important;
+                font-family: 'AT-PROXON', inherit !important;
+                letter-spacing: 0.3px !important;
+                font-weight: 600 !important;
+            }
+            .episode-list-item.current-episode .episode-list-item-number {
+                color: #4fc3f7 !important;
+                font-family: 'AT-ComicSans', inherit !important;
+                font-weight: 700 !important;
+            }
+            /* "NOW" pill badge appended via JS */
+            .episode-list-item.current-episode .at-current-badge {
+                display: inline-block;
+                margin-left: 6px;
+                padding: 1px 7px;
+                font-size: 10px;
+                font-weight: 700;
+                line-height: 1.2;
+                color: #0e1117;
+                background: linear-gradient(135deg, #7dd3fc, #4fc3f7);
+                border-radius: 4px;
+                letter-spacing: 0.5px;
+                vertical-align: middle;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 0 8px rgba(79, 195, 247, 0.45);
+                text-transform: uppercase;
+                animation: at-current-pulse 2.2s ease-in-out infinite;
+            }
+            @keyframes at-current-pulse {
+                0%, 100% { box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 0 8px rgba(79, 195, 247, 0.45); }
+                50%      { box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 0 14px rgba(79, 195, 247, 0.75); }
+            }
+            /* When current episode is also watched/filler, keep cyan visible
+               but preserve the secondary badge. */
+            .episode-list-item.current-episode.at-watched-episode,
+            .episode-list-item.current-episode.at-filler-episode {
+                border-left-color: #4fc3f7 !important;
+                opacity: 1 !important;
+            }
         `;
         (document.head || document.documentElement).appendChild(style);
+
+        // Append a "NOW" badge to the current episode if an1me.to marked one.
+        // Runs deferred so the list is already in DOM; also observes mutations
+        // for SPA navigations that swap which item is .current-episode.
+        decorateCurrentEpisode();
     }
 
-    function highlightFillerEpisodes(slug) {
+    let _currentEpisodeObserver = null;
+    function decorateCurrentEpisode() {
+        const apply = () => {
+            // Remove stale badges from items that are no longer .current-episode
+            // (happens on SPA nav when an1me.to swaps which item has the class).
+            document.querySelectorAll('.at-current-badge').forEach(badge => {
+                const item = badge.closest('.episode-list-item');
+                if (!item || !item.classList.contains('current-episode')) badge.remove();
+            });
+            const items = document.querySelectorAll('.episode-list-item.current-episode');
+            items.forEach(item => {
+                if (item.querySelector('.at-current-badge')) return;
+                const badge = document.createElement('span');
+                badge.className = 'at-current-badge';
+                badge.textContent = 'NOW';
+                item.appendChild(badge);
+            });
+        };
+
+        apply();
+
+        if (_currentEpisodeObserver) {
+            try { _currentEpisodeObserver.disconnect(); } catch { /* noop */ }
+        }
+        const target = document.querySelector('.episode-list-display-box')?.parentElement
+            || document.body;
+        _currentEpisodeObserver = new MutationObserver(() => apply());
+        _currentEpisodeObserver.observe(target, {
+            childList: true, subtree: true, attributes: true, attributeFilter: ['class']
+        });
+        // Disconnect after 15s to avoid long-running observer leaks; the
+        // initial apply + short window covers SPA-driven class toggles.
+        setTimeout(() => {
+            try { _currentEpisodeObserver?.disconnect(); } catch { /* noop */ }
+            _currentEpisodeObserver = null;
+        }, 15000);
+    }
+
+    function highlightFillerEpisodes(slug, title) {
         const { Logger } = AT;
         if (!slug) return;
 
         try {
-            chrome.runtime.sendMessage({ type: 'GET_FILLER_EPISODES', animeSlug: slug }, (response) => {
+            chrome.runtime.sendMessage({ type: 'GET_FILLER_EPISODES', animeSlug: slug, animeTitle: title || null }, (response) => {
                 if (chrome.runtime.lastError || !response?.fillers) return;
                 const fillerSet = new Set(response.fillers.map(Number).filter(n => Number.isFinite(n)));
                 if (fillerSet.size === 0) return;
@@ -721,22 +887,31 @@
                     const groupCoverImages = result.groupCoverImages || {};
                     const slug = animeInfo.animeSlug;
 
+                    // Track whether anything actually changed — only write if yes,
+                    // so we don't fire onChanged → full cloud sync for no-op updates.
+                    let animeChanged = false;
+                    let groupChanged = false;
+
                     if (animeData[slug]) {
                         // Only update existing entries — don't create new ones just from visiting a page
                         if (!animeData[slug].coverImage && animeInfo.coverImage) {
                             animeData[slug].coverImage = animeInfo.coverImage;
+                            animeChanged = true;
                         }
                         // Store site's numeric anime ID for watchlist sync
                         if (animeInfo.siteAnimeId && !animeData[slug].siteAnimeId) {
                             animeData[slug].siteAnimeId = animeInfo.siteAnimeId;
+                            animeChanged = true;
                         }
                         if (hasDetectedTotal) {
                             const existingMaxEpisode = Math.max(
                                 0,
                                 ...((animeData[slug].episodes || []).map(ep => Number(ep.number) || 0))
                             );
-                            if (animeInfo.totalEpisodes >= existingMaxEpisode) {
+                            if (animeInfo.totalEpisodes >= existingMaxEpisode
+                                && animeData[slug].totalEpisodes !== animeInfo.totalEpisodes) {
                                 animeData[slug].totalEpisodes = animeInfo.totalEpisodes;
+                                animeChanged = true;
                             }
                         }
                     }
@@ -747,12 +922,17 @@
                         const baseSlug = getBaseSlug(slug);
                         if (animeInfo.coverImage && !groupCoverImages[baseSlug]) {
                             groupCoverImages[baseSlug] = animeInfo.coverImage;
+                            groupChanged = true;
                         }
                     } catch {
                         // Ignore baseSlug errors; group cover won't be set
                     }
 
-                    chrome.storage.local.set({ animeData, groupCoverImages });
+                    if (!animeChanged && !groupChanged) return;
+                    const patch = {};
+                    if (animeChanged) patch.animeData = animeData;
+                    if (groupChanged) patch.groupCoverImages = groupCoverImages;
+                    chrome.storage.local.set(patch);
                 });
             } catch (e) {
                 Logger.warn('Cover image update failed:', e);
@@ -810,7 +990,13 @@
         highlightWatchedEpisodes(animeInfo.animeSlug);
 
         // ── Color filler episodes in the sidebar (read-only, zero writes) ──
-        highlightFillerEpisodes(animeInfo.animeSlug);
+        highlightFillerEpisodes(animeInfo.animeSlug, animeInfo.animeTitle);
+
+        // ── Decorate current episode with a "NOW" badge ──
+        // Always run here (not just inside style injection) so SPA navigations
+        // after the initial 15 s observer window still get re-decorated.
+        injectEpisodeBadgeStyles();
+        decorateCurrentEpisode();
 
         const alreadyTracked = await ProgressTracker.isEpisodeTracked(animeInfo.uniqueId);
         if (alreadyTracked) {

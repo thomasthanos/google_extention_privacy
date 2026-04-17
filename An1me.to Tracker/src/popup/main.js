@@ -96,6 +96,23 @@
 
     const OWN_WRITE_TTL_MS = 15000;
     const ownWriteTokens = new Set();
+    const MAINTENANCE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+    /**
+     * Check whether a named maintenance pass should run (≥24h since last run).
+     * Uses localStorage (sync) so it doesn't add async overhead to popup open.
+     */
+    function shouldRunMaintenance(name) {
+        try {
+            const key = `lastMaintenanceRunAt_${name}`;
+            const last = Number(localStorage.getItem(key)) || 0;
+            if (Date.now() - last < MAINTENANCE_INTERVAL_MS) return false;
+            localStorage.setItem(key, String(Date.now()));
+            return true;
+        } catch {
+            return true; // if storage fails, default to running
+        }
+    }
     let deferredListRefresh = null;
 
     function generateWriteToken() {
@@ -1023,13 +1040,24 @@
         setupCompactSectionToggle('completedListToggle', 'completed-chevron');
         setupCompactSectionToggle('droppedListToggle', 'dropped-chevron');
 
-        elements.animeList.querySelectorAll('.movie-edit-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => { e.stopPropagation(); editAnimeTitle(btn.dataset.slug); });
-        });
-
-        elements.animeList.querySelectorAll('.movie-delete-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => { e.stopPropagation(); deleteAnime(btn.dataset.slug); });
-        });
+        // Event delegation: one listener on the list container handles all
+        // per-card edit/delete clicks — avoids attaching handlers per render.
+        if (elements.animeList && !elements.animeList.__delegatedClickInstalled) {
+            elements.animeList.addEventListener('click', (e) => {
+                const editBtn = e.target.closest('.movie-edit-btn');
+                if (editBtn && elements.animeList.contains(editBtn)) {
+                    e.stopPropagation();
+                    editAnimeTitle(editBtn.dataset.slug);
+                    return;
+                }
+                const delBtn = e.target.closest('.movie-delete-btn');
+                if (delBtn && elements.animeList.contains(delBtn)) {
+                    e.stopPropagation();
+                    deleteAnime(delBtn.dataset.slug);
+                }
+            });
+            elements.animeList.__delegatedClickInstalled = true;
+        }
     }
 
     /**
@@ -1210,7 +1238,9 @@
                 if (elements.totalTime) elements.totalTime.textContent = stats.totalTime || '0h';
             }
 
-            await Storage.migrateMultiPartAnime();
+            if (shouldRunMaintenance('migrateMultiPartAnime')) {
+                await Storage.migrateMultiPartAnime();
+            }
 
             const result = await Storage.get(['animeData', 'videoProgress', 'groupCoverImages', 'deletedAnime']);
             const normalized = ProgressManager.normalizeCanonicalSlugs(
@@ -1221,18 +1251,25 @@
             window.AnimeTracker.groupCoverImages = result.groupCoverImages || {};
 
             const cleanedData = ProgressManager.removeDuplicateEpisodes(animeData);
-            const { repairedData, repairedCount } = ProgressManager.repairLikelyMissedEpisodes(cleanedData);
+            const runRepair = shouldRunMaintenance('repairLikelyMissedEpisodes');
+            const { repairedData, repairedCount } = runRepair
+                ? ProgressManager.repairLikelyMissedEpisodes(cleanedData)
+                : { repairedData: cleanedData, repairedCount: 0 };
             const rawProgressForDurations = videoProgress || {};
             const { cleaned: cleanedProgress, removedCount: progressRemoved } =
                 ProgressManager.cleanTrackedProgress(repairedData, videoProgress);
 
             const originalCount = UIHelpers.countEpisodes(result.animeData || {});
             const cleanedCount = UIHelpers.countEpisodes(repairedData);
-            const durationFix = normalizeMovieDurations(repairedData, rawProgressForDurations);
-            const phantomCleanup = cleanupPhantomMovies(
-                repairedData,
-                normalized.deletedAnime || result.deletedAnime || {}
-            );
+            const durationFix = shouldRunMaintenance('normalizeMovieDurations')
+                ? normalizeMovieDurations(repairedData, rawProgressForDurations)
+                : { changed: false };
+            const phantomCleanup = shouldRunMaintenance('cleanupPhantomMovies')
+                ? cleanupPhantomMovies(
+                    repairedData,
+                    normalized.deletedAnime || result.deletedAnime || {}
+                )
+                : { changed: false, deletedAnime: normalized.deletedAnime || result.deletedAnime || {} };
             const needsSave =
                 (originalCount !== cleanedCount) || (progressRemoved > 0) ||
                 (repairedCount > 0) || durationFix.changed || normalized.changed || phantomCleanup.changed;
@@ -1324,10 +1361,9 @@
                 }
             }
 
-            await Storage.migrateMultiPartAnime();
-
             // Fast path: render from local storage immediately so the popup
             // doesn't show a blank list while waiting for Firebase round-trips.
+            // (loadData() internally runs migrateMultiPartAnime when due.)
             await loadData();
 
             const data = await FirebaseSync.loadAndSyncData(elements);
@@ -1336,15 +1372,22 @@
                     data.animeData || {}, data.videoProgress || {}, data.deletedAnime || {}
                 );
                 const deduped = ProgressManager.removeDuplicateEpisodes(normalized.animeData || {});
-                const { repairedData, repairedCount } = ProgressManager.repairLikelyMissedEpisodes(deduped);
+                const runRepair2 = shouldRunMaintenance('repairLikelyMissedEpisodes_postSync');
+                const { repairedData, repairedCount } = runRepair2
+                    ? ProgressManager.repairLikelyMissedEpisodes(deduped)
+                    : { repairedData: deduped, repairedCount: 0 };
                 const rawProgressForDurations = normalized.videoProgress || {};
                 const { cleaned: cleanedProgress, removedCount: progressRemoved } =
                     ProgressManager.cleanTrackedProgress(repairedData, rawProgressForDurations);
-                const durationFix = normalizeMovieDurations(repairedData, rawProgressForDurations);
-                const phantomCleanup = cleanupPhantomMovies(
-                    repairedData,
-                    normalized.deletedAnime || data.deletedAnime || {}
-                );
+                const durationFix = shouldRunMaintenance('normalizeMovieDurations_postSync')
+                    ? normalizeMovieDurations(repairedData, rawProgressForDurations)
+                    : { changed: false };
+                const phantomCleanup = shouldRunMaintenance('cleanupPhantomMovies_postSync')
+                    ? cleanupPhantomMovies(
+                        repairedData,
+                        normalized.deletedAnime || data.deletedAnime || {}
+                    )
+                    : { changed: false, deletedAnime: normalized.deletedAnime || data.deletedAnime || {} };
 
                 animeData = repairedData;
                 videoProgress = cleanedProgress;

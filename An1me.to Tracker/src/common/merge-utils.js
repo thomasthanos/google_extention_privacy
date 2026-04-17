@@ -186,6 +186,7 @@
     }
 
     function areAnimeDataMapsEqual(aData, bData) {
+        if (aData === bData) return true; // reference-equality fast path
         const a = aData || {};
         const b = bData || {};
         const aKeys = Object.keys(a);
@@ -202,6 +203,7 @@
     }
 
     function areProgressMapsEqual(aProgress, bProgress) {
+        if (aProgress === bProgress) return true; // reference-equality fast path
         const a = aProgress || {};
         const b = bProgress || {};
         const aKeys = Object.keys(a);
@@ -226,6 +228,7 @@
     }
 
     function shallowEqualDeletedAnime(aDeleted, bDeleted) {
+        if (aDeleted === bDeleted) return true;
         const a = aDeleted || {};
         const b = bDeleted || {};
         const aKeys = Object.keys(a);
@@ -242,6 +245,7 @@
     }
 
     function shallowEqualStringMap(aMap, bMap) {
+        if (aMap === bMap) return true;
         const a = aMap || {};
         const b = bMap || {};
         const aKeys = Object.keys(a);

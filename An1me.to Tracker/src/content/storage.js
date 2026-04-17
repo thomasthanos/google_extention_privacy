@@ -33,9 +33,9 @@ const ContentStorage = {
             }
 
             const timeoutId = setTimeout(() => {
-                Logger.warn('Storage.get() timeout after 5s');
+                Logger.warn('Storage.get() timeout after 15s');
                 resolve({});
-            }, 5000);
+            }, 15000);
 
             chrome.storage.local.get(keys, (localResult) => {
                 if (chrome.runtime.lastError) {
@@ -93,8 +93,8 @@ const ContentStorage = {
             }
 
             const timeoutId = setTimeout(() => {
-                reject(new Error('Storage.set() timeout after 5s'));
-            }, 5000);
+                reject(new Error('Storage.set() timeout after 15s'));
+            }, 15000);
 
             chrome.storage.local.set(data, () => {
                 clearTimeout(timeoutId);

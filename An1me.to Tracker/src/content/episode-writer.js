@@ -33,11 +33,11 @@ const EpisodeWriter = {
         return Number.isFinite(n) && n > 0 ? n : value;
     },
 
-    _syncWatching(siteAnimeId) {
+    _syncWatching(siteAnimeId, slug = null) {
         try {
             const { WatchlistSync } = window.AnimeTrackerContent;
             if (WatchlistSync && siteAnimeId) {
-                WatchlistSync.updateStatus(siteAnimeId, 'watching');
+                WatchlistSync.updateStatus(siteAnimeId, 'watching', slug);
             }
         } catch {
             // Non-critical sync path.
@@ -98,14 +98,14 @@ const EpisodeWriter = {
             delete animeData[slug].onHoldAt;
             animeData[slug].listState = 'active';
             animeData[slug].listStateUpdatedAt = this._compactNow();
-            this._syncWatching(animeData[slug].siteAnimeId || info.siteAnimeId);
+            this._syncWatching(animeData[slug].siteAnimeId || info.siteAnimeId, slug);
         }
 
         if (animeData[slug].droppedAt) {
             delete animeData[slug].droppedAt;
             animeData[slug].listState = 'active';
             animeData[slug].listStateUpdatedAt = this._compactNow();
-            this._syncWatching(animeData[slug].siteAnimeId || info.siteAnimeId);
+            this._syncWatching(animeData[slug].siteAnimeId || info.siteAnimeId, slug);
         }
 
         const validDuration = this._normalizeDuration(duration, logPrefix);
