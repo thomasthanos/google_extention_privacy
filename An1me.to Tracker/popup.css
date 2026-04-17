@@ -448,7 +448,6 @@ body {
 
 /* settings-section: generic column layout for menu items */
 .settings-section { padding: 6px 7px; display: flex; flex-direction: column; gap: 2px; }
-.settings-section-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--t3); padding: 4px 8px 2px; }
 
 /* profile-section: row layout with avatar left */
 .settings-section.profile-section {
@@ -1167,7 +1166,6 @@ body {
 .in-progress-header { display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: var(--amber); font-weight: 600; cursor: pointer; user-select: none; }
 .in-progress-header:hover { color: #fcd34d; }
 .in-progress-title { flex: 1; font-size: 10px; }
-.in-progress-icon { display: none; }
 .collapse-icon { width: 12px; height: 12px; color: var(--amber); transition: transform var(--tf); opacity: 0.7; }
 .anime-in-progress.collapsed .collapse-icon { transform: rotate(-90deg); }
 .in-progress-content { margin-top: 6px; max-height: 130px; overflow-y: auto; opacity: 1; transition: max-height var(--tn), margin var(--tn), opacity var(--tn); }
@@ -1179,7 +1177,6 @@ body {
 /* ─── Meta ─────────────────────────────────────────────────── */
 .anime-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; max-height: 0; overflow: hidden; opacity: 0; transition: max-height var(--tn), opacity var(--tn), margin var(--tn); }
 .anime-card.expanded .anime-meta { max-height: 30px; opacity: 1; margin-bottom: 4px; }
-.anime-last-watched { font-size: 10px; color: var(--t3); display: none; }
 
 /* ─── Episodes ──────────────────────────────────────────────── */
 .anime-episodes { max-height: 0; overflow: hidden; opacity: 0; transition: max-height var(--tn), opacity var(--tn), margin var(--tn); }

@@ -108,15 +108,38 @@
         event.stopImmediatePropagation();
     }
 
+    let _ensureStylePending = false;
+    let _lastEnsureStyleAt = 0;
+    function scheduleEnsureStyle() {
+        // Fast path: the style is already present — 99% of mutations hit this.
+        if (document.getElementById(STYLE_ID)) return;
+        // Throttle at most once per 2s to survive SPA render storms on mobile.
+        const now = Date.now();
+        if (now - _lastEnsureStyleAt < 2000) {
+            if (_ensureStylePending) return;
+            _ensureStylePending = true;
+            setTimeout(() => {
+                _ensureStylePending = false;
+                _lastEnsureStyleAt = Date.now();
+                ensureStyle();
+            }, 2000 - (now - _lastEnsureStyleAt));
+            return;
+        }
+        _lastEnsureStyleAt = now;
+        ensureStyle();
+    }
+
     function setEnabled(nextEnabled) {
         enabled = nextEnabled !== false;
         if (enabled) {
             ensureStyle();
+            _lastEnsureStyleAt = Date.now();
             if (!styleObserver) {
-                styleObserver = new MutationObserver(() => {
-                    ensureStyle();
-                });
-                styleObserver.observe(ROOT, { childList: true, subtree: true });
+                styleObserver = new MutationObserver(scheduleEnsureStyle);
+                // Observe only the head (where the style lives) rather than
+                // the entire documentElement subtree — avoids firing on every
+                // SPA render / episode-list mutation.
+                styleObserver.observe(document.head || ROOT, { childList: true, subtree: false });
             }
             return;
         }

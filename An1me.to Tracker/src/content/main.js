@@ -201,7 +201,11 @@
         }
         lastTimeupdateTime = currentTime;
 
-        await tryRefreshTrackedDuration(videoElement, 'timeupdate');
+        // Skip duration refresh once we've succeeded (or exhausted retries) —
+        // avoids a microtask on every timeupdate tick (~5× per second).
+        if (!durationRefreshAttempted && durationRefreshAttempts < MAX_DURATION_REFRESH_ATTEMPTS) {
+            await tryRefreshTrackedDuration(videoElement, 'timeupdate');
+        }
 
         if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
             // Misclick guard: require minimum real playback before allowing completion
@@ -557,16 +561,24 @@
                 // Episode list may not be in DOM yet (lazy/SPA load) — retry when it appears
                 const container = document.querySelector('.episode-list-display-box');
                 const target = container || document.body;
+                let retryDebounce = null;
                 const obs = new MutationObserver(() => {
-                    const retry = applyHighlights(watchedSet);
-                    if (retry > 0) {
-                        Logger.debug(`Highlighted ${retry} watched episodes (deferred)`);
-                        obs.disconnect();
-                    }
+                    if (retryDebounce) return; // coalesce mutation bursts
+                    retryDebounce = setTimeout(() => {
+                        retryDebounce = null;
+                        const retry = applyHighlights(watchedSet);
+                        if (retry > 0) {
+                            Logger.debug(`Highlighted ${retry} watched episodes (deferred)`);
+                            obs.disconnect();
+                        }
+                    }, 150);
                 });
                 obs.observe(target, { childList: true, subtree: true });
                 // Stop observing after 10s to avoid leaks
-                setTimeout(() => obs.disconnect(), 10000);
+                setTimeout(() => {
+                    obs.disconnect();
+                    if (retryDebounce) { clearTimeout(retryDebounce); retryDebounce = null; }
+                }, 10000);
             }
         });
 
@@ -787,7 +799,14 @@
         }
         const target = document.querySelector('.episode-list-display-box')?.parentElement
             || document.body;
-        _currentEpisodeObserver = new MutationObserver(() => apply());
+        let _applyDebounce = null;
+        _currentEpisodeObserver = new MutationObserver(() => {
+            if (_applyDebounce) return; // coalesce mutation bursts
+            _applyDebounce = setTimeout(() => {
+                _applyDebounce = null;
+                apply();
+            }, 150);
+        });
         _currentEpisodeObserver.observe(target, {
             childList: true, subtree: true, attributes: true, attributeFilter: ['class']
         });

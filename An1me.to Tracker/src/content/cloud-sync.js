@@ -19,6 +19,7 @@
 
     let initialized      = false;
     let listenAbortCtrl  = null;
+    let startListeningInFlight = false;
     let reconnectTimeout = null;
     let currentToken     = null;
     let currentUser      = null;
@@ -661,18 +662,27 @@
     // ─── Firestore SSE stream (Orion / no-SW mode) ────────────────────────────
 
     async function startListening() {
+        // Concurrent-call guard: if another startListening() is already in the
+        // middle of opening/streaming, don't spawn a parallel stream.
+        if (startListeningInFlight) {
+            Logger?.debug('startListening: already in flight, skip');
+            return;
+        }
+        startListeningInFlight = true;
+
         if (listenAbortCtrl) listenAbortCtrl.abort();
         listenAbortCtrl = new AbortController();
 
         const token = await getValidToken();
         const user  = currentUser || await getUser();
-        if (!token || !user) { scheduleReconnect(10000); return; }
+        if (!token || !user) { startListeningInFlight = false; scheduleReconnect(10000); return; }
 
         currentToken = token;
         currentUser  = user;
 
         const docPath = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${user.uid}`;
         let tokenRefreshInterval = null;
+        const streamOpenedAt = Date.now();
 
         try {
             const res = await fetch(`${LISTEN_URL}?key=${FIREBASE_API_KEY}`, {
@@ -684,7 +694,9 @@
 
             if (!res.ok) { scheduleReconnect(); return; }
 
-            reconnectDelay = 5000;
+            // Don't reset reconnectDelay yet — a 200 response doesn't mean the
+            // stream will stay open. Reset in the `finally` block only if the
+            // stream survived long enough to be a real success.
             Logger?.info('Firestore stream connected');
 
             tokenRefreshInterval = setInterval(async () => {
@@ -741,20 +753,28 @@
                 }
             }
         } catch (e) {
-            if (e.name === 'AbortError') return;
+            if (e.name === 'AbortError') { startListeningInFlight = false; return; }
             Logger?.warn(`Stream error: ${e.message}`);
         } finally {
             if (tokenRefreshInterval) {
                 clearInterval(tokenRefreshInterval);
                 tokenRefreshInterval = null;
             }
+            // Only reset backoff if the stream actually stayed alive ≥15s —
+            // otherwise an immediate-close stream would keep looking like
+            // a success and cause tight reconnect loops.
+            if (Date.now() - streamOpenedAt >= 15000) {
+                reconnectDelay = 5000;
+            }
+            startListeningInFlight = false;
         }
         scheduleReconnect();
     }
 
     function scheduleReconnect(delay) {
         if (reconnectTimeout) clearTimeout(reconnectTimeout);
-        const d = delay ?? reconnectDelay;
+        // Floor at 5s so we never hammer the network (mobile battery saver).
+        const d = Math.max(5000, delay ?? reconnectDelay);
         reconnectDelay = Math.min(reconnectDelay * 1.5, MAX_RECONNECT);
         reconnectTimeout = setTimeout(startListening, d);
     }
@@ -944,12 +964,17 @@
 
         try {
             const port = chrome.runtime.connect({ name: 'keepAlive' });
+            const connectedAt = Date.now();
             keepAlivePort = port;
             keepAliveRetryDelay = 100;
-            keepAliveFailCount = 0;
+            // NOTE: do NOT reset keepAliveFailCount here — a successful connect()
+            // call doesn't guarantee the port stayed alive. Reset only after the
+            // port survives for a meaningful interval (see pulse timer below).
 
             keepAlivePulseTimer = setTimeout(() => {
                 keepAlivePulseTimer = null;
+                // Port survived long enough → real success, clear fail counter.
+                keepAliveFailCount = 0;
                 connectKeepalivePort();
             }, 25000);
 
@@ -972,6 +997,18 @@
                 if (keepAlivePulseTimer) {
                     clearTimeout(keepAlivePulseTimer);
                     keepAlivePulseTimer = null;
+                }
+
+                // Immediate disconnects (< 2s after connect) count as failures,
+                // otherwise we'd burn CPU/battery retrying forever on envs where
+                // the SW is unreachable (e.g. mobile after aggressive suspend).
+                const aliveMs = Date.now() - connectedAt;
+                if (aliveMs < 2000) {
+                    keepAliveFailCount++;
+                    if (keepAliveFailCount >= KEEPALIVE_MAX_FAILS) {
+                        Logger?.debug(`keepAlive: ${keepAliveFailCount} quick disconnects, stopping retries`);
+                        return;
+                    }
                 }
 
                 keepAliveRetryDelay = Math.min(keepAliveRetryDelay * 2, 5000);

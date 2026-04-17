@@ -380,7 +380,9 @@ const RT_MAX_DELAY   = 60000;
 // Max consecutive failures before the SSE listener pauses itself.
 // The alarm-based health check restarts it, preventing a tight reconnect loop.
 const RT_MAX_FAILURES = 10;
+const RT_PAUSE_AFTER_MAX_MS = 10 * 60 * 1000; // try again after 10 min of paused state
 let rtConsecutiveFailures = 0;
+let rtPausedAt = 0;
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
 
@@ -877,6 +879,7 @@ async function startRealtimeListener() {
 
     console.debug('[BG-RT] Opening real-time stream...');
     let streamSucceeded = false;
+    let streamOpenedAt = 0;
     try {
         const res = await fetch(`${LISTEN_URL}?key=${FIREBASE_API_KEY}`, {
             method:  'POST',
@@ -890,9 +893,12 @@ async function startRealtimeListener() {
             return;
         }
 
-        rtConsecutiveFailures = 0;
+        // Don't clear rtConsecutiveFailures yet — a POST 200 doesn't mean the
+        // stream stayed open. We only count it as a real success after it
+        // survives long enough to receive data (see markStreamAlive below) or
+        // after ≥15s of uptime (streamUptimeMs check at the bottom).
         streamSucceeded = true;
-        rtReconnectDelay = 5000;
+        streamOpenedAt = Date.now();
         markStreamAlive();
         console.debug('[BG-RT] ✓ Real-time stream connected');
 
@@ -944,14 +950,22 @@ async function startRealtimeListener() {
         console.warn('[BG-RT] Stream error:', e.message);
     }
 
-    if (!streamSucceeded) {
+    // A stream that survived ≥15s counts as a real success → reset backoff.
+    // A stream that died within 15s (or never opened) counts as a failure.
+    const uptimeMs = streamOpenedAt > 0 ? Date.now() - streamOpenedAt : 0;
+    if (streamSucceeded && uptimeMs >= 15000) {
+        rtConsecutiveFailures = 0;
+        rtReconnectDelay = 5000;
+    } else {
         rtConsecutiveFailures++;
     }
     scheduleRtReconnect();
 }
 
 function scheduleRtReconnect() {
-    const delay = rtReconnectDelay === 5000 ? 2000 : rtReconnectDelay;
+    // Floor the reconnect delay at 5s to avoid hammering the network on mobile
+    // when the stream fails immediately (poor signal / SW wake cycle).
+    const delay = Math.max(5000, rtReconnectDelay);
     rtReconnectTimer = setTimeout(startRealtimeListener, delay);
     rtReconnectDelay = Math.min(rtReconnectDelay * 1.5, RT_MAX_DELAY);
 }
@@ -962,6 +976,11 @@ let progressSyncDebounce = null;
 
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace !== 'local') return;
+
+    // Re-entrance guard: if a sync is already running, its own bgStorageSet
+    // will fire this listener before pauseSync's window has fully covered it.
+    // Skip entirely — the in-flight sync will pick up the latest state anyway.
+    if (syncInProgress) return;
 
     // ── Coalesced sync: collect all changes within window, then fire ONE sync ──
     // Instead of separate debounces for videoProgress vs animeData vs groupCover,
@@ -1542,53 +1561,6 @@ async function fetchEpisodeTypesFromAnimeFillerList(animeSlug) {
     } catch (error) {
         console.error(`[Anime Tracker] ✗ Failed for ${animeSlug}:`, error);
         throw error;
-    }
-}
-
-// ─── AniList GraphQL API ─────────────────────────────────────────────────────
-
-const ANILIST_API = 'https://graphql.anilist.co';
-
-async function fetchAniListAiring(title) {
-    const query = `
-        query ($search: String) {
-            Media(search: $search, type: ANIME) {
-                id
-                title { romaji english }
-                status
-                episodes
-                nextAiringEpisode { episode airingAt timeUntilAiring }
-            }
-        }`;
-
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 10000);
-    try {
-        const res = await fetch(ANILIST_API, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ query, variables: { search: title } }),
-            signal: ctrl.signal
-        });
-        clearTimeout(timer);
-        if (!res.ok) return null;
-        const json = await res.json();
-        const media = json?.data?.Media;
-        if (!media) return null;
-        return {
-            anilistId: media.id,
-            title: media.title?.english || media.title?.romaji || title,
-            status: media.status,         // FINISHED | RELEASING | NOT_YET_RELEASED | CANCELLED | HIATUS
-            episodes: media.episodes,
-            nextAiring: media.nextAiringEpisode ? {
-                episode: media.nextAiringEpisode.episode,
-                airingAt: media.nextAiringEpisode.airingAt,
-                timeUntilAiring: media.nextAiringEpisode.timeUntilAiring
-            } : null
-        };
-    } catch {
-        clearTimeout(timer);
-        return null;
     }
 }
 
@@ -2228,35 +2200,6 @@ async function directWatchlistFetch(animeId, type) {
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message.type === 'GET_STATS') {
-        bgStorageGet(['animeData'])
-            .then((result) => {
-                const data = result.animeData || {};
-                sendResponse({
-                    totalAnime:     Object.keys(data).length,
-                    totalEpisodes:  Object.values(data).reduce((s, a) => s + (a.episodes?.length || 0), 0),
-                    totalWatchTime: Object.values(data).reduce((s, a) => s + (a.totalWatchTime    || 0), 0)
-                });
-            })
-            .catch((e) => sendResponse({ error: e.message }));
-        return true;
-    }
-
-    if (message.type === 'CLEAR_DATA') {
-        chrome.alarms.clear(METADATA_REPAIR_ALARM).catch?.(() => {});
-        bgStorageSet({
-            animeData: {},
-            videoProgress: {},
-            deletedAnime: {},
-            groupCoverImages: {},
-            [METADATA_REPAIR_STATE_KEY]: null,
-            [PENDING_METADATA_REPAIR_KEY]: false
-        })
-            .then(() => sendResponse({ success: true }))
-            .catch((e) => sendResponse({ success: false, error: e.message }));
-        return true;
-    }
-
     if (message.type === 'SYNC_TO_FIREBASE') {
         sendResponse({ received: true });
         if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
@@ -2350,14 +2293,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 sendResponse({ success: false, error: error.message });
             }
         })();
-        return true;
-    }
-
-    if (message.type === 'FETCH_ANILIST_AIRING') {
-        if (!message.title) { sendResponse({ error: 'Missing title' }); return true; }
-        fetchAniListAiring(message.title)
-            .then(data => sendResponse({ success: !!data, data }))
-            .catch(error => sendResponse({ success: false, error: error.message }));
         return true;
     }
 
@@ -2477,7 +2412,10 @@ chrome.runtime.onConnect.addListener((port) => {
 });
 
 // ─── Alarm: keep SW alive + health checks ────────────────────────────────────
-chrome.alarms.create('keepAlive', { periodInMinutes: 0.33 });
+// Fires once per minute (Android Chrome clamps periodInMinutes ≥ 1 anyway).
+// The keepAlive port from the content script is what actually keeps the SW
+// warm during playback; this alarm is for stream health + metadata repair.
+chrome.alarms.create('keepAlive', { periodInMinutes: 1 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === METADATA_REPAIR_ALARM) {
@@ -2497,7 +2435,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     const streamDead = !rtListenAbort || rtListenAbort.signal.aborted;
     if (streamDead) {
         console.debug('[BG] keepAlive: stream dead, restarting...');
-        rtConsecutiveFailures = 0;
+        // NOTE: do NOT reset rtConsecutiveFailures here — that would defeat
+        // the "pause after N failures" circuit breaker. Let startRealtimeListener
+        // check the cap and self-gate; alarm just nudges the retry.
         startRealtimeListener();
     }
 
@@ -2520,7 +2460,7 @@ function checkStreamHealth() {
     if (elapsed > 90000) {
         console.debug(`[BG] Stream silent for ${Math.round(elapsed / 1000)}s, reconnecting`);
         lastStreamMessageAt = Date.now();
-        rtConsecutiveFailures = 0;
+        // Do NOT reset rtConsecutiveFailures — preserve the circuit breaker.
         if (rtListenAbort) rtListenAbort.abort();
         startRealtimeListener();
     }
