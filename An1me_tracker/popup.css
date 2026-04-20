@@ -1566,12 +1566,25 @@ body {
 .season-item.complete .season-episode-badge   { color: var(--green); background: rgba(76,175,130,0.08); border: 1px solid rgba(76,175,130,0.2); }
 .season-item-actions { display: none; align-items: center; gap: 2px; }
 .season-item.expanded .season-item-actions { display: flex; }
-/* Movies can't expand, so reveal the edit/delete buttons on hover instead,
-   and drop the misleading pointer cursor on the header. */
+/* Movies can't expand. Keep the edit/delete actions in the layout so the row
+   doesn't jump on hover, and fade/slide them in for a smooth reveal. */
 .season-item-movie .season-item-header { cursor: default; }
-.season-item-movie:hover .season-item-actions { display: flex; }
+.season-item-movie .season-item-actions {
+    display: flex;
+    opacity: 0;
+    transform: translateX(4px);
+    pointer-events: none;
+    transition: opacity var(--tn), transform var(--tn);
+}
+.season-item-movie:hover .season-item-actions,
+.season-item-movie:focus-within .season-item-actions {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+}
 /* Match the orange "Movie" chip used on standalone single-movie cards. */
-.season-movie-type-badge { color: #f4a261; background: rgba(244,162,97,0.12); border: 1px solid rgba(244,162,97,0.35); }
+.season-movie-type-badge { color: #f4a261; background: rgba(244,162,97,0.12); border: 1px solid rgba(244,162,97,0.35); transition: background var(--tf), border-color var(--tf); }
+.season-item-movie:hover .season-movie-type-badge { background: rgba(244,162,97,0.2); border-color: rgba(244,162,97,0.55); }
 .season-edit-btn, .season-delete-btn { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: rgba(255,255,255,0.18); cursor: pointer; border-radius: var(--r-xs); transition: color var(--tf); padding: 0; }
 .season-edit-btn svg, .season-delete-btn svg { width: 11px; height: 11px; stroke-width: 1.8; }
 .season-edit-btn:hover   { color: var(--cyan); }
