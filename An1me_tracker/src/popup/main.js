@@ -1497,11 +1497,15 @@
             await Storage.set(dataToSave);
 
             if (user) {
-                const gcResult = await Storage.get(['groupCoverImages']);
-                await FirebaseSync.saveToCloud({
-                    animeData, videoProgress: currentVideoProgress, deletedAnime,
-                    groupCoverImages: gcResult.groupCoverImages || {}
-                }, true);
+                try {
+                    const gcResult = await Storage.get(['groupCoverImages']);
+                    await FirebaseSync.saveToCloud({
+                        animeData, videoProgress: currentVideoProgress, deletedAnime,
+                        groupCoverImages: gcResult.groupCoverImages || {}
+                    }, true);
+                } catch (syncErr) {
+                    PopupLogger.error('Delete', 'Cloud sync failed:', syncErr);
+                }
             }
 
             // Remove from an1me.to watchlist
@@ -1549,10 +1553,14 @@
             await Storage.set(dataToSave);
 
             if (user) {
-                await FirebaseSync.saveToCloud({
-                    animeData, videoProgress: currentVideoProgress, deletedAnime,
-                    groupCoverImages: result.groupCoverImages || {}
-                }, true);
+                try {
+                    await FirebaseSync.saveToCloud({
+                        animeData, videoProgress: currentVideoProgress, deletedAnime,
+                        groupCoverImages: result.groupCoverImages || {}
+                    }, true);
+                } catch (syncErr) {
+                    PopupLogger.error('Complete', 'Cloud sync failed:', syncErr);
+                }
             }
 
             // Sync to an1me.to watchlist
@@ -1592,10 +1600,14 @@
             await Storage.set(dataToSave);
 
             if (user) {
-                await FirebaseSync.saveToCloud({
-                    animeData, videoProgress: currentVideoProgress, deletedAnime,
-                    groupCoverImages: result.groupCoverImages || {}
-                }, true);
+                try {
+                    await FirebaseSync.saveToCloud({
+                        animeData, videoProgress: currentVideoProgress, deletedAnime,
+                        groupCoverImages: result.groupCoverImages || {}
+                    }, true);
+                } catch (syncErr) {
+                    PopupLogger.error('Drop', 'Cloud sync failed:', syncErr);
+                }
             }
 
             // Sync to an1me.to watchlist
@@ -1635,10 +1647,14 @@
             await Storage.set(dataToSave);
 
             if (user) {
-                await FirebaseSync.saveToCloud({
-                    animeData, videoProgress: currentVideoProgress, deletedAnime,
-                    groupCoverImages: result.groupCoverImages || {}
-                }, true);
+                try {
+                    await FirebaseSync.saveToCloud({
+                        animeData, videoProgress: currentVideoProgress, deletedAnime,
+                        groupCoverImages: result.groupCoverImages || {}
+                    }, true);
+                } catch (syncErr) {
+                    PopupLogger.error('OnHold', 'Cloud sync failed:', syncErr);
+                }
             }
 
             // Sync to an1me.to watchlist
@@ -1662,12 +1678,16 @@
         markInternalSave(dataToSave);
         await Storage.set(dataToSave);
         if (user) {
-            await FirebaseSync.saveToCloud({
-                animeData: {},
-                videoProgress: {},
-                groupCoverImages: {},
-                deletedAnime: {}
-            }, true);
+            try {
+                await FirebaseSync.saveToCloud({
+                    animeData: {},
+                    videoProgress: {},
+                    groupCoverImages: {},
+                    deletedAnime: {}
+                }, true);
+            } catch (syncErr) {
+                PopupLogger.error('ClearAll', 'Cloud sync failed:', syncErr);
+            }
         }
         animeData = {};
         videoProgress = {};

@@ -389,43 +389,53 @@ const FirebaseLib = (function() {
     }
 
     /**
-     * Set Firestore document
+     * Set Firestore document.
+     * Throws on failure so callers can detect errors and retry — previously
+     * returned false on error, which silently swallowed failures.
+     *
+     * @param {string[]} [options.fields] Optional field names for a partial
+     *   update (updateMask). When omitted, writes the full document.
      */
     async function setDocument(collection, docId, data, options = {}) {
         const idToken = await getIdToken();
-        if (!idToken) return false;
-
-        const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collection}/${docId}`;
-
-        try {
-            const body = JSON.stringify({
-                fields: jsonToFirestoreFields(data)
-            });
-            // keepalive allows the request to survive page unload (popup close).
-            // Has a 64KB body limit — fall back to regular fetch if too large.
-            const useKeepalive = !!options.keepalive && body.length < 63000;
-
-            const response = await fetch(url, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${idToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body,
-                keepalive: useKeepalive
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text().catch(() => '');
-                console.error('[Firestore] Set error:', response.status, errorText);
-                throw new Error(`Firestore set error: ${response.status}`);
-            }
-
-            return true;
-        } catch (error) {
-            console.error('[Firestore] Set error:', error);
-            return false;
+        if (!idToken) {
+            const err = new Error('No auth token');
+            err.code = 'NO_AUTH';
+            throw err;
         }
+
+        let url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collection}/${docId}`;
+        if (Array.isArray(options.fields) && options.fields.length > 0) {
+            const mask = options.fields.map(f => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&');
+            url += `?${mask}`;
+        }
+
+        const body = JSON.stringify({
+            fields: jsonToFirestoreFields(data)
+        });
+        // keepalive allows the request to survive page unload (popup close).
+        // Has a 64KB body limit — fall back to regular fetch if too large.
+        const useKeepalive = !!options.keepalive && body.length < 63000;
+
+        const response = await fetch(url, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${idToken}`,
+                'Content-Type': 'application/json'
+            },
+            body,
+            keepalive: useKeepalive
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '');
+            const err = new Error(`Firestore set error: ${response.status}`);
+            err.status = response.status;
+            err.body = errorText;
+            throw err;
+        }
+
+        return true;
     }
 
     /**

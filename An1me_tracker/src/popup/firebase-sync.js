@@ -189,14 +189,15 @@ const FirebaseSync = {
             return this.performCloudSave();
         }
 
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             this.saveToCloudTimeout = setTimeout(async () => {
                 try {
                     await this.performCloudSave();
+                    resolve();
                 } catch (error) {
                     PopupLogger.error('Firebase', 'Debounced save failed:', error);
+                    reject(error);
                 }
-                resolve();
             }, CONFIG.CLOUD_SAVE_DEBOUNCE_MS);
         });
     },
