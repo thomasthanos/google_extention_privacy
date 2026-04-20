@@ -384,7 +384,7 @@ function isSyncPaused() {
 let rtListenAbort    = null;
 let rtReconnectTimer = null;
 let rtReconnectDelay = 5000;
-const RT_MAX_DELAY   = 60000;
+const RT_MAX_DELAY   = 5 * 60 * 1000; // 5 min ceiling — prevents tight reconnect loop after persistent failure
 
 // Max consecutive failures before the SSE listener pauses itself.
 // The alarm-based health check restarts it, preventing a tight reconnect loop.
@@ -392,6 +392,9 @@ const RT_MAX_FAILURES = 10;
 const RT_PAUSE_AFTER_MAX_MS = 10 * 60 * 1000; // try again after 10 min of paused state
 let rtConsecutiveFailures = 0;
 let rtPausedAt = 0;
+// Timestamp of last successful stream open — used to skip the catch-up GET
+// when we just reconnected (avoids piling up 1-read GETs on every reconnect).
+let _lastSuccessfulStreamOpenedAt = 0;
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
 
@@ -901,8 +904,14 @@ async function startRealtimeListener() {
     }
 
     // ── Catch-up fetch ────────────────────────────────────────────────────────
+    // Skip the catch-up GET when we just successfully opened a stream < 60s ago.
+    // In a reconnect storm (flaky network, token refresh churn), the 45s-gap
+    // check triggers on every retry and piles up extra Firestore reads that
+    // the stream's initial snapshot would have delivered anyway.
     const gapSinceLastMessage = Date.now() - lastStreamMessageAt;
-    if (gapSinceLastMessage > 45000) {
+    const justHadSuccessfulOpen = _lastSuccessfulStreamOpenedAt > 0 &&
+                                  (Date.now() - _lastSuccessfulStreamOpenedAt) < 60000;
+    if (gapSinceLastMessage > 45000 && !justHadSuccessfulOpen) {
         ddebug(`[BG-RT] Catching up after ${Math.round(gapSinceLastMessage / 1000)}s gap...`);
         try {
             const cloudDoc = await fetchCloudData(user, token);
@@ -995,6 +1004,7 @@ async function startRealtimeListener() {
         rtConsecutiveFailures = 0;
         rtPausedAt = 0;
         rtReconnectDelay = 5000;
+        _lastSuccessfulStreamOpenedAt = streamOpenedAt;
     } else {
         rtConsecutiveFailures++;
     }
@@ -2285,6 +2295,28 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return true;
     }
 
+    // Popup asks SW for the latest cloud doc. SW serves from its 5-min cache
+    // (which the SSE stream keeps warm in real time), falling back to a fresh
+    // GET only on cache miss. This consolidates what used to be two independent
+    // Firestore GETs per popup open (popup + BG) into one SW-serviced request.
+    if (message.type === 'GET_CLOUD_DOC') {
+        (async () => {
+            try {
+                const user  = await getFirebaseUser();
+                const token = await getFirebaseToken();
+                if (!user || !token) {
+                    sendResponse({ success: false, error: 'not_authenticated' });
+                    return;
+                }
+                const doc = await fetchCloudDataCached(user, token);
+                sendResponse({ success: true, doc: doc || null });
+            } catch (e) {
+                sendResponse({ success: false, error: e.message });
+            }
+        })();
+        return true;
+    }
+
     if (message.type === 'FETCH_ANIME_INFO') {
         if (!message.slug) { sendResponse({ error: 'Missing slug' }); return true; }
         fetchAnimePageInfo(message.slug)
@@ -2499,8 +2531,12 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name !== 'keepAlive') return;
 
     const streamDead = !rtListenAbort || rtListenAbort.signal.aborted;
-    if (streamDead) {
-        ddebug('[BG] keepAlive: stream dead, restarting...');
+    const reconnectPending = !!rtReconnectTimer;
+    // Only nudge a reconnect if there is no pending reconnect timer — otherwise
+    // we cancel the scheduled exponential-backoff reconnect inside startRealtimeListener
+    // and effectively force-reconnect every minute (1440 Firestore reads/day).
+    if (streamDead && !reconnectPending) {
+        ddebug('[BG] keepAlive: stream dead and no reconnect pending, restarting...');
         // NOTE: do NOT reset rtConsecutiveFailures here — that would defeat
         // the "pause after N failures" circuit breaker. Let startRealtimeListener
         // check the cap and self-gate; alarm just nudges the retry.

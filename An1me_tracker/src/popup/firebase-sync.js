@@ -327,21 +327,46 @@ const FirebaseSync = {
                 cloudData = cachedCloudData;
                 PopupLogger.debug('Sync', 'Using cached cloud user document');
             } else {
-                let retryCount = 0;
-                const maxRetries = 3;
-
-                while (retryCount < maxRetries) {
-                    try {
-                        cloudData = await FirebaseLib.getDocument('users', this.currentUser.uid);
+                // Ask the background SW first — it keeps a 5-min cloud-doc cache
+                // that the SSE stream warms in real time. Serves identical data
+                // to a direct GET on cache hit, but costs zero Firestore reads.
+                // Falls through to FirebaseLib.getDocument on cache miss or when
+                // the SW isn't reachable (e.g. signed-out state, rare race).
+                try {
+                    const swResp = await new Promise((resolve) => {
+                        try {
+                            chrome.runtime.sendMessage({ type: 'GET_CLOUD_DOC' }, (resp) => {
+                                if (chrome.runtime.lastError) { resolve(null); return; }
+                                resolve(resp || null);
+                            });
+                        } catch { resolve(null); }
+                    });
+                    if (swResp?.success) {
+                        cloudData = swResp.doc || null;
                         this.setCachedUserDocument(this.currentUser.uid, cloudData);
-                        break;
-                    } catch (e) {
-                        retryCount++;
-                        if (retryCount < maxRetries) {
-                            PopupLogger.warn('Sync', `Cloud fetch failed, retrying (${retryCount}/${maxRetries})...`);
-                            await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
-                        } else {
-                            throw e;
+                        PopupLogger.debug('Sync', 'Using SW-cached cloud document');
+                    }
+                } catch (e) {
+                    PopupLogger.debug('Sync', 'SW cloud-doc fetch skipped:', e?.message || e);
+                }
+
+                if (!cloudData) {
+                    let retryCount = 0;
+                    const maxRetries = 3;
+
+                    while (retryCount < maxRetries) {
+                        try {
+                            cloudData = await FirebaseLib.getDocument('users', this.currentUser.uid);
+                            this.setCachedUserDocument(this.currentUser.uid, cloudData);
+                            break;
+                        } catch (e) {
+                            retryCount++;
+                            if (retryCount < maxRetries) {
+                                PopupLogger.warn('Sync', `Cloud fetch failed, retrying (${retryCount}/${maxRetries})...`);
+                                await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+                            } else {
+                                throw e;
+                            }
                         }
                     }
                 }
