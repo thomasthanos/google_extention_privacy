@@ -1566,6 +1566,10 @@ body {
 .season-item.complete .season-episode-badge   { color: var(--green); background: rgba(76,175,130,0.08); border: 1px solid rgba(76,175,130,0.2); }
 .season-item-actions { display: none; align-items: center; gap: 2px; }
 .season-item.expanded .season-item-actions { display: flex; }
+/* Movies can't expand, so reveal the edit/delete buttons on hover instead,
+   and drop the misleading pointer cursor on the header. */
+.season-item-movie .season-item-header { cursor: default; }
+.season-item-movie:hover .season-item-actions { display: flex; }
 .season-edit-btn, .season-delete-btn { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: rgba(255,255,255,0.18); cursor: pointer; border-radius: var(--r-xs); transition: color var(--tf); padding: 0; }
 .season-edit-btn svg, .season-delete-btn svg { width: 11px; height: 11px; stroke-width: 1.8; }
 .season-edit-btn:hover   { color: var(--cyan); }
