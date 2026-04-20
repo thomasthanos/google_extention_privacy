@@ -218,7 +218,7 @@ const FirebaseSync = {
             return;
         }
 
-        if (this.isSavingToCloud || !this.pendingSave || !this.currentUser) {
+        if (!this.pendingSave || !this.currentUser) {
             this.cloudSaveRetryCount = 0;
             return;
         }
@@ -246,7 +246,9 @@ const FirebaseSync = {
                     email: this.currentUser.email
                 };
 
-                await FirebaseLib.setDocument('users', this.currentUser.uid, savedDoc);
+                await FirebaseLib.setDocument('users', this.currentUser.uid, savedDoc, {
+                    fields: ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'lastUpdated', 'email']
+                });
                 this.setCachedUserDocument(this.currentUser.uid, savedDoc);
                 PopupLogger.log('Firebase', 'Data saved to cloud');
 
@@ -555,7 +557,10 @@ const FirebaseSync = {
                 groupCoverImages: dataToSave.groupCoverImages || {},
                 lastUpdated:      new Date().toISOString(),
                 email:            this.currentUser.email
-            }, { keepalive: true }).catch(err => {
+            }, {
+                keepalive: true,
+                fields: ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'lastUpdated', 'email']
+            }).catch(err => {
                 PopupLogger.error('Sync', 'Save on unload failed:', err);
             });
         }

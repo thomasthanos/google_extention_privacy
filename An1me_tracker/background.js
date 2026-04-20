@@ -592,12 +592,13 @@ async function syncProgressOnly() {
 
         if (response.ok) {
             lastPushedProgressBG = JSON.parse(JSON.stringify(localVP));
-            // Refresh cached cloud doc optimistically so the next full sync
-            // doesn't re-GET to discover our own write.
-            if (_bgCloudDocCache) {
-                _bgCloudDocCache = { ..._bgCloudDocCache, videoProgress: localVP, lastUpdated: pushedAt };
-                _bgCloudDocCacheTime = Date.now();
-            }
+            // Invalidate the cached cloud doc so the next full sync re-fetches
+            // and picks up any concurrent writes from other devices. The SSE
+            // listener usually refreshes the cache for us, but when it is
+            // temporarily offline the optimistic update was masking remote
+            // changes. Paying one extra GET per few pushes is cheaper than
+            // silently dropping another device's work.
+            invalidateBgCloudDocCache();
             _lastAppliedCloudUpdatedAt = pushedAt;
             bgRememberOwnWrite(pushedAt);
         } else {
@@ -717,16 +718,10 @@ async function syncToFirebase() {
         });
 
         if (response.ok) {
-            // Refresh cached cloud doc with what we just wrote
-            _bgCloudDocCache = {
-                ...(_bgCloudDocCache || {}),
-                animeData:        mergedAnime,
-                videoProgress:    mergedProgress,
-                deletedAnime:     mergedDeleted,
-                groupCoverImages: mergedGroup,
-                lastUpdated:      pushedAt
-            };
-            _bgCloudDocCacheTime = Date.now();
+            // Invalidate rather than optimistically refresh — protects against
+            // races with a concurrent write from another device that arrived
+            // between our last read and this PATCH.
+            invalidateBgCloudDocCache();
             _lastAppliedCloudUpdatedAt = pushedAt;
             bgRememberOwnWrite(pushedAt);
         } else {

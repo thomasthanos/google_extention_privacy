@@ -2924,6 +2924,20 @@
                 void applyMetadataRepairState(changes.metadataRepairState.newValue || null);
             }
 
+            // Cache invalidation: when an external writer (SSE → SW → storage,
+            // or another tab) touches one of the Firebase-synced keys, drop
+            // the popup's cached cloud user document so the next sync reads
+            // fresh state instead of serving stale cloud data for up to the
+            // full cache TTL.
+            if (isExternalUpdate && (
+                changes.animeData ||
+                changes.videoProgress ||
+                changes.deletedAnime ||
+                changes.groupCoverImages
+            )) {
+                try { FirebaseSync.clearCachedUserDocument(); } catch {}
+            }
+
             if (needsFullRender) {
                 if (storageUpdateTimeout) clearTimeout(storageUpdateTimeout);
                 storageUpdateTimeout = setTimeout(async () => {

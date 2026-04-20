@@ -319,11 +319,11 @@
             if (res.ok) {
                 lastPushedProgress = mergedSnap;
                 lastPushAt = Date.now();
-                // Update cloud cache optimistically so the next push doesn't re-GET
-                if (_cloudDocCache) {
-                    _cloudDocCache = { ..._cloudDocCache, videoProgress: mergedVP, lastUpdated: pushedAt };
-                    _cloudDocCacheTime = Date.now();
-                }
+                // Invalidate the cache so the next push/read sees any concurrent
+                // writes from other devices. Optimistic updates would mask those
+                // whenever our SSE stream is offline or lagging; paying one extra
+                // GET on the next push is the safer trade-off.
+                invalidateCloudDocCache();
                 _lastAppliedCloudUpdatedAt = pushedAt;
                 rememberOwnWrite(pushedAt);
                 Logger?.info('videoProgress pushed (merged)');
@@ -441,16 +441,10 @@
             if (res.ok) {
                 lastPushedFullSnap = uploadSnap;
                 lastPushAt = Date.now();
-                // Update cloud cache optimistically
-                _cloudDocCache = {
-                    ...(_cloudDocCache || {}),
-                    animeData:        mergedAnime,
-                    videoProgress:    mergedProgress,
-                    deletedAnime:     mergedDeleted,
-                    groupCoverImages: mergedGroupCovers,
-                    lastUpdated:      pushedAt
-                };
-                _cloudDocCacheTime = Date.now();
+                // Invalidate rather than optimistically refresh — protects
+                // against races with a concurrent write from another device
+                // that arrived between our last read and this PATCH.
+                invalidateCloudDocCache();
                 _lastAppliedCloudUpdatedAt = pushedAt;
                 rememberOwnWrite(pushedAt);
                 Logger?.info('Full push to Firestore complete');
