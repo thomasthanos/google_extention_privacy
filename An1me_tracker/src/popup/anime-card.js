@@ -1026,8 +1026,24 @@ const AnimeCardRenderer = {
                 } // end normal season
             } // end else (not movie)
 
+            // Movies have no progress bar and no episode list — skip both the
+            // content wrapper and the expand chevron so the row doesn't ship an
+            // empty collapsible or a non-functional caret.
+            const hasExpandableContent = !isMovie;
+            const expandIconHtml = hasExpandableContent
+                ? `<div class="season-expand-icon">${UIHelpers.createIcon('chevron')}</div>`
+                : '';
+            const contentHtml = hasExpandableContent
+                ? `<div class="season-item-content">
+                        <div class="season-progress-container">
+                            ${progressInfoHTML}
+                        </div>
+                        ${episodesHTML}
+                    </div>`
+                : '';
+
             const html = `
-                <div class="season-item ${statusClass}" data-slug="${slug}">
+                <div class="season-item ${statusClass}${isMovie ? ' season-item-movie' : ''}" data-slug="${slug}">
                     <div class="season-item-header">
                         <div class="season-item-left">
                             <span class="season-status-icon">${statusIcon}</span>
@@ -1039,15 +1055,10 @@ const AnimeCardRenderer = {
                                 <button class="season-edit-btn" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
                                 <button class="season-delete-btn" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
                             </div>
-                            <div class="season-expand-icon">${UIHelpers.createIcon('chevron')}</div>
+                            ${expandIconHtml}
                         </div>
                     </div>
-                    <div class="season-item-content">
-                        <div class="season-progress-container">
-                            ${progressInfoHTML}
-                        </div>
-                        ${episodesHTML}
-                    </div>
+                    ${contentHtml}
                 </div>
             `;
 

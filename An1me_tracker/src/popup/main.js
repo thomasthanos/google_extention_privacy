@@ -1023,10 +1023,13 @@
         });
 
         elements.animeList.querySelectorAll('.season-item-header').forEach(header => {
+            const seasonItem = header.closest('.season-item');
+            // Movie rows have no collapsible content — skip wiring the toggle so
+            // clicking doesn't add a no-op `.expanded` class.
+            if (seasonItem?.classList.contains('season-item-movie')) return;
             const toggleSeason = (e) => {
                 if (e.target.closest('.season-edit-btn') || e.target.closest('.season-delete-btn')) return;
                 e.stopPropagation();
-                const seasonItem = header.closest('.season-item');
                 if (seasonItem) seasonItem.classList.toggle('expanded');
             };
             header.addEventListener('click', toggleSeason);
