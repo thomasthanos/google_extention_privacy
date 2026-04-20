@@ -1501,6 +1501,32 @@ async function fetchAnimePageInfo(slug) {
         || html.match(/showWatchlistModal\(['"]#watchlist-(\d+)['"]\)/);
     if (idMatch) siteAnimeId = parseInt(idMatch[1], 10);
 
+    // ── Duration (seconds) ──────────────────────────────────────────────────
+    // Parse the Greek/English <dt>Διάρκεια|Duration</dt><dd>...</dd> label. The
+    // <dd> body can be "120 λεπτά", "24 min.", "1h 55m", "2 hr 5 min" etc.
+    let durationSeconds = null;
+    const durDdMatch = html.match(
+        /(?:Διάρκεια|Duration)<\/dt>\s*(<dd[^>]*>[\s\S]{0,200}?<\/dd>)/i
+    );
+    if (durDdMatch) {
+        const text = durDdMatch[1].replace(/<[^>]+>/g, ' ').toLowerCase();
+        let totalMinutes = 0;
+        // Match all "Nh", "N hr", "N hour", "N ώρ" tokens
+        const hourMatches = text.matchAll(/(\d+)\s*(?:h\b|hr\b|hour|ώρ)/g);
+        for (const m of hourMatches) totalMinutes += parseInt(m[1], 10) * 60;
+        // Match all "Nm", "N min", "N λεπτ" tokens
+        const minMatches = text.matchAll(/(\d+)\s*(?:m\b|min|λεπτ)/g);
+        for (const m of minMatches) totalMinutes += parseInt(m[1], 10);
+        // Fallback: first bare number, assume minutes (an1me.to's common shape)
+        if (totalMinutes === 0) {
+            const bareNum = text.match(/\b(\d{1,4})\b/);
+            if (bareNum) totalMinutes = parseInt(bareNum[1], 10);
+        }
+        if (totalMinutes > 0 && totalMinutes <= 24 * 60) {
+            durationSeconds = totalMinutes * 60;
+        }
+    }
+
     return {
         totalEpisodes,
         status,
@@ -1509,7 +1535,8 @@ async function fetchAnimePageInfo(slug) {
         nextEpisodeTimezone,
         coverImage,
         siteAnimeId,
-        resolvedSlug
+        resolvedSlug,
+        durationSeconds
     };
 }
 
@@ -1534,8 +1561,12 @@ async function batchFetchAnimeInfo(slugs) {
                     await bgStorageSet({ [`animeinfo_${slug}`]: entry });
                     successCount++;
 
-                    if (info.coverImage || info.siteAnimeId) {
-                        backfills.set(slug, { coverImage: info.coverImage, siteAnimeId: info.siteAnimeId });
+                    if (info.coverImage || info.siteAnimeId || info.durationSeconds) {
+                        backfills.set(slug, {
+                            coverImage: info.coverImage,
+                            siteAnimeId: info.siteAnimeId,
+                            durationSeconds: info.durationSeconds || null
+                        });
                     }
                 } else {
                     await bgStorageSet({ [`animeinfo_${slug}`]: { notFound: true, cachedAt: Date.now() } });
@@ -1564,6 +1595,26 @@ async function batchFetchAnimeInfo(slugs) {
             if (fill.siteAnimeId && !animeData[slug].siteAnimeId) {
                 animeData[slug].siteAnimeId = fill.siteAnimeId;
                 changed = true;
+            }
+            // Backfill movie/episode duration when the add-flow seeded a placeholder
+            // (0 for movies, 1440/6000/7200 legacy estimates).
+            if (fill.durationSeconds && Array.isArray(animeData[slug].episodes)) {
+                const dur = fill.durationSeconds;
+                let epsChanged = false;
+                animeData[slug].episodes = animeData[slug].episodes.map((ep) => {
+                    const current = Number(ep?.duration) || 0;
+                    if (isPlaceholderDuration(current)) {
+                        epsChanged = true;
+                        return { ...ep, duration: dur, durationSource: 'site-metadata' };
+                    }
+                    return ep;
+                });
+                if (epsChanged) {
+                    animeData[slug].totalWatchTime = animeData[slug].episodes.reduce(
+                        (sum, ep) => sum + (Number(ep?.duration) || 0), 0
+                    );
+                    changed = true;
+                }
             }
         }
         if (changed) await bgStorageSet({ animeData });

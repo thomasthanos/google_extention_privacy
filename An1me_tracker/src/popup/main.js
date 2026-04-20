@@ -2051,8 +2051,15 @@
             updateStats();
             hideAddAnimeDialog();
 
-            // Fetch cover image + info for the newly added anime in background
-            if (!animeData[slug].coverImage) {
+            // Fetch cover image + site metadata (incl. runtime) for the newly added
+            // anime in background. Also triggers when any episode has a placeholder
+            // duration — mostly movies, which seed with duration=0 in the add flow.
+            const hasPlaceholderDuration = Array.isArray(animeData[slug].episodes)
+                && animeData[slug].episodes.some(ep => {
+                    const d = Number(ep?.duration) || 0;
+                    return d <= 0 || d === 1440 || d === 6000 || d === 7200;
+                });
+            if (!animeData[slug].coverImage || hasPlaceholderDuration) {
                 chrome.runtime.sendMessage(
                     { type: 'BATCH_FETCH_ANIME_INFO', slugs: [slug] },
                     () => { if (chrome.runtime.lastError) { /* ignore */ } }
