@@ -235,11 +235,14 @@ const Notifications = {
 
         const prompt = doc.createElement('div');
         prompt.id = 'anime-tracker-resume-prompt';
+        // innerHTML only carries static icon SVGs and structural markup.
+        // Dynamic text (timeStr) is written via textContent below to keep the
+        // template XSS-safe even if a future edit adds user-controlled data.
         prompt.innerHTML = `
             <div class="at-shine"></div>
             <div class="at-header">
                 ${this._icons.clock()}
-                <span class="at-text">Resume from <strong>${timeStr}</strong>?</span>
+                <span class="at-text">Resume from <strong data-at-timestr></strong>?</span>
             </div>
             <div class="at-buttons">
                 <button class="at-btn at-yes" id="at-resume-yes">
@@ -250,6 +253,8 @@ const Notifications = {
                 </button>
             </div>
         `;
+        const timeNode = prompt.querySelector('[data-at-timestr]');
+        if (timeNode) timeNode.textContent = timeStr;
 
         this.injectResumeStyles(doc);
         container.appendChild(prompt);

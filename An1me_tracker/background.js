@@ -27,6 +27,15 @@ const shallowEqualDeletedAnime = sharedMergeUtils.shallowEqualDeletedAnime || mi
 const shallowEqualObjectMap  = sharedMergeUtils.shallowEqualObjectMap  || missingMergeUtil('shallowEqualObjectMap');
 const isLikelyMovieSlug      = sharedMergeUtils.isLikelyMovieSlug      || missingMergeUtil('isLikelyMovieSlug');
 
+// ─── Debug logging ───────────────────────────────────────────────────────────
+// Diagnostic console.log / console.debug calls are gated behind BG_DEBUG so
+// production installs don't spam the service-worker console. Warnings and
+// errors stay unconditional since they surface real problems. Flip BG_DEBUG
+// to true locally when investigating an issue.
+const BG_DEBUG = false;
+const dlog   = (...a) => { if (BG_DEBUG) console.log(...a); };
+const ddebug = (...a) => { if (BG_DEBUG) console.debug(...a); };
+
 // ─── Cleanup helpers ─────────────────────────────────────────────────────────
 
 const COMPLETED_PERCENTAGE = 85;
@@ -444,7 +453,7 @@ async function refreshFirebaseToken(refreshToken) {
                 expiresAt:    Date.now() + parseInt(data.expires_in) * 1000
             };
             await bgStorageSet({ firebase_tokens: tokens });
-            console.log('[BG] Token refreshed');
+            dlog('[BG] Token refreshed');
             return tokens;
         } catch (e) {
             console.error('[BG] Token refresh failed:', e);
@@ -857,7 +866,7 @@ async function _doApplyCloudUpdate(cloudDoc) {
                 deletedAnime:     mergedDeleted,
                 groupCoverImages: mergedGroup
             });
-            console.log(`[BG-RT] ← Cloud update applied (eps: ${localEps}→${mergedEps})`);
+            dlog(`[BG-RT] ← Cloud update applied (eps: ${localEps}→${mergedEps})`);
         }
         if (cloudUpdatedAt) _lastAppliedCloudUpdatedAt = cloudUpdatedAt;
     } catch (e) {
@@ -894,7 +903,7 @@ async function startRealtimeListener() {
     // ── Catch-up fetch ────────────────────────────────────────────────────────
     const gapSinceLastMessage = Date.now() - lastStreamMessageAt;
     if (gapSinceLastMessage > 45000) {
-        console.debug(`[BG-RT] Catching up after ${Math.round(gapSinceLastMessage / 1000)}s gap...`);
+        ddebug(`[BG-RT] Catching up after ${Math.round(gapSinceLastMessage / 1000)}s gap...`);
         try {
             const cloudDoc = await fetchCloudData(user, token);
             if (cloudDoc) await applyCloudUpdate(cloudDoc);
@@ -906,7 +915,7 @@ async function startRealtimeListener() {
     rtListenAbort = new AbortController();
     const docPath = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${user.uid}`;
 
-    console.debug('[BG-RT] Opening real-time stream...');
+    ddebug('[BG-RT] Opening real-time stream...');
     let streamSucceeded = false;
     let streamOpenedAt = 0;
     try {
@@ -929,7 +938,7 @@ async function startRealtimeListener() {
         streamSucceeded = true;
         streamOpenedAt = Date.now();
         markStreamAlive();
-        console.debug('[BG-RT] ✓ Real-time stream connected');
+        ddebug('[BG-RT] ✓ Real-time stream connected');
 
         const reader  = res.body.getReader();
         const decoder = new TextDecoder();
@@ -1051,7 +1060,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
         if (newCount > oldCount || metadataChanged) {
             if (newCount > oldCount) {
-                console.log(
+                dlog(
                     `%cAnime Tracker %c➕ New episode! (${oldCount}→${newCount})`,
                     'color:rgb(255,107,107);font-weight:bold;font-size:12px',
                     'color:rgb(148,163,184);font-size:11px'
@@ -1273,7 +1282,7 @@ async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
     if (found) {
         fillerSlugCache[cacheKey] = found;
         await bgStorageSet({ [storageKey]: found });
-        console.log(`[AnimeTracker] Filler slug discovered: ${an1meSlug} → ${found}`);
+        dlog(`[AnimeTracker] Filler slug discovered: ${an1meSlug} → ${found}`);
         return found;
     }
 
@@ -1284,7 +1293,7 @@ async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
     } catch (e) {
         console.warn('[BG] Failed to cache notFound filler slug:', e.message);
     }
-    console.log(`[AnimeTracker] No filler data for ${an1meSlug} (tried ${candidates.length} candidates)`);
+    dlog(`[AnimeTracker] No filler data for ${an1meSlug} (tried ${candidates.length} candidates)`);
     return null;
 }
 
@@ -1549,7 +1558,7 @@ async function batchFetchAnimeInfo(slugs) {
         }
         if (changed) await bgStorageSet({ animeData });
     }
-    console.log(`[BG] Batch fetch done — ${successCount}/${slugs.length}`);
+    dlog(`[BG] Batch fetch done — ${successCount}/${slugs.length}`);
 }
 
 // ─── Episode type fetcher ─────────────────────────────────────────────────────
@@ -1613,7 +1622,7 @@ async function fetchEpisodeTypesFromAnimeFillerList(animeSlug) {
             return null;
         }
 
-        console.log(`[Anime Tracker] ✓ Fetched episode types for ${animeSlug}:`, episodeTypes);
+        dlog(`[Anime Tracker] ✓ Fetched episode types for ${animeSlug}:`, episodeTypes);
         return episodeTypes;
     } catch (error) {
         console.error(`[Anime Tracker] ✗ Failed for ${animeSlug}:`, error);
@@ -2076,7 +2085,7 @@ async function migrateFromSyncToLocal() {
             await new Promise((resolve) => {
                 chrome.storage.sync.remove(['animeData', 'trackedEpisodes', 'videoProgress'], () => resolve());
             });
-            console.log('[Anime Tracker] Migration complete');
+            dlog('[Anime Tracker] Migration complete');
         }
     } catch (error) {
         console.error('[Anime Tracker] Migration error:', error);
@@ -2129,7 +2138,7 @@ async function persistBeforeUnloadTrack(animeInfo, duration) {
     // Auto-undrop: if user watches a new episode of a dropped anime, undrop it
     if (animeData[slug].droppedAt) {
         delete animeData[slug].droppedAt;
-        console.log('[BG] Auto-undropped anime (new episode tracked):', slug);
+        dlog('[BG] Auto-undropped anime (new episode tracked):', slug);
     }
 
     const validDuration = normalizeTrackedDuration(duration);
@@ -2195,7 +2204,7 @@ async function persistBeforeUnloadTrack(animeInfo, duration) {
 // Finds an open an1me.to tab and forwards the sync request to its content script,
 // which can make the fetch with session cookies. Falls back to direct fetch.
 async function syncWatchlistToSite(animeId, type) {
-    console.log(`%c WatchlistSync %c ${type} %c anime #${animeId}`, 'background:#6366f1;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'background:#818cf8;color:#fff;padding:2px 6px', 'color:#a5b4fc');
+    dlog(`%c WatchlistSync %c ${type} %c anime #${animeId}`, 'background:#6366f1;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'background:#818cf8;color:#fff;padding:2px 6px', 'color:#a5b4fc');
 
     try {
         // Find an open an1me.to tab to forward the request through
@@ -2211,11 +2220,11 @@ async function syncWatchlistToSite(animeId, type) {
                     console.warn(`%c WatchlistSync %c tab forward failed`, 'background:#ef4444;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fca5a5', chrome.runtime.lastError.message);
                     directWatchlistFetch(animeId, type).catch(e => console.warn('[BG] WatchlistSync direct fallback failed:', e.message));
                 } else {
-                    console.log(`%c WatchlistSync %c ✓ forwarded to tab`, 'background:#22c55e;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#86efac');
+                    dlog(`%c WatchlistSync %c ✓ forwarded to tab`, 'background:#22c55e;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#86efac');
                 }
             });
         } else {
-            console.log(`%c WatchlistSync %c no tab open, direct fetch`, 'background:#f59e0b;color:#000;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fcd34d');
+            dlog(`%c WatchlistSync %c no tab open, direct fetch`, 'background:#f59e0b;color:#000;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fcd34d');
             await directWatchlistFetch(animeId, type);
         }
     } catch (e) {
@@ -2244,12 +2253,12 @@ async function directWatchlistFetch(animeId, type) {
         try {
             const data = JSON.parse(text);
             if (data?.success) {
-                console.log(`%c WatchlistSync %c ✓ ${data.data?.message || 'OK'}`, 'background:#22c55e;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#86efac');
+                dlog(`%c WatchlistSync %c ✓ ${data.data?.message || 'OK'}`, 'background:#22c55e;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#86efac');
             } else {
                 console.warn(`%c WatchlistSync %c ✗ ${data.data?.message || text.substring(0, 100)}`, 'background:#ef4444;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fca5a5');
             }
         } catch {
-            console.log(`%c WatchlistSync %c HTTP ${res.status} ${text.substring(0, 100)}`, 'background:#6366f1;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#a5b4fc');
+            dlog(`%c WatchlistSync %c HTTP ${res.status} ${text.substring(0, 100)}`, 'background:#6366f1;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#a5b4fc');
         }
     } catch (e) {
         console.warn(`%c WatchlistSync %c ✗ ${e.message}`, 'background:#ef4444;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fca5a5');
@@ -2337,7 +2346,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
                 // Fallback: try Jikan API (MAL) for filler data
                 if (message.animeTitle) {
-                    console.log(`[BG] AnimeFillerList miss, trying Jikan for "${message.animeTitle}"`);
+                    dlog(`[BG] AnimeFillerList miss, trying Jikan for "${message.animeTitle}"`);
                     const jikanData = await fetchJikanEpisodes(message.animeTitle);
                     if (jikanData && jikanData.filler.length > 0) {
                         sendResponse({ success: true, episodeTypes: jikanData, fillerSlug: message.animeSlug, source: 'jikan' });
@@ -2435,14 +2444,14 @@ chrome.runtime.onInstalled.addListener((details) => {
             'background:linear-gradient(135deg,rgba(255,107,107,0.2),rgba(255,142,83,0.2))',
             'border-radius:4px'
         ].join(';');
-        console.log(`%c🎬 Anime Tracker v${chrome.runtime.getManifest().version}`, style);
+        dlog(`%c🎬 Anime Tracker v${chrome.runtime.getManifest().version}`, style);
         migrateFromSyncToLocal();
     }
     setTimeout(startRealtimeListener, 2000);
 });
 
 chrome.runtime.onStartup.addListener(() => {
-    console.log('[Anime Tracker] Extension started');
+    dlog('[Anime Tracker] Extension started');
     migrateFromSyncToLocal();
     setTimeout(startRealtimeListener, 2000);
     // Restore smart notification alarm if enabled
@@ -2462,7 +2471,7 @@ chrome.runtime.onConnect.addListener((port) => {
             const msg = err.message || '';
             const isExpectedClose = msg.includes('back/forward cache') || msg.includes('message channel is closed');
             if (!isExpectedClose) {
-                console.debug('[BG] keepAlive port disconnected:', msg);
+                ddebug('[BG] keepAlive port disconnected:', msg);
             }
         }
     });
@@ -2491,7 +2500,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
     const streamDead = !rtListenAbort || rtListenAbort.signal.aborted;
     if (streamDead) {
-        console.debug('[BG] keepAlive: stream dead, restarting...');
+        ddebug('[BG] keepAlive: stream dead, restarting...');
         // NOTE: do NOT reset rtConsecutiveFailures here — that would defeat
         // the "pause after N failures" circuit breaker. Let startRealtimeListener
         // check the cap and self-gate; alarm just nudges the retry.
@@ -2515,7 +2524,7 @@ function markStreamAlive() {
 function checkStreamHealth() {
     const elapsed = Date.now() - lastStreamMessageAt;
     if (elapsed > 90000) {
-        console.debug(`[BG] Stream silent for ${Math.round(elapsed / 1000)}s, reconnecting`);
+        ddebug(`[BG] Stream silent for ${Math.round(elapsed / 1000)}s, reconnecting`);
         lastStreamMessageAt = Date.now();
         // Do NOT reset rtConsecutiveFailures — preserve the circuit breaker.
         if (rtListenAbort) rtListenAbort.abort();

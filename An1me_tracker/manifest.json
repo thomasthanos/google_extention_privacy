@@ -82,7 +82,8 @@
         "src/fonts/comic_sans.ttf"
       ],
       "matches": [
-        "<all_urls>"
+        "https://an1me.to/*",
+        "https://*.an1me.to/*"
       ]
     }
   ]
