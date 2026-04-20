@@ -115,6 +115,15 @@
     }
     let deferredListRefresh = null;
 
+    // Cached markup from the last full anime-list render. When the next render
+    // would produce the same markup (common: storage.onChanged fires for keys
+    // the list doesn't reflect, or for no-op progress updates), we skip the
+    // DOM swap entirely — this preserves scroll position, focus, and in-flight
+    // hover/transition state that an `innerHTML =` wipe would otherwise
+    // destroy. Reset to `null` on category/sort changes that imply a forced
+    // re-render is appropriate.
+    let _lastRenderedListMarkup = null;
+
     function generateWriteToken() {
         try {
             return crypto.randomUUID();
@@ -619,7 +628,10 @@
             .sort((a, b) => new Date(b.lastProgress || 0) - new Date(a.lastProgress || 0));
 
         if (entries.length === 0 && inProgressAnime.length === 0) {
-            elements.animeList.innerHTML = '';
+            if (_lastRenderedListMarkup !== '') {
+                elements.animeList.replaceChildren();
+                _lastRenderedListMarkup = '';
+            }
             elements.emptyState.classList.add('visible');
             return;
         }
@@ -858,9 +870,35 @@
             : '';
         const activeCompactSectionHtml = activeCompactItem ? activeCompactItem.sectionHtml : '';
 
-        // Disable transitions during render to prevent flicker
+        const combinedHtml = inProgressHtml + trackedHtml + chipsHtml + activeCompactSectionHtml;
+
+        // Skip the DOM swap entirely when the output hasn't changed since the
+        // last render. storage.onChanged fires for plenty of keys the list
+        // doesn't reflect (metadata caches, episode-type caches, repair state,
+        // own echoes) and for progress writes that save the same currentTime
+        // we already rendered — rebuilding the whole subtree in those cases
+        // flushes scroll position and any hover/transition state for no gain.
+        if (combinedHtml === _lastRenderedListMarkup && elements.animeList.firstChild) {
+            // DOM already matches — only refresh the live progress bars on
+            // in-progress cards, since videoProgress can change without
+            // altering the rendered markup (same seconds, different ms).
+            if (elements.animeList.querySelector('.ip-card')) {
+                _ipPatch(videoProgress || {});
+            }
+            return;
+        }
+
+        // Disable transitions during render to prevent flicker.
         elements.animeList.classList.add('no-transition');
-        elements.animeList.innerHTML = inProgressHtml + trackedHtml + chipsHtml + activeCompactSectionHtml;
+
+        // Build the new subtree off-DOM and swap it in atomically with
+        // replaceChildren. The old `innerHTML = str` pattern triggered two
+        // mutations (clear + parse-into-live-tree); this is one.
+        const range = document.createRange();
+        range.selectNodeContents(elements.animeList);
+        const fragment = range.createContextualFragment(combinedHtml);
+        elements.animeList.replaceChildren(fragment);
+        _lastRenderedListMarkup = combinedHtml;
 
         // Restore expanded state
         elements.animeList.querySelectorAll('.anime-card').forEach(card => {
