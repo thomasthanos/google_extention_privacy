@@ -1558,7 +1558,7 @@ body {
 .season-item.complete .season-status-icon { color: var(--green); background: rgba(76,175,130,0.12); }
 .season-item.complete { border-color: rgba(76,175,130,0.2); }
 .season-item.complete:hover { border-color: rgba(76,175,130,0.38); }
-.season-label { font-size: 12px; font-weight: 600; color: var(--t1); }
+.season-label { font-size: 12px; font-weight: 600; color: var(--t1); flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .season-item-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .season-episode-badge { font-size: 9px; font-weight: 600; padding: 2px 7px; border-radius: var(--r-pill); white-space: nowrap; }
 .season-item.not-started .season-episode-badge { color: var(--t3); background: rgba(255,255,255,0.03); border: 1px solid var(--b0); }

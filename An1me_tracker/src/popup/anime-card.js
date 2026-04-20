@@ -763,7 +763,9 @@ const AnimeCardRenderer = {
             let episodeBadgeText, progressInfoHTML, episodesHTML;
 
             if (isMovie) {
-                // Handle as movie - show duration instead of episodes
+                // Handle as movie - show duration instead of episodes.
+                // No progress-info row: the status icon + duration badge in the header already
+                // convey watched/not-watched; repeating "✅ Watched 0m" below only took up space.
                 const watchTime = anime.totalWatchTime || 0;
                 const formattedTime = UIHelpers.formatDuration(watchTime);
                 const isWatched = episodeCount > 0 || watchTime > 0;
@@ -774,12 +776,7 @@ const AnimeCardRenderer = {
                 statusIcon = isComplete ? '✓' : '○';
 
                 episodeBadgeText = formattedTime || 'Movie';
-                progressInfoHTML = `
-                    <div class="progress-info">
-                        <span>${isWatched ? '✅ Watched' : '⭕ Not watched'}</span>
-                        <span>${formattedTime}</span>
-                    </div>
-                `;
+                progressInfoHTML = '';
                 episodesHTML = ''; // No episodes list for movies
             } else {
                 // Handle as regular season (or a specific part)
