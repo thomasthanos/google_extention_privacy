@@ -591,7 +591,10 @@ async function syncProgressOnly() {
         });
 
         if (response.ok) {
-            lastPushedProgressBG = JSON.parse(JSON.stringify(localVP));
+            // structuredClone is faster than a JSON round-trip and preserves
+            // nested references cleanly; the snapshot is only compared via
+            // areProgressMapsEqual so a structural copy is all we need.
+            lastPushedProgressBG = structuredClone(localVP);
             // Invalidate the cached cloud doc so the next full sync re-fetches
             // and picks up any concurrent writes from other devices. The SSE
             // listener usually refreshes the cache for us, but when it is

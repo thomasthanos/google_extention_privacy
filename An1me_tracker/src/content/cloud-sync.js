@@ -928,7 +928,7 @@
             if (!document.hidden) startListening();
         });
 
-        setInterval(async () => {
+        const orionTokenRefreshTimer = setInterval(async () => {
             const newToken = await getValidToken();
             if (!newToken) return;
             if (newToken !== currentToken) {
@@ -938,6 +938,7 @@
         }, 50 * 60 * 1000);
 
         window.addEventListener('beforeunload', () => {
+            clearInterval(orionTokenRefreshTimer);
             listenAbortCtrl?.abort();
             pushOnTeardown(true);
         });

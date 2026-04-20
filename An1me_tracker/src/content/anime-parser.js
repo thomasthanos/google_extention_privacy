@@ -183,7 +183,10 @@ const AnimeParser = {
 
             const coverImageElement = document.querySelector('.anime-featured img')
                 || document.querySelector('.anime-main-image');
-            const coverImage = coverImageElement ? coverImageElement.src || null : null;
+            // Only trust plain https URLs — reject javascript:/data:/file:/etc.
+            // since this value ends up in <img src> on the popup side.
+            const rawCoverSrc = coverImageElement?.src || '';
+            const coverImage = /^https:\/\//i.test(rawCoverSrc) ? rawCoverSrc : null;
 
             // Extract numeric anime ID from the page for watchlist sync
             const siteAnimeId = this.extractSiteAnimeId();
