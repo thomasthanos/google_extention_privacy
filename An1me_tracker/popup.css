@@ -1570,6 +1570,8 @@ body {
    and drop the misleading pointer cursor on the header. */
 .season-item-movie .season-item-header { cursor: default; }
 .season-item-movie:hover .season-item-actions { display: flex; }
+/* Match the orange "Movie" chip used on standalone single-movie cards. */
+.season-movie-type-badge { color: #f4a261; background: rgba(244,162,97,0.12); border: 1px solid rgba(244,162,97,0.35); }
 .season-edit-btn, .season-delete-btn { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: rgba(255,255,255,0.18); cursor: pointer; border-radius: var(--r-xs); transition: color var(--tf); padding: 0; }
 .season-edit-btn svg, .season-delete-btn svg { width: 11px; height: 11px; stroke-width: 1.8; }
 .season-edit-btn:hover   { color: var(--cyan); }

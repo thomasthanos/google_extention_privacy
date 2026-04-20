@@ -1042,6 +1042,24 @@ const AnimeCardRenderer = {
                     </div>`
                 : '';
 
+            // Movies render with the same lightweight right-side styling as the
+            // standalone movie cards: an orange "Movie" meta-badge + plain-text
+            // runtime (no pill), so a Fate chronology row looks identical to a
+            // Trinity Seven / other movie inside a movie-group.
+            const rightSideHtml = isMovie
+                ? `<span class="meta-badge season-movie-type-badge">Movie</span>
+                   <span class="movie-duration">${episodeBadgeText}</span>
+                   <div class="season-item-actions">
+                       <button class="season-edit-btn" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
+                       <button class="season-delete-btn" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
+                   </div>`
+                : `<span class="season-episode-badge">${episodeBadgeText}</span>
+                   <div class="season-item-actions">
+                       <button class="season-edit-btn" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
+                       <button class="season-delete-btn" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
+                   </div>
+                   ${expandIconHtml}`;
+
             const html = `
                 <div class="season-item ${statusClass}${isMovie ? ' season-item-movie' : ''}" data-slug="${slug}">
                     <div class="season-item-header">
@@ -1049,13 +1067,8 @@ const AnimeCardRenderer = {
                             <span class="season-status-icon">${statusIcon}</span>
                             <span class="season-label">${seasonLabel}</span>
                         </div>
-                    <div class="season-item-right">
-                            <span class="season-episode-badge">${episodeBadgeText}</span>
-                            <div class="season-item-actions">
-                                <button class="season-edit-btn" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
-                                <button class="season-delete-btn" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
-                            </div>
-                            ${expandIconHtml}
+                        <div class="season-item-right">
+                            ${rightSideHtml}
                         </div>
                     </div>
                     ${contentHtml}
