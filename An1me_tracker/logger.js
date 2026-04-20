@@ -11,6 +11,7 @@
     const rawLog = console.log.bind(console);
     const rawWarn = console.warn.bind(console);
     const rawError = console.error.bind(console);
+    const rawDebug = (console.debug || console.log).bind(console);
 
     const TAG_COLORS = {
         Firebase:    { bg: 'rgba(240,192,64,0.2)',  text: '#f0c040' },
@@ -45,5 +46,6 @@
         log(tag, ...args)   { styled(rawLog, tag, args); },
         warn(tag, ...args)  { styled(rawWarn, tag, args); },
         error(tag, ...args) { styled(rawError, tag, args); },
+        debug(tag, ...args) { styled(rawDebug, tag, args); },
     };
 })();
