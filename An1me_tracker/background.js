@@ -401,7 +401,16 @@ let _lastSuccessfulStreamOpenedAt = 0;
 // is present: an open an1me.to tab (`keepAlive` port) or an open popup
 // (`popupAlive` port). When the last consumer disconnects, the stream is
 // aborted and all reconnect timers cleared — zero Firestore reads while idle.
+//
+// ⚠️ The content-script `keepAlive` port cycles every ~25s (MV3 port timeout
+// workaround). Naive teardown on every disconnect would abort + reopen the
+// stream every 25s (1 Firestore read/25s). We debounce the teardown: after
+// the last consumer leaves, wait IDLE_TEARDOWN_GRACE_MS. If a new consumer
+// arrives in that window (the normal port-cycle case) we cancel the teardown
+// and keep the stream open for free.
 const activeStreamConsumers = new Set();
+const IDLE_TEARDOWN_GRACE_MS = 10000; // 10s — covers 25s port-cycle + jitter
+let _idleTeardownTimer = null;
 
 function hasStreamConsumers() {
     return activeStreamConsumers.size > 0;
@@ -410,6 +419,15 @@ function hasStreamConsumers() {
 function addStreamConsumer(id) {
     const wasEmpty = activeStreamConsumers.size === 0;
     activeStreamConsumers.add(id);
+
+    // Cancel any pending teardown — the port-cycle just landed a new consumer
+    // before the grace window elapsed. Stream stays up; no extra read.
+    if (_idleTeardownTimer) {
+        clearTimeout(_idleTeardownTimer);
+        _idleTeardownTimer = null;
+        ddebug(`[BG-RT] Consumer ${id} reclaimed idle window`);
+    }
+
     if (wasEmpty) {
         ddebug(`[BG-RT] Consumer connected (${id}) — waking stream`);
         const streamDead = !rtListenAbort || rtListenAbort.signal.aborted;
@@ -422,16 +440,22 @@ function addStreamConsumer(id) {
 function removeStreamConsumer(id) {
     if (!activeStreamConsumers.has(id)) return;
     activeStreamConsumers.delete(id);
-    if (activeStreamConsumers.size === 0) {
-        ddebug('[BG-RT] All consumers gone — pausing stream (idle mode)');
+    if (activeStreamConsumers.size > 0) return;
+
+    // Debounce teardown — don't abort the stream mid-port-cycle. A fresh
+    // consumer should arrive within ~100ms of the old one disconnecting.
+    if (_idleTeardownTimer) clearTimeout(_idleTeardownTimer);
+    _idleTeardownTimer = setTimeout(() => {
+        _idleTeardownTimer = null;
+        if (activeStreamConsumers.size > 0) return; // safety
+        ddebug('[BG-RT] Idle grace expired — pausing stream');
         if (rtListenAbort) { try { rtListenAbort.abort(); } catch {} }
         rtListenAbort = null;
         if (rtReconnectTimer) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
-        // Reset backoff so the next activation starts from a clean slate.
         rtReconnectDelay = 5000;
         rtConsecutiveFailures = 0;
         rtPausedAt = 0;
-    }
+    }, IDLE_TEARDOWN_GRACE_MS);
 }
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
