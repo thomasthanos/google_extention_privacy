@@ -3112,6 +3112,17 @@
     async function init() {
         const { FirebaseSync, Storage, FillerFetchUI } = AT;
 
+        // Tell the SW that the popup is alive so it wakes the SSE stream. The
+        // port auto-disconnects when the popup closes, letting the SW drop
+        // back into idle (0 Firestore reads/writes) if no an1me.to tab is open.
+        try {
+            const _popupAlivePort = chrome.runtime.connect({ name: 'popupAlive' });
+            // Hold a reference in case of GC heuristics; no-op otherwise.
+            window.__popupAlivePort = _popupAlivePort;
+        } catch (e) {
+            PopupLogger.debug('Init', 'popupAlive port connect failed:', e?.message || e);
+        }
+
         FillerFetchUI.init();
 
         try {

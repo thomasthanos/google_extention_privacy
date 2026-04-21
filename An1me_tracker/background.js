@@ -396,6 +396,44 @@ let rtPausedAt = 0;
 // when we just reconnected (avoids piling up 1-read GETs on every reconnect).
 let _lastSuccessfulStreamOpenedAt = 0;
 
+// ─── Stream-consumer tracking ────────────────────────────────────────────────
+// The SSE stream + its reconnect/catch-up pipeline only runs while a consumer
+// is present: an open an1me.to tab (`keepAlive` port) or an open popup
+// (`popupAlive` port). When the last consumer disconnects, the stream is
+// aborted and all reconnect timers cleared — zero Firestore reads while idle.
+const activeStreamConsumers = new Set();
+
+function hasStreamConsumers() {
+    return activeStreamConsumers.size > 0;
+}
+
+function addStreamConsumer(id) {
+    const wasEmpty = activeStreamConsumers.size === 0;
+    activeStreamConsumers.add(id);
+    if (wasEmpty) {
+        ddebug(`[BG-RT] Consumer connected (${id}) — waking stream`);
+        const streamDead = !rtListenAbort || rtListenAbort.signal.aborted;
+        if (streamDead && !rtReconnectTimer) {
+            startRealtimeListener();
+        }
+    }
+}
+
+function removeStreamConsumer(id) {
+    if (!activeStreamConsumers.has(id)) return;
+    activeStreamConsumers.delete(id);
+    if (activeStreamConsumers.size === 0) {
+        ddebug('[BG-RT] All consumers gone — pausing stream (idle mode)');
+        if (rtListenAbort) { try { rtListenAbort.abort(); } catch {} }
+        rtListenAbort = null;
+        if (rtReconnectTimer) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
+        // Reset backoff so the next activation starts from a clean slate.
+        rtReconnectDelay = 5000;
+        rtConsecutiveFailures = 0;
+        rtPausedAt = 0;
+    }
+}
+
 // ─── Token helpers ────────────────────────────────────────────────────────────
 
 async function signOutDueToTokenFailure() {
@@ -878,6 +916,12 @@ async function _doApplyCloudUpdate(cloudDoc) {
 }
 
 async function startRealtimeListener() {
+    // Idle gate: without an active consumer (an1me.to tab or open popup) we
+    // keep the stream closed to avoid any Firestore reads during idle periods.
+    if (!hasStreamConsumers()) {
+        ddebug('[BG-RT] No active consumers, skipping stream start');
+        return;
+    }
     if (rtConsecutiveFailures >= RT_MAX_FAILURES) {
         const now = Date.now();
         if (!rtPausedAt) rtPausedAt = now;
@@ -1012,6 +1056,12 @@ async function startRealtimeListener() {
 }
 
 function scheduleRtReconnect() {
+    // Don't schedule reconnects while idle — the stream will restart when a
+    // consumer returns (an1me.to tab opens or popup opens).
+    if (!hasStreamConsumers()) {
+        if (rtReconnectTimer) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
+        return;
+    }
     // Floor the reconnect delay at 5s to avoid hammering the network on mobile
     // when the stream fails immediately (poor signal / SW wake cycle).
     const delay = Math.max(5000, rtReconnectDelay);
@@ -2530,13 +2580,13 @@ chrome.runtime.onInstalled.addListener((details) => {
         dlog(`%c🎬 Anime Tracker v${chrome.runtime.getManifest().version}`, style);
         migrateFromSyncToLocal();
     }
-    setTimeout(startRealtimeListener, 2000);
+    // Stream starts lazily when a consumer port connects — see onConnect above.
 });
 
 chrome.runtime.onStartup.addListener(() => {
     dlog('[Anime Tracker] Extension started');
     migrateFromSyncToLocal();
-    setTimeout(startRealtimeListener, 2000);
+    // Stream starts lazily when a consumer port connects — see onConnect above.
     // Restore smart notification alarm if enabled
     bgStorageGet(['smartNotificationsEnabled']).then(r => {
         if (r.smartNotificationsEnabled === true) {
@@ -2545,16 +2595,23 @@ chrome.runtime.onStartup.addListener(() => {
     }).catch(() => {});
 });
 
-// ─── Keep-alive port ──────────────────────────────────────────────────────────
+// ─── Keep-alive / consumer ports ──────────────────────────────────────────────
+// `keepAlive`    — from an1me.to content script (tab open / video playing)
+// `popupAlive`   — from the extension popup (opened UI)
+// Both count as "stream consumers". When zero ports are connected, the SSE
+// stream is paused to guarantee zero Firestore reads during true idle.
 chrome.runtime.onConnect.addListener((port) => {
-    if (port.name !== 'keepAlive') return;
+    if (port.name !== 'keepAlive' && port.name !== 'popupAlive') return;
+    const consumerId = `${port.name}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+    addStreamConsumer(consumerId);
     port.onDisconnect.addListener(() => {
+        removeStreamConsumer(consumerId);
         const err = chrome.runtime.lastError;
         if (err) {
             const msg = err.message || '';
             const isExpectedClose = msg.includes('back/forward cache') || msg.includes('message channel is closed');
             if (!isExpectedClose) {
-                ddebug('[BG] keepAlive port disconnected:', msg);
+                ddebug(`[BG] ${port.name} port disconnected:`, msg);
             }
         }
     });
@@ -2581,6 +2638,16 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
     if (alarm.name !== 'keepAlive') return;
 
+    // Resume background metadata repair regardless of stream state — it hits
+    // an1me.to / animefillerlist.com, not Firestore, and is user-initiated.
+    resumeMetadataRepairIfNeeded().catch((error) => {
+        console.error('[BG] Failed to resume metadata repair from keepAlive:', error);
+    });
+
+    // Stream health work only runs while a consumer is present. Truly idle →
+    // no stream restart, no health check, no Firestore reads.
+    if (!hasStreamConsumers()) return;
+
     const streamDead = !rtListenAbort || rtListenAbort.signal.aborted;
     const reconnectPending = !!rtReconnectTimer;
     // Only nudge a reconnect if there is no pending reconnect timer — otherwise
@@ -2595,10 +2662,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     }
 
     checkStreamHealth();
-
-    resumeMetadataRepairIfNeeded().catch((error) => {
-        console.error('[BG] Failed to resume metadata repair from keepAlive:', error);
-    });
 });
 
 // ─── Stream health watchdog ───────────────────────────────────────────────────
@@ -2609,6 +2672,12 @@ function markStreamAlive() {
 }
 
 function checkStreamHealth() {
+    // Never force-reconnect while idle — the stream is intentionally off.
+    if (!hasStreamConsumers()) return;
+    // Respect the scheduled exponential-backoff reconnect. Firing our own
+    // reconnect here would bypass the backoff and cost 1 Firestore read/min
+    // whenever the stream is transiently silent (post-wake, flaky network).
+    if (rtReconnectTimer) return;
     const elapsed = Date.now() - lastStreamMessageAt;
     if (elapsed > 90000) {
         ddebug(`[BG] Stream silent for ${Math.round(elapsed / 1000)}s, reconnecting`);
@@ -2620,7 +2689,9 @@ function checkStreamHealth() {
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
-startRealtimeListener();
+// NOTE: we no longer call startRealtimeListener() here. The stream starts only
+// when a consumer port (an1me.to keepAlive or popupAlive) connects, so idle
+// browser windows cost 0 Firestore reads/writes.
 maybeStartPendingMetadataRepair().catch((error) => {
     console.error('[BG] Failed to start pending metadata repair on boot:', error);
 });
