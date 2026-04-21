@@ -123,12 +123,22 @@ const AnilistService = {
                 }
             }
 
-            // Collect slugs that need fetching
+            // Collect slugs that need fetching.
+            // Respect the cache TTLs so RELEASING anime without a known
+            // nextEpisodeAt don't re-fetch on every popup open — we used to
+            // retry unconditionally whenever nextEpisodeAt was missing, which
+            // produced a quiet but constant stream of an1me.to page fetches
+            // for ongoing shows (One Piece, Frieren 2, …).
+            const now = Date.now();
             const slugsToFetch = Object.keys(animeData).filter(slug => {
                 const cached = this.cache[slug];
                 if (!cached || !cached.cachedAt) return true;
-                if (cached.status === 'RELEASING' && !cached.nextEpisodeAt) return true;
-                return false;
+                const age = now - cached.cachedAt;
+                if (cached.notFound) {
+                    return age >= this.CACHE_TTL_NOT_FOUND;
+                }
+                const ttl = cached.status === 'RELEASING' ? this.CACHE_TTL_AIRING : this.CACHE_TTL;
+                return age >= ttl;
             });
 
             if (slugsToFetch.length === 0) {
