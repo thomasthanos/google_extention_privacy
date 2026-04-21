@@ -1,23 +1,7 @@
-/**
- * Anime Tracker — Stats Engine
- * Pure, memoized read-only analytics over `animeData`.
- * No writes. No storage. Safe to call from popup render paths.
- *
- * Exposes: window.AnimeTracker.StatsEngine
- *
- * Data shape recap (from episode-writer.js):
- *   animeData[slug] = {
- *     title, slug, episodes: [{number, watchedAt, duration, durationSource}],
- *     totalWatchTime, lastWatched, totalEpisodes, coverImage, siteAnimeId,
- *     completedAt?, droppedAt?, onHoldAt?, listState?
- *   }
- */
 (function () {
     'use strict';
 
-    // ── Date helpers (local-time buckets) ──
     function dayKey(date) {
-        // YYYY-MM-DD in local time so streaks align with the user's calendar.
         const y = date.getFullYear();
         const m = String(date.getMonth() + 1).padStart(2, '0');
         const d = String(date.getDate()).padStart(2, '0');
@@ -37,7 +21,6 @@
     }
 
     function daysBetween(aKey, bKey) {
-        // Inclusive-like diff in days between two YYYY-MM-DD keys.
         const [ay, am, ad] = aKey.split('-').map(Number);
         const [by, bm, bd] = bKey.split('-').map(Number);
         const a = Date.UTC(ay, am - 1, ad);
@@ -45,9 +28,6 @@
         return Math.round((b - a) / 86400000);
     }
 
-    // ── Memoization ──
-    // Cache key: number of slugs + sum of episodes + max lastWatched. Cheap to compute,
-    // and changes whenever data changes meaningfully.
     let _cache = null;
 
     function signatureOf(animeData) {
@@ -63,22 +43,19 @@
             slugs++;
             if (Array.isArray(a.episodes)) eps += a.episodes.length;
             if (a.lastWatched && a.lastWatched > maxLast) maxLast = a.lastWatched;
-            // Include listState transitions (completed/dropped/onHold) so the
-            // dashboard buckets refresh even when no new episode is added.
             const stateTs = a.listStateUpdatedAt || a.completedAt || a.droppedAt || a.onHoldAt || '';
             if (stateTs && stateTs > maxStateTs) maxStateTs = stateTs;
         }
         return `${slugs}|${eps}|${maxLast}|${maxStateTs}`;
     }
 
-    // ── Core index builder ──
     function buildWatchIndex(animeData) {
         const sig = signatureOf(animeData);
         if (_cache && _cache.sig === sig) return _cache.index;
 
-        const byDay = new Map();   // dayKey -> { episodes, seconds, animes: Set<slug> }
-        const byMonth = new Map(); // monthKey -> seconds
-        const perAnime = new Map(); // slug -> { firstWatchedAt, lastWatchedAt, watchedCount, days: Set, rateEpsPerDay }
+        const byDay = new Map();
+        const byMonth = new Map();
+        const perAnime = new Map();
         let totalEpisodes = 0;
         let totalSeconds = 0;
 
@@ -151,7 +128,6 @@
         return index;
     }
 
-    // ── Streak ──
     function computeStreak(byDayOrIndex) {
         const byDay = byDayOrIndex?.byDay || byDayOrIndex;
         if (!byDay || byDay.size === 0) {
@@ -168,7 +144,6 @@
         const keys = Array.from(byDay.keys()).sort();
         const lastKey = keys[keys.length - 1];
 
-        // Longest streak (scan all days)
         let longest = 1;
         let run = 1;
         for (let i = 1; i < keys.length; i++) {
@@ -181,7 +156,6 @@
             }
         }
 
-        // Current streak: counts only if last watch is today or yesterday
         let current = 0;
         let brokenOn = null;
         if (lastKey === todayKey || lastKey === yesterdayKey) {
@@ -192,10 +166,6 @@
                 else break;
             }
         } else {
-            // Streak already broken — report the day after last as the break.
-            // Parse lastKey as LOCAL time (not UTC) to match dayKey()'s local-time
-            // formatting. `new Date("YYYY-MM-DD")` parses as UTC midnight, which
-            // shifts the date by one day in negative-UTC timezones.
             const [ly, lm, ld] = lastKey.split('-').map(Number);
             const d = new Date(ly, lm - 1, ld);
             d.setDate(d.getDate() + 1);
@@ -210,8 +180,6 @@
         };
     }
 
-    // ── Completion prediction ──
-    // Returns { etaDate, epsPerDay, remaining, confidence } or null if not predictable.
     function predictCompletion(anime, index) {
         if (!anime || !Array.isArray(anime.episodes) || anime.episodes.length < 3) return null;
 
@@ -330,14 +298,13 @@
         };
     }
 
-    // ── Weekly window ──
     function windowStats(index, days = 7) {
         const out = {
             episodes: 0,
             seconds: 0,
             activeDays: 0,
-            perAnime: new Map(), // slug -> { episodes, seconds }
-            days: [] // [{dayKey, episodes, seconds}] chronological
+            perAnime: new Map(),
+            days: []
         };
         const now = new Date();
         const start = new Date();
@@ -353,7 +320,6 @@
                 out.activeDays++;
                 for (const slug of bucket.animes) {
                     const row = out.perAnime.get(slug) || { episodes: 0, seconds: 0 };
-                    // Episodes per anime within window requires re-scanning; good enough to count unique slug-days here.
                     out.perAnime.set(slug, row);
                 }
             }
@@ -362,7 +328,6 @@
         return out;
     }
 
-    // Walk animeData once for per-anime episode counts within a window
     function topAnimeInWindow(animeData, days = 7, limit = 5) {
         const now = new Date();
         const cutoff = new Date();
@@ -390,7 +355,6 @@
         return rows.slice(0, limit);
     }
 
-    // ── Completion status categorization (used by dashboard table) ──
     function categorizeAnime(animeData) {
         const rows = { completed: [], watching: [], onHold: [], dropped: [], notStarted: [] };
         for (const slug in animeData || {}) {
@@ -406,7 +370,6 @@
             else if (watched === 0) rows.notStarted.push(row);
             else rows.watching.push(row);
         }
-        // Sort: most recent first inside each bucket
         for (const k in rows) {
             rows[k].sort((x, y) => (y.lastWatched || '').localeCompare(x.lastWatched || ''));
         }
@@ -423,7 +386,6 @@
         topAnimeInWindow,
         categorizeAnime,
         invalidate,
-        // helpers exposed for views
         dayKey,
         monthKey,
         daysBetween

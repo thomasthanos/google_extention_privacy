@@ -1,13 +1,7 @@
-/**
- * Anime Tracker - Background Service Worker
- * Handles extension lifecycle, message passing, and auto-sync to Firebase
- */
-
-// ─── Config ───────────────────────────────────────────────────────────────────
-const FIREBASE_API_KEY    = "AIzaSyCDF9US2OwARlyZ0AH_zDpjzmOXRtrGKMg";
+const FIREBASE_API_KEY = "AIzaSyCDF9US2OwARlyZ0AH_zDpjzmOXRtrGKMg";
 const FIREBASE_PROJECT_ID = "anime-tracker-64d86";
-const FIRESTORE_BASE      = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)`;
-const LISTEN_URL          = `${FIRESTORE_BASE}/documents:listen`;
+const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)`;
+const LISTEN_URL = `${FIRESTORE_BASE}/documents:listen`;
 
 importScripts('src/common/merge-utils.js');
 
@@ -16,37 +10,25 @@ const missingMergeUtil = (name) => () => {
     throw new Error(`[BG] Missing shared merge util: ${name}`);
 };
 
-const mergeVideoProgress     = sharedMergeUtils.mergeVideoProgress     || missingMergeUtil('mergeVideoProgress');
-const mergeAnimeData         = sharedMergeUtils.mergeAnimeData         || missingMergeUtil('mergeAnimeData');
-const mergeDeletedAnime      = sharedMergeUtils.mergeDeletedAnime      || missingMergeUtil('mergeDeletedAnime');
-const applyDeletedAnime      = sharedMergeUtils.applyDeletedAnime      || missingMergeUtil('applyDeletedAnime');
-const mergeGroupCoverImages  = sharedMergeUtils.mergeGroupCoverImages  || missingMergeUtil('mergeGroupCoverImages');
-const areAnimeDataMapsEqual  = sharedMergeUtils.areAnimeDataMapsEqual  || missingMergeUtil('areAnimeDataMapsEqual');
-const areProgressMapsEqual   = sharedMergeUtils.areProgressMapsEqual   || missingMergeUtil('areProgressMapsEqual');
+const mergeVideoProgress = sharedMergeUtils.mergeVideoProgress || missingMergeUtil('mergeVideoProgress');
+const mergeAnimeData = sharedMergeUtils.mergeAnimeData || missingMergeUtil('mergeAnimeData');
+const mergeDeletedAnime = sharedMergeUtils.mergeDeletedAnime || missingMergeUtil('mergeDeletedAnime');
+const applyDeletedAnime = sharedMergeUtils.applyDeletedAnime || missingMergeUtil('applyDeletedAnime');
+const mergeGroupCoverImages = sharedMergeUtils.mergeGroupCoverImages || missingMergeUtil('mergeGroupCoverImages');
+const areAnimeDataMapsEqual = sharedMergeUtils.areAnimeDataMapsEqual || missingMergeUtil('areAnimeDataMapsEqual');
+const areProgressMapsEqual = sharedMergeUtils.areProgressMapsEqual || missingMergeUtil('areProgressMapsEqual');
 const shallowEqualDeletedAnime = sharedMergeUtils.shallowEqualDeletedAnime || missingMergeUtil('shallowEqualDeletedAnime');
-const shallowEqualObjectMap  = sharedMergeUtils.shallowEqualObjectMap  || missingMergeUtil('shallowEqualObjectMap');
-const isLikelyMovieSlug      = sharedMergeUtils.isLikelyMovieSlug      || missingMergeUtil('isLikelyMovieSlug');
+const shallowEqualObjectMap = sharedMergeUtils.shallowEqualObjectMap || missingMergeUtil('shallowEqualObjectMap');
+const isLikelyMovieSlug = sharedMergeUtils.isLikelyMovieSlug || missingMergeUtil('isLikelyMovieSlug');
 
-// ─── Debug logging ───────────────────────────────────────────────────────────
-// Diagnostic console.log / console.debug calls are gated behind BG_DEBUG so
-// production installs don't spam the service-worker console. Warnings and
-// errors stay unconditional since they surface real problems. Flip BG_DEBUG
-// to true locally when investigating an issue.
 const BG_DEBUG = false;
-const dlog   = (...a) => { if (BG_DEBUG) console.log(...a); };
+const dlog = (...a) => { if (BG_DEBUG) console.log(...a); };
 const ddebug = (...a) => { if (BG_DEBUG) console.debug(...a); };
 
-// ─── Cleanup helpers ─────────────────────────────────────────────────────────
-
 const COMPLETED_PERCENTAGE = 85;
-const DELETED_ANIME_MAX_AGE_MS = 10 * 24 * 60 * 60 * 1000; // 10 days
+const DELETED_ANIME_MAX_AGE_MS = 10 * 24 * 60 * 60 * 1000;
 const MAX_PROGRESS_ENTRIES = 200;
 
-/**
- * Lightweight version of ProgressManager.cleanTrackedProgress for background.
- * Removes videoProgress entries for episodes already tracked in animeData
- * or that have reached the completion threshold.
- */
 function cleanTrackedProgressBg(animeData, videoProgress) {
     if (!videoProgress || !animeData) return videoProgress;
 
@@ -68,14 +50,10 @@ function cleanTrackedProgressBg(animeData, videoProgress) {
         const isCompleted = (progress.percentage || 0) >= COMPLETED_PERCENTAGE;
         const savedAge = progress.savedAt ? now - new Date(progress.savedAt).getTime() : Infinity;
 
-        // Episode already in animeData → no need for resume progress
         if (isTracked) continue;
-        // Completed but not tracked → stale
         if (isCompleted) continue;
-        // Deleted tombstone → remove
         if (progress.deleted) continue;
 
-        // Strip redundant coverImage if the anime is already tracked
         if (progress.coverImage) {
             const slugMatch = id.match(/^(.+)__episode-\d+$/);
             if (slugMatch && trackedSlugs.has(slugMatch[1])) {
@@ -88,7 +66,6 @@ function cleanTrackedProgressBg(animeData, videoProgress) {
         cleaned[id] = progress;
     }
 
-    // Cap total entries — keep most recent by savedAt/lastPlayedAt
     const entries = Object.entries(cleaned);
     if (entries.length > MAX_PROGRESS_ENTRIES) {
         const getTs = (p) => {
@@ -105,9 +82,6 @@ function cleanTrackedProgressBg(animeData, videoProgress) {
     return cleaned;
 }
 
-/**
- * Prune deletedAnime entries older than 30 days (in-place).
- */
 function pruneDeletedAnime(deletedAnime) {
     if (!deletedAnime) return;
     const cutoff = Date.now() - DELETED_ANIME_MAX_AGE_MS;
@@ -119,8 +93,6 @@ function pruneDeletedAnime(deletedAnime) {
         }
     }
 }
-
-// ─── Storage helpers ─────────────────────────────────────────────────────────
 
 function bgStorageGet(keys) {
     return new Promise((resolve, reject) => {
@@ -368,11 +340,10 @@ async function buildLibraryRepairPlan(animeData, options = {}) {
     };
 }
 
-// ─── State ────────────────────────────────────────────────────────────────────
-let syncInProgress      = false;
-let pendingSync         = false;
+let syncInProgress = false;
+let pendingSync = false;
 let syncDebounceTimeout = null;
-let syncPausedUntil     = 0;
+let syncPausedUntil = 0;
 
 function pauseSync(ms = 5000) {
     syncPausedUntil = Math.max(syncPausedUntil, Date.now() + ms);
@@ -381,42 +352,22 @@ function isSyncPaused() {
     return Date.now() < syncPausedUntil;
 }
 
-let rtListenAbort    = null;
+let rtListenAbort = null;
 let rtReconnectTimer = null;
 let rtReconnectDelay = 5000;
-const RT_MAX_DELAY   = 5 * 60 * 1000; // 5 min ceiling — prevents tight reconnect loop after persistent failure
+const RT_MAX_DELAY = 5 * 60 * 1000;
 
-// Max consecutive failures before the SSE listener pauses itself.
-// Lower threshold + longer pause = we stop hammering an endpoint that is
-// consistently returning errors (e.g. Firestore 501 UNIMPLEMENTED). The
-// alarm-based health check restarts it after the pause window.
 const RT_MAX_FAILURES = 5;
-const RT_PAUSE_AFTER_MAX_MS = 15 * 60 * 1000; // 15 min circuit-breaker window
+const RT_PAUSE_AFTER_MAX_MS = 15 * 60 * 1000;
 let rtConsecutiveFailures = 0;
 let rtPausedAt = 0;
-// Dedupe repeated stream-open failure logs — when Firestore returns the same
-// HTTP status + inner code on every retry we only want to see it once per
-// distinct reason instead of flooding DevTools.
 let _lastRtFailSignature = '';
 let _lastRtFailRepeatCount = 0;
-// Timestamp of last successful stream open — used to skip the catch-up GET
-// when we just reconnected (avoids piling up 1-read GETs on every reconnect).
+let rtStreamPermanentlyDisabled = false;
 let _lastSuccessfulStreamOpenedAt = 0;
 
-// ─── Stream-consumer tracking ────────────────────────────────────────────────
-// The SSE stream + its reconnect/catch-up pipeline only runs while a consumer
-// is present: an open an1me.to tab (`keepAlive` port) or an open popup
-// (`popupAlive` port). When the last consumer disconnects, the stream is
-// aborted and all reconnect timers cleared — zero Firestore reads while idle.
-//
-// ⚠️ The content-script `keepAlive` port cycles every ~25s (MV3 port timeout
-// workaround). Naive teardown on every disconnect would abort + reopen the
-// stream every 25s (1 Firestore read/25s). We debounce the teardown: after
-// the last consumer leaves, wait IDLE_TEARDOWN_GRACE_MS. If a new consumer
-// arrives in that window (the normal port-cycle case) we cancel the teardown
-// and keep the stream open for free.
 const activeStreamConsumers = new Set();
-const IDLE_TEARDOWN_GRACE_MS = 10000; // 10s — covers 25s port-cycle + jitter
+const IDLE_TEARDOWN_GRACE_MS = 10000;
 let _idleTeardownTimer = null;
 
 function hasStreamConsumers() {
@@ -427,15 +378,13 @@ function addStreamConsumer(id) {
     const wasEmpty = activeStreamConsumers.size === 0;
     activeStreamConsumers.add(id);
 
-    // Cancel any pending teardown — the port-cycle just landed a new consumer
-    // before the grace window elapsed. Stream stays up; no extra read.
     if (_idleTeardownTimer) {
         clearTimeout(_idleTeardownTimer);
         _idleTeardownTimer = null;
         ddebug(`[BG-RT] Consumer ${id} reclaimed idle window`);
     }
 
-    if (wasEmpty) {
+    if (wasEmpty && !rtStreamPermanentlyDisabled) {
         ddebug(`[BG-RT] Consumer connected (${id}) — waking stream`);
         const streamDead = !rtListenAbort || rtListenAbort.signal.aborted;
         if (streamDead && !rtReconnectTimer) {
@@ -449,37 +398,24 @@ function removeStreamConsumer(id) {
     activeStreamConsumers.delete(id);
     if (activeStreamConsumers.size > 0) return;
 
-    // Debounce teardown — don't abort the stream mid-port-cycle. A fresh
-    // consumer should arrive within ~100ms of the old one disconnecting.
     if (_idleTeardownTimer) clearTimeout(_idleTeardownTimer);
     _idleTeardownTimer = setTimeout(() => {
         _idleTeardownTimer = null;
-        if (activeStreamConsumers.size > 0) return; // safety
+        if (activeStreamConsumers.size > 0) return;
         ddebug('[BG-RT] Idle grace expired — pausing stream');
-        // Flush any pending progress PATCH before the SW may suspend — with
-        // the new 3-min debounce, a tab closing mid-session could otherwise
-        // lose its tail of progress updates until the next browser launch.
         if (progressSyncDebounce) {
             clearTimeout(progressSyncDebounce);
             progressSyncDebounce = null;
             if (!syncDebounceTimeout && !syncInProgress) {
-                syncProgressOnly().catch(() => {});
+                syncProgressOnly().catch(() => { });
             }
         }
-        if (rtListenAbort) { try { rtListenAbort.abort(); } catch {} }
+        if (rtListenAbort) { try { rtListenAbort.abort(); } catch { } }
         rtListenAbort = null;
         if (rtReconnectTimer) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
-        // Preserve rtConsecutiveFailures / rtPausedAt across idle cycles so a
-        // tripped breaker stays tripped even when the popup keeps reopening.
-        // Previously we reset both to 0 here, which meant every popup open
-        // cycle restarted the retry budget and refilled the console with the
-        // same HTTP 400/501 UNIMPLEMENTED spam. The 15-min pause window will
-        // still let the stream self-heal once Firestore recovers.
         rtReconnectDelay = 5000;
     }, IDLE_TEARDOWN_GRACE_MS);
 }
-
-// ─── Token helpers ────────────────────────────────────────────────────────────
 
 async function signOutDueToTokenFailure() {
     console.warn('[BG] Token refresh failed — signing user out to force re-auth');
@@ -488,7 +424,6 @@ async function signOutDueToTokenFailure() {
     } catch (e) {
         console.error('[BG] Failed to clear auth storage during sign-out:', e);
     }
-    // Stop the SSE listener so it does not keep retrying with a null token
     if (rtListenAbort) rtListenAbort.abort();
     if (rtReconnectTimer) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
 }
@@ -498,7 +433,6 @@ async function getFirebaseToken() {
         const stored = await bgStorageGet(['firebase_tokens']);
         const tokens = stored.firebase_tokens;
         if (!tokens?.idToken) return null;
-        // Refresh if token expires within 2 minutes
         if (tokens.expiresAt < Date.now() + 120000) {
             const refreshed = await refreshFirebaseToken(tokens.refreshToken);
             if (!refreshed) {
@@ -514,8 +448,6 @@ async function getFirebaseToken() {
     }
 }
 
-// Singleflight guard: concurrent sync paths (progress + full + SSE) must not
-// race each other for a refresh. We coalesce them into a single network call.
 let _bgRefreshInflight = null;
 async function refreshFirebaseToken(refreshToken) {
     if (!refreshToken) return null;
@@ -534,9 +466,9 @@ async function refreshFirebaseToken(refreshToken) {
             const data = await response.json();
             if (data.error) return null;
             const tokens = {
-                idToken:      data.id_token,
+                idToken: data.id_token,
                 refreshToken: data.refresh_token,
-                expiresAt:    Date.now() + parseInt(data.expires_in) * 1000
+                expiresAt: Date.now() + parseInt(data.expires_in) * 1000
             };
             await bgStorageSet({ firebase_tokens: tokens });
             dlog('[BG] Token refreshed');
@@ -558,8 +490,6 @@ async function getFirebaseUser() {
     } catch { return null; }
 }
 
-// ─── Firestore codec ──────────────────────────────────────────────────────────
-
 function jsonToFirestoreFields(obj) {
     const fields = {};
     for (const [key, value] of Object.entries(obj)) fields[key] = jsonToFirestoreValue(value);
@@ -568,25 +498,25 @@ function jsonToFirestoreFields(obj) {
 
 function jsonToFirestoreValue(value) {
     if (value === null || value === undefined) return { nullValue: null };
-    if (typeof value === 'string')  return { stringValue: value };
+    if (typeof value === 'string') return { stringValue: value };
     if (typeof value === 'boolean') return { booleanValue: value };
-    if (typeof value === 'number')  return Number.isInteger(value)
+    if (typeof value === 'number') return Number.isInteger(value)
         ? { integerValue: value.toString() }
         : { doubleValue: value };
-    if (Array.isArray(value))  return { arrayValue: { values: value.map(jsonToFirestoreValue) } };
+    if (Array.isArray(value)) return { arrayValue: { values: value.map(jsonToFirestoreValue) } };
     if (typeof value === 'object') return { mapValue: { fields: jsonToFirestoreFields(value) } };
     return { nullValue: null };
 }
 
 function fromFSValue(v) {
     if (!v) return null;
-    if ('nullValue'    in v) return null;
+    if ('nullValue' in v) return null;
     if ('booleanValue' in v) return v.booleanValue;
-    if ('stringValue'  in v) return v.stringValue;
+    if ('stringValue' in v) return v.stringValue;
     if ('integerValue' in v) return parseInt(v.integerValue, 10);
-    if ('doubleValue'  in v) return v.doubleValue;
-    if ('arrayValue'   in v) return (v.arrayValue.values || []).map(fromFSValue);
-    if ('mapValue'     in v) {
+    if ('doubleValue' in v) return v.doubleValue;
+    if ('arrayValue' in v) return (v.arrayValue.values || []).map(fromFSValue);
+    if ('mapValue' in v) {
         const obj = {};
         for (const [k, val] of Object.entries(v.mapValue.fields || {})) obj[k] = fromFSValue(val);
         return obj;
@@ -601,14 +531,9 @@ function fromFSDoc(doc) {
     return out;
 }
 
-// ─── Merge helpers ────────────────────────────────────────────────────────────
-
-
-// ─── Cloud fetch ──────────────────────────────────────────────────────────────
-
 async function fetchCloudData(user, token) {
     try {
-        const url      = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
+        const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
         if (!response.ok) return null;
         return fromFSDoc(await response.json());
@@ -618,14 +543,9 @@ async function fetchCloudData(user, token) {
     }
 }
 
-// ─── Cloud doc cache ─────────────────────────────────────────────────────────
-// The SSE listener pushes the authoritative cloud state to us in real-time
-// (applyCloudUpdate refreshes _bgCloudDocCache directly), so we can keep a
-// long TTL safely. The SSE stream is the source of truth for invalidation;
-// a periodic GET is a fallback in case the stream is down.
-let _bgCloudDocCache     = null;
+let _bgCloudDocCache = null;
 let _bgCloudDocCacheTime = 0;
-const _BG_CLOUD_TTL      = 5 * 60 * 1000; // 5 min
+const _BG_CLOUD_TTL = 5 * 60 * 1000;
 
 function invalidateBgCloudDocCache() {
     _bgCloudDocCache = null;
@@ -645,16 +565,14 @@ async function fetchCloudDataCached(user, token) {
     return doc;
 }
 
-// ─── Push: videoProgress only (merged PATCH) ─────────────────────────────────
-
 let progressSyncInProgress = false;
-let progressSyncPending    = false;
-let lastPushedProgressBG   = null;
+let progressSyncPending = false;
+let lastPushedProgressBG = null;
 
 async function syncProgressOnly() {
     if (progressSyncInProgress) { progressSyncPending = true; return; }
 
-    const user  = await getFirebaseUser();
+    const user = await getFirebaseUser();
     const token = await getFirebaseToken();
     if (!user || !token) return;
 
@@ -663,39 +581,26 @@ async function syncProgressOnly() {
         const result = await bgStorageGet(['videoProgress', 'animeData']);
         let localVP = result.videoProgress || {};
 
-        // Quick check: skip if nothing changed since last push
         if (lastPushedProgressBG && areProgressMapsEqual(localVP, lastPushedProgressBG)) return;
 
-        // Clean completed/tracked entries before pushing
         localVP = cleanTrackedProgressBg(result.animeData || {}, localVP);
 
-        // Push-only: no cloud read needed. SSE listener handles incoming updates.
-        // This reduces 3 reads + 1 write → 0 reads + 1 write per progress sync.
-        const url       = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
+        const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         const fieldMask = 'updateMask.fieldPaths=videoProgress&updateMask.fieldPaths=lastUpdated';
         const pushedAt = new Date().toISOString();
-        const response  = await fetch(`${url}?${fieldMask}`, {
-            method:  'PATCH',
+        const response = await fetch(`${url}?${fieldMask}`, {
+            method: 'PATCH',
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body:    JSON.stringify({
+            body: JSON.stringify({
                 fields: jsonToFirestoreFields({
                     videoProgress: localVP,
-                    lastUpdated:   pushedAt
+                    lastUpdated: pushedAt
                 })
             })
         });
 
         if (response.ok) {
-            // structuredClone is faster than a JSON round-trip and preserves
-            // nested references cleanly; the snapshot is only compared via
-            // areProgressMapsEqual so a structural copy is all we need.
             lastPushedProgressBG = structuredClone(localVP);
-            // Invalidate the cached cloud doc so the next full sync re-fetches
-            // and picks up any concurrent writes from other devices. The SSE
-            // listener usually refreshes the cache for us, but when it is
-            // temporarily offline the optimistic update was masking remote
-            // changes. Paying one extra GET per few pushes is cheaper than
-            // silently dropping another device's work.
             invalidateBgCloudDocCache();
             _lastAppliedCloudUpdatedAt = pushedAt;
             bgRememberOwnWrite(pushedAt);
@@ -714,8 +619,6 @@ async function syncProgressOnly() {
     }
 }
 
-// ─── Push: full sync (animeData + videoProgress) ─────────────────────────────
-
 async function syncToFirebase() {
     if (syncInProgress) { pendingSync = true; return; }
 
@@ -728,12 +631,11 @@ async function syncToFirebase() {
     try {
         const cloudDoc = await fetchCloudDataCached(user, token);
 
-        // Single read after cloud fetch to get the freshest local state
         const result = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
-        const localAnime    = result.animeData        || {};
-        const localProgress = result.videoProgress    || {};
-        const localDeleted  = result.deletedAnime     || {};
-        const localGroup    = result.groupCoverImages || {};
+        const localAnime = result.animeData || {};
+        const localProgress = result.videoProgress || {};
+        const localDeleted = result.deletedAnime || {};
+        const localGroup = result.groupCoverImages || {};
 
         const mergedDeleted = cloudDoc?.deletedAnime
             ? mergeDeletedAnime(localDeleted, cloudDoc.deletedAnime)
@@ -749,38 +651,32 @@ async function syncToFirebase() {
             ? mergeVideoProgress(localProgress, cloudDoc.videoProgress)
             : { ...localProgress };
 
-        // Clean completed/tracked progress entries after merge
         mergedProgress = cleanTrackedProgressBg(mergedAnime, mergedProgress);
 
-        // Prune deletedAnime entries older than 30 days
         pruneDeletedAnime(mergedDeleted);
 
-        const cloudGroup  = cloudDoc?.groupCoverImages || {};
+        const cloudGroup = cloudDoc?.groupCoverImages || {};
         const mergedGroup = mergeGroupCoverImages(localGroup, cloudGroup);
 
-        const animeChanged    = !areAnimeDataMapsEqual(localAnime, mergedAnime);
+        const animeChanged = !areAnimeDataMapsEqual(localAnime, mergedAnime);
         const progressChanged = !areProgressMapsEqual(localProgress, mergedProgress);
-        const deletedChanged  = !shallowEqualDeletedAnime(localDeleted, mergedDeleted);
-        const groupChanged    = !shallowEqualObjectMap(localGroup, mergedGroup);
+        const deletedChanged = !shallowEqualDeletedAnime(localDeleted, mergedDeleted);
+        const groupChanged = !shallowEqualObjectMap(localGroup, mergedGroup);
 
         if (animeChanged || progressChanged || deletedChanged || groupChanged) {
             pauseSync();
             await bgStorageSet({
-                animeData:        mergedAnime,
-                videoProgress:    mergedProgress,
-                deletedAnime:     mergedDeleted,
+                animeData: mergedAnime,
+                videoProgress: mergedProgress,
+                deletedAnime: mergedDeleted,
                 groupCoverImages: mergedGroup
             });
         }
 
-        // Skip the cloud PATCH when the merged result already matches what's
-        // in the cloud. Without this gate, every storage.onChanged event
-        // (including those caused by SSE applying remote updates back to local)
-        // produces a redundant write — a major source of Firestore write traffic.
-        const cloudAnimeRef    = cloudDoc?.animeData        || {};
-        const cloudProgressRef = cloudDoc?.videoProgress    || {};
-        const cloudDeletedRef  = cloudDoc?.deletedAnime     || {};
-        const cloudGroupRef    = cloudDoc?.groupCoverImages || {};
+        const cloudAnimeRef = cloudDoc?.animeData || {};
+        const cloudProgressRef = cloudDoc?.videoProgress || {};
+        const cloudDeletedRef = cloudDoc?.deletedAnime || {};
+        const cloudGroupRef = cloudDoc?.groupCoverImages || {};
         const needsCloudWrite =
             !areAnimeDataMapsEqual(mergedAnime, cloudAnimeRef) ||
             !areProgressMapsEqual(mergedProgress, cloudProgressRef) ||
@@ -788,37 +684,32 @@ async function syncToFirebase() {
             !shallowEqualObjectMap(mergedGroup, cloudGroupRef);
 
         if (!needsCloudWrite) {
-            // Nothing to push — refresh the cache timestamp so we don't re-fetch
-            // immediately, and return early.
             _bgCloudDocCacheTime = Date.now();
             return;
         }
 
-        const url       = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
+        const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         const fieldMask = [
             'animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'lastUpdated', 'email'
         ].map(f => `updateMask.fieldPaths=${f}`).join('&');
 
         const pushedAt = new Date().toISOString();
         const response = await fetch(`${url}?${fieldMask}`, {
-            method:  'PATCH',
+            method: 'PATCH',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body:    JSON.stringify({
+            body: JSON.stringify({
                 fields: jsonToFirestoreFields({
-                    animeData:        mergedAnime,
-                    videoProgress:    mergedProgress,
-                    deletedAnime:     mergedDeleted,
+                    animeData: mergedAnime,
+                    videoProgress: mergedProgress,
+                    deletedAnime: mergedDeleted,
                     groupCoverImages: mergedGroup,
-                    lastUpdated:      pushedAt,
-                    email:            user.email
+                    lastUpdated: pushedAt,
+                    email: user.email
                 })
             })
         });
 
         if (response.ok) {
-            // Invalidate rather than optimistically refresh — protects against
-            // races with a concurrent write from another device that arrived
-            // between our last read and this PATCH.
             invalidateBgCloudDocCache();
             _lastAppliedCloudUpdatedAt = pushedAt;
             bgRememberOwnWrite(pushedAt);
@@ -834,11 +725,9 @@ async function syncToFirebase() {
     }
 }
 
-// ─── Real-time listener (SSE) ─────────────────────────────────────────────────
-
-let _applyCloudUpdateDoc     = null;
-let _applyCloudDebounce      = null;
-let _applyCloudUpdateQueue   = Promise.resolve();
+let _applyCloudUpdateDoc = null;
+let _applyCloudDebounce = null;
+let _applyCloudUpdateQueue = Promise.resolve();
 let _applyCloudUpdateWaiters = [];
 let _lastAppliedCloudUpdatedAt = null;
 
@@ -847,15 +736,12 @@ const _MAX_CLOUD_UPDATE_WAITERS = 100;
 async function applyCloudUpdate(cloudDoc) {
     if (!cloudDoc) return;
 
-    // Stream gives us the authoritative cloud state — refresh the cache
-    _bgCloudDocCache     = cloudDoc;
+    _bgCloudDocCache = cloudDoc;
     _bgCloudDocCacheTime = Date.now();
 
-    // Debounce rapid SSE updates (e.g. multiple field changes in quick succession)
     _applyCloudUpdateDoc = cloudDoc;
     if (_applyCloudDebounce) clearTimeout(_applyCloudDebounce);
 
-    // Cap waiter queue to prevent unbounded growth from rapid SSE bursts
     if (_applyCloudUpdateWaiters.length >= _MAX_CLOUD_UPDATE_WAITERS) {
         const stale = _applyCloudUpdateWaiters.splice(0, _applyCloudUpdateWaiters.length - _MAX_CLOUD_UPDATE_WAITERS + 1);
         for (const w of stale) w.resolve();
@@ -867,7 +753,7 @@ async function applyCloudUpdate(cloudDoc) {
             _applyCloudDebounce = null;
             const pendingWaiters = _applyCloudUpdateWaiters.splice(0);
             _applyCloudUpdateQueue = _applyCloudUpdateQueue
-                .catch(() => {})
+                .catch(() => { })
                 .then(() => _drainCloudUpdates())
                 .then(() => {
                     for (const waiter of pendingWaiters) waiter.resolve();
@@ -887,8 +773,6 @@ async function _drainCloudUpdates() {
     }
 }
 
-// Track own recent writes to drop SSE self-echo without rejecting legitimate
-// remote updates from devices with clock skew.
 const _bgRecentOwnWrites = [];
 const _BG_MAX_RECENT_OWN_WRITES = 20;
 function bgRememberOwnWrite(ts) {
@@ -903,18 +787,14 @@ function bgIsOwnEcho(ts) {
 async function _doApplyCloudUpdate(cloudDoc) {
     if (!cloudDoc) return;
 
-    // Skip while a full sync is in progress — it already merges cloud data
     if (syncInProgress) return;
 
-    // Drop self-echo (our own write coming back via SSE). Remote updates with
-    // earlier timestamps (clock skew) pass through.
     const cloudUpdatedAt = cloudDoc.lastUpdated || null;
     if (cloudUpdatedAt && bgIsOwnEcho(cloudUpdatedAt)) {
         return;
     }
 
     try {
-        // Single read: get the latest local state
         const local = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
 
         const mergedDeleted = cloudDoc.deletedAnime
@@ -926,14 +806,12 @@ async function _doApplyCloudUpdate(cloudDoc) {
 
         let mergedProgress = mergeVideoProgress(local.videoProgress || {}, cloudDoc.videoProgress || {});
 
-        // Clean completed/tracked progress entries after merge — mirrors popup sync logic
         mergedProgress = cleanTrackedProgressBg(mergedAnime, mergedProgress);
 
-        // Prune deletedAnime entries older than 30 days
         pruneDeletedAnime(mergedDeleted);
 
-        const localGroup  = local.groupCoverImages   || {};
-        const cloudGroup  = cloudDoc.groupCoverImages || {};
+        const localGroup = local.groupCoverImages || {};
+        const cloudGroup = cloudDoc.groupCoverImages || {};
         const mergedGroup = mergeGroupCoverImages(localGroup, cloudGroup);
 
         const localEps = Object.values(local.animeData || {}).reduce((s, a) => s + (a.episodes?.length || 0), 0);
@@ -941,15 +819,15 @@ async function _doApplyCloudUpdate(cloudDoc) {
         const animeChanged = !areAnimeDataMapsEqual(local.animeData || {}, mergedAnime);
 
         const progressChanged = !areProgressMapsEqual(local.videoProgress || {}, mergedProgress);
-        const deletedChanged  = !shallowEqualDeletedAnime(local.deletedAnime || {}, mergedDeleted);
-        const groupChanged    = !shallowEqualObjectMap(localGroup, mergedGroup);
+        const deletedChanged = !shallowEqualDeletedAnime(local.deletedAnime || {}, mergedDeleted);
+        const groupChanged = !shallowEqualObjectMap(localGroup, mergedGroup);
 
         if (animeChanged || progressChanged || deletedChanged || groupChanged) {
             pauseSync(5000);
             await bgStorageSet({
-                animeData:        mergedAnime,
-                videoProgress:    mergedProgress,
-                deletedAnime:     mergedDeleted,
+                animeData: mergedAnime,
+                videoProgress: mergedProgress,
+                deletedAnime: mergedDeleted,
                 groupCoverImages: mergedGroup
             });
             dlog(`[BG-RT] ← Cloud update applied (eps: ${localEps}→${mergedEps})`);
@@ -961,45 +839,35 @@ async function _doApplyCloudUpdate(cloudDoc) {
 }
 
 async function startRealtimeListener() {
-    // Idle gate: without an active consumer (an1me.to tab or open popup) we
-    // keep the stream closed to avoid any Firestore reads during idle periods.
+    if (rtStreamPermanentlyDisabled) return;
     if (!hasStreamConsumers()) {
         ddebug('[BG-RT] No active consumers, skipping stream start');
         return;
     }
     if (rtConsecutiveFailures >= RT_MAX_FAILURES) {
-        const now = Date.now();
-        if (!rtPausedAt) rtPausedAt = now;
-        // After 10 minutes of paused state, clear the circuit breaker once
-        // and try again — the root cause may have been transient (poor signal,
-        // server hiccup, token refresh glitch).
-        if (now - rtPausedAt < RT_PAUSE_AFTER_MAX_MS) {
-            console.warn(`[BG-RT] paused (${rtConsecutiveFailures} fails) — retrying in ${Math.round((RT_PAUSE_AFTER_MAX_MS - (now - rtPausedAt))/1000)}s`);
-            return;
+        if (!rtStreamPermanentlyDisabled) {
+            rtStreamPermanentlyDisabled = true;
+            console.warn('[BG-RT] breaker tripped — disabling real-time stream for this session. Falling back to polling sync.');
+            if (rtListenAbort) { try { rtListenAbort.abort(); } catch { } }
+            rtListenAbort = null;
+            if (rtReconnectTimer) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
         }
-        console.warn('[BG-RT] pause window elapsed, attempting recovery');
-        rtConsecutiveFailures = 0;
-        rtPausedAt = 0;
+        return;
     }
 
     if (rtListenAbort) rtListenAbort.abort();
     if (rtReconnectTimer) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
 
-    const user  = await getFirebaseUser();
+    const user = await getFirebaseUser();
     const token = await getFirebaseToken();
     if (!user || !token) {
         rtReconnectTimer = setTimeout(startRealtimeListener, 15000);
         return;
     }
 
-    // ── Catch-up fetch ────────────────────────────────────────────────────────
-    // Skip the catch-up GET when we just successfully opened a stream < 60s ago.
-    // In a reconnect storm (flaky network, token refresh churn), the 45s-gap
-    // check triggers on every retry and piles up extra Firestore reads that
-    // the stream's initial snapshot would have delivered anyway.
     const gapSinceLastMessage = Date.now() - lastStreamMessageAt;
     const justHadSuccessfulOpen = _lastSuccessfulStreamOpenedAt > 0 &&
-                                  (Date.now() - _lastSuccessfulStreamOpenedAt) < 60000;
+        (Date.now() - _lastSuccessfulStreamOpenedAt) < 60000;
     if (gapSinceLastMessage > 45000 && !justHadSuccessfulOpen) {
         ddebug(`[BG-RT] Catching up after ${Math.round(gapSinceLastMessage / 1000)}s gap...`);
         try {
@@ -1018,34 +886,31 @@ async function startRealtimeListener() {
     let streamOpenedAt = 0;
     try {
         const res = await fetch(`${LISTEN_URL}?key=${FIREBASE_API_KEY}`, {
-            method:  'POST',
+            method: 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ addTarget: { documents: { documents: [docPath] }, targetId: 1 } }),
-            signal:  rtListenAbort.signal
+            body: JSON.stringify({ addTarget: { documents: { documents: [docPath] }, targetId: 1 } }),
+            signal: rtListenAbort.signal
         });
 
         if (!res.ok) {
-            // Previously this path returned early without touching
-            // rtConsecutiveFailures → the circuit breaker never tripped and
-            // the stream retried forever (observed: 10+ `documents:listen`
-            // requests per session when Firestore returned 501/5xx).
-            //
-            // Firestore sometimes wraps server-side UNIMPLEMENTED in an HTTP
-            // 400 envelope (`{ error: { code: 501, status: "UNIMPLEMENTED" }}`),
-            // so we peek at the body to classify correctly — otherwise a real
-            // 501 would be treated as a benign 4xx and retried too eagerly.
             const bodyText = await res.text().catch(() => '');
             let innerCode = 0;
             try {
                 const parsed = JSON.parse(bodyText);
                 innerCode = Number(parsed?.error?.code) || 0;
-            } catch { /* body not JSON */ }
+            } catch { }
+            if (res.status === 501 || innerCode === 501) {
+                rtStreamPermanentlyDisabled = true;
+                console.warn('[BG-RT] documents:listen returned UNIMPLEMENTED — disabling real-time stream. Falling back to polling sync.');
+                if (rtListenAbort) { try { rtListenAbort.abort(); } catch { } }
+                rtListenAbort = null;
+                if (rtReconnectTimer) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
+                return;
+            }
             const serverError = res.status >= 500 || innerCode >= 500;
             const signature = `${res.status}/${innerCode}`;
             if (signature === _lastRtFailSignature) {
                 _lastRtFailRepeatCount++;
-                // Emit a single summary line every 10 repeats so the user still
-                // notices if the storm is ongoing, but we don't flood the log.
                 if (_lastRtFailRepeatCount % 10 === 0) {
                     console.warn(`[BG-RT] Stream open still failing (${signature}) ×${_lastRtFailRepeatCount}`);
                 }
@@ -1056,30 +921,23 @@ async function startRealtimeListener() {
             }
             rtConsecutiveFailures++;
             if (serverError) {
-                // 5xx (or wrapped UNIMPLEMENTED) rarely recovers within seconds
-                // — jump straight to a long delay instead of burning the ramp.
                 rtReconnectDelay = Math.max(rtReconnectDelay, 60000);
-                rtConsecutiveFailures += 1; // extra penalty → trip breaker sooner
+                rtConsecutiveFailures += 1;
             } else if (res.status === 401 || res.status === 403 || innerCode === 401 || innerCode === 403) {
-                // Auth problem — a token refresh happens on next entry anyway.
                 rtReconnectDelay = Math.max(rtReconnectDelay, 15000);
             }
             scheduleRtReconnect();
             return;
         }
 
-        // Don't clear rtConsecutiveFailures yet — a POST 200 doesn't mean the
-        // stream stayed open. We only count it as a real success after it
-        // survives long enough to receive data (see markStreamAlive below) or
-        // after ≥15s of uptime (streamUptimeMs check at the bottom).
         streamSucceeded = true;
         streamOpenedAt = Date.now();
         markStreamAlive();
         ddebug('[BG-RT] ✓ Real-time stream connected');
 
-        const reader  = res.body.getReader();
+        const reader = res.body.getReader();
         const decoder = new TextDecoder();
-        let buffer    = '';
+        let buffer = '';
 
         while (true) {
             const { value, done } = await reader.read();
@@ -1088,7 +946,6 @@ async function startRealtimeListener() {
             markStreamAlive();
 
             buffer += decoder.decode(value, { stream: true });
-            // Guard against unbounded buffer growth
             if (buffer.length > 256 * 1024) {
                 console.warn('[BG-RT] SSE buffer overflow, reconnecting');
                 rtListenAbort.abort();
@@ -1110,13 +967,11 @@ async function startRealtimeListener() {
                     }
                     if (msg.targetChange?.targetChangeType === 'REMOVE' &&
                         msg.targetChange?.cause?.code === 16) {
-                        // Token expired mid-stream — refresh and reconnect
                         rtListenAbort.abort();
                         setTimeout(startRealtimeListener, 1000);
                         return;
                     }
                 } catch {
-                    // Ignore non-JSON stream fragments
                 }
             }
         }
@@ -1125,8 +980,6 @@ async function startRealtimeListener() {
         console.warn('[BG-RT] Stream error:', e.message);
     }
 
-    // A stream that survived ≥15s counts as a real success → reset backoff.
-    // A stream that died within 15s (or never opened) counts as a failure.
     const uptimeMs = streamOpenedAt > 0 ? Date.now() - streamOpenedAt : 0;
     if (streamSucceeded && uptimeMs >= 15000) {
         rtConsecutiveFailures = 0;
@@ -1142,37 +995,25 @@ async function startRealtimeListener() {
 }
 
 function scheduleRtReconnect() {
-    // Don't schedule reconnects while idle — the stream will restart when a
-    // consumer returns (an1me.to tab opens or popup opens).
+    if (rtStreamPermanentlyDisabled) return;
     if (!hasStreamConsumers()) {
         if (rtReconnectTimer) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
         return;
     }
-    // Floor the reconnect delay at 5s to avoid hammering the network on mobile
-    // when the stream fails immediately (poor signal / SW wake cycle).
     const delay = Math.max(5000, rtReconnectDelay);
     rtReconnectTimer = setTimeout(startRealtimeListener, delay);
     rtReconnectDelay = Math.min(rtReconnectDelay * 1.5, RT_MAX_DELAY);
 }
-
-// ─── Storage change listener ──────────────────────────────────────────────────
 
 let progressSyncDebounce = null;
 
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace !== 'local') return;
 
-    // Re-entrance guard: if a sync is already running, its own bgStorageSet
-    // will fire this listener before pauseSync's window has fully covered it.
-    // Skip entirely — the in-flight sync will pick up the latest state anyway.
     if (syncInProgress) return;
 
-    // ── Coalesced sync: collect all changes within window, then fire ONE sync ──
-    // Instead of separate debounces for videoProgress vs animeData vs groupCover,
-    // use a single unified debounce that picks the right sync type.
-
     let _pendingProgressSync = false;
-    let _pendingFullSync     = false;
+    let _pendingFullSync = false;
 
     if (changes.videoProgress && !isSyncPaused()) {
         _pendingProgressSync = true;
@@ -1234,21 +1075,14 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         }
     }
 
-    // Coalesce: full sync supersedes progress-only sync
     if (_pendingFullSync) {
         if (progressSyncDebounce) { clearTimeout(progressSyncDebounce); progressSyncDebounce = null; }
         if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
         syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 5000);
     } else if (_pendingProgressSync) {
         if (progressSyncDebounce) clearTimeout(progressSyncDebounce);
-        // Local chrome.storage writes are already instant (that's what the user
-        // actually relies on to not lose progress after a crash). The cloud
-        // PATCH is just a cross-device convenience, so we coalesce aggressively
-        // — 3 min between pushes easily drops a full watching session from
-        // ~20 cloud writes to 2–3 without any user-visible progress loss.
         progressSyncDebounce = setTimeout(() => {
             progressSyncDebounce = null;
-            // Skip if a full sync is scheduled or currently running
             if (syncDebounceTimeout || syncInProgress) return;
             syncProgressOnly();
         }, 3 * 60 * 1000);
@@ -1261,33 +1095,28 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     }
 });
 
-// ─── AnimeFillerList slug discovery ──────────────────────────────────────────
-
-// Direct an1me.to slug → animefillerlist.com slug mappings for well-known series.
-// Avoids HEAD request discovery entirely for these entries.
-// Add new entries here instead of relying on the generic heuristic.
 const KNOWN_FILLER_SLUGS = {
-    'naruto':                                'naruto',
-    'naruto-shippuuden':                     'naruto-shippuden',
-    'one-piece':                             'one-piece',
-    'bleach':                                'bleach',
-    'bleach-sennen-kessen-hen':              'bleach',
-    'dragon-ball-z':                         'dragon-ball-z',
-    'dragon-ball-super':                     'dragon-ball-super',
-    'fairy-tail':                            'fairy-tail',
-    'shingeki-no-kyojin':                    'attack-on-titan',
-    'kimetsu-no-yaiba':                      'demon-slayer-kimetsu-no-yaiba',
-    'boku-no-hero-academia':                 'my-hero-academia',
-    'hunter-x-hunter-2011':                 'hunter-x-hunter-2011',
-    'fullmetal-alchemist-brotherhood':       'fullmetal-alchemist-brotherhood',
-    'sword-art-online':                      'sword-art-online',
-    'black-clover':                          'black-clover',
-    'boruto-naruto-next-generations':        'boruto-naruto-next-generations',
-    'one-punch-man':                         'one-punch-man',
-    'jujutsu-kaisen':                        'jujutsu-kaisen',
-    'shingeki-no-kyojin-season-2':           'attack-on-titan',
-    'shingeki-no-kyojin-season-3':           'attack-on-titan',
-    'shingeki-no-kyojin-the-final-season':   'attack-on-titan',
+    'naruto': 'naruto',
+    'naruto-shippuuden': 'naruto-shippuden',
+    'one-piece': 'one-piece',
+    'bleach': 'bleach',
+    'bleach-sennen-kessen-hen': 'bleach',
+    'dragon-ball-z': 'dragon-ball-z',
+    'dragon-ball-super': 'dragon-ball-super',
+    'fairy-tail': 'fairy-tail',
+    'shingeki-no-kyojin': 'attack-on-titan',
+    'kimetsu-no-yaiba': 'demon-slayer-kimetsu-no-yaiba',
+    'boku-no-hero-academia': 'my-hero-academia',
+    'hunter-x-hunter-2011': 'hunter-x-hunter-2011',
+    'fullmetal-alchemist-brotherhood': 'fullmetal-alchemist-brotherhood',
+    'sword-art-online': 'sword-art-online',
+    'black-clover': 'black-clover',
+    'boruto-naruto-next-generations': 'boruto-naruto-next-generations',
+    'one-punch-man': 'one-punch-man',
+    'jujutsu-kaisen': 'jujutsu-kaisen',
+    'shingeki-no-kyojin-season-2': 'attack-on-titan',
+    'shingeki-no-kyojin-season-3': 'attack-on-titan',
+    'shingeki-no-kyojin-the-final-season': 'attack-on-titan',
 };
 
 const fillerSlugCache = {};
@@ -1338,16 +1167,16 @@ function generateFillerSlugCandidates(an1meSlug, animeTitle) {
     }
 
     const JP_TO_EN = {
-        'shingeki-no-kyojin':             'attack-titan',
-        'kimetsu-no-yaiba':               'demon-slayer-kimetsu-no-yaiba',
-        'boku-no-hero-academia':          'my-hero-academia',
-        'hagane-no-renkinjutsushi':       'fullmetal-alchemist',
-        'ansatsu-kyoushitsu':             'assassination-classroom',
-        'nanatsu-no-taizai':             'seven-deadly-sins',
-        'yakusoku-no-neverland':          'promised-neverland',
+        'shingeki-no-kyojin': 'attack-titan',
+        'kimetsu-no-yaiba': 'demon-slayer-kimetsu-no-yaiba',
+        'boku-no-hero-academia': 'my-hero-academia',
+        'hagane-no-renkinjutsushi': 'fullmetal-alchemist',
+        'ansatsu-kyoushitsu': 'assassination-classroom',
+        'nanatsu-no-taizai': 'seven-deadly-sins',
+        'yakusoku-no-neverland': 'promised-neverland',
         'tensei-shitara-slime-datta-ken': 'that-time-i-got-reincarnated-slime',
-        'kenpuu-denki':                   'berserk',
-        'naruto-shippuuden':              'naruto-shippuden',  // AnimeFillerList uses 'shippuden'
+        'kenpuu-denki': 'berserk',
+        'naruto-shippuuden': 'naruto-shippuden',
     };
     for (const [jpBase, enBase] of Object.entries(JP_TO_EN)) {
         if (slug.startsWith(jpBase)) {
@@ -1375,7 +1204,6 @@ async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
 
     if (!forceRefresh && cacheKey in fillerSlugCache) return fillerSlugCache[cacheKey];
 
-    // Check pre-defined known mappings first — no HEAD request needed
     if (cacheKey in KNOWN_FILLER_SLUGS) {
         const known = KNOWN_FILLER_SLUGS[cacheKey];
         fillerSlugCache[cacheKey] = known;
@@ -1401,7 +1229,6 @@ async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
                 return cached;
             }
             if (cached?.notFound) {
-                // 3-day TTL — must match FILLER_NOT_FOUND_CACHE_TTL in src/popup/config.js
                 const age = cached.cachedAt ? Date.now() - cached.cachedAt : Infinity;
                 if (age < 3 * 24 * 60 * 60 * 1000) {
                     fillerSlugCache[cacheKey] = null;
@@ -1414,7 +1241,6 @@ async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
         console.warn('[BG] discoverFillerSlug storage read failed:', e.message);
     }
 
-    // Try candidates in parallel (cap at 5 to avoid hammering the server)
     const candidates = generateFillerSlugCandidates(an1meSlug, animeTitle).slice(0, 5);
     const tryCandidate = async (candidate) => {
         const headCtrl = new AbortController();
@@ -1422,7 +1248,7 @@ async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
         try {
             const resp = await fetch(`https://www.animefillerlist.com/shows/${candidate}`, { method: 'HEAD', signal: headCtrl.signal });
             if (resp.ok) return candidate;
-        } catch {}
+        } catch { }
         finally { clearTimeout(timer); }
         return null;
     };
@@ -1448,8 +1274,6 @@ async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
     return null;
 }
 
-// ─── an1me.to anime info fetcher ─────────────────────────────────────────────
-
 function isSeasonLikeSlug(slug) {
     return /-(?:season-?\d+|(?:\d+)(?:st|nd|rd|th)-season|s\d+|(?:part|cour)-?\d+|(?:ii|iii|iv|v|vi))(?=$|-)/i.test(String(slug || ''));
 }
@@ -1474,20 +1298,15 @@ function buildAnimeInfoSlugCandidates(slug) {
         out.push(value);
     };
 
-    // season-2 -> 2nd-season
     add(input.replace(/-season-?(\d+)(?=$|-)/i, (_m, num) => {
         const ord = toOrdinal(num);
         return ord ? `-${ord}-season` : _m;
     }));
 
-    // 2nd-season -> season-2
     add(input.replace(/-(\d+)(st|nd|rd|th)-season(?=$|-)/i, '-season-$1'));
 
-    // s2 -> season-2
     add(input.replace(/-s(\d+)(?=$|-)/i, '-season-$1'));
 
-    // Only non-seasonal slugs are allowed to fall back to base slug.
-    // For explicit season slugs, base fallback often maps to a different season.
     if (!isSeasonLikeSlug(input)) {
         const base = input.replace(
             /-(?:season-?\d+|(?:\d+)(?:st|nd|rd|th)-season|s\d+|part-?\d+|cour-?\d+|(?:ii|iii|iv|v|vi))$/i,
@@ -1516,7 +1335,6 @@ async function fetchAnimePageInfo(slug) {
         clearTimeout(timer);
     }
 
-    // If 404, try known slug variants first (e.g. season-2 -> 2nd-season).
     if (!response.ok && response.status === 404 && candidates.length > 1) {
         for (const candidateSlug of candidates.slice(1)) {
             const ctrl2 = new AbortController();
@@ -1537,10 +1355,6 @@ async function fetchAnimePageInfo(slug) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const html = await response.text();
 
-    // ── Episode count ────────────────────────────────────────────────────────
-    // Try multiple patterns: Greek label, English label, generic <dt> with number.
-    // After capturing the <dd> block, strip all HTML tags and grab the first
-    // 1-4 digit number so formats like "220 επεισόδια" or "220 Episodes" work.
     let totalEpisodes = null;
     const epDdMatch = html.match(
         /(?:Επεισόδια|Episodes?)<\/dt>\s*(<dd[^>]*>[\s\S]{0,300}?<\/dd>)/
@@ -1551,7 +1365,6 @@ async function fetchAnimePageInfo(slug) {
         if (numMatch) totalEpisodes = parseInt(numMatch[1], 10);
     }
 
-    // Always scan episode links on the page for the highest actually available episode.
     let latestEpisode = null;
     {
         let maxEp = 0;
@@ -1566,15 +1379,10 @@ async function fetchAnimePageInfo(slug) {
         if (maxEp > 0) latestEpisode = maxEp;
     }
 
-    // Fallback: if metadata didn't give totalEpisodes, use episode links
     if (!totalEpisodes && latestEpisode) {
         totalEpisodes = latestEpisode;
     }
 
-    // ── Status ───────────────────────────────────────────────────────────────
-    // Try Greek "Προβλήθηκε" and English "Aired" <dt> labels.
-    // A "?" in the date text means the end date is unknown → still airing.
-    // Also recognise explicit "Finished Airing" / "Currently Airing" text.
     let status = null;
     const dateMatch = html.match(
         /(?:Προβλήθηκε|Aired?)<\/dt>[\s\S]{0,300}?<time[^>]*>([\s\S]*?)<\/time>/
@@ -1589,20 +1397,14 @@ async function fetchAnimePageInfo(slug) {
         else if (/Currently\s+Airing|Προβάλλεται\s+τώρα/i.test(html)) status = 'RELEASING';
     }
 
-    // Check for an explicit "Airing" badge on the page (the site marks anime
-    // as Airing when episodes are still being uploaded, e.g. ongoing translations,
-    // even if the original air dates are complete).
     if (status === 'FINISHED' || !status) {
         if (/>Airing<\//i.test(html)) status = 'RELEASING';
     }
 
-    // If the date metadata says FINISHED but not all episodes are on the site yet,
-    // the anime is effectively still releasing (e.g. ongoing fan translations).
     if (status === 'FINISHED' && totalEpisodes && latestEpisode && latestEpisode < totalEpisodes) {
         status = 'RELEASING';
     }
 
-    // ── Next scheduled episode countdown ───────────────────────────────────
     let nextEpisodeAt = null;
     let nextEpisodeTimezone = null;
     const countdownMatch = html.match(
@@ -1620,9 +1422,6 @@ async function fetchAnimePageInfo(slug) {
         }
     }
 
-    // ── Cover image ─────────────────────────────────────────────────────────
-    // Try multiple selectors: the site uses class="anime-main-image" on the
-    // /anime/{slug}/ page. Fall back to OG/meta image or schema.org image.
     let coverImage = null;
     const imgMatch = html.match(/<img[^>]+class=["'][^"']*anime-main-image[^"']*["'][^>]*src=["']([^"']+)["']/i)
         || html.match(/<img[^>]+src=["']([^"']+)["'][^>]*class=["'][^"']*anime-main-image[^"']*["']/i);
@@ -1635,16 +1434,12 @@ async function fetchAnimePageInfo(slug) {
         if (ogMatch) coverImage = ogMatch[1];
     }
 
-    // ── Site anime ID ─────────────────────────────────────────────────────
     let siteAnimeId = null;
     const idMatch = html.match(/\bcurrent_post_data_id\s*=\s*(\d+)/)
         || html.match(/\bcurrent_anime_id\s*=\s*(\d+)/)
         || html.match(/showWatchlistModal\(['"]#watchlist-(\d+)['"]\)/);
     if (idMatch) siteAnimeId = parseInt(idMatch[1], 10);
 
-    // ── Duration (seconds) ──────────────────────────────────────────────────
-    // Parse the Greek/English <dt>Διάρκεια|Duration</dt><dd>...</dd> label. The
-    // <dd> body can be "120 λεπτά", "24 min.", "1h 55m", "2 hr 5 min" etc.
     let durationSeconds = null;
     const durDdMatch = html.match(
         /(?:Διάρκεια|Duration)<\/dt>\s*(<dd[^>]*>[\s\S]{0,200}?<\/dd>)/i
@@ -1652,13 +1447,10 @@ async function fetchAnimePageInfo(slug) {
     if (durDdMatch) {
         const text = durDdMatch[1].replace(/<[^>]+>/g, ' ').toLowerCase();
         let totalMinutes = 0;
-        // Match all "Nh", "N hr", "N hour", "N ώρ" tokens
         const hourMatches = text.matchAll(/(\d+)\s*(?:h\b|hr\b|hour|ώρ)/g);
         for (const m of hourMatches) totalMinutes += parseInt(m[1], 10) * 60;
-        // Match all "Nm", "N min", "N λεπτ" tokens
         const minMatches = text.matchAll(/(\d+)\s*(?:m\b|min|λεπτ)/g);
         for (const m of minMatches) totalMinutes += parseInt(m[1], 10);
-        // Fallback: first bare number, assume minutes (an1me.to's common shape)
         if (totalMinutes === 0) {
             const bareNum = text.match(/\b(\d{1,4})\b/);
             if (bareNum) totalMinutes = parseInt(bareNum[1], 10);
@@ -1681,14 +1473,11 @@ async function fetchAnimePageInfo(slug) {
     };
 }
 
-// ─── Batch anime info fetcher (runs in background) ──────────────────────────
-
 async function batchFetchAnimeInfo(slugs) {
     const BATCH_SIZE = 3;
     const DELAY_MS = 1200;
     let successCount = 0;
 
-    // Collect backfill data separately to avoid stale-snapshot overwrites
     const backfills = new Map();
 
     for (let i = 0; i < slugs.length; i += BATCH_SIZE) {
@@ -1722,7 +1511,6 @@ async function batchFetchAnimeInfo(slugs) {
         }
     }
 
-    // Re-read fresh animeData and apply only the backfill changes
     if (backfills.size > 0) {
         const fresh = await bgStorageGet(['animeData']);
         const animeData = fresh.animeData || {};
@@ -1737,8 +1525,6 @@ async function batchFetchAnimeInfo(slugs) {
                 animeData[slug].siteAnimeId = fill.siteAnimeId;
                 changed = true;
             }
-            // Backfill movie/episode duration when the add-flow seeded a placeholder
-            // (0 for movies, 1440/6000/7200 legacy estimates).
             if (fill.durationSeconds && Array.isArray(animeData[slug].episodes)) {
                 const dur = fill.durationSeconds;
                 let epsChanged = false;
@@ -1763,13 +1549,11 @@ async function batchFetchAnimeInfo(slugs) {
     dlog(`[BG] Batch fetch done — ${successCount}/${slugs.length}`);
 }
 
-// ─── Episode type fetcher ─────────────────────────────────────────────────────
-
 async function fetchEpisodeTypesFromAnimeFillerList(animeSlug) {
     try {
-        const url      = `https://www.animefillerlist.com/shows/${animeSlug}`;
-        const ctrl     = new AbortController();
-        const timer    = setTimeout(() => ctrl.abort(), 15000);
+        const url = `https://www.animefillerlist.com/shows/${animeSlug}`;
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 15000);
         let response;
         try {
             response = await fetch(url, { signal: ctrl.signal });
@@ -1780,20 +1564,20 @@ async function fetchEpisodeTypesFromAnimeFillerList(animeSlug) {
             if (response.status === 404) return null;
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        const html         = await response.text();
+        const html = await response.text();
         const episodeTypes = { canon: [], filler: [], mixed: [], anime_canon: [], totalEpisodes: null };
 
         const trPattern = /<tr[^>]*\bclass=["']([^"']+)["'][^>]*>([\s\S]*?)<\/tr>/gi;
         let trMatch;
         while ((trMatch = trPattern.exec(html)) !== null) {
-            const classes    = trMatch[1].toLowerCase();
+            const classes = trMatch[1].toLowerCase();
             const rowContent = trMatch[2];
 
             let type = null;
-            if (/\bmanga_canon\b/.test(classes))     type = 'canon';
-            else if (/\bmixed_canon/.test(classes))  type = 'mixed';
+            if (/\bmanga_canon\b/.test(classes)) type = 'canon';
+            else if (/\bmixed_canon/.test(classes)) type = 'mixed';
             else if (/\banime_canon\b/.test(classes)) type = 'anime_canon';
-            else if (/\bfiller\b/.test(classes))     type = 'filler';
+            else if (/\bfiller\b/.test(classes)) type = 'filler';
 
             if (!type) continue;
 
@@ -1818,7 +1602,6 @@ async function fetchEpisodeTypesFromAnimeFillerList(animeSlug) {
         ];
         if (all.length > 0) episodeTypes.totalEpisodes = Math.max(...all);
 
-        // If nothing was parsed at all, treat as not-found rather than caching empty data
         if (all.length === 0) {
             console.warn(`[Anime Tracker] ⚠ No episodes parsed for ${animeSlug} — site structure may have changed`);
             return null;
@@ -1832,11 +1615,8 @@ async function fetchEpisodeTypesFromAnimeFillerList(animeSlug) {
     }
 }
 
-// ─── Jikan API (MAL) — fallback filler source ───────────────────────────────
-
 async function fetchJikanEpisodes(title) {
     try {
-        // Step 1: search for anime
         const searchCtrl = new AbortController();
         const searchTimer = setTimeout(() => searchCtrl.abort(), 10000);
         const searchRes = await fetch(
@@ -1849,13 +1629,12 @@ async function fetchJikanEpisodes(title) {
         const anime = searchData?.data?.[0];
         if (!anime?.mal_id) return null;
 
-        // Step 2: fetch episodes (paginated, get all)
         const malId = anime.mal_id;
         const allEpisodes = [];
         let page = 1;
         let hasNext = true;
 
-        while (hasNext && page <= 10) { // Safety: max 10 pages (250 episodes)
+        while (hasNext && page <= 10) {
             const epCtrl = new AbortController();
             const epTimer = setTimeout(() => epCtrl.abort(), 10000);
             const epRes = await fetch(
@@ -1868,15 +1647,14 @@ async function fetchJikanEpisodes(title) {
             if (epData?.data) allEpisodes.push(...epData.data);
             hasNext = epData?.pagination?.has_next_page === true;
             page++;
-            if (hasNext) await new Promise(r => setTimeout(r, 400)); // Jikan rate limit
+            if (hasNext) await new Promise(r => setTimeout(r, 400));
         }
 
         if (allEpisodes.length === 0) return null;
 
-        // Jikan marks fillers with `filler: true` and recaps with `recap: true`
         const episodeTypes = { canon: [], filler: [], mixed: [], anime_canon: [], totalEpisodes: allEpisodes.length };
         for (const ep of allEpisodes) {
-            const num = ep.mal_id; // episode number
+            const num = ep.mal_id;
             if (!num || num <= 0) continue;
             if (ep.filler) {
                 episodeTypes.filler.push(num);
@@ -1893,10 +1671,8 @@ async function fetchJikanEpisodes(title) {
     }
 }
 
-// ─── Smart Notifications — new episode alerts ───────────────────────────────
-
 const SMART_NOTIF_ALARM = 'smartNotifCheck';
-const SMART_NOTIF_INTERVAL_MINUTES = 60; // check every hour
+const SMART_NOTIF_INTERVAL_MINUTES = 60;
 
 async function checkNewEpisodes() {
     try {
@@ -1911,16 +1687,15 @@ async function checkNewEpisodes() {
 
         for (const [slug, anime] of Object.entries(animeData)) {
             if (anime.droppedAt || anime.completedAt) continue;
-            if (checked >= 5) break; // max 5 checks per cycle to avoid rate limits
+            if (checked >= 5) break;
 
             const cachedKey = `animeinfo_${slug}`;
             const cached = (await bgStorageGet([cachedKey]))[cachedKey];
 
-            // Only check airing anime
             if (!cached || (cached.status !== 'RELEASING')) continue;
 
             const lastCheckedTime = lastCheck[slug] || 0;
-            if (now - lastCheckedTime < 3600000) continue; // skip if checked <1h ago
+            if (now - lastCheckedTime < 3600000) continue;
 
             checked++;
             try {
@@ -1929,7 +1704,6 @@ async function checkNewEpisodes() {
 
                 const prevLatest = cached.latestEpisode || 0;
                 if (info.latestEpisode > prevLatest && prevLatest > 0) {
-                    // New episode available!
                     const highestWatched = Math.max(0, ...(anime.episodes || []).map(ep => Number(ep.number) || 0));
                     if (info.latestEpisode > highestWatched) {
                         chrome.notifications.create(`new-ep-${slug}`, {
@@ -1941,16 +1715,14 @@ async function checkNewEpisodes() {
                         });
                     }
 
-                    // Update cache with new episode count
                     await bgStorageSet({ [cachedKey]: { ...cached, ...info, cachedAt: now } });
                 }
 
                 updatedLastCheck[slug] = now;
             } catch {
-                // Skip this anime on error
             }
 
-            await new Promise(r => setTimeout(r, 1500)); // rate limit
+            await new Promise(r => setTimeout(r, 1500));
         }
 
         await bgStorageSet({ smartNotifLastCheck: updatedLastCheck });
@@ -1959,7 +1731,6 @@ async function checkNewEpisodes() {
     }
 }
 
-// Notification click → open an1me.to
 chrome.notifications.onClicked.addListener((notifId) => {
     if (notifId.startsWith('new-ep-')) {
         const slug = notifId.replace('new-ep-', '');
@@ -2259,28 +2030,26 @@ async function resumeMetadataRepairIfNeeded() {
     });
 }
 
-// ─── Migration ────────────────────────────────────────────────────────────────
-
 async function migrateFromSyncToLocal() {
     try {
-        const syncData        = await new Promise((resolve, reject) => {
+        const syncData = await new Promise((resolve, reject) => {
             chrome.storage.sync.get(['animeData', 'videoProgress'], (result) => {
                 if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
                 else resolve(result);
             });
         });
-        const validAnimeData  = syncData.animeData
+        const validAnimeData = syncData.animeData
             && typeof syncData.animeData === 'object'
             && !Array.isArray(syncData.animeData);
         const validVideoProgress = syncData.videoProgress
             && typeof syncData.videoProgress === 'object'
             && !Array.isArray(syncData.videoProgress);
-        const hasSyncData = (validAnimeData    && Object.keys(syncData.animeData).length > 0) ||
-                            (validVideoProgress && Object.keys(syncData.videoProgress).length > 0);
+        const hasSyncData = (validAnimeData && Object.keys(syncData.animeData).length > 0) ||
+            (validVideoProgress && Object.keys(syncData.videoProgress).length > 0);
         if (hasSyncData) {
             const localData = await bgStorageGet(['animeData', 'videoProgress']);
-            const merged    = {
-                animeData:     { ...(validAnimeData     ? syncData.animeData    : {}), ...(localData.animeData    || {}) },
+            const merged = {
+                animeData: { ...(validAnimeData ? syncData.animeData : {}), ...(localData.animeData || {}) },
                 videoProgress: { ...(validVideoProgress ? syncData.videoProgress : {}), ...(localData.videoProgress || {}) }
             };
             await bgStorageSet(merged);
@@ -2293,8 +2062,6 @@ async function migrateFromSyncToLocal() {
         console.error('[Anime Tracker] Migration error:', error);
     }
 }
-
-// ─── Message handler ──────────────────────────────────────────────────────────
 
 function normalizeTrackedDuration(duration) {
     const MAX_REASONABLE_DURATION_SECONDS = 6 * 60 * 60;
@@ -2315,7 +2082,7 @@ async function persistBeforeUnloadTrack(animeInfo, duration) {
     }
 
     const result = await bgStorageGet(['animeData', 'videoProgress']);
-    const animeData     = result.animeData     || {};
+    const animeData = result.animeData || {};
     const videoProgress = result.videoProgress || {};
 
     const slug = animeInfo.animeSlug;
@@ -2337,7 +2104,6 @@ async function persistBeforeUnloadTrack(animeInfo, duration) {
         animeData[slug].episodes = [];
     }
 
-    // Auto-undrop: if user watches a new episode of a dropped anime, undrop it
     if (animeData[slug].droppedAt) {
         delete animeData[slug].droppedAt;
         dlog('[BG] Auto-undropped anime (new episode tracked):', slug);
@@ -2401,18 +2167,12 @@ async function persistBeforeUnloadTrack(animeInfo, duration) {
     }
 }
 
-// ─── Watchlist Sync to an1me.to ──────────────────────────────────────────────
-// Called from popup when user toggles complete/drop/active.
-// Finds an open an1me.to tab and forwards the sync request to its content script,
-// which can make the fetch with session cookies. Falls back to direct fetch.
 async function syncWatchlistToSite(animeId, type) {
     dlog(`%c WatchlistSync %c ${type} %c anime #${animeId}`, 'background:#6366f1;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'background:#818cf8;color:#fff;padding:2px 6px', 'color:#a5b4fc');
 
     try {
-        // Find an open an1me.to tab to forward the request through
         const tabs = await chrome.tabs.query({ url: 'https://an1me.to/*' });
         if (tabs && tabs.length > 0) {
-            // Forward to content script in the first matching tab
             chrome.tabs.sendMessage(tabs[0].id, {
                 type: 'WATCHLIST_SYNC_EXECUTE',
                 animeId,
@@ -2434,7 +2194,6 @@ async function syncWatchlistToSite(animeId, type) {
     }
 }
 
-// Direct fetch fallback (may lack cookies in service worker context)
 async function directWatchlistFetch(animeId, type) {
     const AJAX_URL = 'https://an1me.to/wp-admin/admin-ajax.php';
     const action = type === 'remove' ? 'remove_from_watchlist' : 'add_to_watchlist';
@@ -2477,8 +2236,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     if (message.type === 'SYNC_PROGRESS_ONLY') {
         sendResponse({ received: true });
-        if (progressSyncDebounce) clearTimeout(progressSyncDebounce);
-        progressSyncDebounce = setTimeout(() => { progressSyncDebounce = null; syncProgressOnly(); }, 500);
+        if (progressSyncDebounce) { clearTimeout(progressSyncDebounce); progressSyncDebounce = null; }
+        syncProgressOnly();
         return true;
     }
 
@@ -2487,14 +2246,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return true;
     }
 
-    // Popup asks SW for the latest cloud doc. SW serves from its 5-min cache
-    // (which the SSE stream keeps warm in real time), falling back to a fresh
-    // GET only on cache miss. This consolidates what used to be two independent
-    // Firestore GETs per popup open (popup + BG) into one SW-serviced request.
     if (message.type === 'GET_CLOUD_DOC') {
         (async () => {
             try {
-                const user  = await getFirebaseUser();
+                const user = await getFirebaseUser();
                 const token = await getFirebaseToken();
                 if (!user || !token) {
                     sendResponse({ success: false, error: 'not_authenticated' });
@@ -2527,7 +2282,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return true;
     }
 
-    // ── Watchlist Sync (from popup or background) ───────────────────────────
     if (message.type === 'WATCHLIST_SYNC') {
         sendResponse({ received: true });
         const { animeId, watchlistType } = message;
@@ -2540,8 +2294,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
 
     if (message.type === 'CLEAR_FILLER_CACHE') {
-        // Allows the popup's FillerService.clearCache() to also purge the
-        // background-side in-memory slug cache and the persisted storageKey.
         const slug = (message.animeSlug || '').toLowerCase();
         if (slug) {
             delete fillerSlugCache[slug];
@@ -2568,7 +2320,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                     }
                 }
 
-                // Fallback: try Jikan API (MAL) for filler data
                 if (message.animeTitle) {
                     dlog(`[BG] AnimeFillerList miss, trying Jikan for "${message.animeTitle}"`);
                     const jikanData = await fetchJikanEpisodes(message.animeTitle);
@@ -2592,7 +2343,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 if (message.enabled) {
                     chrome.alarms.create(SMART_NOTIF_ALARM, { periodInMinutes: SMART_NOTIF_INTERVAL_MINUTES });
                 } else {
-                    chrome.alarms.clear(SMART_NOTIF_ALARM).catch(() => {});
+                    chrome.alarms.clear(SMART_NOTIF_ALARM).catch(() => { });
                 }
                 sendResponse({ success: true });
             })
@@ -2601,10 +2352,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
 
     if (message.type === 'GET_FILLER_EPISODES') {
-        // Content script asks for filler data for a specific slug.
-        // If we have it cached, return immediately. Otherwise do an
-        // on-demand fetch so unwatched/untracked anime still get the
-        // filler UI in the episode list.
         if (!message.animeSlug) { sendResponse({ fillers: null }); return true; }
         const slug = message.animeSlug;
         const title = message.animeTitle || null;
@@ -2617,8 +2364,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                     sendResponse({ fillers: cached?.notFound ? null : (cached?.filler || null) });
                     return;
                 }
-                // Cache missing/stale → fetch on demand (cheap: HEAD + page parse,
-                // results persisted so subsequent calls are instant).
                 const result = await repairEpisodeTypesCache(slug, title, false);
                 const fillers = result?.entry?.notFound ? null : (result?.entry?.filler || null);
                 sendResponse({ fillers });
@@ -2650,14 +2395,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
 });
 
-// ─── Lifecycle ────────────────────────────────────────────────────────────────
-
 chrome.runtime.onInstalled.addListener((details) => {
     if (details.reason === 'install') {
         bgStorageSet({
-            animeData:    {},
+            animeData: {},
             videoProgress: {},
-            settings:     { watchThreshold: 0.85, notifications: true }
+            settings: { watchThreshold: 0.85, notifications: true }
         }).catch(e => console.error('[BG] Failed to init storage on install:', e));
     } else if (details.reason === 'update') {
         const style = [
@@ -2671,26 +2414,18 @@ chrome.runtime.onInstalled.addListener((details) => {
         dlog(`%c🎬 Anime Tracker v${chrome.runtime.getManifest().version}`, style);
         migrateFromSyncToLocal();
     }
-    // Stream starts lazily when a consumer port connects — see onConnect above.
 });
 
 chrome.runtime.onStartup.addListener(() => {
     dlog('[Anime Tracker] Extension started');
     migrateFromSyncToLocal();
-    // Stream starts lazily when a consumer port connects — see onConnect above.
-    // Restore smart notification alarm if enabled
     bgStorageGet(['smartNotificationsEnabled']).then(r => {
         if (r.smartNotificationsEnabled === true) {
             chrome.alarms.create(SMART_NOTIF_ALARM, { periodInMinutes: SMART_NOTIF_INTERVAL_MINUTES });
         }
-    }).catch(() => {});
+    }).catch(() => { });
 });
 
-// ─── Keep-alive / consumer ports ──────────────────────────────────────────────
-// `keepAlive`    — from an1me.to content script (tab open / video playing)
-// `popupAlive`   — from the extension popup (opened UI)
-// Both count as "stream consumers". When zero ports are connected, the SSE
-// stream is paused to guarantee zero Firestore reads during true idle.
 chrome.runtime.onConnect.addListener((port) => {
     if (port.name !== 'keepAlive' && port.name !== 'popupAlive') return;
     const consumerId = `${port.name}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
@@ -2708,10 +2443,6 @@ chrome.runtime.onConnect.addListener((port) => {
     });
 });
 
-// ─── Alarm: keep SW alive + health checks ────────────────────────────────────
-// Fires once per minute (Android Chrome clamps periodInMinutes ≥ 1 anyway).
-// The keepAlive port from the content script is what actually keeps the SW
-// warm during playback; this alarm is for stream health + metadata repair.
 chrome.alarms.create('keepAlive', { periodInMinutes: 1 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -2729,33 +2460,23 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
     if (alarm.name !== 'keepAlive') return;
 
-    // Resume background metadata repair regardless of stream state — it hits
-    // an1me.to / animefillerlist.com, not Firestore, and is user-initiated.
     resumeMetadataRepairIfNeeded().catch((error) => {
         console.error('[BG] Failed to resume metadata repair from keepAlive:', error);
     });
 
-    // Stream health work only runs while a consumer is present. Truly idle →
-    // no stream restart, no health check, no Firestore reads.
     if (!hasStreamConsumers()) return;
+    if (rtStreamPermanentlyDisabled) return;
 
     const streamDead = !rtListenAbort || rtListenAbort.signal.aborted;
     const reconnectPending = !!rtReconnectTimer;
-    // Only nudge a reconnect if there is no pending reconnect timer — otherwise
-    // we cancel the scheduled exponential-backoff reconnect inside startRealtimeListener
-    // and effectively force-reconnect every minute (1440 Firestore reads/day).
     if (streamDead && !reconnectPending) {
         ddebug('[BG] keepAlive: stream dead and no reconnect pending, restarting...');
-        // NOTE: do NOT reset rtConsecutiveFailures here — that would defeat
-        // the "pause after N failures" circuit breaker. Let startRealtimeListener
-        // check the cap and self-gate; alarm just nudges the retry.
         startRealtimeListener();
     }
 
     checkStreamHealth();
 });
 
-// ─── Stream health watchdog ───────────────────────────────────────────────────
 let lastStreamMessageAt = Date.now();
 
 function markStreamAlive() {
@@ -2763,26 +2484,18 @@ function markStreamAlive() {
 }
 
 function checkStreamHealth() {
-    // Never force-reconnect while idle — the stream is intentionally off.
+    if (rtStreamPermanentlyDisabled) return;
     if (!hasStreamConsumers()) return;
-    // Respect the scheduled exponential-backoff reconnect. Firing our own
-    // reconnect here would bypass the backoff and cost 1 Firestore read/min
-    // whenever the stream is transiently silent (post-wake, flaky network).
     if (rtReconnectTimer) return;
     const elapsed = Date.now() - lastStreamMessageAt;
     if (elapsed > 90000) {
         ddebug(`[BG] Stream silent for ${Math.round(elapsed / 1000)}s, reconnecting`);
         lastStreamMessageAt = Date.now();
-        // Do NOT reset rtConsecutiveFailures — preserve the circuit breaker.
         if (rtListenAbort) rtListenAbort.abort();
         startRealtimeListener();
     }
 }
 
-// ─── Boot ─────────────────────────────────────────────────────────────────────
-// NOTE: we no longer call startRealtimeListener() here. The stream starts only
-// when a consumer port (an1me.to keepAlive or popupAlive) connects, so idle
-// browser windows cost 0 Firestore reads/writes.
 maybeStartPendingMetadataRepair().catch((error) => {
     console.error('[BG] Failed to start pending metadata repair on boot:', error);
 });

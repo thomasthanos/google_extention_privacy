@@ -1,42 +1,30 @@
-/**
- * Anime Tracker - Configuration Constants
- */
-
 const CONFIG = {
-    // Cache settings
-    EPISODE_TYPES_CACHE_TTL:    24 * 60 * 60 * 1000, // 24 hours
-    FILLER_NOT_FOUND_CACHE_TTL:  3 * 24 * 60 * 60 * 1000, // 3 days — retry sooner in case a filler list gets added
+    EPISODE_TYPES_CACHE_TTL: 24 * 60 * 60 * 1000,
+    FILLER_NOT_FOUND_CACHE_TTL: 3 * 24 * 60 * 60 * 1000,
 
-    // UI settings
     SEARCH_DEBOUNCE_MS: 150,
     STORAGE_UPDATE_DEBOUNCE_MS: 600,
 
-    // Rate limiting for auto-fetch
-    AUTO_FETCH_BATCH_SIZE:    3,
+    AUTO_FETCH_BATCH_SIZE: 3,
     AUTO_FETCH_BASE_DELAY_MS: 1000,
-    AUTO_FETCH_MAX_TOTAL:     30, // max anime per popup-open to avoid burst requests
+    AUTO_FETCH_MAX_TOTAL: 30,
 
-    // Episode display limits
     VISIBLE_EPISODES_LIMIT: 10,
     VISIBLE_FILLERS_LIMIT: 6,
     COMPLETED_LIST_MIN_DAYS: 4,
 
-    // Progress thresholds
-    COMPLETED_PERCENTAGE: 85, // must match ContentConfig.COMPLETED_PERCENTAGE in src/content/config.js
+    COMPLETED_PERCENTAGE: 85,
 
-    // Cloud save
-    CLOUD_SAVE_DEBOUNCE_MS:  2000,
-    MAX_CLOUD_SAVE_RETRIES:  3,
-    MAX_RETRY_DELAY_MS:      30000
+    CLOUD_SAVE_DEBOUNCE_MS: 2000,
+    MAX_CLOUD_SAVE_RETRIES: 3,
+    MAX_RETRY_DELAY_MS: 30000
 };
 
-// Donate links
 const DONATE_LINKS = {
     paypal: 'https://www.paypal.me/ThomasThanos',
     revolut: 'https://revolut.me/thomas2873'
 };
 
-// Parts display configuration for multi-part anime
 const ANIME_PARTS_CONFIG = {
     'fate-zero': [
         { name: 'Fate/Zero S1', start: 1, end: 13, displayStart: 1, displayEnd: 13 },
@@ -56,17 +44,11 @@ const CANONICAL_EPISODE_OFFSET_MAPPING = {
     'fate-zero-2nd-season': 13,
 };
 
-
-// Base series slugs whose movie entries should be merged INTO the series season group
-// instead of shown in a separate movie group.
 const SERIES_MOVIE_MERGE_SLUGS = new Set([
     'trinity-seven',
     'fate',
 ]);
 
-/**
- * Season Grouping Utility
- */
 const SeasonGrouping = {
     isChronologyGroup(baseSlug) {
         return baseSlug === 'fate';
@@ -572,7 +554,6 @@ const SeasonGrouping = {
         for (const [groupKey, entries] of movieGroups) {
             const baseSlug = groupKey.replace(/__movies$/, '');
             if (groups.has(baseSlug) && SERIES_MOVIE_MERGE_SLUGS.has(baseSlug)) {
-                // Merge movie entries into the series season group
                 const seriesGroup = groups.get(baseSlug);
                 const maxSeasonNum = seriesGroup.reduce((m, e) => Math.max(m, e.seasonNum || 0), 0);
                 entries.forEach((entry, i) => {
@@ -645,7 +626,6 @@ const SeasonGrouping = {
     }
 };
 
-// Export
 window.AnimeTracker = window.AnimeTracker || {};
 window.AnimeTracker.CONFIG = CONFIG;
 window.AnimeTracker.DONATE_LINKS = DONATE_LINKS;

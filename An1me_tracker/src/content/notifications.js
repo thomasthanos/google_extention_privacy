@@ -1,10 +1,3 @@
-/**
- * Anime Tracker - UI Notifications (Enhanced)
- * Resume prompt and completion notifications
- * 
- * Premium glass morphism with 3D depth, gradient SVG icons, and cinematic animations
- */
-
 const Notifications = {
     cleanupFunctions: [],
 
@@ -13,7 +6,7 @@ const Notifications = {
     },
 
     cleanup() {
-        this.cleanupFunctions.forEach(fn => { try { fn() } catch {} });
+        this.cleanupFunctions.forEach(fn => { try { fn() } catch { } });
         this.cleanupFunctions = [];
     },
 
@@ -37,7 +30,6 @@ const Notifications = {
             id: 'anime-tracker-root-styles',
             textContent: `
                 :root {
-                    /* Backgrounds - deeper, richer glass */
                     --at-bg-primary: rgba(10, 12, 20, 0.88);
                     --at-bg-secondary: rgba(12, 16, 28, 0.92);
                     --at-bg-accent-resume: rgba(79, 195, 247, 0.12);
@@ -45,7 +37,6 @@ const Notifications = {
                     --at-bg-no: rgba(255, 255, 255, 0.06);
                     --at-bg-no-hover: rgba(255, 255, 255, 0.1);
                     
-                    /* Accent Colors */
                     --at-accent-resume: #4fc3f7;
                     --at-accent-resume-light: #81d4fa;
                     --at-accent-resume-dark: #0288d1;
@@ -57,19 +48,16 @@ const Notifications = {
                     --at-accent-complete-dark: #2e7d57;
                     --at-accent-complete-gradient: linear-gradient(135deg, #4caf82 0%, #2e7d57 100%);
                     
-                    /* Text Colors */
                     --at-text-primary: #e8edf8;
                     --at-text-secondary: #8899b0;
                     --at-text-dark: #5a6888;
                     --at-text-white: #ffffff;
                     
-                    /* Borders - subtle double-layer */
                     --at-border-light: rgba(255, 255, 255, 0.05);
                     --at-border-medium: rgba(255, 255, 255, 0.1);
                     --at-border-accent: rgba(76, 175, 130, 0.25);
                     --at-border-resume: rgba(79, 195, 247, 0.2);
                     
-                    /* 3D Shadows - multi-layer for depth */
                     --at-shadow-3d: 
                         0 2px 4px rgba(0,0,0,0.2),
                         0 8px 16px rgba(0,0,0,0.25),
@@ -90,12 +78,10 @@ const Notifications = {
                         0 4px 12px rgba(76, 175, 130, 0.2),
                         0 16px 32px rgba(76, 175, 130, 0.15);
                     
-                    /* Glow Filters */
                     --at-glow-resume: drop-shadow(0 0 6px rgba(79, 195, 247, 0.5)) drop-shadow(0 0 12px rgba(79, 195, 247, 0.2));
                     --at-glow-complete: drop-shadow(0 0 6px rgba(76, 175, 130, 0.5)) drop-shadow(0 0 12px rgba(76, 175, 130, 0.2));
                     --at-glow-icon: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
                     
-                    /* Insets for 3D depth */
                     --at-inset-top: rgba(255, 255, 255, 0.08);
                     --at-inset-bottom: rgba(0, 0, 0, 0.2);
                 }
@@ -133,7 +119,7 @@ const Notifications = {
                     }
                     return { doc: iDoc, container: parent };
                 }
-            } catch { /* cross-origin, skip */ }
+            } catch { }
         }
         return { doc: document, container: document.body };
     },
@@ -151,7 +137,6 @@ const Notifications = {
         (doc.head || doc.documentElement).appendChild(style);
     },
 
-    // ── SVG Icons with gradients ─────────────────────────────────────────────
     _icons: {
         clock(gradId = 'atGradClock') {
             return `<svg class="at-icon" viewBox="0 0 24 24" fill="none">
@@ -221,10 +206,10 @@ const Notifications = {
 
     showResumePrompt(savedProgress, onResume, onStartOver) {
         const timeStr = `${Math.floor(savedProgress.currentTime / 60)}:${(savedProgress.currentTime % 60).toString().padStart(2, '0')}`;
-        
+
         document.querySelectorAll('#anime-tracker-resume-prompt').forEach(el => el.remove());
         document.querySelectorAll('iframe').forEach(f => {
-            try { f.contentDocument?.querySelectorAll('#anime-tracker-resume-prompt').forEach(el => el.remove()); } catch {}
+            try { f.contentDocument?.querySelectorAll('#anime-tracker-resume-prompt').forEach(el => el.remove()); } catch { }
         });
 
         this.ensureFont();
@@ -235,9 +220,6 @@ const Notifications = {
 
         const prompt = doc.createElement('div');
         prompt.id = 'anime-tracker-resume-prompt';
-        // innerHTML only carries static icon SVGs and structural markup.
-        // Dynamic text (timeStr) is written via textContent below to keep the
-        // template XSS-safe even if a future edit adds user-controlled data.
         prompt.innerHTML = `
             <div class="at-shine"></div>
             <div class="at-header">
@@ -260,15 +242,15 @@ const Notifications = {
         container.appendChild(prompt);
 
         const yes = prompt.querySelector('#at-resume-yes');
-        const no  = prompt.querySelector('#at-resume-no');
-        
+        const no = prompt.querySelector('#at-resume-no');
+
         const remove = () => this.removeElement(prompt);
         const onYes = () => { yes.removeEventListener('click', onYes); no.removeEventListener('click', onNo); remove(); onResume(); };
-        const onNo  = () => { yes.removeEventListener('click', onYes); no.removeEventListener('click', onNo); remove(); onStartOver(); };
+        const onNo = () => { yes.removeEventListener('click', onYes); no.removeEventListener('click', onNo); remove(); onStartOver(); };
 
         yes.addEventListener('click', onYes);
         no.addEventListener('click', onNo);
-        
+
         this.addCleanup(() => { yes?.removeEventListener('click', onYes); no?.removeEventListener('click', onNo); remove(); });
         setTimeout(remove, 10000);
     },
@@ -308,7 +290,6 @@ const Notifications = {
                 #anime-tracker-resume-prompt * { user-select: none; font-family: inherit }
                 #anime-tracker-resume-prompt.at-hiding { animation: atFadeOut .35s cubic-bezier(.4,0,1,1) forwards }
                 
-                /* Shine sweep effect */
                 .at-shine {
                     position: absolute;
                     top: 0; left: -100%; width: 60%; height: 100%;
@@ -410,7 +391,7 @@ const Notifications = {
     showCompletion(info) {
         document.querySelectorAll('#anime-tracker-notification').forEach(el => el.remove());
         document.querySelectorAll('iframe').forEach(f => {
-            try { f.contentDocument?.querySelectorAll('#anime-tracker-notification').forEach(el => el.remove()); } catch {}
+            try { f.contentDocument?.querySelectorAll('#anime-tracker-notification').forEach(el => el.remove()); } catch { }
         });
 
         this.ensureFont();
@@ -480,7 +461,6 @@ const Notifications = {
                 }
                 #anime-tracker-notification * { user-select: none; font-family: inherit }
                 
-                /* Shine sweep */
                 .at-notif-shine {
                     position: absolute;
                     top: 0; left: -100%; width: 50%; height: 100%;
@@ -489,7 +469,6 @@ const Notifications = {
                     pointer-events: none;
                 }
                 
-                /* Auto-dismiss progress bar */
                 .at-notif-progress {
                     position: absolute;
                     bottom: 0; left: 0;
@@ -561,18 +540,16 @@ const Notifications = {
     }
 };
 
-// Export
 window.AnimeTrackerContent = window.AnimeTrackerContent || {};
 window.AnimeTrackerContent.Notifications = Notifications;
 
-// ── DEV TEST BRIDGE ──────────────────────────────────────────────────────────
 document.addEventListener('__at_test_complete', (e) => {
     Notifications.showCompletion(e.detail);
 });
 document.addEventListener('__at_test_resume', (e) => {
     Notifications.showResumePrompt(
         e.detail,
-        () => {},
-        () => {}
+        () => { },
+        () => { }
     );
 });

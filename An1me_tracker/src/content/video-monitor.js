@@ -1,10 +1,4 @@
-/**
- * Anime Tracker - Video Monitor
- * Handles video element detection and monitoring
- */
-
 const VideoMonitor = {
-    // State
     videoElement: null,
     checkInterval: null,
     progressSaveInterval: null,
@@ -44,9 +38,6 @@ const VideoMonitor = {
         this.retryCount = 0;
     },
 
-    /**
-     * Check if video element is active and visible
-     */
     isVideoActive(video) {
         const { Logger } = window.AnimeTrackerContent;
 
@@ -58,8 +49,8 @@ const VideoMonitor = {
                 video.duration > 0 &&
                 video.duration < 100000 &&
                 (video.offsetParent !== null ||
-                 video.getBoundingClientRect().width > 50 ||
-                 video.style.display !== 'none')
+                    video.getBoundingClientRect().width > 50 ||
+                    video.style.display !== 'none')
             );
         } catch (e) {
             Logger.error('Error checking video activity:', e);
@@ -81,7 +72,6 @@ const VideoMonitor = {
             if (this.isVideoActive(video)) return video;
         }
 
-        // Same-origin iframes only (cross-origin throws SecurityError — caught)
         const iframes = document.querySelectorAll('iframe');
         for (const iframe of iframes) {
             try {
@@ -111,7 +101,6 @@ const VideoMonitor = {
                     }
                 }
             } catch {
-                // Cross-origin iframe — SecurityError is expected, skip silently.
                 Logger.debug('Cross-origin iframe, skipping');
             }
         }
@@ -174,7 +163,6 @@ const VideoMonitor = {
             window.removeEventListener('pagehide', eventHandlers.handleBeforeUnload);
         });
 
-        // Check for saved progress
         if (animeInfo) {
             const savedProgress = await ProgressTracker.getSavedProgress(animeInfo.uniqueId);
             if (savedProgress && savedProgress.currentTime > CONFIG.MIN_PROGRESS_TO_SAVE) {
@@ -189,12 +177,12 @@ const VideoMonitor = {
                             savedProgress,
                             () => {
                                 video.currentTime = savedProgress.currentTime;
-                                video.play().catch(() => {});
+                                video.play().catch(() => { });
                                 Logger.success(`Resumed @ ${savedProgress.currentTime}s`);
                             },
                             () => {
                                 video.currentTime = 0;
-                                video.play().catch(() => {});
+                                video.play().catch(() => { });
                             }
                         );
                     } else {
@@ -233,8 +221,6 @@ const VideoMonitor = {
             }
         };
 
-        // Only run the interval while the tab is visible — full stop when
-        // hidden (no wasted callback wakeups on mobile battery saver).
         if (typeof document === 'undefined' || document.visibilityState === 'visible') {
             startSaveInterval();
         }
@@ -261,9 +247,6 @@ const VideoMonitor = {
         return false;
     },
 
-    /**
-     * Start watching for video with retries
-     */
     startWatching(animeInfo, eventHandlers) {
         const { CONFIG, Logger } = window.AnimeTrackerContent;
 
@@ -295,9 +278,6 @@ const VideoMonitor = {
                 }
             });
 
-            // MutationObserver for dynamic content — self-disconnects after
-            // MAX_RETRIES window so we don't observe document.body subtree
-            // forever on pages where the video never loads (battery drain).
             let observerTimeout;
             const observer = new MutationObserver(() => {
                 clearTimeout(observerTimeout);
@@ -335,6 +315,5 @@ const VideoMonitor = {
     }
 };
 
-// Export
 window.AnimeTrackerContent = window.AnimeTrackerContent || {};
 window.AnimeTrackerContent.VideoMonitor = VideoMonitor;

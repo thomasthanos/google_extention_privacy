@@ -1,10 +1,3 @@
-/**
- * Anime Tracker - Shared Merge Utilities
- *
- * Single source of truth for local <-> cloud merge logic.
- * Loaded in popup, content scripts, and background service worker.
- */
-
 (function () {
     'use strict';
 
@@ -186,7 +179,7 @@
     }
 
     function areAnimeDataMapsEqual(aData, bData) {
-        if (aData === bData) return true; // reference-equality fast path
+        if (aData === bData) return true;
         const a = aData || {};
         const b = bData || {};
         const aKeys = Object.keys(a);
@@ -203,7 +196,7 @@
     }
 
     function areProgressMapsEqual(aProgress, bProgress) {
-        if (aProgress === bProgress) return true; // reference-equality fast path
+        if (aProgress === bProgress) return true;
         const a = aProgress || {};
         const b = bProgress || {};
         const aKeys = Object.keys(a);
@@ -296,13 +289,7 @@
         return moviePatterns.some((pattern) => pattern.test(value));
     }
 
-    // ─── videoProgress merge ──────────────────────────────────────────────────
-    // Primary conflict resolver: currentTime (clock-independent).
-    // Timestamps used only as tiebreaker or for tombstone ordering.
-    // TOMBSTONE_GRACE_MS ensures a tombstone must be meaningfully later than
-    // the live entry's savedAt before it wins, guarding against clock skew.
-
-    const TOMBSTONE_GRACE_MS = 5000; // 5 s
+    const TOMBSTONE_GRACE_MS = 5000;
 
     function mergeVideoProgress(local, cloud) {
         const merged = { ...(cloud || {}) };
@@ -319,13 +306,13 @@
 
             if (localDeleted && !cloudDeleted) {
                 const localDeletedAt = lp.deletedAt ? +new Date(lp.deletedAt) : 0;
-                const cloudSavedAt   = cp.savedAt   ? +new Date(cp.savedAt)   : 0;
+                const cloudSavedAt = cp.savedAt ? +new Date(cp.savedAt) : 0;
                 if (localDeletedAt > cloudSavedAt + TOMBSTONE_GRACE_MS) {
                     merged[id] = lp;
                 }
             } else if (!localDeleted && cloudDeleted) {
                 const cloudDeletedAt = cp.deletedAt ? +new Date(cp.deletedAt) : 0;
-                const localSavedAt   = lp.savedAt   ? +new Date(lp.savedAt)   : 0;
+                const localSavedAt = lp.savedAt ? +new Date(lp.savedAt) : 0;
                 if (localSavedAt > cloudDeletedAt + TOMBSTONE_GRACE_MS) {
                     merged[id] = lp;
                 }
@@ -347,8 +334,6 @@
 
         return merged;
     }
-
-    // ─── animeData merge ──────────────────────────────────────────────────────
 
     function mergeAnimeData(localData, cloudData) {
         const merged = { ...(cloudData || {}), ...(localData || {}) };
@@ -372,15 +357,15 @@
                 }
 
                 const existingWatchedAt = existing.watchedAt ? +new Date(existing.watchedAt) : 0;
-                const episodeWatchedAt  = episode.watchedAt  ? +new Date(episode.watchedAt)  : 0;
+                const episodeWatchedAt = episode.watchedAt ? +new Date(episode.watchedAt) : 0;
 
                 if (episodeWatchedAt > existingWatchedAt) {
                     episodesByNumber.set(episode.number, episode);
                 } else if (episodeWatchedAt === existingWatchedAt) {
-                    const existingIsVideo  = existing.durationSource === 'video';
-                    const episodeIsVideo   = episode.durationSource  === 'video';
+                    const existingIsVideo = existing.durationSource === 'video';
+                    const episodeIsVideo = episode.durationSource === 'video';
                     const existingDuration = Number(existing.duration) || 0;
-                    const episodeDuration  = Number(episode.duration)  || 0;
+                    const episodeDuration = Number(episode.duration) || 0;
 
                     if ((episodeIsVideo && !existingIsVideo) ||
                         (episodeIsVideo === existingIsVideo && episodeDuration > existingDuration)) {
@@ -420,8 +405,6 @@
         return merged;
     }
 
-    // ─── deletedAnime merge ───────────────────────────────────────────────────
-
     function mergeDeletedAnime(local, cloud) {
         const merged = { ...(cloud || {}) };
 
@@ -450,10 +433,6 @@
         return animeData;
     }
 
-    // ─── groupCoverImages merge ───────────────────────────────────────────────
-    // Entries are { url, coverSetAt } or plain strings (legacy, treated as coverSetAt = 0).
-    // Newer coverSetAt wins; legacy strings always lose to timestamped entries.
-
     function getCoverUrl(entry) {
         if (!entry) return null;
         if (typeof entry === 'string') return entry;
@@ -469,7 +448,7 @@
     function mergeGroupCoverImages(local, cloud) {
         const localObj = local || {};
         const cloudObj = cloud || {};
-        const result   = { ...cloudObj };
+        const result = { ...cloudObj };
 
         for (const [slug, localEntry] of Object.entries(localObj)) {
             const cloudEntry = cloudObj[slug];

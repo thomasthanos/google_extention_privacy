@@ -1,10 +1,3 @@
-/**
- * Anime Tracker - Copy Guard
- *
- * Blocks text selection/copy across an1me.to except for explicitly allowed
- * content blocks and native editable controls.
- */
-
 (function () {
     'use strict';
 
@@ -111,9 +104,7 @@
     let _ensureStylePending = false;
     let _lastEnsureStyleAt = 0;
     function scheduleEnsureStyle() {
-        // Fast path: the style is already present — 99% of mutations hit this.
         if (document.getElementById(STYLE_ID)) return;
-        // Throttle at most once per 2s to survive SPA render storms on mobile.
         const now = Date.now();
         if (now - _lastEnsureStyleAt < 2000) {
             if (_ensureStylePending) return;
@@ -136,9 +127,6 @@
             _lastEnsureStyleAt = Date.now();
             if (!styleObserver) {
                 styleObserver = new MutationObserver(scheduleEnsureStyle);
-                // Observe only the head (where the style lives) rather than
-                // the entire documentElement subtree — avoids firing on every
-                // SPA render / episode-list mutation.
                 styleObserver.observe(document.head || ROOT, { childList: true, subtree: false });
             }
             return;

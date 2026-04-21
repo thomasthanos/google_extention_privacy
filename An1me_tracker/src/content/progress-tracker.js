@@ -1,10 +1,4 @@
-/**
- * Anime Tracker - Progress Tracker
- * Handles video progress saving and loading
- */
-
 const ProgressTracker = {
-    // State
     lastSavedProgress: new Map(),
     lastSaveTime: 0,
     saveInProgress: false,
@@ -14,17 +8,14 @@ const ProgressTracker = {
     seekSaveTimeout: null,
     MAX_REASONABLE_DURATION_SECONDS: 6 * 60 * 60,
 
-    // In-memory cache for videoProgress reads (avoids redundant storage calls)
     _vpCache: null,
     _vpCacheTime: 0,
-    _VP_CACHE_TTL: 5000, // 5 seconds
+    _VP_CACHE_TTL: 5000,
 
-    // In-memory cache for animeData (tracked-episode check)
     _adCache: null,
     _adCacheTime: 0,
-    _AD_CACHE_TTL: 15000, // 15 seconds
+    _AD_CACHE_TTL: 15000,
 
-    /** Keep the current entry + newest N-1. Used when chrome.storage quota is exceeded. */
     _emergencyPruneProgress(videoProgress, keepId) {
         const entries = Object.entries(videoProgress);
         entries.sort((a, b) => {
@@ -47,13 +38,12 @@ const ProgressTracker = {
         const m = uniqueId.match(/^(.+)__episode-(\d+)$/);
         if (!m) return false;
         const slug = m[1];
-        const num  = parseInt(m[2], 10);
+        const num = parseInt(m[2], 10);
         const anime = animeData[slug];
         if (!anime || !Array.isArray(anime.episodes)) return false;
         return anime.episodes.some(ep => Number(ep?.number) === num);
     },
 
-    /** Compact ISO timestamp without milliseconds */
     _compactNow() {
         return new Date().toISOString().split('.')[0] + 'Z';
     },
@@ -82,18 +72,16 @@ const ProgressTracker = {
         }
     },
 
-    // Two signals: (A) progress >= threshold, or (B) within 120s of end AND >= 60% watched.
-    // The 60% guard on signal B prevents false positives on short clips.
     shouldMarkComplete(currentTime, duration) {
         const { CONFIG } = window.AnimeTrackerContent;
 
         if (!duration || duration <= 0) return false;
 
-        const progress      = currentTime / duration;
+        const progress = currentTime / duration;
         const remainingTime = duration - currentTime;
 
         const progressThreshold = (CONFIG.COMPLETED_PERCENTAGE || 85) / 100;
-        const outroThreshold    = CONFIG.REMAINING_TIME_THRESHOLD || 120;
+        const outroThreshold = CONFIG.REMAINING_TIME_THRESHOLD || 120;
 
         if (progress >= progressThreshold) return true;
 
@@ -246,7 +234,6 @@ const ProgressTracker = {
             let videoProgress;
             let animeData;
 
-            // Use cached reads when fresh enough
             const vpCacheHit = this._vpCache && (now - this._vpCacheTime) < this._VP_CACHE_TTL;
             const adCacheHit = this._adCache && (now - this._adCacheTime) < this._AD_CACHE_TTL;
 
@@ -259,23 +246,15 @@ const ProgressTracker = {
                 if (!adCacheHit) keys.push('animeData');
                 const result = await Storage.get(keys);
                 videoProgress = vpCacheHit ? this._vpCache : (result.videoProgress || {});
-                animeData     = adCacheHit ? this._adCache : (result.animeData || {});
+                animeData = adCacheHit ? this._adCache : (result.animeData || {});
                 if (!adCacheHit) { this._adCache = animeData; this._adCacheTime = now; }
             }
 
-            // Skip entirely if this episode is already tracked in animeData —
-            // cleanTrackedProgressBg would strip it anyway, and writing causes
-            // an unnecessary cloud push.
             if (this._isEpisodeAlreadyTrackedSync(uniqueId, animeData)) {
                 Logger.debug('Skip progress save: episode already tracked', uniqueId);
                 return;
             }
 
-            // ── New-anime grace period ──────────────────────────────────────
-            // If this anime isn't in animeData yet, don't persist anything for
-            // the first NEW_ANIME_GRACE_SECONDS of playback. This stops misclicks
-            // and quick-bail "I didn't like it" sessions from polluting the
-            // in-progress list and forcing manual drops afterwards.
             const graceSeconds = Number(CONFIG.NEW_ANIME_GRACE_SECONDS) || 0;
             if (graceSeconds > 0 && currentTime < graceSeconds) {
                 const slugMatch = uniqueId.match(/^(.+)__episode-\d+$/);
@@ -302,12 +281,6 @@ const ProgressTracker = {
                 return;
             }
 
-            // Skip writes that represent <3s of real forward motion.
-            // Rationale: rapid pause/unpause cycles (and seek-wobble) advance
-            // currentTime by tiny amounts and would otherwise each produce a
-            // storage.set → chrome.storage.onChanged → cloud push cycle.
-            // 3s is well below the resume-prompt usefulness threshold but far
-            // enough above timeupdate noise to matter.
             const MIN_ADVANCE_SECONDS = 3;
             if (existingProgress &&
                 existingProgress.duration === newDuration &&
@@ -315,14 +288,8 @@ const ProgressTracker = {
                 return;
             }
 
-            // Only store coverImage for untracked anime (fallback for display).
-            // Tracked anime already have coverImage in animeData.
             const coverImage = !existingProgress?.coverImage ? this.getCoverImageUrl() : existingProgress.coverImage;
 
-            // Capture the page path slug ONLY when it differs from the default
-            // <animeSlug>-episode-<num> pattern (e.g. movies/specials whose URL
-            // is just /watch/<slug>/ with no episode suffix). The popup uses
-            // this to build a correct "Continue" link instead of guessing.
             let pagePath = existingProgress?.pagePath;
             try {
                 const pathMatch = (window.location?.pathname || '').match(/\/watch\/([^/?#]+)/);
@@ -332,7 +299,7 @@ const ProgressTracker = {
                     const defaultPathSlug = `${idMatch[1]}-episode-${idMatch[2]}`;
                     pagePath = currentPathSlug === defaultPathSlug ? undefined : currentPathSlug;
                 }
-            } catch { /* ignore */ }
+            } catch { }
 
             const nowIso = this._compactNow();
             videoProgress[uniqueId] = {
@@ -348,7 +315,6 @@ const ProgressTracker = {
             try {
                 await Storage.set({ videoProgress });
             } catch (err) {
-                // Storage quota protection: on quota-exceeded, aggressively prune and retry once.
                 const msg = (err && err.message) || '';
                 if (msg.includes('QUOTA') || msg.includes('quota')) {
                     Logger.warn('Storage quota hit — pruning videoProgress and retrying');
@@ -364,12 +330,10 @@ const ProgressTracker = {
                     throw err;
                 }
             }
-            // Update cache after successful write
             this._vpCache = videoProgress;
             this._vpCacheTime = Date.now();
             Logger.debug(`Progress saved: ${uniqueId} → ${videoProgress[uniqueId].percentage}% (${newCurrentTime}s/${Math.floor(duration)}s)`);
 
-            // ── Early watchlist sync after 2 min of playback ──
             if (!this._watchlistSynced && newCurrentTime >= 120) {
                 this._watchlistSynced = true;
                 try {
@@ -383,17 +347,15 @@ const ProgressTracker = {
                             const siteId = ad[slug]?.siteAnimeId;
                             const pageId = siteId || (window.AnimeTrackerContent.AnimeParser?.extractSiteAnimeId?.());
                             if (pageId) {
-                                // First episode → plan_to_watch, otherwise → watching
                                 const isFirst = !ad[slug] || !ad[slug].episodes || ad[slug].episodes.length === 0;
                                 WatchlistSync.updateStatus(pageId, isFirst ? 'plan_to_watch' : 'watching', slug);
                             }
                         }
                     }
-                } catch { /* non-critical */ }
+                } catch { }
             }
         } catch (e) {
             if (e.message && e.message.includes('Extension context invalidated')) {
-                // silent — extension reloads
             } else {
                 Logger.error('Save progress exception:', e);
                 throw e;
@@ -413,17 +375,12 @@ const ProgressTracker = {
 
         if (currentTime < CONFIG.MIN_PROGRESS_TO_SAVE) return;
 
-        // Idle guard: if tab isn't visible, don't record ambient progress.
-        // Urgent/force saves (pause, visibilitychange, pagehide) are still
-        // allowed — those ARE the snapshot when the user stops watching.
         if (!force && typeof document !== 'undefined'
             && document.visibilityState && document.visibilityState !== 'visible') {
             return;
         }
 
-        // If past completion threshold but not enough real playback, skip save.
-        // This prevents seek-to-end from creating ghost progress entries.
-        if (this.shouldMarkComplete(currentTime, duration)) return;
+        if (!force && this.shouldMarkComplete(currentTime, duration)) return;
 
         const now = Date.now();
         const regularThrottleMs = Math.max(5000, Number(CONFIG.PROGRESS_WRITE_THROTTLE_MS) || 45000);
@@ -431,7 +388,8 @@ const ProgressTracker = {
         const urgentThrottleMs = Math.max(500, Number(CONFIG.FORCED_PROGRESS_WRITE_THROTTLE_MS) || 3000);
         const throttleMs = !force ? regularThrottleMs : (urgent ? urgentThrottleMs : pauseThrottleMs);
 
-        if ((now - this.lastSaveTime) < throttleMs) {
+        if (urgent) {
+        } else if ((now - this.lastSaveTime) < throttleMs) {
             this.pendingSeekSave = { uniqueId, currentTime, duration, urgent };
 
             if (this.seekSaveTimeout) {
@@ -599,6 +557,8 @@ const ProgressTracker = {
             anime.totalWatchTime = anime.episodes.reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
             anime.lastWatched = this._compactNow();
             await Storage.set({ animeData });
+            this._adCache = animeData;
+            this._adCacheTime = Date.now();
             Logger.debug(`Refreshed tracked duration: ${animeKey} (${validDuration}s)`);
             return true;
         } catch (e) {
@@ -622,9 +582,10 @@ const ProgressTracker = {
                 throw new Error('Invalid video duration');
             }
 
-            const result = await Storage.get(['animeData', 'deletedAnime']);
+            const result = await Storage.get(['animeData', 'deletedAnime', 'videoProgress']);
             const animeData = result.animeData || {};
             const deletedAnime = { ...(result.deletedAnime || {}) };
+            const videoProgress = { ...(result.videoProgress || {}) };
 
             const validDuration = this.normalizeDuration(videoDuration);
             if (!validDuration) {
@@ -641,7 +602,25 @@ const ProgressTracker = {
             }
 
             delete deletedAnime[info.animeSlug];
-            await Storage.set({ animeData, deletedAnime });
+
+            const tossIds = [info.uniqueId];
+            if (info.isDoubleEpisode && info.secondEpisodeNumber) {
+                const base = info.uniqueId.replace(/__episode-\d+$/, '');
+                tossIds.push(`${base}__episode-${info.secondEpisodeNumber}`);
+            }
+            let progressTouched = false;
+            for (const id of tossIds) {
+                if (videoProgress[id]) { delete videoProgress[id]; progressTouched = true; }
+            }
+            const payload = { animeData, deletedAnime };
+            if (progressTouched) payload.videoProgress = videoProgress;
+            await Storage.set(payload);
+            this._adCache = animeData;
+            this._adCacheTime = Date.now();
+            if (progressTouched) {
+                this._vpCache = videoProgress;
+                this._vpCacheTime = Date.now();
+            }
 
             if (writeResult.changeType === 'updated-placeholder') {
                 Logger.debug(`Updated placeholder duration for tracked episode: ${info.uniqueId}`);
@@ -651,7 +630,6 @@ const ProgressTracker = {
             Logger.success(`✓ Tracked: ${info.animeTitle} Ep${info.episodeNumber}${info.isDoubleEpisode ? '-' + info.secondEpisodeNumber : ''}`);
             Notifications.showCompletion(info);
 
-            // ── Watchlist sync ──────────────────────────────────────────────
             try {
                 const { WatchlistSync } = window.AnimeTrackerContent;
                 const siteId = animeData[info.animeSlug].siteAnimeId || info.siteAnimeId;
@@ -660,14 +638,12 @@ const ProgressTracker = {
                     const totalEps = animeData[info.animeSlug].totalEpisodes;
 
                     if (totalEps && watchedEps >= totalEps) {
-                        // All episodes watched → completed
                         WatchlistSync.updateStatus(siteId, 'completed', info.animeSlug);
                     } else {
-                        // Any episode completed → watching
                         WatchlistSync.updateStatus(siteId, 'watching', info.animeSlug);
                     }
                 }
-            } catch { /* watchlist sync is non-critical */ }
+            } catch { }
 
             return true;
         } catch (e) {
@@ -695,6 +671,5 @@ const ProgressTracker = {
     }
 };
 
-// Export
 window.AnimeTrackerContent = window.AnimeTrackerContent || {};
 window.AnimeTrackerContent.ProgressTracker = ProgressTracker;

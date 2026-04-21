@@ -369,6 +369,7 @@
         const latestAvailable = AnilistService?.getLatestEpisode(lowerSlug);
         const metaTotal = AnilistService?.getTotalEpisodes(lowerSlug);
         const isPartiallyUploaded = metaTotal && latestAvailable && latestAvailable < metaTotal;
+        const looksLikeStandaloneSpecial = /(?:^|-)special(?:-|$)|(?:^|-)ova(?:-|$)|(?:^|-)ona(?:-|$)|(?:^|-)fan-letter(?:-|$)/i.test(lowerSlug);
 
         // ── Completion checks ───────────────────────────────────────────────
         let isComplete = false;
@@ -383,6 +384,16 @@
             const progressData = FillerService.calculateProgress(watchedCount, slug, anime);
 
             if (progressData.progress >= 100 && !isPartiallyUploaded) {
+                isComplete = true;
+            } else if (
+                watchedCount === 1 &&
+                !isPartiallyUploaded &&
+                (
+                    metaTotal === 1 ||
+                    latestAvailable === 1 ||
+                    (anilistStatus === 'FINISHED' && looksLikeStandaloneSpecial)
+                )
+            ) {
                 isComplete = true;
             } else if (anilistStatus === 'FINISHED' && progressData.total == null && !isPartiallyUploaded) {
                 // Total unknown: don't auto-complete, let user decide

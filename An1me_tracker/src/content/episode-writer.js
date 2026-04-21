@@ -44,6 +44,25 @@ const EpisodeWriter = {
         }
     },
 
+    _setListState(entry, state, at) {
+        if (!entry) return;
+        entry.listState = state;
+        entry.listStateUpdatedAt = at;
+
+        if (state === 'completed') {
+            entry.completedAt = entry.completedAt || at;
+            delete entry.droppedAt;
+            delete entry.onHoldAt;
+            return;
+        }
+
+        if (state === 'active') {
+            delete entry.completedAt;
+            delete entry.droppedAt;
+            delete entry.onHoldAt;
+        }
+    },
+
     /**
      * Mutates animeData with the newly watched episode, if needed.
      * Returns an operation result for callers to decide follow-up actions.
@@ -155,8 +174,18 @@ const EpisodeWriter = {
         // Recompute from episodes so double-episode pushes are counted correctly.
         animeData[slug].totalWatchTime = animeData[slug].episodes
             .reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
-        animeData[slug].lastWatched = this._compactNow();
+        const nowIso = this._compactNow();
+        animeData[slug].lastWatched = nowIso;
         animeData[slug].episodes.sort((a, b) => (Number(a?.number) || 0) - (Number(b?.number) || 0));
+
+        const trackedCount = animeData[slug].episodes.length;
+        const totalEpisodes = Number(animeData[slug].totalEpisodes) || 0;
+        if (totalEpisodes > 0 && trackedCount >= totalEpisodes) {
+            this._setListState(animeData[slug], 'completed', nowIso);
+        } else if (animeData[slug].listState === 'completed' && totalEpisodes > trackedCount) {
+            this._setListState(animeData[slug], 'active', nowIso);
+        }
+
         return { changed: true, changeType: 'added-episode', createdAnime };
     }
 };
