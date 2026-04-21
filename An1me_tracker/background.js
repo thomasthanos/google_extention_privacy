@@ -394,6 +394,11 @@ const RT_MAX_FAILURES = 5;
 const RT_PAUSE_AFTER_MAX_MS = 15 * 60 * 1000; // 15 min circuit-breaker window
 let rtConsecutiveFailures = 0;
 let rtPausedAt = 0;
+// Dedupe repeated stream-open failure logs — when Firestore returns the same
+// HTTP status + inner code on every retry we only want to see it once per
+// distinct reason instead of flooding DevTools.
+let _lastRtFailSignature = '';
+let _lastRtFailRepeatCount = 0;
 // Timestamp of last successful stream open — used to skip the catch-up GET
 // when we just reconnected (avoids piling up 1-read GETs on every reconnect).
 let _lastSuccessfulStreamOpenedAt = 0;
@@ -451,12 +456,26 @@ function removeStreamConsumer(id) {
         _idleTeardownTimer = null;
         if (activeStreamConsumers.size > 0) return; // safety
         ddebug('[BG-RT] Idle grace expired — pausing stream');
+        // Flush any pending progress PATCH before the SW may suspend — with
+        // the new 3-min debounce, a tab closing mid-session could otherwise
+        // lose its tail of progress updates until the next browser launch.
+        if (progressSyncDebounce) {
+            clearTimeout(progressSyncDebounce);
+            progressSyncDebounce = null;
+            if (!syncDebounceTimeout && !syncInProgress) {
+                syncProgressOnly().catch(() => {});
+            }
+        }
         if (rtListenAbort) { try { rtListenAbort.abort(); } catch {} }
         rtListenAbort = null;
         if (rtReconnectTimer) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
+        // Preserve rtConsecutiveFailures / rtPausedAt across idle cycles so a
+        // tripped breaker stays tripped even when the popup keeps reopening.
+        // Previously we reset both to 0 here, which meant every popup open
+        // cycle restarted the retry budget and refilled the console with the
+        // same HTTP 400/501 UNIMPLEMENTED spam. The 15-min pause window will
+        // still let the stream self-heal once Firestore recovers.
         rtReconnectDelay = 5000;
-        rtConsecutiveFailures = 0;
-        rtPausedAt = 0;
     }, IDLE_TEARDOWN_GRACE_MS);
 }
 
@@ -1022,7 +1041,19 @@ async function startRealtimeListener() {
                 innerCode = Number(parsed?.error?.code) || 0;
             } catch { /* body not JSON */ }
             const serverError = res.status >= 500 || innerCode >= 500;
-            console.warn(`[BG-RT] Stream open failed: HTTP ${res.status}${innerCode ? ` (inner ${innerCode})` : ''}`);
+            const signature = `${res.status}/${innerCode}`;
+            if (signature === _lastRtFailSignature) {
+                _lastRtFailRepeatCount++;
+                // Emit a single summary line every 10 repeats so the user still
+                // notices if the storm is ongoing, but we don't flood the log.
+                if (_lastRtFailRepeatCount % 10 === 0) {
+                    console.warn(`[BG-RT] Stream open still failing (${signature}) ×${_lastRtFailRepeatCount}`);
+                }
+            } else {
+                _lastRtFailSignature = signature;
+                _lastRtFailRepeatCount = 1;
+                console.warn(`[BG-RT] Stream open failed: HTTP ${res.status}${innerCode ? ` (inner ${innerCode})` : ''}`);
+            }
             rtConsecutiveFailures++;
             if (serverError) {
                 // 5xx (or wrapped UNIMPLEMENTED) rarely recovers within seconds
@@ -1102,6 +1133,8 @@ async function startRealtimeListener() {
         rtPausedAt = 0;
         rtReconnectDelay = 5000;
         _lastSuccessfulStreamOpenedAt = streamOpenedAt;
+        _lastRtFailSignature = '';
+        _lastRtFailRepeatCount = 0;
     } else {
         rtConsecutiveFailures++;
     }
@@ -1208,12 +1241,17 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 5000);
     } else if (_pendingProgressSync) {
         if (progressSyncDebounce) clearTimeout(progressSyncDebounce);
+        // Local chrome.storage writes are already instant (that's what the user
+        // actually relies on to not lose progress after a crash). The cloud
+        // PATCH is just a cross-device convenience, so we coalesce aggressively
+        // — 3 min between pushes easily drops a full watching session from
+        // ~20 cloud writes to 2–3 without any user-visible progress loss.
         progressSyncDebounce = setTimeout(() => {
             progressSyncDebounce = null;
             // Skip if a full sync is scheduled or currently running
             if (syncDebounceTimeout || syncInProgress) return;
             syncProgressOnly();
-        }, 30000);
+        }, 3 * 60 * 1000);
     }
 
     if (changes.animeData) {
