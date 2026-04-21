@@ -387,9 +387,11 @@ let rtReconnectDelay = 5000;
 const RT_MAX_DELAY   = 5 * 60 * 1000; // 5 min ceiling — prevents tight reconnect loop after persistent failure
 
 // Max consecutive failures before the SSE listener pauses itself.
-// The alarm-based health check restarts it, preventing a tight reconnect loop.
-const RT_MAX_FAILURES = 10;
-const RT_PAUSE_AFTER_MAX_MS = 10 * 60 * 1000; // try again after 10 min of paused state
+// Lower threshold + longer pause = we stop hammering an endpoint that is
+// consistently returning errors (e.g. Firestore 501 UNIMPLEMENTED). The
+// alarm-based health check restarts it after the pause window.
+const RT_MAX_FAILURES = 5;
+const RT_PAUSE_AFTER_MAX_MS = 15 * 60 * 1000; // 15 min circuit-breaker window
 let rtConsecutiveFailures = 0;
 let rtPausedAt = 0;
 // Timestamp of last successful stream open — used to skip the catch-up GET
@@ -1004,6 +1006,22 @@ async function startRealtimeListener() {
         });
 
         if (!res.ok) {
+            // Previously this path returned early without touching
+            // rtConsecutiveFailures → the circuit breaker never tripped and
+            // the stream retried forever (observed: 10+ `documents:listen`
+            // requests per session when Firestore returned 501/5xx).
+            console.warn(`[BG-RT] Stream open failed: HTTP ${res.status}`);
+            rtConsecutiveFailures++;
+            // Server-side errors (5xx, including 501 UNIMPLEMENTED) rarely
+            // recover within a few seconds — jump straight to a long delay
+            // instead of burning the exponential ramp from 5s.
+            if (res.status >= 500) {
+                rtReconnectDelay = Math.max(rtReconnectDelay, 60000);
+                rtConsecutiveFailures += 1; // extra penalty → trip breaker sooner
+            } else if (res.status === 401 || res.status === 403) {
+                // Auth problem — a token refresh happens on next entry anyway.
+                rtReconnectDelay = Math.max(rtReconnectDelay, 15000);
+            }
             scheduleRtReconnect();
             return;
         }
