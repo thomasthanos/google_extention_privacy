@@ -344,11 +344,13 @@ const ProgressTracker = {
                         if (slug) {
                             const adResult = await Storage.get(['animeData']);
                             const ad = adResult.animeData || {};
+                            const entry = ad[slug] || null;
                             const siteId = ad[slug]?.siteAnimeId;
                             const pageId = siteId || (window.AnimeTrackerContent.AnimeParser?.extractSiteAnimeId?.());
                             if (pageId) {
-                                const isFirst = !ad[slug] || !ad[slug].episodes || ad[slug].episodes.length === 0;
-                                WatchlistSync.updateStatus(pageId, isFirst ? 'plan_to_watch' : 'watching', slug);
+                                WatchlistSync.syncFromStorage(pageId, slug, {
+                                    fallbackType: WatchlistSync.getProgressFallbackType(entry, slug)
+                                });
                             }
                         }
                     }
@@ -634,14 +636,10 @@ const ProgressTracker = {
                 const { WatchlistSync } = window.AnimeTrackerContent;
                 const siteId = animeData[info.animeSlug].siteAnimeId || info.siteAnimeId;
                 if (WatchlistSync && siteId) {
-                    const watchedEps = animeData[info.animeSlug].episodes.length;
-                    const totalEps = animeData[info.animeSlug].totalEpisodes;
-
-                    if (totalEps && watchedEps >= totalEps) {
-                        WatchlistSync.updateStatus(siteId, 'completed', info.animeSlug);
-                    } else {
-                        WatchlistSync.updateStatus(siteId, 'watching', info.animeSlug);
-                    }
+                    WatchlistSync.syncFromStorage(siteId, info.animeSlug, {
+                        fallbackType: 'watching',
+                        keepFirstEpisodeAsPlanToWatch: true
+                    });
                 }
             } catch { }
 

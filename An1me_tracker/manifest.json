@@ -42,6 +42,20 @@
         "https://an1me.to/*",
         "https://*.an1me.to/*"
       ],
+      "exclude_matches": [
+        "https://an1me.to/watch/*"
+      ],
+      "js": [
+        "src/content/watchlist-sync.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://an1me.to/*",
+        "https://*.an1me.to/*"
+      ],
       "js": [
         "src/content/copy-guard.js"
       ],

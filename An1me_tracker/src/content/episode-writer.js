@@ -37,7 +37,7 @@ const EpisodeWriter = {
         try {
             const { WatchlistSync } = window.AnimeTrackerContent;
             if (WatchlistSync && siteAnimeId) {
-                WatchlistSync.updateStatus(siteAnimeId, 'watching', slug);
+                WatchlistSync.syncFromStorage(siteAnimeId, slug, { fallbackType: 'watching' });
             }
         } catch {
             // Non-critical sync path.

@@ -85,10 +85,10 @@
                     const entry = animeData[slug];
                     const siteId = entry?.siteAnimeId || animeInfo.siteAnimeId;
                     if (WatchlistSync && siteId) {
-                        const watchedEps = entry?.episodes?.length || 0;
-                        const totalEps = entry?.totalEpisodes;
-                        if (totalEps && watchedEps >= totalEps) WatchlistSync.updateStatus(siteId, 'completed', slug);
-                        else WatchlistSync.updateStatus(siteId, 'watching', slug);
+                        WatchlistSync.syncFromStorage(siteId, slug, {
+                            fallbackType: 'watching',
+                            keepFirstEpisodeAsPlanToWatch: true
+                        });
                     }
                 } catch { }
 
