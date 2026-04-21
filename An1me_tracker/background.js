@@ -1010,15 +1010,26 @@ async function startRealtimeListener() {
             // rtConsecutiveFailures → the circuit breaker never tripped and
             // the stream retried forever (observed: 10+ `documents:listen`
             // requests per session when Firestore returned 501/5xx).
-            console.warn(`[BG-RT] Stream open failed: HTTP ${res.status}`);
+            //
+            // Firestore sometimes wraps server-side UNIMPLEMENTED in an HTTP
+            // 400 envelope (`{ error: { code: 501, status: "UNIMPLEMENTED" }}`),
+            // so we peek at the body to classify correctly — otherwise a real
+            // 501 would be treated as a benign 4xx and retried too eagerly.
+            const bodyText = await res.text().catch(() => '');
+            let innerCode = 0;
+            try {
+                const parsed = JSON.parse(bodyText);
+                innerCode = Number(parsed?.error?.code) || 0;
+            } catch { /* body not JSON */ }
+            const serverError = res.status >= 500 || innerCode >= 500;
+            console.warn(`[BG-RT] Stream open failed: HTTP ${res.status}${innerCode ? ` (inner ${innerCode})` : ''}`);
             rtConsecutiveFailures++;
-            // Server-side errors (5xx, including 501 UNIMPLEMENTED) rarely
-            // recover within a few seconds — jump straight to a long delay
-            // instead of burning the exponential ramp from 5s.
-            if (res.status >= 500) {
+            if (serverError) {
+                // 5xx (or wrapped UNIMPLEMENTED) rarely recovers within seconds
+                // — jump straight to a long delay instead of burning the ramp.
                 rtReconnectDelay = Math.max(rtReconnectDelay, 60000);
                 rtConsecutiveFailures += 1; // extra penalty → trip breaker sooner
-            } else if (res.status === 401 || res.status === 403) {
+            } else if (res.status === 401 || res.status === 403 || innerCode === 401 || innerCode === 403) {
                 // Auth problem — a token refresh happens on next entry anyway.
                 rtReconnectDelay = Math.max(rtReconnectDelay, 15000);
             }
