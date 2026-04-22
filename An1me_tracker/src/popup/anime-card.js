@@ -182,6 +182,7 @@ const AnimeCardRenderer = {
         const totalWatchedEpisodes = anime.episodes?.length || 0;
         const totalEpisodesPossible = progressData.total || 0;
         const isManuallyCompleted = !!anime.completedAt && totalWatchedEpisodes > 0;
+        const isMovieEntry = window.AnimeTracker.SeasonGrouping.isMovie(slug, anime);
 
         const _latestAvail = AnilistService?.getLatestEpisode(slug);
         const _metaTotal = AnilistService?.getTotalEpisodes(slug);
@@ -195,7 +196,7 @@ const AnimeCardRenderer = {
         const isCardComplete = isManuallyCompleted
             || (progressData.progress === 100 && totalWatchedEpisodes > 0 && !_isPartiallyUploaded)
             || isFinishedByAnilist
-            || (window.AnimeTracker.SeasonGrouping.isMovie(slug, anime) && totalWatchedEpisodes > 0);
+            || (isMovieEntry && totalWatchedEpisodes > 0);
         const displayTotal = _isPartiallyUploaded && _latestAvail > 0 ? _latestAvail : totalEpisodesPossible;
         const totalProgressText = displayTotal > 0 ? `${currentEpisode}/${displayTotal}` : `${currentEpisode}`;
         const episodeProgressText = currentEpisode > 0 ? `Ep ${totalProgressText}` : '';
@@ -235,6 +236,7 @@ const AnimeCardRenderer = {
         const progressBadge = !isCardComplete && !isDropped && !isOnHold && episodeProgressText
             ? `<span class="meta-badge meta-badge-progress">${episodeProgressText}</span>`
             : '';
+        const completedTypeBadge = '';
         const statusBadgeClass = isDropped
             ? 'meta-badge-dropped'
             : (isOnHold
@@ -292,16 +294,21 @@ const AnimeCardRenderer = {
                         : `1 ep every ${Math.max(1, Math.round(1 / pred.epsPerDay))} days`;
                     let modelPrefix = 'Based on your recent watching pace';
                     if (pred.model === 'release-aware') {
-                        modelPrefix = 'Based on your recent pace and weekly airing cadence';
+                        modelPrefix = 'Based on your recent pace, your overall watch rhythm, and weekly airing cadence';
                     } else if (pred.model === 'catch-up-aware') {
-                        modelPrefix = 'Based on how fast you usually catch up on this anime';
+                        modelPrefix = 'Based on how fast you usually catch up on this anime and your overall watch rhythm';
                     } else if (pred.model === 'next-drop-pace') {
                         modelPrefix = 'Based on how fast you usually clear a new episode of this anime';
+                    } else {
+                        modelPrefix = 'Based on your recent pace, this anime watch pattern, and your overall watch rhythm';
                     }
                     const remainingText = pred.remaining > 0
                         ? `${pred.daysLeft} days left · ${pred.remaining} left`
                         : `${pred.daysLeft} day${pred.daysLeft === 1 ? '' : 's'} after a new drop`;
-                    const tip = `${modelPrefix}: about ${tipRate}, ${pred.model === 'next-drop-pace' ? 'you usually catch up' : 'you should be caught up'} around ${eta.toLocaleDateString()} (${remainingText} · ${pred.confidence} confidence)`;
+                    const rangeText = pred.latestDays > pred.earliestDays
+                        ? ` · likely window ${pred.earliestDays}-${pred.latestDays} days`
+                        : '';
+                    const tip = `${modelPrefix}: about ${tipRate}, ${pred.model === 'next-drop-pace' ? 'you usually catch up' : 'you should be caught up'} around ${eta.toLocaleDateString()} (${remainingText}${rangeText} · ${pred.confidence} confidence)`;
                     if (pred.model !== 'next-drop-pace') {
                         inlineEtaHtml = `<span class="meta-time-eta meta-time-eta-ai meta-time-eta-${pred.confidence}" title="${UIHelpers.escapeHtml(tip)}">~${UIHelpers.escapeHtml(label)}</span>`;
                     }
@@ -317,7 +324,7 @@ const AnimeCardRenderer = {
             </div>`;
         const metaRowHtml = `
             <div class="anime-meta-row-wrap">
-                <div class="anime-meta-row">${progressBadge}${statusBadge}${airingBadge}</div>
+                <div class="anime-meta-row">${progressBadge}${completedTypeBadge}${statusBadge}${airingBadge}</div>
                 <div class="anime-header-controls">
                     ${headerActionsHtml}
                     <div class="anime-expand-icon">${UIHelpers.createIcon('chevron')}</div>
@@ -1019,9 +1026,7 @@ const AnimeCardRenderer = {
         } else {
             statusGroup = 'Watching';
         }
-        const groupProgressBadge = !allSeasonsComplete
-            ? `<span class="meta-badge meta-badge-progress">${itemLabel}</span>`
-            : '';
+        const groupProgressBadge = `<span class="meta-badge meta-badge-progress">${itemLabel}</span>`;
         const groupStatusClass = allSeasonsComplete ? 'meta-badge-complete' : (anyStarted ? 'meta-badge-watching' : 'meta-badge-notstarted');
         const groupStatusIcon = allSeasonsComplete ? '✓' : '⊙';
         const groupStatusBadge = `<span class="meta-badge ${groupStatusClass}">${groupStatusIcon} ${statusGroup}</span>`;
