@@ -605,12 +605,23 @@ body {
   font-weight: 800;
   line-height: 1;
   color: var(--cyan);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  letter-spacing: 0;
   white-space: nowrap;
   width: 100%;
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   display: block
+}
+
+#statsBar .stat-value.stat-value-long {
+  font-size: 22px
+}
+
+#statsBar .stat-value.stat-value-xlong {
+  font-size: 19px
 }
 
 #statsBar .stat-label {

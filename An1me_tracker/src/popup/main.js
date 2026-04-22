@@ -164,6 +164,15 @@
         });
     }
 
+    function setTopStatValue(element, value) {
+        if (!element) return;
+        const text = value == null ? '0' : String(value);
+        const compactLength = text.replace(/\s+/g, '').length;
+        element.textContent = text;
+        element.classList.toggle('stat-value-long', compactLength >= 5);
+        element.classList.toggle('stat-value-xlong', compactLength >= 7);
+    }
+
     function getActiveFilter() {
         return elements.searchInput?.value || '';
     }
@@ -1122,9 +1131,9 @@
         const animeEntries = Object.entries(animeData);
         const groups = SeasonGrouping.groupByBase(animeEntries);
         const totalAnimeCount = groups.size;
-        elements.totalAnime.textContent = totalAnimeCount;
+        setTopStatValue(elements.totalAnime, totalAnimeCount);
         const totalMoviesCount = animeEntries.filter(([slug, anime]) => SeasonGrouping.isMovie(slug, anime)).length;
-        if (elements.totalMovies) elements.totalMovies.textContent = totalMoviesCount;
+        if (elements.totalMovies) setTopStatValue(elements.totalMovies, totalMoviesCount);
 
         let totalWatchedEpisodes = 0;
         let totalWatchTime = 0;
@@ -1137,8 +1146,8 @@
         }
 
         const totalTimeStr = UIHelpers.formatDurationShort(totalWatchTime);
-        elements.totalEpisodes.textContent = totalWatchedEpisodes;
-        elements.totalTime.textContent = totalTimeStr;
+        setTopStatValue(elements.totalEpisodes, totalWatchedEpisodes);
+        setTopStatValue(elements.totalTime, totalTimeStr);
 
         try {
             const manifest = chrome.runtime.getManifest();

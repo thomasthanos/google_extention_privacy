@@ -31,10 +31,6 @@ const UIHelpers = {
 
         if (hours >= 72) {
             const days = Math.floor(hours / 24);
-            const remainingHours = hours % 24;
-            if (remainingHours > 0) {
-                return `${days}d ${remainingHours}h`;
-            }
             return `${days}d`;
         }
 
