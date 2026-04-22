@@ -521,7 +521,10 @@
         }
     }
 
-    const PERIODIC_PUSH_INTERVAL = 120000;
+    // Periodic push fires every 5 min during active watching. Gives ~4-5 cloud
+    // syncs per 24-min episode — good balance between freshness and write volume.
+    // Keepalive on teardown covers the close path as a final safety net.
+    const PERIODIC_PUSH_INTERVAL = 300000;
     let periodicPushTimer = null;
     let lastPushAt = 0;
     let _lastIdleSnapshot = null;
@@ -577,8 +580,10 @@
         if (progressDebounce) { clearTimeout(progressDebounce); progressDebounce = null; }
         if (progressMaxWaitTimer) { clearTimeout(progressMaxWaitTimer); progressMaxWaitTimer = null; }
 
+        // Direct keepalive fetch from the content script — survives page unload.
+        // Intentionally no wakeBackgroundSW here: that would trigger a duplicate write
+        // via SW's SYNC_PROGRESS_ONLY handler. The direct keepalive fetch is enough.
         pushProgressDirect({ keepalive: true });
-        wakeBackgroundSW('SYNC_PROGRESS_ONLY');
     }
 
     function resetTeardownSyncGuard() {
@@ -814,9 +819,9 @@
             if (shouldSyncProgress) {
                 if (isOrionMode) {
                     scheduleFullPush(3000);
-                } else {
-                    scheduleProgressPush(60000);
                 }
+                // SW-mode: BG's storage.onChanged debounce (5min) is the single source of truth
+                // for progress writes. No CS-side push needed — avoids duplicate writes.
             }
         });
 
@@ -857,7 +862,8 @@
             Logger?.info('SW available — acting as wake-up agent');
             initialized = true;
             watchStorage(false);
-            scheduleProgressPush(10000);
+            // No initial scheduleProgressPush — BG's storage.onChanged debounce handles it.
+            // Warm token cache so teardown keepalive fetch can fire without async lookup.
             (async () => {
                 try { currentToken = await getValidToken(); } catch { }
             })();

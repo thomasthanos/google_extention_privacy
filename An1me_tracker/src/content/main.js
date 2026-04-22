@@ -37,8 +37,26 @@
         if (!lastVideoSource) { lastVideoSource = src; return false; }
         if (src === lastVideoSource) return false;
         lastVideoSource = src;
-        resetEpisodeTrackingState('video source changed');
-        return true;
+        // Only reset tracking state if the actual EPISODE changed (uniqueId differs
+        // from what we're tracking). A plain src change usually means quality/mirror
+        // switch within the same episode — resetting the accumulator then would
+        // wipe out legit watch time and block completion at end of episode.
+        if (currentEpisodeId && animeInfo && currentEpisodeId !== animeInfo.uniqueId) {
+            resetEpisodeTrackingState('episode id changed via video source');
+            return true;
+        }
+        return false;
+    }
+
+    // Near-end bypass for the misclick guard. Once the user is this close to the
+    // actual end of the video, it's no longer plausible that this is a misclick —
+    // skip the 120s accumulator minimum and mark complete even if the accumulator
+    // was wiped (e.g. by a mid-episode quality switch).
+    function isNearEnd(currentTime, duration) {
+        if (!duration || duration <= 0) return false;
+        const remaining = duration - currentTime;
+        const progress = currentTime / duration;
+        return remaining <= 30 || progress >= 0.95;
     }
 
     function writeSyncEpisode(info, duration, animeData, logPrefix) {
@@ -59,7 +77,7 @@
         if (!duration || !ProgressTracker.shouldMarkComplete(currentTime, duration)) return;
 
         const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
-        if (accumulatedPlaybackSeconds < minWatch) {
+        if (accumulatedPlaybackSeconds < minWatch && !isNearEnd(currentTime, duration)) {
             Logger.debug(`trackImmediately: only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), skipping`);
             return;
         }
@@ -102,7 +120,12 @@
                 trackingState = TrackingState.COMPLETED;
             }
         } catch (e) {
+            // On failure (e.g. transient storage error, extension context invalidated),
+            // reset both trackingState AND earlyTrackDone so subsequent timeupdate
+            // events can retry. Otherwise earlyTrackDone stays true forever and the
+            // raw handler never calls trackImmediately again.
             trackingState = TrackingState.IDLE;
+            earlyTrackDone = false;
             Logger.error('Immediate track failed:', e);
         }
     }
@@ -165,7 +188,7 @@
 
         if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
             const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
-            if (accumulatedPlaybackSeconds < minWatch) {
+            if (accumulatedPlaybackSeconds < minWatch && !isNearEnd(currentTime, duration)) {
                 Logger.debug(`Threshold reached but only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), waiting...`);
                 return;
             }
@@ -208,7 +231,7 @@
             if (trackingState !== TrackingState.IDLE) return;
 
             const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
-            if (accumulatedPlaybackSeconds < minWatch) {
+            if (accumulatedPlaybackSeconds < minWatch && !isNearEnd(currentTime, duration)) {
                 Logger.debug(`Debounced: threshold reached but only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), waiting...`);
                 return;
             }
@@ -271,8 +294,16 @@
         const videoElement = VideoMonitor.getVideoElement();
 
         if (animeInfo && videoElement) {
+            const duration = videoElement.duration || 0;
+            const currentTime = videoElement.currentTime || 0;
             const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
-            if (trackingState !== TrackingState.COMPLETED && accumulatedPlaybackSeconds < minWatch) {
+            // The `ended` event fires at the natural end of the video — this is
+            // definitionally not a misclick. Skip the accumulator guard when we're
+            // at or near the real end, so a mid-episode quality/src switch (which
+            // resets the accumulator) can't block a legitimate completion.
+            if (trackingState !== TrackingState.COMPLETED
+                && accumulatedPlaybackSeconds < minWatch
+                && !isNearEnd(currentTime, duration)) {
                 Logger.debug(`Video ended but only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), not tracking`);
                 return;
             }
@@ -317,7 +348,7 @@
 
             if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
                 const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
-                if (accumulatedPlaybackSeconds < minWatch) {
+                if (accumulatedPlaybackSeconds < minWatch && !isNearEnd(currentTime, duration)) {
                     Logger.debug(`Visibility change: only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), saving progress instead`);
                     ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration, true, true);
                     return;
@@ -360,7 +391,7 @@
             if (trackingState === TrackingState.COMPLETED) return;
 
             const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
-            if (accumulatedPlaybackSeconds < minWatch) {
+            if (accumulatedPlaybackSeconds < minWatch && !isNearEnd(currentTime, duration)) {
                 ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration, true, true);
                 return;
             }

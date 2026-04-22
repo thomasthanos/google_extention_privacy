@@ -569,6 +569,8 @@ let progressSyncInProgress = false;
 let progressSyncPending = false;
 let lastPushedProgressBG = null;
 
+let _lastProgressSyncAt = 0;
+
 async function syncProgressOnly() {
     if (progressSyncInProgress) { progressSyncPending = true; return; }
 
@@ -604,6 +606,7 @@ async function syncProgressOnly() {
             invalidateBgCloudDocCache();
             _lastAppliedCloudUpdatedAt = pushedAt;
             bgRememberOwnWrite(pushedAt);
+            _lastProgressSyncAt = Date.now();
         } else {
             console.warn('[BG] Progress sync failed:', response.status);
             if (response.status >= 500) invalidateBgCloudDocCache();
@@ -1081,11 +1084,13 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 5000);
     } else if (_pendingProgressSync) {
         if (progressSyncDebounce) clearTimeout(progressSyncDebounce);
+        // 5-min debounce matches CS periodic push cadence — on natural pauses this
+        // fires so the cloud stays close to local state without over-writing.
         progressSyncDebounce = setTimeout(() => {
             progressSyncDebounce = null;
             if (syncDebounceTimeout || syncInProgress) return;
             syncProgressOnly();
-        }, 3 * 60 * 1000);
+        }, 5 * 60 * 1000);
     }
 
     if (changes.animeData) {
@@ -2236,6 +2241,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     if (message.type === 'SYNC_PROGRESS_ONLY') {
         sendResponse({ received: true });
+        // Min-interval guard: if a successful progress sync happened in the last
+        // ~4 min, skip this immediate sync and let the next scheduled push handle it.
+        // Prevents back-to-back writes when BG debounce and CS periodic push collide.
+        const sinceLast = Date.now() - _lastProgressSyncAt;
+        if (_lastProgressSyncAt && sinceLast < 4 * 60 * 1000) {
+            return true;
+        }
         if (progressSyncDebounce) { clearTimeout(progressSyncDebounce); progressSyncDebounce = null; }
         syncProgressOnly();
         return true;

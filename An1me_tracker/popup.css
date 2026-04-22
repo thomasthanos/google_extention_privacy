@@ -62,7 +62,7 @@
 }
 
 body {
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-family: 'ComicSans', 'Inter', 'Segoe UI', system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   color: var(--t1);
@@ -605,7 +605,6 @@ body {
   font-weight: 800;
   line-height: 1;
   color: var(--cyan);
-  text-shadow: 0 0 20px rgba(79, 195, 247, 0.4), 0 0 40px rgba(79, 195, 247, 0.15);
   white-space: nowrap;
   width: 100%;
   text-align: center;
@@ -2559,6 +2558,7 @@ body {
 }
 
 .ip-title {
+  font-family: 'PROXON', 'ComicSans', sans-serif;
   font-size: 12px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.96);
@@ -3474,6 +3474,7 @@ body {
 }
 
 .season-group-name {
+  font-family: 'PROXON', 'ComicSans', sans-serif;
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -3626,6 +3627,7 @@ body {
 }
 
 .season-label {
+  font-family: 'PROXON', 'ComicSans', sans-serif;
   font-size: 12px;
   font-weight: 600;
   color: var(--t1);
@@ -3867,6 +3869,7 @@ body {
 }
 
 .movie-group-name {
+  font-family: 'PROXON', 'ComicSans', sans-serif;
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -3999,6 +4002,7 @@ body {
 }
 
 .movie-label {
+  font-family: 'PROXON', 'ComicSans', sans-serif;
   font-size: 12px;
   font-weight: 600;
   color: var(--t1);
@@ -4681,7 +4685,7 @@ body {
 
 .hm-lbl {
   fill: var(--t2);
-  font-family: Inter, system-ui, sans-serif
+  font-family: 'ComicSans', 'Inter', system-ui, sans-serif
 }
 
 .hm-cell {
@@ -4718,7 +4722,7 @@ body {
 
 .bar-lbl {
   fill: var(--t2);
-  font-family: Inter, system-ui, sans-serif
+  font-family: 'ComicSans', 'Inter', system-ui, sans-serif
 }
 
 .bar-rect {

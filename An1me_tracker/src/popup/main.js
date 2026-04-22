@@ -114,6 +114,7 @@
         }
     }
     let deferredListRefresh = null;
+    let realignCategoryTabs = () => {};
 
     // Cached markup from the last full anime-list render. When the next render
     // would produce the same markup (common: storage.onChanged fires for keys
@@ -540,6 +541,7 @@
     function showMainApp(user) {
         elements.authSection.style.display = 'none';
         elements.mainApp.style.display = 'flex';
+        realignCategoryTabs();
 
         if (user) {
             if (user.photoURL) {
@@ -1375,20 +1377,7 @@
                     elements.categoryTabs.querySelectorAll('.category-tab').forEach(t => {
                         t.classList.toggle('active', t.dataset.category === currentCategory);
                     });
-                    // Update slider position for restored category
-                    const restoredActive = elements.categoryTabs.querySelector('.category-tab.active');
-                    const tabSlider = elements.categoryTabs.querySelector('.category-tabs-slider');
-                    if (restoredActive && tabSlider) {
-                        requestAnimationFrame(() => {
-                            const cr = elements.categoryTabs.getBoundingClientRect();
-                            const tr = restoredActive.getBoundingClientRect();
-                            tabSlider.style.transition = 'none';
-                            tabSlider.style.width = tr.width + 'px';
-                            tabSlider.style.transform = `translateX(${tr.left - cr.left - 4}px)`;
-                            tabSlider.offsetHeight;
-                            tabSlider.style.transition = '';
-                        });
-                    }
+                    realignCategoryTabs();
                 }
             }
 
@@ -2862,6 +2851,7 @@
                 if (!activeTab) return;
                 const containerRect = elements.categoryTabs.getBoundingClientRect();
                 const tabRect = activeTab.getBoundingClientRect();
+                if (!containerRect.width || !tabRect.width) return;
                 const offsetX = tabRect.left - containerRect.left - 4; // 4px padding
                 slider.style.width = tabRect.width + 'px';
                 slider.style.transform = `translateX(${offsetX}px)`;
@@ -2873,6 +2863,25 @@
                     slider.style.transition = '';
                 }
             }
+
+            realignCategoryTabs = () => {
+                const activeTab = elements.categoryTabs?.querySelector('.category-tab.active');
+                if (!activeTab) return;
+
+                const attempt = (retriesLeft = 3) => {
+                    requestAnimationFrame(() => {
+                        const tabRect = activeTab.getBoundingClientRect();
+                        const containerRect = elements.categoryTabs.getBoundingClientRect();
+                        if ((!tabRect.width || !containerRect.width) && retriesLeft > 0) {
+                            attempt(retriesLeft - 1);
+                            return;
+                        }
+                        moveSlider(activeTab, true);
+                    });
+                };
+
+                attempt();
+            };
 
             // Initial position (no animation)
             const initialActive = elements.categoryTabs.querySelector('.category-tab.active');
