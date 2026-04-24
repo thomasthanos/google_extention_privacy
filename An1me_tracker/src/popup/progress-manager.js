@@ -293,14 +293,17 @@ const ProgressManager = {
     /**
      * Clean progress for tracked/completed episodes
      */
-    cleanTrackedProgress(animeData, videoProgress) {
+    cleanTrackedProgress(animeData, videoProgress, deletedAnime = {}) {
         const { UIHelpers } = window.AnimeTracker;
         const { CONFIG } = window.AnimeTracker;
         const { SeasonGrouping } = window.AnimeTracker;
+        const { removeDeletedProgress } = window.AnimeTracker.MergeUtils;
 
         if (!videoProgress || Object.keys(videoProgress).length === 0) {
             return { cleaned: videoProgress, removedCount: 0 };
         }
+
+        const baseProgress = removeDeletedProgress(videoProgress, deletedAnime);
 
         const trackedIds = new Set();
         for (const [animeSlug, anime] of Object.entries(animeData)) {
@@ -314,7 +317,7 @@ const ProgressManager = {
         const cleaned = {};
         let removedCount = 0;
 
-        for (const [id, progress] of Object.entries(videoProgress)) {
+        for (const [id, progress] of Object.entries(baseProgress)) {
             const isTracked = trackedIds.has(id);
             const isCompleted = progress.percentage >= CONFIG.COMPLETED_PERCENTAGE;
             const slugMatch = id.match(/^(.+)__episode-\d+$/);

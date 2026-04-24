@@ -1,7 +1,10 @@
 const FIREBASE_API_KEY = "AIzaSyCDF9US2OwARlyZ0AH_zDpjzmOXRtrGKMg";
 const FIREBASE_PROJECT_ID = "anime-tracker-64d86";
-const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)`;
+const FIRESTORE_DATABASE = `projects/${FIREBASE_PROJECT_ID}/databases/(default)`;
+const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/${FIRESTORE_DATABASE}`;
 const LISTEN_URL = `${FIRESTORE_BASE}/documents:listen`;
+const FIRESTORE_LISTEN_SUPPORTED = false;
+const CLOUD_POLL_INTERVAL_MS = 60000;
 
 importScripts('src/common/merge-utils.js');
 
@@ -14,6 +17,7 @@ const mergeVideoProgress = sharedMergeUtils.mergeVideoProgress || missingMergeUt
 const mergeAnimeData = sharedMergeUtils.mergeAnimeData || missingMergeUtil('mergeAnimeData');
 const mergeDeletedAnime = sharedMergeUtils.mergeDeletedAnime || missingMergeUtil('mergeDeletedAnime');
 const applyDeletedAnime = sharedMergeUtils.applyDeletedAnime || missingMergeUtil('applyDeletedAnime');
+const removeDeletedProgress = sharedMergeUtils.removeDeletedProgress || missingMergeUtil('removeDeletedProgress');
 const mergeGroupCoverImages = sharedMergeUtils.mergeGroupCoverImages || missingMergeUtil('mergeGroupCoverImages');
 const areAnimeDataMapsEqual = sharedMergeUtils.areAnimeDataMapsEqual || missingMergeUtil('areAnimeDataMapsEqual');
 const areProgressMapsEqual = sharedMergeUtils.areProgressMapsEqual || missingMergeUtil('areProgressMapsEqual');
@@ -29,8 +33,10 @@ const COMPLETED_PERCENTAGE = 85;
 const DELETED_ANIME_MAX_AGE_MS = 10 * 24 * 60 * 60 * 1000;
 const MAX_PROGRESS_ENTRIES = 200;
 
-function cleanTrackedProgressBg(animeData, videoProgress) {
+function cleanTrackedProgressBg(animeData, videoProgress, deletedAnime = {}) {
     if (!videoProgress || !animeData) return videoProgress;
+
+    const baseProgress = removeDeletedProgress(videoProgress, deletedAnime);
 
     const trackedIds = new Set();
     for (const [slug, anime] of Object.entries(animeData)) {
@@ -44,7 +50,7 @@ function cleanTrackedProgressBg(animeData, videoProgress) {
     const trackedSlugs = new Set(Object.keys(animeData));
     const now = Date.now();
     const cleaned = {};
-    for (const [id, progress] of Object.entries(videoProgress)) {
+    for (const [id, progress] of Object.entries(baseProgress)) {
         if (id === '__slugIndex') continue;
         const isTracked = trackedIds.has(id);
         const isCompleted = (progress.percentage || 0) >= COMPLETED_PERCENTAGE;
@@ -365,6 +371,8 @@ let _lastRtFailSignature = '';
 let _lastRtFailRepeatCount = 0;
 let rtStreamPermanentlyDisabled = false;
 let _lastSuccessfulStreamOpenedAt = 0;
+let _lastCloudPollAt = 0;
+let _cloudPollInFlight = null;
 
 const activeStreamConsumers = new Set();
 const IDLE_TEARDOWN_GRACE_MS = 10000;
@@ -382,6 +390,11 @@ function addStreamConsumer(id) {
         clearTimeout(_idleTeardownTimer);
         _idleTeardownTimer = null;
         ddebug(`[BG-RT] Consumer ${id} reclaimed idle window`);
+    }
+
+    if (wasEmpty && !FIRESTORE_LISTEN_SUPPORTED) {
+        pollCloudData('consumer-connected').catch(() => { });
+        return;
     }
 
     if (wasEmpty && !rtStreamPermanentlyDisabled) {
@@ -543,6 +556,33 @@ async function fetchCloudData(user, token) {
     }
 }
 
+async function pollCloudData(reason = 'poll') {
+    if (_cloudPollInFlight) return _cloudPollInFlight;
+    if ((Date.now() - _lastCloudPollAt) < CLOUD_POLL_INTERVAL_MS) return null;
+
+    _cloudPollInFlight = (async () => {
+        try {
+            const user = await getFirebaseUser();
+            const token = await getFirebaseToken();
+            if (!user || !token) return null;
+
+            _lastCloudPollAt = Date.now();
+            const cloudDoc = await fetchCloudData(user, token);
+            if (cloudDoc) {
+                await applyCloudUpdate(cloudDoc);
+            }
+            return cloudDoc;
+        } catch (e) {
+            console.warn(`[BG-RT] Poll sync failed (${reason}):`, e.message);
+            return null;
+        } finally {
+            _cloudPollInFlight = null;
+        }
+    })();
+
+    return _cloudPollInFlight;
+}
+
 let _bgCloudDocCache = null;
 let _bgCloudDocCacheTime = 0;
 const _BG_CLOUD_TTL = 5 * 60 * 1000;
@@ -580,12 +620,12 @@ async function syncProgressOnly() {
 
     progressSyncInProgress = true;
     try {
-        const result = await bgStorageGet(['videoProgress', 'animeData']);
+        const result = await bgStorageGet(['videoProgress', 'animeData', 'deletedAnime']);
         let localVP = result.videoProgress || {};
 
         if (lastPushedProgressBG && areProgressMapsEqual(localVP, lastPushedProgressBG)) return;
 
-        localVP = cleanTrackedProgressBg(result.animeData || {}, localVP);
+        localVP = cleanTrackedProgressBg(result.animeData || {}, localVP, result.deletedAnime || {});
 
         const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         const fieldMask = 'updateMask.fieldPaths=videoProgress&updateMask.fieldPaths=lastUpdated';
@@ -654,7 +694,7 @@ async function syncToFirebase() {
             ? mergeVideoProgress(localProgress, cloudDoc.videoProgress)
             : { ...localProgress };
 
-        mergedProgress = cleanTrackedProgressBg(mergedAnime, mergedProgress);
+        mergedProgress = cleanTrackedProgressBg(mergedAnime, mergedProgress, mergedDeleted);
 
         pruneDeletedAnime(mergedDeleted);
 
@@ -809,7 +849,7 @@ async function _doApplyCloudUpdate(cloudDoc) {
 
         let mergedProgress = mergeVideoProgress(local.videoProgress || {}, cloudDoc.videoProgress || {});
 
-        mergedProgress = cleanTrackedProgressBg(mergedAnime, mergedProgress);
+        mergedProgress = cleanTrackedProgressBg(mergedAnime, mergedProgress, mergedDeleted);
 
         pruneDeletedAnime(mergedDeleted);
 
@@ -842,6 +882,14 @@ async function _doApplyCloudUpdate(cloudDoc) {
 }
 
 async function startRealtimeListener() {
+    if (!FIRESTORE_LISTEN_SUPPORTED) {
+        if (!rtStreamPermanentlyDisabled) {
+            rtStreamPermanentlyDisabled = true;
+            console.warn('[BG-RT] Firestore documents:listen is not usable over plain fetch here; using polling sync instead.');
+        }
+        await pollCloudData('listen-fallback');
+        return;
+    }
     if (rtStreamPermanentlyDisabled) return;
     if (!hasStreamConsumers()) {
         ddebug('[BG-RT] No active consumers, skipping stream start');
@@ -882,7 +930,7 @@ async function startRealtimeListener() {
     }
 
     rtListenAbort = new AbortController();
-    const docPath = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${user.uid}`;
+    const docPath = `${FIRESTORE_DATABASE}/documents/users/${user.uid}`;
 
     ddebug('[BG-RT] Opening real-time stream...');
     let streamSucceeded = false;
@@ -891,16 +939,21 @@ async function startRealtimeListener() {
         const res = await fetch(`${LISTEN_URL}?key=${FIREBASE_API_KEY}`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ addTarget: { documents: { documents: [docPath] }, targetId: 1 } }),
+            body: JSON.stringify({
+                database: FIRESTORE_DATABASE,
+                addTarget: { documents: { documents: [docPath] }, targetId: 1 }
+            }),
             signal: rtListenAbort.signal
         });
 
         if (!res.ok) {
             const bodyText = await res.text().catch(() => '');
             let innerCode = 0;
+            let innerMessage = '';
             try {
                 const parsed = JSON.parse(bodyText);
                 innerCode = Number(parsed?.error?.code) || 0;
+                innerMessage = parsed?.error?.message || '';
             } catch { }
             if (res.status === 501 || innerCode === 501) {
                 rtStreamPermanentlyDisabled = true;
@@ -920,7 +973,11 @@ async function startRealtimeListener() {
             } else {
                 _lastRtFailSignature = signature;
                 _lastRtFailRepeatCount = 1;
-                console.warn(`[BG-RT] Stream open failed: HTTP ${res.status}${innerCode ? ` (inner ${innerCode})` : ''}`);
+                console.warn(
+                    `[BG-RT] Stream open failed: HTTP ${res.status}` +
+                    `${innerCode ? ` (inner ${innerCode})` : ''}` +
+                    `${innerMessage ? ` - ${innerMessage}` : ''}`
+                );
             }
             rtConsecutiveFailures++;
             if (serverError) {
@@ -2477,6 +2534,10 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     });
 
     if (!hasStreamConsumers()) return;
+    if (!FIRESTORE_LISTEN_SUPPORTED || rtStreamPermanentlyDisabled) {
+        pollCloudData('keepAlive').catch(() => { });
+        return;
+    }
     if (rtStreamPermanentlyDisabled) return;
 
     const streamDead = !rtListenAbort || rtListenAbort.signal.aborted;

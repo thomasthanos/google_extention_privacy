@@ -441,7 +441,7 @@ const FirebaseSync = {
                 finalData.deletedAnime = mergedDeletedAnime;
 
                 const { cleaned: cleanedProgress } =
-                    ProgressManager.cleanTrackedProgress(finalData.animeData, finalData.videoProgress);
+                    ProgressManager.cleanTrackedProgress(finalData.animeData, finalData.videoProgress, mergedDeletedAnime);
                 finalData.videoProgress = cleanedProgress;
 
                 finalData.groupCoverImages = mergedGroupCovers;

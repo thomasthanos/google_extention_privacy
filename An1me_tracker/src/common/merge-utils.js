@@ -291,6 +291,42 @@
 
     const TOMBSTONE_GRACE_MS = 5000;
 
+    function getProgressActivityTimestamp(progress) {
+        if (!progress || typeof progress !== 'object') return 0;
+        return Math.max(
+            toMillis(progress.savedAt),
+            toMillis(progress.watchedAt),
+            toMillis(progress.lastPlayedAt),
+            toMillis(progress.deletedAt)
+        );
+    }
+
+    function removeDeletedProgress(videoProgress, deletedAnime) {
+        if (!videoProgress || typeof videoProgress !== 'object') return {};
+
+        const cleaned = {};
+        for (const [id, progress] of Object.entries(videoProgress || {})) {
+            if (id === '__slugIndex') continue;
+
+            const slugMatch = id.match(/^(.+)__episode-\d+$/);
+            const animeSlug = slugMatch ? slugMatch[1] : '';
+            const deletedInfo = animeSlug ? deletedAnime?.[animeSlug] : null;
+            const deletedAt = toMillis(deletedInfo?.deletedAt || deletedInfo);
+
+            if (!deletedAt) {
+                cleaned[id] = progress;
+                continue;
+            }
+
+            const progressTs = getProgressActivityTimestamp(progress);
+            if (progressTs > deletedAt + TOMBSTONE_GRACE_MS) {
+                cleaned[id] = progress;
+            }
+        }
+
+        return cleaned;
+    }
+
     function mergeVideoProgress(local, cloud) {
         const merged = { ...(cloud || {}) };
 
@@ -469,6 +505,7 @@
         mergeAnimeData,
         mergeDeletedAnime,
         applyDeletedAnime,
+        removeDeletedProgress,
         mergeGroupCoverImages,
         getCoverUrl,
         getCoverSetAt,

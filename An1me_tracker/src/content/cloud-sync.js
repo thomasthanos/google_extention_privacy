@@ -5,6 +5,8 @@
     const FIREBASE_PROJECT_ID = 'anime-tracker-64d86';
     const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)`;
     const LISTEN_URL = `${FIRESTORE_BASE}/documents:listen`;
+    const FIRESTORE_LISTEN_SUPPORTED = false;
+    const CLOUD_POLL_INTERVAL_MS = 60000;
 
     const Logger = window.AnimeTrackerContent?.Logger;
 
@@ -16,6 +18,8 @@
     let currentUser = null;
     let reconnectDelay = 5000;
     const MAX_RECONNECT = 60000;
+    let lastCloudPollAt = 0;
+    let pollInFlight = null;
     let teardownSyncTriggered = false;
 
     let csSyncPausedUntil = 0;
@@ -145,6 +149,7 @@
         mergeVideoProgress,
         mergeDeletedAnime,
         applyDeletedAnime,
+        removeDeletedProgress,
         mergeGroupCoverImages,
         areAnimeDataMapsEqual,
         areProgressMapsEqual,
@@ -196,8 +201,41 @@
         }
     }
 
-    function filterTrackedFromProgress(videoProgress, animeData) {
+    async function pollCloudDoc(token, user, reason = 'poll') {
+        if (pollInFlight) return pollInFlight;
+        if ((Date.now() - lastCloudPollAt) < CLOUD_POLL_INTERVAL_MS) return null;
+
+        pollInFlight = (async () => {
+            try {
+                lastCloudPollAt = Date.now();
+                const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
+                const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+                if (!response.ok) {
+                    Logger?.warn(`Cloud poll failed (${reason}): ${response.status}`);
+                    return null;
+                }
+
+                const cloudDoc = fromFSDoc(await response.json());
+                _cloudDocCache = cloudDoc;
+                _cloudDocCacheTime = Date.now();
+                if (cloudDoc) {
+                    await applyCloudUpdate(cloudDoc);
+                }
+                return cloudDoc;
+            } catch (e) {
+                Logger?.warn(`Cloud poll error (${reason}): ${e.message}`);
+                return null;
+            } finally {
+                pollInFlight = null;
+            }
+        })();
+
+        return pollInFlight;
+    }
+
+    function filterTrackedFromProgress(videoProgress, animeData, deletedAnime = {}) {
         if (!videoProgress || !animeData) return videoProgress || {};
+        const baseProgress = removeDeletedProgress(videoProgress, deletedAnime);
         const trackedIds = new Set();
         for (const [slug, anime] of Object.entries(animeData)) {
             if (anime?.episodes) {
@@ -205,7 +243,7 @@
             }
         }
         const out = {};
-        for (const [id, p] of Object.entries(videoProgress)) {
+        for (const [id, p] of Object.entries(baseProgress)) {
             if (id === '__slugIndex') continue;
             if (trackedIds.has(id)) continue;
             if (p?.deleted) continue;
@@ -214,8 +252,9 @@
         return out;
     }
 
-    function cleanMergedProgress(videoProgress, animeData) {
+    function cleanMergedProgress(videoProgress, animeData, deletedAnime = {}) {
         if (!videoProgress || typeof videoProgress !== 'object') return {};
+        const baseProgress = removeDeletedProgress(videoProgress, deletedAnime);
 
         const trackedIds = new Set();
         for (const [slug, anime] of Object.entries(animeData || {})) {
@@ -229,7 +268,7 @@
         const completedPct = window.AnimeTrackerContent?.CONFIG?.COMPLETED_PERCENTAGE || 85;
         const cleaned = {};
 
-        for (const [id, progress] of Object.entries(videoProgress)) {
+        for (const [id, progress] of Object.entries(baseProgress)) {
             if (!progress || progress.deleted) continue;
             if (trackedIds.has(id)) continue;
             if ((Number(progress.percentage) || 0) >= completedPct) continue;
@@ -251,9 +290,13 @@
         isPushingProgressDirect = true;
 
         try {
-            const localSnapshot = await chrome.storage.local.get(['videoProgress', 'animeData']);
+            const localSnapshot = await chrome.storage.local.get(['videoProgress', 'animeData', 'deletedAnime']);
             const localAnimeData = localSnapshot.animeData || {};
-            const filteredLocalVP = filterTrackedFromProgress(localSnapshot.videoProgress || {}, localAnimeData);
+            const filteredLocalVP = filterTrackedFromProgress(
+                localSnapshot.videoProgress || {},
+                localAnimeData,
+                localSnapshot.deletedAnime || {}
+            );
             const snapshot = JSON.stringify(filteredLocalVP);
             if (snapshot === lastPushedProgress) return;
 
@@ -612,7 +655,8 @@
 
             const mergedProgress = cleanMergedProgress(
                 mergeVideoProgress(local.videoProgress || {}, cloudDoc.videoProgress || {}),
-                mergedAnime
+                mergedAnime,
+                mergedDeleted
             );
 
             const localGroupCovers = local.groupCoverImages || {};
@@ -659,6 +703,16 @@
 
         currentToken = token;
         currentUser = user;
+
+        if (!FIRESTORE_LISTEN_SUPPORTED) {
+            try {
+                await pollCloudDoc(token, user, 'listen-fallback');
+            } finally {
+                startListeningInFlight = false;
+            }
+            scheduleReconnect(CLOUD_POLL_INTERVAL_MS);
+            return;
+        }
 
         const docPath = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${user.uid}`;
         let tokenRefreshInterval = null;

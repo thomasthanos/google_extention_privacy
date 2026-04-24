@@ -1263,7 +1263,7 @@
             const localVideoProgress = all.videoProgress || {};
             const localDeletedAnime = all.deletedAnime || {};
 
-            const { cleaned } = ProgressManager.cleanTrackedProgress(localAnimeData, localVideoProgress);
+            const { cleaned } = ProgressManager.cleanTrackedProgress(localAnimeData, localVideoProgress, localDeletedAnime);
             const sortedProgress = Object.entries(cleaned).sort((a, b) => {
                 const aTs = new Date(a[1]?.savedAt || a[1]?.watchedAt || 0).getTime() || 0;
                 const bTs = new Date(b[1]?.savedAt || b[1]?.watchedAt || 0).getTime() || 0;
@@ -1308,7 +1308,7 @@
             const repairedData = ProgressManager.removeDuplicateEpisodes(withoutAutoRepaired.cleanedData);
             const rawProgressForDurations = videoProgress || {};
             const { cleaned: cleanedProgress, removedCount: progressRemoved } =
-                ProgressManager.cleanTrackedProgress(repairedData, videoProgress);
+                ProgressManager.cleanTrackedProgress(repairedData, videoProgress, normalized.deletedAnime || result.deletedAnime || {});
 
             const originalCount = UIHelpers.countEpisodes(result.animeData || {});
             const cleanedCount = UIHelpers.countEpisodes(repairedData);
@@ -1404,7 +1404,7 @@
                 const repairedData = ProgressManager.removeDuplicateEpisodes(withoutAutoRepaired.cleanedData);
                 const rawProgressForDurations = normalized.videoProgress || {};
                 const { cleaned: cleanedProgress, removedCount: progressRemoved } =
-                    ProgressManager.cleanTrackedProgress(repairedData, rawProgressForDurations);
+                    ProgressManager.cleanTrackedProgress(repairedData, rawProgressForDurations, normalized.deletedAnime || data.deletedAnime || {});
                 const durationFix = shouldRunMaintenance('normalizeMovieDurations_postSync')
                     ? normalizeMovieDurations(repairedData, rawProgressForDurations)
                     : { changed: false };
@@ -3191,7 +3191,7 @@
 
                 // Clean tracked/completed videoProgress entries
                 if (raw.videoProgress && raw.animeData) {
-                    const { cleaned, removedCount } = ProgressManager.cleanTrackedProgress(raw.animeData, raw.videoProgress);
+                    const { cleaned, removedCount } = ProgressManager.cleanTrackedProgress(raw.animeData, raw.videoProgress, raw.deletedAnime || {});
                     if (removedCount > 0) {
                         raw.videoProgress = cleaned;
                         dirty = true;
