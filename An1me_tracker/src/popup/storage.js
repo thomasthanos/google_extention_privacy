@@ -21,6 +21,12 @@ const STORAGE_EPISODE_OFFSET_MAPPING = {
 
 const LEGACY_SYNC_KEYS = new Set(['animeData', 'trackedEpisodes', 'videoProgress']);
 
+function hasStoredValue(value) {
+    if (value === undefined || value === null) return false;
+    if (typeof value !== 'object') return true;
+    return Object.keys(value).length > 0;
+}
+
 function decodeHtmlEntities(value) {
     if (typeof value !== 'string' || !value.includes('&')) return value;
 
@@ -57,16 +63,12 @@ const Storage = {
                 // Only skip the sync fallback when ALL requested keys are present locally.
                 // If even one key is missing, check sync storage so we don't silently drop
                 // data that was written there (e.g. during cross-key migration).
-                const hasLocalData = requestedKeys.every(key => localResult[key] !== undefined &&
-                    (typeof localResult[key] !== 'object' || Object.keys(localResult[key]).length > 0));
+                const hasLocalData = requestedKeys.every((key) => hasStoredValue(localResult[key]));
 
                 if (hasLocalData || legacySyncKeys.length === 0) {
                     resolve(localResult);
                 } else {
-                    const missingLegacyKeys = legacySyncKeys.filter((key) =>
-                        localResult[key] === undefined ||
-                        (typeof localResult[key] === 'object' && localResult[key] && Object.keys(localResult[key]).length === 0)
-                    );
+                    const missingLegacyKeys = legacySyncKeys.filter((key) => !hasStoredValue(localResult[key]));
 
                     if (missingLegacyKeys.length === 0) {
                         resolve(localResult);
@@ -79,8 +81,7 @@ const Storage = {
                             return;
                         }
 
-                        const hasSyncData = missingLegacyKeys.some(key => syncResult[key] !== undefined &&
-                            (typeof syncResult[key] !== 'object' || Object.keys(syncResult[key]).length > 0));
+                        const hasSyncData = missingLegacyKeys.some((key) => hasStoredValue(syncResult[key]));
 
                         if (hasSyncData) {
                             console.log('[Storage] Migrating from sync to local');

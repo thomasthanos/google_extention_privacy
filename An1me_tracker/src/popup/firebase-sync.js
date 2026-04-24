@@ -425,6 +425,7 @@ const FirebaseSync = {
                 finalData.videoProgress = normalized.videoProgress || {};
                 mergedDeletedAnime = normalized.deletedAnime || {};
 
+                mergedDeletedAnime = AnimeTracker.MergeUtils.pruneStaleDeletedAnime(finalData.animeData, mergedDeletedAnime);
                 AnimeTracker.MergeUtils.applyDeletedAnime(finalData.animeData, mergedDeletedAnime);
 
                 // Prune deletedAnime entries older than 30 days

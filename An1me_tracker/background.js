@@ -16,6 +16,7 @@ const missingMergeUtil = (name) => () => {
 const mergeVideoProgress = sharedMergeUtils.mergeVideoProgress || missingMergeUtil('mergeVideoProgress');
 const mergeAnimeData = sharedMergeUtils.mergeAnimeData || missingMergeUtil('mergeAnimeData');
 const mergeDeletedAnime = sharedMergeUtils.mergeDeletedAnime || missingMergeUtil('mergeDeletedAnime');
+const pruneStaleDeletedAnime = sharedMergeUtils.pruneStaleDeletedAnime || missingMergeUtil('pruneStaleDeletedAnime');
 const applyDeletedAnime = sharedMergeUtils.applyDeletedAnime || missingMergeUtil('applyDeletedAnime');
 const removeDeletedProgress = sharedMergeUtils.removeDeletedProgress || missingMergeUtil('removeDeletedProgress');
 const mergeGroupCoverImages = sharedMergeUtils.mergeGroupCoverImages || missingMergeUtil('mergeGroupCoverImages');
@@ -680,7 +681,7 @@ async function syncToFirebase() {
         const localDeleted = result.deletedAnime || {};
         const localGroup = result.groupCoverImages || {};
 
-        const mergedDeleted = cloudDoc?.deletedAnime
+        let mergedDeleted = cloudDoc?.deletedAnime
             ? mergeDeletedAnime(localDeleted, cloudDoc.deletedAnime)
             : localDeleted;
 
@@ -688,6 +689,7 @@ async function syncToFirebase() {
             ? mergeAnimeData(localAnime, cloudDoc.animeData)
             : { ...localAnime };
 
+        mergedDeleted = pruneStaleDeletedAnime(mergedAnime, mergedDeleted);
         applyDeletedAnime(mergedAnime, mergedDeleted);
 
         let mergedProgress = cloudDoc?.videoProgress
@@ -840,11 +842,12 @@ async function _doApplyCloudUpdate(cloudDoc) {
     try {
         const local = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
 
-        const mergedDeleted = cloudDoc.deletedAnime
+        let mergedDeleted = cloudDoc.deletedAnime
             ? mergeDeletedAnime(local.deletedAnime || {}, cloudDoc.deletedAnime)
             : (local.deletedAnime || {});
 
         let mergedAnime = mergeAnimeData(local.animeData || {}, cloudDoc.animeData || {});
+        mergedDeleted = pruneStaleDeletedAnime(mergedAnime, mergedDeleted);
         applyDeletedAnime(mergedAnime, mergedDeleted);
 
         let mergedProgress = mergeVideoProgress(local.videoProgress || {}, cloudDoc.videoProgress || {});

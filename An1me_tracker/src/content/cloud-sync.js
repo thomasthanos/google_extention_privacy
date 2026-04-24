@@ -148,6 +148,7 @@
         mergeAnimeData,
         mergeVideoProgress,
         mergeDeletedAnime,
+        pruneStaleDeletedAnime,
         applyDeletedAnime,
         removeDeletedProgress,
         mergeGroupCoverImages,
@@ -406,7 +407,7 @@
                 fullPushPending = true;
             }
 
-            const mergedDeleted = cloudData?.deletedAnime
+            let mergedDeleted = cloudData?.deletedAnime
                 ? mergeDeletedAnime(local.deletedAnime || {}, cloudData.deletedAnime)
                 : (local.deletedAnime || {});
 
@@ -414,6 +415,7 @@
                 ? mergeAnimeData(local.animeData || {}, cloudData.animeData)
                 : { ...(local.animeData || {}) };
 
+            mergedDeleted = pruneStaleDeletedAnime(mergedAnime, mergedDeleted);
             applyDeletedAnime(mergedAnime, mergedDeleted);
 
             const mergedProgress = cloudData?.videoProgress
@@ -645,12 +647,13 @@
         try {
             const local = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
 
-            const mergedDeleted = cloudDoc.deletedAnime
+            let mergedDeleted = cloudDoc.deletedAnime
                 ? mergeDeletedAnime(local.deletedAnime || {}, cloudDoc.deletedAnime)
                 : (local.deletedAnime || {});
 
             const mergedAnime = mergeAnimeData(local.animeData || {}, cloudDoc.animeData || {});
 
+            mergedDeleted = pruneStaleDeletedAnime(mergedAnime, mergedDeleted);
             applyDeletedAnime(mergedAnime, mergedDeleted);
 
             const mergedProgress = cleanMergedProgress(

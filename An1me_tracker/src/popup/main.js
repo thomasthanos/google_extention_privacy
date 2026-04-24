@@ -115,6 +115,8 @@
     }
     let deferredListRefresh = null;
     let realignCategoryTabs = () => {};
+    const POPUP_CLOUD_REFRESH_MS = 60000;
+    let popupCloudRefreshTimer = null;
 
     // Cached markup from the last full anime-list render. When the next render
     // would produce the same markup (common: storage.onChanged fires for keys
@@ -1459,6 +1461,32 @@
         } finally {
             loadAndSyncInProgress = false;
         }
+    }
+
+    async function refreshPopupCloudData(forceFresh = false) {
+        if (!AT?.FirebaseSync?.getUser?.()) return;
+        if (forceFresh) {
+            try { AT.FirebaseSync.clearCachedUserDocument(); } catch {}
+        }
+        await loadAndSyncData();
+    }
+
+    function stopPopupCloudRefresh() {
+        if (popupCloudRefreshTimer) {
+            clearInterval(popupCloudRefreshTimer);
+            popupCloudRefreshTimer = null;
+        }
+    }
+
+    function startPopupCloudRefresh() {
+        stopPopupCloudRefresh();
+        if (document.hidden || !AT?.FirebaseSync?.getUser?.()) return;
+
+        popupCloudRefreshTimer = setInterval(() => {
+            refreshPopupCloudData(true).catch((error) => {
+                PopupLogger.debug('Sync', 'Background popup refresh skipped:', error?.message || error);
+            });
+        }, POPUP_CLOUD_REFRESH_MS);
     }
 
     async function deleteProgress(slug, episodeNumber) {
@@ -3230,13 +3258,17 @@
                 // send a lightweight ping instead of SYNC_TO_FIREBASE to avoid
                 // a duplicate full sync (popup handles sync via loadAndSyncData).
                 try { chrome.runtime.sendMessage({ type: 'GET_VERSION' }); } catch {}
-                await loadAndSyncData();
+                await refreshPopupCloudData(true);
+                startPopupCloudRefresh();
                 if (pendingAutoRepairAfterSignIn) {
                     pendingAutoRepairAfterSignIn = false;
                     await fetchAllFillers({ autoStart: true });
                 }
             },
-            onUserSignedOut: () => showAuthScreen(),
+            onUserSignedOut: () => {
+                stopPopupCloudRefresh();
+                showAuthScreen();
+            },
             onError: () => { showMainApp(null); loadData(); }
         });
     }
@@ -3296,9 +3328,21 @@
     // _ipPatch is called from the main storage.onChanged listener (initEventListeners)
     // to avoid registering duplicate listeners. Exposed here for access.
 
-    window.addEventListener('beforeunload', () => { AT.FirebaseSync.cleanup(); });
+    window.addEventListener('beforeunload', () => {
+        stopPopupCloudRefresh();
+        AT.FirebaseSync.cleanup();
+    });
     document.addEventListener('visibilitychange', () => {
-        if (document.hidden) { AT.FirebaseSync.cleanup(); }
+        if (document.hidden) {
+            stopPopupCloudRefresh();
+            AT.FirebaseSync.cleanup();
+            return;
+        }
+
+        startPopupCloudRefresh();
+        refreshPopupCloudData(true).catch((error) => {
+            PopupLogger.debug('Sync', 'Visibility refresh skipped:', error?.message || error);
+        });
     });
 
     init();

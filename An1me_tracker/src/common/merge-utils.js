@@ -455,6 +455,22 @@
         return merged;
     }
 
+    function pruneStaleDeletedAnime(animeData, deletedAnime) {
+        const pruned = { ...(deletedAnime || {}) };
+
+        for (const [slug, info] of Object.entries(pruned)) {
+            const deletedAt = toMillis(info?.deletedAt || info);
+            if (!deletedAt) continue;
+
+            const activityTs = getAnimeActivityTimestamp(animeData?.[slug]);
+            if (activityTs > deletedAt + TOMBSTONE_GRACE_MS) {
+                delete pruned[slug];
+            }
+        }
+
+        return pruned;
+    }
+
     function applyDeletedAnime(animeData, deletedAnime) {
         for (const [slug, info] of Object.entries(deletedAnime || {})) {
             if (!animeData[slug]) continue;
@@ -504,6 +520,7 @@
         mergeVideoProgress,
         mergeAnimeData,
         mergeDeletedAnime,
+        pruneStaleDeletedAnime,
         applyDeletedAnime,
         removeDeletedProgress,
         mergeGroupCoverImages,
