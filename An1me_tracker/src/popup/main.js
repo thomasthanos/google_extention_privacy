@@ -16,7 +16,13 @@
     let currentCategory = 'all'; // 'all', 'series', 'movies'
     let currentCompactStatus = 'airing'; // 'airing', 'on_hold', 'completed', 'dropped'
     let currentCompactStatusOpen = false;
+    let goalSettings = null;
+    let badgeState = {};
+    let lastBadgeSnapshot = [];
+    let currentViewMode = null;
     const COPY_GUARD_STORAGE_KEY = 'copyGuardEnabled';
+    const GOAL_SETTINGS_KEY = 'goalSettings';
+    const BADGE_STATE_KEY = 'badgeUnlocks';
 
     // DOM Elements
     const elements = {
@@ -39,6 +45,9 @@
         settingsDataToolsToggle: document.getElementById('settingsDataToolsToggle'),
         settingsDataToolsContent: document.getElementById('settingsDataToolsContent'),
         settingsClear: document.getElementById('settingsClear'),
+        settingsExportData: document.getElementById('settingsExportData'),
+        settingsImportData: document.getElementById('settingsImportData'),
+        settingsImportFile: document.getElementById('settingsImportFile'),
         settingsSignOut: document.getElementById('settingsSignOut'),
         // Main
         animeList: document.getElementById('animeList'),
@@ -351,9 +360,12 @@
         const target = new Date(isoString);
         if (isNaN(target.getTime())) return 0;
         const now = new Date();
-        const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const targetMidnight = new Date(target.getFullYear(), target.getMonth(), target.getDate());
-        return Math.round((nowMidnight - targetMidnight) / (1000 * 60 * 60 * 24));
+        // Use UTC midnight to avoid DST drift: the day-clock shifts by 1h
+        // twice a year and a plain `(midnightA - midnightB) / 86400000`
+        // would round to ±1 day on those days. UTC has fixed-length days.
+        const nowUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+        const targetUtc = Date.UTC(target.getFullYear(), target.getMonth(), target.getDate());
+        return Math.round((nowUtc - targetUtc) / 86400000);
     }
 
     /**
@@ -483,7 +495,8 @@
                 const hasBetterProgressDuration =
                     progressDuration >= MIN_RELIABLE_DURATION_SECONDS &&
                     progressDuration <= MAX_RELIABLE_DURATION_SECONDS;
-                const isLegacyDuration = currentDuration === 1440 || currentDuration === 6000 || currentDuration === 7200;
+                const isLegacyDuration = window.AnimeTrackerMergeUtils?.PLACEHOLDER_DURATION_VALUES?.includes(currentDuration)
+                    ?? (currentDuration === 1440 || currentDuration === 6000 || currentDuration === 7200);
                 const isUnknownDuration = currentDuration <= 0;
                 const isVideoMeasured = ep?.durationSource === 'video';
 
@@ -662,18 +675,26 @@
 
         elements.emptyState.classList.remove('visible');
 
-        // Precompute latest-activity timestamps once (O(N+M)) before sorting.
+        // Precompute latest-activity timestamps once. Previous version was
+        // O(N × M) — re-iterated the full videoProgress map per anime.
+        // Now: walk videoProgress once, bucket by slug, then merge with
+        // anime.lastWatched in O(N + M).
+        const progressLatestBySlug = new Map();
+        for (const [id, progress] of Object.entries(videoProgress)) {
+            if (!id || id === '__slugIndex' || progress?.deleted) continue;
+            const sepIdx = id.indexOf('__episode-');
+            if (sepIdx === -1) continue;
+            const slug = id.slice(0, sepIdx);
+            const t = progress?.savedAt ? new Date(progress.savedAt).getTime() : 0;
+            if (!t) continue;
+            const cur = progressLatestBySlug.get(slug) || 0;
+            if (t > cur) progressLatestBySlug.set(slug, t);
+        }
         const latestMap = new Map();
         for (const [slug, anime] of entries) {
-            let latest = new Date(anime.lastWatched || 0).getTime();
-            const prefix = slug + '__';
-            for (const [id, progress] of Object.entries(videoProgress)) {
-                if (id.startsWith(prefix) && !progress.deleted) {
-                    const t = progress.savedAt ? new Date(progress.savedAt).getTime() : 0;
-                    if (t > latest) latest = t;
-                }
-            }
-            latestMap.set(slug, latest);
+            const lastWatchedTs = anime.lastWatched ? new Date(anime.lastWatched).getTime() : 0;
+            const progressTs = progressLatestBySlug.get(slug) || 0;
+            latestMap.set(slug, Math.max(lastWatchedTs || 0, progressTs));
         }
 
         // Sort all entries according to the active sort mode
@@ -960,6 +981,149 @@
         });
     }
 
+    // ─── Export / Import library backup ────────────────────────────────
+    // Format v1: { version, exportedAt, animeData, videoProgress, deletedAnime,
+    //              groupCoverImages, goalSettings, badgeUnlocks }. Stable so
+    // future versions can be migrated forward instead of rejected.
+    const BACKUP_FORMAT_VERSION = 1;
+
+    async function exportLibraryToJson() {
+        const { Storage } = AT;
+        const snapshot = await Storage.get([
+            'animeData', 'videoProgress', 'deletedAnime',
+            'groupCoverImages', 'goalSettings', 'badgeUnlocks'
+        ]);
+
+        const payload = {
+            version: BACKUP_FORMAT_VERSION,
+            exportedAt: new Date().toISOString(),
+            extensionVersion: chrome.runtime?.getManifest?.()?.version || null,
+            animeData: snapshot.animeData || {},
+            videoProgress: snapshot.videoProgress || {},
+            deletedAnime: snapshot.deletedAnime || {},
+            groupCoverImages: snapshot.groupCoverImages || {},
+            goalSettings: snapshot.goalSettings || null,
+            badgeUnlocks: snapshot.badgeUnlocks || {}
+        };
+
+        const json = JSON.stringify(payload, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace(/T.*/, '');
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `an1me-tracker-backup-${stamp}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        // Revoke after a tick so the download has time to start.
+        setTimeout(() => { try { URL.revokeObjectURL(url); } catch {} }, 1500);
+
+        const animeCount = Object.keys(payload.animeData).length;
+        AT.UIHelpers?.showToast?.(`Exported ${animeCount} anime`, { type: 'success' });
+    }
+
+    async function importLibraryFromFile(file) {
+        const { Storage, FirebaseSync, ProgressManager } = AT;
+        const Merge = window.AnimeTrackerMergeUtils;
+        if (!Merge?.mergeAnimeData) throw new Error('Merge utils unavailable');
+
+        const text = await file.text();
+        let parsed;
+        try {
+            parsed = JSON.parse(text);
+        } catch {
+            throw new Error('Invalid JSON file');
+        }
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            throw new Error('Backup file is malformed');
+        }
+        // Tolerant: animeData is the only field we strictly require to merge anything.
+        if (!parsed.animeData || typeof parsed.animeData !== 'object') {
+            throw new Error('Backup is missing animeData');
+        }
+
+        const incomingCount = Object.keys(parsed.animeData).length;
+        const ok = await showInlineConfirm({
+            title: 'Import library backup?',
+            body: `This will MERGE ${incomingCount} anime into your library. Local changes are preserved on conflicts (most-recent wins).`,
+            confirmLabel: 'Import',
+            cancelLabel: 'Cancel',
+            danger: false
+        });
+        if (!ok) return;
+
+        const local = await Storage.get([
+            'animeData', 'videoProgress', 'deletedAnime',
+            'groupCoverImages', 'goalSettings', 'badgeUnlocks'
+        ]);
+
+        // Merge with the same primitives we use for cloud sync — safe handling
+        // of timestamps, deleted tombstones, episode dedupe, etc.
+        let mergedAnime = Merge.mergeAnimeData(local.animeData || {}, parsed.animeData || {});
+        let mergedDeleted = Merge.mergeDeletedAnime(local.deletedAnime || {}, parsed.deletedAnime || {});
+        mergedDeleted = Merge.pruneStaleDeletedAnime(mergedAnime, mergedDeleted);
+        Merge.applyDeletedAnime(mergedAnime, mergedDeleted);
+
+        let mergedProgress = Merge.mergeVideoProgress(local.videoProgress || {}, parsed.videoProgress || {});
+        const mergedGroup = Merge.mergeGroupCoverImages(local.groupCoverImages || {}, parsed.groupCoverImages || {});
+        const mergedGoals = Merge.mergeGoalSettings
+            ? Merge.mergeGoalSettings(local.goalSettings || null, parsed.goalSettings || null)
+            : (parsed.goalSettings || local.goalSettings || null);
+        const mergedBadges = Merge.mergeBadgeUnlocks
+            ? Merge.mergeBadgeUnlocks(local.badgeUnlocks || {}, parsed.badgeUnlocks || {})
+            : { ...(local.badgeUnlocks || {}), ...(parsed.badgeUnlocks || {}) };
+
+        // Run the same post-merge cleanup pass we use on load.
+        if (ProgressManager?.removeDuplicateEpisodes) {
+            mergedAnime = ProgressManager.removeDuplicateEpisodes(mergedAnime);
+        }
+
+        const payload = {
+            animeData: mergedAnime,
+            videoProgress: mergedProgress,
+            deletedAnime: mergedDeleted,
+            groupCoverImages: mergedGroup,
+            goalSettings: mergedGoals,
+            badgeUnlocks: mergedBadges
+        };
+        markInternalSave(payload);
+        await Storage.set(payload);
+
+        // Update in-memory copies so the next render is correct without a reload.
+        animeData = mergedAnime;
+        videoProgress = mergedProgress;
+        if (mergedGoals) goalSettings = mergedGoals;
+        badgeState = mergedBadges;
+        try { window.AnimeTracker.groupCoverImages = mergedGroup; } catch {}
+
+        renderAnimeList(elements.searchInput?.value || '');
+        await updateStats();
+
+        // Push merged data to cloud if logged in so the import is reflected
+        // across devices, not just this one.
+        const user = FirebaseSync?.getUser?.();
+        if (user) {
+            try {
+                await FirebaseSync.saveToCloud({
+                    animeData: mergedAnime,
+                    videoProgress: mergedProgress,
+                    deletedAnime: mergedDeleted,
+                    groupCoverImages: mergedGroup,
+                    goalSettings: mergedGoals,
+                    badgeUnlocks: mergedBadges
+                }, true);
+            } catch (err) {
+                PopupLogger.warn('Import', 'Cloud push failed (local merge already saved):', err);
+            }
+        }
+
+        AT.UIHelpers?.showToast?.(`Imported ${incomingCount} anime`, {
+            type: 'success', duration: 2600
+        });
+    }
+
     /**
      * Setup card event listeners
      */
@@ -1008,10 +1172,21 @@
                 const toggleCard = (e) => {
                     if (e.target.closest('.anime-card-actions') || e.target.closest('.anime-header-actions') || e.target.closest('.anime-fetch-filler')) return;
                     e.stopPropagation();
-                    card.classList.toggle('expanded');
+                    const wasExpanded = card.classList.toggle('expanded');
+                    card.setAttribute('aria-expanded', wasExpanded ? 'true' : 'false');
                 };
                 header.addEventListener('click', toggleCard);
             }
+            // Keyboard activation: Enter / Space toggle expansion when the
+            // card itself (not a child button) is focused. Skip when focus is
+            // inside an interactive child so we don't double-trigger.
+            card.addEventListener('keydown', (e) => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                if (e.target !== card) return;
+                e.preventDefault();
+                const wasExpanded = card.classList.toggle('expanded');
+                card.setAttribute('aria-expanded', wasExpanded ? 'true' : 'false');
+            });
         });
 
         elements.animeList.querySelectorAll('.anime-season-group').forEach(group => {
@@ -1165,6 +1340,140 @@
             });
         } catch (e) {
             PopupLogger.error('Stats', 'Failed to cache stats:', e);
+        }
+    }
+
+    async function loadGoalAndBadgeState() {
+        try {
+            const result = await chrome.storage.local.get([GOAL_SETTINGS_KEY, BADGE_STATE_KEY]);
+            const AchievementsEngine = window.AnimeTracker?.AchievementsEngine;
+            const defaults = AchievementsEngine?.getDefaultGoalSettings?.() || {
+                daily:   { targetMinutes: 60, updatedAt: null },
+                weekly:  { targetEpisodes: 5, updatedAt: null },
+                monthly: { targetEpisodes: 20, updatedAt: null }
+            };
+            const stored = result[GOAL_SETTINGS_KEY] || {};
+            goalSettings = {
+                daily:   { ...defaults.daily,   ...(stored.daily   || {}) },
+                weekly:  { ...defaults.weekly,  ...(stored.weekly  || {}) },
+                monthly: { ...defaults.monthly, ...(stored.monthly || {}) }
+            };
+            badgeState = result[BADGE_STATE_KEY] || {};
+        } catch (e) {
+            PopupLogger.warn('Goals', 'Failed to load goal/badge state:', e);
+            goalSettings = null;
+            badgeState = {};
+        }
+    }
+
+    async function persistBadgeUnlocks(newlyUnlocked) {
+        if (!Array.isArray(newlyUnlocked) || newlyUnlocked.length === 0) return;
+        const nowIso = new Date().toISOString();
+        const next = { ...(badgeState || {}) };
+        for (const badge of newlyUnlocked) {
+            if (!next[badge.id]) {
+                next[badge.id] = { unlockedAt: nowIso, notified: false };
+            }
+        }
+        badgeState = next;
+        try {
+            await chrome.storage.local.set({ [BADGE_STATE_KEY]: next });
+        } catch (e) {
+            PopupLogger.warn('Goals', 'Failed to persist badge unlocks:', e);
+        }
+
+        if (newlyUnlocked.length > 3) {
+            try {
+                chrome.runtime.sendMessage({
+                    type: 'BADGES_UNLOCKED_BATCH',
+                    count: newlyUnlocked.length
+                }, () => { if (chrome.runtime.lastError) { } });
+            } catch { }
+        } else {
+            for (const badge of newlyUnlocked) {
+                try {
+                    chrome.runtime.sendMessage({
+                        type: 'BADGE_UNLOCKED',
+                        id: badge.id,
+                        title: badge.title,
+                        desc: badge.desc,
+                        icon: badge.icon
+                    }, () => { if (chrome.runtime.lastError) { } });
+                } catch { }
+            }
+        }
+    }
+
+    function setViewMode(mode) {
+        const appRoot = document.querySelector('.app');
+        const statsView = document.getElementById('statsView');
+        const goalsView = document.getElementById('goalsView');
+        const viewStatsBtn = document.getElementById('viewStatsBtn');
+        const viewGoalsBtn = document.getElementById('viewGoalsBtn');
+
+        currentViewMode = mode || null;
+
+        if (appRoot) {
+            appRoot.classList.toggle('stats-mode', mode === 'stats');
+            appRoot.classList.toggle('goals-mode', mode === 'goals');
+        }
+        if (viewStatsBtn) {
+            viewStatsBtn.classList.toggle('is-active', mode === 'stats');
+            viewStatsBtn.setAttribute('aria-pressed', mode === 'stats' ? 'true' : 'false');
+        }
+        if (viewGoalsBtn) {
+            viewGoalsBtn.classList.toggle('is-active', mode === 'goals');
+            viewGoalsBtn.setAttribute('aria-pressed', mode === 'goals' ? 'true' : 'false');
+        }
+
+        if (mode === 'stats' && statsView) {
+            statsView.removeAttribute('hidden');
+            try {
+                window.AnimeTracker?.StatsView?.render(statsView, animeData);
+            } catch (e) {
+                console.error('[StatsView] render failed:', e);
+                statsView.textContent = 'Stats unavailable.';
+            }
+        } else if (mode === 'goals') {
+            if (goalsView) goalsView.removeAttribute('hidden');
+            renderGoalsView();
+        }
+    }
+
+    function renderGoalsView() {
+        const container = document.getElementById('goalsView');
+        if (!container) return;
+        container.removeAttribute('hidden');
+
+        const StatsEngine = window.AnimeTracker?.StatsEngine;
+        const AchievementsEngine = window.AnimeTracker?.AchievementsEngine;
+        const GoalsView = window.AnimeTracker?.GoalsView;
+        if (!StatsEngine || !AchievementsEngine || !GoalsView) {
+            container.textContent = 'Goals engine not loaded.';
+            return;
+        }
+
+        try {
+            const index = StatsEngine.buildWatchIndex(animeData);
+            const hourIndex = AchievementsEngine.buildHourIndex(animeData);
+            GoalsView.render(container, {
+                animeData,
+                index,
+                hourIndex,
+                goalSettings,
+                badgeState,
+                onGoalsChanged: (next) => { goalSettings = next; }
+            });
+
+            const nextSnapshot = GoalsView.getLastBadgeEvaluation();
+            const newlyUnlocked = AchievementsEngine.diffUnlocks(lastBadgeSnapshot, nextSnapshot);
+            lastBadgeSnapshot = nextSnapshot;
+            if (newlyUnlocked.length > 0) {
+                persistBadgeUnlocks(newlyUnlocked);
+            }
+        } catch (e) {
+            PopupLogger.error('Goals', 'render failed:', e);
+            container.textContent = 'Goals unavailable.';
         }
     }
 
@@ -1347,6 +1656,7 @@
 
             renderAnimeList();
             await updateStats();
+            await loadGoalAndBadgeState();
 
             const repairState = await syncMetadataRepairStateFromStorage({ autoOpenRunning: true });
             const repairRunning = repairState?.status === 'running';
@@ -1436,6 +1746,7 @@
 
                 renderAnimeList(elements.searchInput?.value || '');
                 await updateStats();
+                await loadGoalAndBadgeState();
 
                 const repairState = await syncMetadataRepairStateFromStorage({ autoOpenRunning: true });
                 const repairRunning = repairState?.status === 'running';
@@ -1542,9 +1853,70 @@
     // Tracks slugs whose delete is currently in flight to block double-click races.
     const _deletingSlugs = new Set();
 
+    // Lightweight inline confirm toast — no native confirm() blocking, no full-page modal.
+    // Returns a Promise<boolean>: resolves true on Confirm, false on Cancel / dismiss / 8s timeout.
+    function showInlineConfirm({ title, body, confirmLabel = 'Delete', cancelLabel = 'Cancel', danger = true } = {}) {
+        return new Promise((resolve) => {
+            // Replace any prior toast so spamming actions doesn't stack them.
+            document.querySelectorAll('.at-confirm-toast').forEach(n => n.remove());
+
+            const el = document.createElement('div');
+            el.className = 'at-confirm-toast' + (danger ? ' at-confirm-toast--danger' : '');
+            el.setAttribute('role', 'alertdialog');
+            el.setAttribute('aria-live', 'polite');
+            el.innerHTML = `
+                <div class="at-confirm-text">
+                    ${title ? `<div class="at-confirm-title"></div>` : ''}
+                    ${body  ? `<div class="at-confirm-body"></div>`  : ''}
+                </div>
+                <div class="at-confirm-actions">
+                    <button type="button" class="at-confirm-cancel"></button>
+                    <button type="button" class="at-confirm-ok"></button>
+                </div>
+            `;
+            // Set text content separately to avoid HTML-injection through title/body params.
+            if (title) el.querySelector('.at-confirm-title').textContent = title;
+            if (body)  el.querySelector('.at-confirm-body').textContent = body;
+            el.querySelector('.at-confirm-cancel').textContent = cancelLabel;
+            el.querySelector('.at-confirm-ok').textContent = confirmLabel;
+
+            const finish = (value) => {
+                el.classList.add('at-confirm-toast--leaving');
+                setTimeout(() => { try { el.remove(); } catch {} }, 180);
+                clearTimeout(timeoutId);
+                resolve(value);
+            };
+            const timeoutId = setTimeout(() => finish(false), 8000);
+
+            el.querySelector('.at-confirm-ok').addEventListener('click', () => finish(true));
+            el.querySelector('.at-confirm-cancel').addEventListener('click', () => finish(false));
+
+            document.body.appendChild(el);
+            requestAnimationFrame(() => el.classList.add('at-confirm-toast--visible'));
+            // Focus the confirm button so Enter triggers, Esc cancels.
+            setTimeout(() => el.querySelector('.at-confirm-ok')?.focus(), 50);
+            const onKey = (e) => {
+                if (e.key === 'Escape') { finish(false); document.removeEventListener('keydown', onKey, true); }
+                if (e.key === 'Enter')  { finish(true);  document.removeEventListener('keydown', onKey, true); }
+            };
+            document.addEventListener('keydown', onKey, true);
+        });
+    }
+
     async function deleteAnime(slug) {
         const { Storage, FirebaseSync } = AT;
         if (_deletingSlugs.has(slug)) return;
+
+        // Confirm step — protects against accidental double-clicks on the
+        // delete icon. Skipped only when called programmatically via a flag.
+        const animeTitle = animeData[slug]?.title || slug;
+        const ok = await showInlineConfirm({
+            title: 'Delete this anime?',
+            body: `“${animeTitle}” will be removed from your library across all devices.`,
+            confirmLabel: 'Delete',
+            cancelLabel: 'Keep'
+        });
+        if (!ok) return;
         _deletingSlugs.add(slug);
         const wasInAnimeData = !!animeData[slug];
         const siteAnimeId = animeData[slug]?.siteAnimeId;
@@ -1596,9 +1968,11 @@
 
             renderAnimeList(elements.searchInput?.value || '');
             updateStats();
+            try { AT.UIHelpers?.showToast?.('Anime deleted', { type: 'success' }); } catch {}
         } catch (e) {
             PopupLogger.error('Delete', 'Error:', e);
-            alert('Failed to delete anime. Please try again.');
+            try { AT.UIHelpers?.showToast?.('Failed to delete anime', { type: 'error', duration: 3500 }); }
+            catch { alert('Failed to delete anime. Please try again.'); }
         } finally {
             _deletingSlugs.delete(slug);
         }
@@ -1695,6 +2069,53 @@
             updateStats();
         } catch (e) {
             PopupLogger.error('Drop', 'Error:', e);
+        }
+    }
+
+    /**
+     * Toggle favorite status. Uses internal `favorite` boolean + `favoritedAt`
+     * timestamp so cloud-merge picks the most recent setting on conflict.
+     */
+    async function toggleAnimeFavorite(slug) {
+        const { Storage, FirebaseSync } = AT;
+        if (!animeData[slug]) return;
+
+        try {
+            const now = new Date().toISOString();
+            const wasFavorite = !!animeData[slug].favorite;
+            if (wasFavorite) {
+                animeData[slug].favorite = false;
+                animeData[slug].favoritedAt = null;
+            } else {
+                animeData[slug].favorite = true;
+                animeData[slug].favoritedAt = now;
+            }
+            animeData[slug].favoriteUpdatedAt = now;
+
+            const dataToSave = { animeData };
+            const user = FirebaseSync.getUser();
+            if (user) dataToSave.userId = user.uid;
+            markInternalSave(dataToSave);
+            await Storage.set(dataToSave);
+
+            if (user) {
+                try {
+                    const fresh = await Storage.get(['videoProgress', 'deletedAnime', 'groupCoverImages']);
+                    await FirebaseSync.saveToCloud({
+                        animeData,
+                        videoProgress: fresh.videoProgress || {},
+                        deletedAnime: fresh.deletedAnime || {},
+                        groupCoverImages: fresh.groupCoverImages || {}
+                    }, true);
+                } catch (syncErr) {
+                    PopupLogger.error('Favorite', 'Cloud sync failed:', syncErr);
+                }
+            }
+
+            renderAnimeList(elements.searchInput?.value || '');
+            try { AT.UIHelpers?.showToast?.(wasFavorite ? 'Removed from favorites' : 'Added to favorites', { type: 'success', duration: 1400 }); } catch {}
+        } catch (e) {
+            PopupLogger.error('Favorite', 'Error:', e);
         }
     }
 
@@ -2094,11 +2515,10 @@
             // Fetch cover image + site metadata (incl. runtime) for the newly added
             // anime in background. Also triggers when any episode has a placeholder
             // duration — mostly movies, which seed with duration=0 in the add flow.
+            const isPlaceholderDur = window.AnimeTrackerMergeUtils?.isPlaceholderDuration
+                || ((d) => { const v = Number(d) || 0; return v <= 0 || v === 1440 || v === 6000 || v === 7200; });
             const hasPlaceholderDuration = Array.isArray(animeData[slug].episodes)
-                && animeData[slug].episodes.some(ep => {
-                    const d = Number(ep?.duration) || 0;
-                    return d <= 0 || d === 1440 || d === 6000 || d === 7200;
-                });
+                && animeData[slug].episodes.some(ep => isPlaceholderDur(ep?.duration));
             if (!animeData[slug].coverImage || hasPlaceholderDuration) {
                 chrome.runtime.sendMessage(
                     { type: 'BATCH_FETCH_ANIME_INFO', slugs: [slug] },
@@ -2171,9 +2591,11 @@
                 })().catch(err => PopupLogger.error('EditTitle', 'Cloud save error:', err));
             }
             hideEditTitleDialog();
+            try { AT.UIHelpers?.showToast?.('Title updated', { type: 'success' }); } catch {}
         } catch (error) {
             PopupLogger.error('EditTitle', 'Error:', error);
-            alert('Failed to update title. Please try again.');
+            try { AT.UIHelpers?.showToast?.('Failed to update title', { type: 'error', duration: 3500 }); }
+            catch { alert('Failed to update title. Please try again.'); }
         }
     }
 
@@ -2205,8 +2627,19 @@
 
         if (force) {
             const infoKeys = slugs.map((slug) => `animeinfo_${slug}`);
-            if (infoKeys.length > 0) {
-                await Storage.remove(infoKeys);
+            // Chunk the remove() so we don't hit MAX_WRITE_OPERATIONS_PER_MINUTE
+            // on libraries with hundreds of anime. 100 keys/call is well under
+            // any chrome.storage limit and avoids one giant transaction.
+            const REMOVE_CHUNK = 100;
+            for (let i = 0; i < infoKeys.length; i += REMOVE_CHUNK) {
+                const chunk = infoKeys.slice(i, i + REMOVE_CHUNK);
+                try {
+                    await Storage.remove(chunk);
+                } catch (error) {
+                    PopupLogger.warn('RefreshAll', `chunk remove failed at ${i}:`, error?.message || error);
+                    // Don't break — continue with remaining chunks so we
+                    // still clear most of the cache and proceed to refetch.
+                }
             }
             for (const slug of slugs) {
                 delete AnilistService.cache[slug];
@@ -2601,6 +3034,7 @@
                 if (elements.sortBtn) elements.sortBtn.classList.remove('active');
                 const willOpen = !elements.settingsDropdown.classList.contains('visible');
                 elements.settingsDropdown.classList.toggle('visible');
+                elements.settingsBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
                 if (!willOpen) { setSettingsDataToolsExpanded(false); setSettingsPreferencesExpanded(false); }
             });
         }
@@ -2609,6 +3043,7 @@
             if (elements.settingsDropdown && elements.settingsBtn &&
                 !elements.settingsDropdown.contains(e.target) && !elements.settingsBtn.contains(e.target)) {
                 elements.settingsDropdown.classList.remove('visible');
+                elements.settingsBtn.setAttribute('aria-expanded', 'false');
                 setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
             }
@@ -2704,6 +3139,40 @@
                 setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
                 showDialog();
+            });
+        }
+
+        if (elements.settingsExportData) {
+            elements.settingsExportData.addEventListener('click', () => {
+                elements.settingsDropdown.classList.remove('visible');
+                setSettingsDataToolsExpanded(false);
+                exportLibraryToJson().catch((err) => {
+                    PopupLogger.error('Export', err);
+                    AT.UIHelpers?.showToast?.('Export failed', { type: 'error', duration: 3500 });
+                });
+            });
+        }
+
+        if (elements.settingsImportData && elements.settingsImportFile) {
+            elements.settingsImportData.addEventListener('click', () => {
+                elements.settingsImportFile.value = '';
+                elements.settingsImportFile.click();
+            });
+            elements.settingsImportFile.addEventListener('change', async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                elements.settingsDropdown.classList.remove('visible');
+                setSettingsDataToolsExpanded(false);
+                try {
+                    await importLibraryFromFile(file);
+                } catch (err) {
+                    PopupLogger.error('Import', err);
+                    AT.UIHelpers?.showToast?.(err?.message || 'Import failed', {
+                        type: 'error', duration: 4000
+                    });
+                } finally {
+                    e.target.value = '';
+                }
             });
         }
 
@@ -2930,32 +3399,40 @@
                     elements.categoryTabs.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
                     tab.classList.add('active');
 
-                    const statsView = document.getElementById('statsView');
-                    const appRoot   = document.querySelector('.app');
+                    const appRoot = document.querySelector('.app');
 
-                    if (rawCat === 'stats') {
-                        if (appRoot) appRoot.classList.add('stats-mode');
-                        // Recompute slider AFTER layout shift caused by stats-mode class
-                        requestAnimationFrame(() => moveSlider(tab, false));
-                        if (statsView) {
-                            try {
-                                window.AnimeTracker.StatsView.render(statsView, animeData);
-                            } catch (e) {
-                                console.error('[StatsView] render failed:', e);
-                                statsView.textContent = 'Stats unavailable.';
-                            }
-                        }
-                        return;
-                    }
+                    // Switching a category exits any view mode (stats/goals)
+                    setViewMode(null);
 
-                    // Switch back to list view
-                    if (appRoot) appRoot.classList.remove('stats-mode');
                     requestAnimationFrame(() => moveSlider(tab, false));
 
                     currentCategory = normalizeCategory(rawCat);
                     if (elements.searchInput) renderAnimeList(elements.searchInput.value);
                     await chrome.storage.local.set({ userPreferences: { sort: currentSort, category: currentCategory } });
                 });
+            });
+        }
+
+        // ─── Header view-mode toggles (Stats / Goals icon buttons) ──────────
+        const viewStatsBtn = document.getElementById('viewStatsBtn');
+        const viewGoalsBtn = document.getElementById('viewGoalsBtn');
+
+        if (viewStatsBtn) {
+            viewStatsBtn.addEventListener('click', () => {
+                const next = currentViewMode === 'stats' ? null : 'stats';
+                setViewMode(next);
+            });
+        }
+        if (viewGoalsBtn) {
+            viewGoalsBtn.addEventListener('click', async () => {
+                if (currentViewMode === 'goals') {
+                    setViewMode(null);
+                    return;
+                }
+                if (goalSettings === null) {
+                    await loadGoalAndBadgeState();
+                }
+                setViewMode('goals');
             });
         }
 
@@ -2973,12 +3450,30 @@
                 animeData = changes.animeData.newValue || {};
                 needsFullRender = true;
                 if (!isOwn) isExternalUpdate = true;
-                // Invalidate stats cache so ETA + dashboard reflect the new data
+                // Invalidate stats + achievements caches so views reflect new data
                 try { window.AnimeTracker?.StatsEngine?.invalidate(); } catch {}
+                try { window.AnimeTracker?.AchievementsEngine?.invalidate(); } catch {}
                 const statsView = document.getElementById('statsView');
                 const appRoot = document.querySelector('.app');
                 if (statsView && appRoot && appRoot.classList.contains('stats-mode')) {
                     try { window.AnimeTracker.StatsView.render(statsView, animeData); } catch {}
+                }
+                if (appRoot && appRoot.classList.contains('goals-mode')) {
+                    try { renderGoalsView(); } catch {}
+                }
+            }
+            if (changes[GOAL_SETTINGS_KEY]) {
+                goalSettings = changes[GOAL_SETTINGS_KEY].newValue || null;
+                const appRoot = document.querySelector('.app');
+                if (appRoot && appRoot.classList.contains('goals-mode')) {
+                    try { renderGoalsView(); } catch {}
+                }
+            }
+            if (changes[BADGE_STATE_KEY]) {
+                badgeState = changes[BADGE_STATE_KEY].newValue || {};
+                const appRoot = document.querySelector('.app');
+                if (appRoot && appRoot.classList.contains('goals-mode')) {
+                    try { renderGoalsView(); } catch {}
                 }
             }
             if (changes.groupCoverImages) {
@@ -3111,6 +3606,12 @@
                 if (target.classList.contains('anime-onhold-toggle') || target.closest('.anime-onhold-toggle')) {
                     const btn = target.classList.contains('anime-onhold-toggle') ? target : target.closest('.anime-onhold-toggle');
                     if (btn.dataset.slug) await toggleAnimeOnHold(btn.dataset.slug);
+                    return;
+                }
+
+                if (target.classList.contains('anime-favorite-toggle') || target.closest('.anime-favorite-toggle')) {
+                    const btn = target.classList.contains('anime-favorite-toggle') ? target : target.closest('.anime-favorite-toggle');
+                    if (btn.dataset.slug) await toggleAnimeFavorite(btn.dataset.slug);
                     return;
                 }
 
@@ -3327,6 +3828,58 @@
 
     // _ipPatch is called from the main storage.onChanged listener (initEventListeners)
     // to avoid registering duplicate listeners. Exposed here for access.
+
+    // ─── Global keyboard shortcuts ───────────────────────────────────────
+    // `/`        → focus the search input (skipped while typing in another field)
+    // `Esc`      → close any open dialog / dropdown / view-mode in priority order
+    document.addEventListener('keydown', (e) => {
+        const target = e.target;
+        const isTypingTarget = target && (
+            target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.isContentEditable
+        );
+
+        if (e.key === '/' && !isTypingTarget && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            if (elements.searchInput) {
+                e.preventDefault();
+                elements.searchInput.focus();
+                elements.searchInput.select?.();
+            }
+            return;
+        }
+
+        if (e.key === 'Escape') {
+            // Priority: open dialogs > dropdowns > active view mode.
+            const openDialog =
+                document.querySelector('.confirm-dialog.visible') ||
+                document.querySelector('.dialog.visible') ||
+                document.querySelector('[role="dialog"][aria-modal="true"]:not([hidden])');
+            if (openDialog) {
+                const cancel = openDialog.querySelector('[data-dialog-cancel], .btn-cancel, .dialog-cancel');
+                if (cancel) { cancel.click(); return; }
+            }
+            if (elements.settingsDropdown?.classList.contains('visible')) {
+                elements.settingsDropdown.classList.remove('visible');
+                elements.settingsBtn?.setAttribute('aria-expanded', 'false');
+                return;
+            }
+            if (elements.sortDropdown?.classList.contains('visible')) {
+                elements.sortDropdown.classList.remove('visible');
+                elements.sortBtn?.classList.remove('active');
+                return;
+            }
+            if (currentViewMode) {
+                setViewMode(null);
+                return;
+            }
+            // If search is non-empty, clear it instead of doing nothing.
+            if (elements.searchInput && elements.searchInput.value && document.activeElement === elements.searchInput) {
+                elements.searchInput.value = '';
+                elements.searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        }
+    });
 
     window.addEventListener('beforeunload', () => {
         stopPopupCloudRefresh();

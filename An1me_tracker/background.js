@@ -25,6 +25,7 @@ const areProgressMapsEqual = sharedMergeUtils.areProgressMapsEqual || missingMer
 const shallowEqualDeletedAnime = sharedMergeUtils.shallowEqualDeletedAnime || missingMergeUtil('shallowEqualDeletedAnime');
 const shallowEqualObjectMap = sharedMergeUtils.shallowEqualObjectMap || missingMergeUtil('shallowEqualObjectMap');
 const isLikelyMovieSlug = sharedMergeUtils.isLikelyMovieSlug || missingMergeUtil('isLikelyMovieSlug');
+const isPlaceholderDuration = sharedMergeUtils.isPlaceholderDuration || missingMergeUtil('isPlaceholderDuration');
 
 const BG_DEBUG = false;
 const dlog = (...a) => { if (BG_DEBUG) console.log(...a); };
@@ -1307,19 +1308,37 @@ async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
     }
 
     const candidates = generateFillerSlugCandidates(an1meSlug, animeTitle).slice(0, 5);
+    // Race candidates: cancel siblings as soon as one HEAD returns 200.
+    // Previous version waited for ALL 5 (or all to time out), wasting
+    // ~2-4s on every miss path.
+    const groupCtrl = new AbortController();
     const tryCandidate = async (candidate) => {
-        const headCtrl = new AbortController();
-        const timer = setTimeout(() => headCtrl.abort(), 10000);
+        const perCtrl = new AbortController();
+        const onAbort = () => perCtrl.abort();
+        groupCtrl.signal.addEventListener('abort', onAbort, { once: true });
+        const timer = setTimeout(() => perCtrl.abort(), 10000);
         try {
-            const resp = await fetch(`https://www.animefillerlist.com/shows/${candidate}`, { method: 'HEAD', signal: headCtrl.signal });
+            const resp = await fetch(
+                `https://www.animefillerlist.com/shows/${candidate}`,
+                { method: 'HEAD', signal: perCtrl.signal }
+            );
             if (resp.ok) return candidate;
-        } catch { }
-        finally { clearTimeout(timer); }
-        return null;
+            throw new Error(`HTTP ${resp.status}`);
+        } finally {
+            clearTimeout(timer);
+            groupCtrl.signal.removeEventListener('abort', onAbort);
+        }
     };
 
-    const results = await Promise.all(candidates.map(tryCandidate));
-    const found = results.find(r => r !== null) ?? null;
+    let found = null;
+    try {
+        // Promise.any throws AggregateError only when EVERY promise rejects.
+        // We treat any single fulfilled promise as the answer, and abort the rest.
+        found = await Promise.any(candidates.map(tryCandidate));
+        groupCtrl.abort();
+    } catch {
+        found = null;
+    }
 
     if (found) {
         fillerSlugCache[cacheKey] = found;
@@ -1738,6 +1757,11 @@ async function fetchJikanEpisodes(title) {
 
 const SMART_NOTIF_ALARM = 'smartNotifCheck';
 const SMART_NOTIF_INTERVAL_MINUTES = 60;
+// Cap how many anime we hit per tick to keep an1me.to load polite. The
+// previous cap of 5 meant a user with ~50 airing anime would take up to
+// 10 hours for a full pass. 10/tick × hourly = roughly a full sweep per
+// 5 hours for most users while still rate-limiting via inter-fetch delay.
+const SMART_NOTIF_MAX_PER_TICK = 10;
 
 async function checkNewEpisodes() {
     try {
@@ -1750,9 +1774,17 @@ async function checkNewEpisodes() {
         const updatedLastCheck = { ...lastCheck };
         let checked = 0;
 
-        for (const [slug, anime] of Object.entries(animeData)) {
-            if (anime.droppedAt || anime.completedAt) continue;
-            if (checked >= 5) break;
+        // Sort eligible anime by oldest lastCheck timestamp first so we
+        // rotate through the list across ticks instead of always hitting
+        // the same first N entries.
+        const eligible = Object.entries(animeData)
+            .filter(([slug, anime]) => !anime.droppedAt && !anime.completedAt && !anime.onHoldAt)
+            .map(([slug, anime]) => [slug, anime, lastCheck[slug] || 0])
+            .sort((a, b) => a[2] - b[2])
+            .map(([slug, anime]) => [slug, anime]);
+
+        for (const [slug, anime] of eligible) {
+            if (checked >= SMART_NOTIF_MAX_PER_TICK) break;
 
             const cachedKey = `animeinfo_${slug}`;
             const cached = (await bgStorageGet([cachedKey]))[cachedKey];
@@ -1799,10 +1831,66 @@ async function checkNewEpisodes() {
 chrome.notifications.onClicked.addListener((notifId) => {
     if (notifId.startsWith('new-ep-')) {
         const slug = notifId.replace('new-ep-', '');
-        chrome.tabs.create({ url: `https://an1me.to/anime/${slug}/` });
+        // Encode slug to avoid breaking the URL if it ever contains odd characters
+        // (slugs are normally URL-safe, but this is defense-in-depth).
+        const encoded = encodeURIComponent(slug);
+        chrome.tabs.create({ url: `https://an1me.to/anime/${encoded}/` });
+        chrome.notifications.clear(notifId);
+        return;
+    }
+    if (notifId.startsWith('badge-') || notifId === 'badges-batch') {
+        // openPopup() requires a user gesture in some browsers and a
+        // specific window context; if it's unavailable we fall back to
+        // opening the popup HTML in a regular tab so the user always
+        // lands somewhere when they click the notification.
+        const openPopupFallback = () => {
+            try {
+                chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
+            } catch { /* swallow — last-resort no-op */ }
+        };
+        try {
+            const result = chrome.action?.openPopup?.();
+            if (result && typeof result.then === 'function') {
+                result.catch(openPopupFallback);
+            } else if (result === undefined) {
+                // Older Chrome returns undefined synchronously when the
+                // popup can't be opened from a service worker.
+                openPopupFallback();
+            }
+        } catch {
+            openPopupFallback();
+        }
         chrome.notifications.clear(notifId);
     }
 });
+
+function showBadgeNotification(badge) {
+    try {
+        chrome.notifications.create(`badge-${badge.id}`, {
+            type: 'basic',
+            iconUrl: 'src/icons/icon128.png',
+            title: 'Badge unlocked!',
+            message: `${badge.icon || '🏅'} ${badge.title} — ${badge.desc || ''}`.trim(),
+            priority: 1
+        });
+    } catch (e) {
+        console.warn('[BG] Badge notification failed:', e);
+    }
+}
+
+function showBatchBadgeNotification(count) {
+    try {
+        chrome.notifications.create('badges-batch', {
+            type: 'basic',
+            iconUrl: 'src/icons/icon128.png',
+            title: 'Achievements unlocked!',
+            message: `You unlocked ${count} new badges. Tap to view.`,
+            priority: 1
+        });
+    } catch (e) {
+        console.warn('[BG] Batch badge notification failed:', e);
+    }
+}
 
 let metadataRepairInProgress = false;
 
@@ -2136,11 +2224,6 @@ function normalizeTrackedDuration(duration) {
     return value;
 }
 
-function isPlaceholderDuration(duration) {
-    const d = Number(duration) || 0;
-    return d <= 0 || d === 1440 || d === 6000 || d === 7200;
-}
-
 async function persistBeforeUnloadTrack(animeInfo, duration) {
     if (!animeInfo?.animeSlug || !animeInfo?.episodeNumber) {
         throw new Error('Invalid animeInfo for TRACK_BEFORE_UNLOAD');
@@ -2237,8 +2320,16 @@ async function syncWatchlistToSite(animeId, type) {
 
     try {
         const tabs = await chrome.tabs.query({ url: 'https://an1me.to/*' });
-        if (tabs && tabs.length > 0) {
-            chrome.tabs.sendMessage(tabs[0].id, {
+        // Pick the first tab that's actually loaded and not discarded.
+        // chrome.tabs.query can return discarded tabs (memory-saver mode in
+        // recent Chrome versions) which CAN'T receive runtime messages —
+        // sendMessage would fire "Receiving end does not exist" and we'd fall
+        // through to direct fetch anyway, but with a noisy console error.
+        const liveTab = (tabs || []).find(t =>
+            t && t.id != null && t.discarded !== true && t.status !== 'unloaded'
+        );
+        if (liveTab) {
+            chrome.tabs.sendMessage(liveTab.id, {
                 type: 'WATCHLIST_SYNC_EXECUTE',
                 animeId,
                 watchlistType: type
@@ -2251,7 +2342,7 @@ async function syncWatchlistToSite(animeId, type) {
                 }
             });
         } else {
-            dlog(`%c WatchlistSync %c no tab open, direct fetch`, 'background:#f59e0b;color:#000;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fcd34d');
+            dlog(`%c WatchlistSync %c no live tab open, direct fetch`, 'background:#f59e0b;color:#000;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fcd34d');
             await directWatchlistFetch(animeId, type);
         }
     } catch (e) {
@@ -2296,6 +2387,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ received: true });
         if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
         syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 500);
+        return true;
+    }
+
+    if (message.type === 'BADGE_UNLOCKED') {
+        sendResponse({ received: true });
+        showBadgeNotification({
+            id: message.id,
+            title: message.title,
+            desc: message.desc,
+            icon: message.icon
+        });
+        return true;
+    }
+
+    if (message.type === 'BADGES_UNLOCKED_BATCH') {
+        sendResponse({ received: true });
+        showBatchBadgeNotification(Number(message.count) || 0);
         return true;
     }
 

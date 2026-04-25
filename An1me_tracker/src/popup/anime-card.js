@@ -170,14 +170,7 @@ const AnimeCardRenderer = {
 
         const partsSection = this.createPartsSection(slug, anime.episodes);
 
-        const firstLetter = (anime.title || '').trim().charAt(0) || '';
-        const safeCoverImage = UIHelpers.sanitizeImageUrl(anime.coverImage);
-        const coverHtml = safeCoverImage
-            ? `<img src="${UIHelpers.escapeHtml(safeCoverImage)}" alt="${UIHelpers.escapeHtml(anime.title)}" style="border-radius:8px;width:44px;height:58px;object-fit:cover;">
-              `
-            : `<div style="width:44px;height:58px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff;">
-                    ${UIHelpers.escapeHtml(firstLetter.toUpperCase())}
-               </div>`;
+        const coverHtml = UIHelpers.renderCoverFigure(anime.title, anime.coverImage);
 
         const totalWatchedEpisodes = anime.episodes?.length || 0;
         const totalEpisodesPossible = progressData.total || 0;
@@ -336,11 +329,12 @@ const AnimeCardRenderer = {
             </div>`;
 
         return `
-            <div class="anime-card" data-slug="${slug}">
+            <div class="anime-card" data-slug="${slug}" tabindex="0" role="button" aria-expanded="false" aria-label="${UIHelpers.escapeHtml(anime.title || slug)}, press Enter to expand">
                 <div class="anime-card-header">
                     <div class="anime-cover-container" style="flex-shrink:0;">${coverHtml}</div>
                     <div class="anime-header-main" style="flex:1; display:flex; flex-direction:column; min-width:0; margin-left:8px;">
                         <div class="anime-title-row" style="display:flex; align-items:center; overflow:hidden;">
+                            ${anime.favorite ? `<span class="anime-favorite-indicator" title="Favorite" aria-label="Favorite">${UIHelpers.createIcon('star-filled')}</span>` : ''}
                             <span class="anime-title-text" style="font-size:14px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1;min-width:0;">${UIHelpers.escapeHtml(anime.title)}</span>
                         </div>
                         ${metaRowHtml}
@@ -374,6 +368,7 @@ const AnimeCardRenderer = {
                         </div>
                     </div>
                     <div class="anime-card-actions">
+                        <button class="anime-favorite-toggle${anime.favorite ? ' is-favorite' : ''}" data-slug="${slug}" data-favorite="${!!anime.favorite}" title="${anime.favorite ? 'Remove from favorites' : 'Mark as favorite'}" aria-pressed="${!!anime.favorite}">${UIHelpers.createIcon(anime.favorite ? 'star-filled' : 'star')}<span>${anime.favorite ? 'Favorited' : 'Favorite'}</span></button>
                         <button class="anime-onhold-toggle" data-slug="${slug}" data-onhold="${!!anime.onHoldAt}" title="${anime.onHoldAt ? 'Resume watching' : 'Put on hold'}">${UIHelpers.createIcon('pause')}<span>${anime.onHoldAt ? 'Resume' : 'Hold'}</span></button>
                         <button class="anime-complete-toggle" data-slug="${slug}" data-completed="${isManuallyCompleted}" title="${isManuallyCompleted ? 'Unmark as completed' : 'Mark as completed'}">${UIHelpers.createIcon('check')}<span>${isManuallyCompleted ? 'Undo' : 'Complete'}</span></button>
                         <button class="anime-drop-toggle" data-slug="${slug}" data-dropped="${!!anime.droppedAt}" title="${anime.droppedAt ? 'Unmark as dropped' : 'Drop'}">${UIHelpers.createIcon('drop')}<span>${anime.droppedAt ? 'Undrop' : 'Drop'}</span></button>
@@ -433,7 +428,7 @@ const AnimeCardRenderer = {
                 <div class="part-item ${statusClass}" data-part-start="${part.start}" data-part-end="${part.end}">
                     <div class="part-item-header">
                         <span class="part-status-icon">${statusIcon}</span>
-                        <span class="part-name">${part.name}</span>
+                        <span class="part-name">${UIHelpers.escapeHtml(part.name)}</span>
                         <span class="part-episodes">Ep ${part.start}-${part.end}</span>
                         <span class="part-progress">${watchedInPart}/${totalInPart}</span>
                         <div class="part-expand-icon">${UIHelpers.createIcon('chevron')}</div>
@@ -498,7 +493,7 @@ const AnimeCardRenderer = {
         const safeCoverImage = UIHelpers.sanitizeImageUrl(anime.coverImage);
         const coverHtml = safeCoverImage
             ? `<img class="ip-cover" src="${UIHelpers.escapeHtml(safeCoverImage)}" alt="">`
-            : `<div class="ip-cover-placeholder">▶</div>`;
+            : `<div class="ip-cover-placeholder">&#9654;</div>`;
 
         const savedDate = latestEp.savedAt ? new Date(latestEp.savedAt) : null;
         const now = new Date();
@@ -619,14 +614,7 @@ const AnimeCardRenderer = {
         const groupImages = (window.AnimeTracker && window.AnimeTracker.groupCoverImages) || {};
         const coverImageGroup = groupImages[baseSlug] ||
             ((firstSeason?.anime && firstSeason.anime.coverImage) ? firstSeason.anime.coverImage : null);
-        const safeCoverImageGroup = UIHelpers.sanitizeImageUrl(coverImageGroup);
-        const firstLetterGroup = (baseTitle || '').trim().charAt(0) || '';
-        const coverHtmlGroup = safeCoverImageGroup
-            ? `<img src="${UIHelpers.escapeHtml(safeCoverImageGroup)}" alt="${UIHelpers.escapeHtml(baseTitle)}" style="border-radius:8px;width:44px;height:58px;object-fit:cover;">
-              `
-            : `<div style="width:44px;height:58px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff;">
-                    ${UIHelpers.escapeHtml(firstLetterGroup.toUpperCase())}
-               </div>`;
+        const coverHtmlGroup = UIHelpers.renderCoverFigure(baseTitle, coverImageGroup);
 
         let latestWatched = null;
 
@@ -954,11 +942,11 @@ const AnimeCardRenderer = {
                    ${expandIconHtml}`;
 
             const html = `
-                <div class="season-item ${statusClass}${isMovie ? ' season-item-movie' : ''}" data-slug="${slug}">
+                <div class="season-item ${statusClass}${isMovie ? ' season-item-movie' : ''}" data-slug="${UIHelpers.escapeHtml(slug)}">
                     <div class="season-item-header">
                         <div class="season-item-left">
                             <span class="season-status-icon">${statusIcon}</span>
-                            <span class="season-label">${seasonLabel}</span>
+                            <span class="season-label">${UIHelpers.escapeHtml(seasonLabel)}</span>
                         </div>
                         <div class="season-item-right">
                             ${rightSideHtml}
@@ -1101,11 +1089,11 @@ const AnimeCardRenderer = {
             const statusIcon = isWatched ? '✓' : '○';
 
             return `
-                <div class="movie-item ${statusClass}" data-slug="${slug}">
+                <div class="movie-item ${statusClass}" data-slug="${UIHelpers.escapeHtml(slug)}">
                     <div class="movie-item-header">
                         <div class="movie-item-left">
                             <span class="movie-status-icon">${statusIcon}</span>
-                            <span class="movie-label">${movieLabel}</span>
+                            <span class="movie-label">${UIHelpers.escapeHtml(movieLabel)}</span>
                         </div>
                         <div class="movie-item-right">
                             <span class="movie-duration">${formattedTime}</span>
@@ -1143,13 +1131,7 @@ const AnimeCardRenderer = {
 
         const groupImages = (window.AnimeTracker && window.AnimeTracker.groupCoverImages) || {};
         const coverImageGroup = groupImages[baseSlug] || ((firstMovie?.anime && firstMovie.anime.coverImage) ? firstMovie.anime.coverImage : null);
-        const safeCoverImageGroup = UIHelpers.sanitizeImageUrl(coverImageGroup);
-        const firstLetterGroup = (baseTitle || '').trim().charAt(0) || '';
-        const coverHtmlGroup = safeCoverImageGroup
-            ? `<img src="${UIHelpers.escapeHtml(safeCoverImageGroup)}" alt="${UIHelpers.escapeHtml(baseTitle)}" style="border-radius:8px;width:44px;height:58px;object-fit:cover;">`
-            : `<div style="width:44px;height:58px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff;">
-                    ${UIHelpers.escapeHtml(firstLetterGroup.toUpperCase())}
-               </div>`;
+        const coverHtmlGroup = UIHelpers.renderCoverFigure(baseTitle, coverImageGroup);
 
         const totalMovies = movies.length;
         const statusGroup = (watchedCount === 0) ? 'Not started' : (watchedCount < totalMovies ? 'Watching' : 'Completed');
@@ -1202,14 +1184,7 @@ const AnimeCardRenderer = {
             lastWatched = anime.lastWatched ? UIHelpers.formatDate(anime.lastWatched) : 'Never';
         }
 
-        const coverImg = anime.coverImage || null;
-        const safeCoverImg = UIHelpers.sanitizeImageUrl(coverImg);
-        const firstLetter = (title || '').trim().charAt(0) || '';
-        const coverHtml = safeCoverImg
-            ? `<img src="${UIHelpers.escapeHtml(safeCoverImg)}" alt="${UIHelpers.escapeHtml(title)}" style="border-radius:8px;width:44px;height:58px;object-fit:cover;">`
-            : `<div style="width:44px;height:58px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff;">
-                    ${UIHelpers.escapeHtml(firstLetter.toUpperCase())}
-               </div>`;
+        const coverHtml = UIHelpers.renderCoverFigure(title, anime.coverImage || null);
 
         const singleStatusClass = isWatched ? 'meta-badge-complete' : 'meta-badge-notstarted';
         const singleStatusIcon = isWatched ? '✓' : '⊙';

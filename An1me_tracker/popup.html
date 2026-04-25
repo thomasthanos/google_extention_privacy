@@ -95,9 +95,28 @@
                         <h1>Anime Tracker</h1>
                     </div>
                     <div class="header-actions">
-                        <button class="btn-icon" id="settingsBtn" title="Settings">
+                        <button class="btn-icon view-toggle" id="viewStatsBtn" data-view="stats" title="Stats"
+                            aria-label="Open stats view" aria-pressed="false">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                stroke-linecap="round">
+                                aria-hidden="true" focusable="false">
+                                <line x1="18" y1="20" x2="18" y2="10" />
+                                <line x1="12" y1="20" x2="12" y2="4" />
+                                <line x1="6" y1="20" x2="6" y2="14" />
+                            </svg>
+                        </button>
+                        <button class="btn-icon view-toggle" id="viewGoalsBtn" data-view="goals"
+                            title="Goals &amp; Achievements" aria-label="Open goals and achievements"
+                            aria-pressed="false">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                aria-hidden="true" focusable="false">
+                                <circle cx="12" cy="8" r="6" />
+                                <polyline points="8.21 13.89 7 22 12 19 17 22 15.79 13.88" />
+                            </svg>
+                        </button>
+                        <button class="btn-icon" id="settingsBtn" title="Settings" aria-label="Open settings menu"
+                            aria-haspopup="true" aria-expanded="false">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" aria-hidden="true" focusable="false">
                                 <circle cx="12" cy="5" r="1.5" fill="currentColor" />
                                 <circle cx="12" cy="12" r="1.5" fill="currentColor" />
                                 <circle cx="12" cy="19" r="1.5" fill="currentColor" />
@@ -173,6 +192,32 @@
                                                 Info</span><span class="settings-item-subtitle">Re-fetch episode counts
                                                 &amp; status</span></div>
                                     </button>
+                                    <button class="settings-item" id="settingsExportData">
+                                        <div class="settings-item-icon"><svg viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                stroke-linejoin="round">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                                <polyline points="7 10 12 15 17 10" />
+                                                <line x1="12" y1="15" x2="12" y2="3" />
+                                            </svg></div>
+                                        <div class="settings-item-text"><span class="settings-item-title">Export
+                                                Backup</span><span class="settings-item-subtitle">Download a JSON of
+                                                your library</span></div>
+                                    </button>
+                                    <button class="settings-item" id="settingsImportData">
+                                        <div class="settings-item-icon"><svg viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                stroke-linejoin="round">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                                <polyline points="17 8 12 3 7 8" />
+                                                <line x1="12" y1="3" x2="12" y2="15" />
+                                            </svg></div>
+                                        <div class="settings-item-text"><span class="settings-item-title">Import
+                                                Backup</span><span class="settings-item-subtitle">Restore from a
+                                                previous JSON export</span></div>
+                                    </button>
+                                    <input type="file" id="settingsImportFile" accept="application/json,.json"
+                                        style="display:none" aria-hidden="true">
                                     <button class="settings-item danger" id="settingsClear">
                                         <div class="settings-item-icon"><svg viewBox="0 0 24 24" fill="none"
                                                 stroke="currentColor" stroke-width="2">
@@ -323,12 +368,6 @@
                             <line x1="16" y1="8" x2="22" y2="8" />
                             <line x1="16" y1="16" x2="22" y2="16" />
                         </svg>Movies</button>
-                    <button class="category-tab" data-category="stats" title="Statistics &amp; activity"><svg
-                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="18" y1="20" x2="18" y2="10" />
-                            <line x1="12" y1="20" x2="12" y2="4" />
-                            <line x1="6" y1="20" x2="6" y2="14" />
-                        </svg>Stats</button>
                 </div>
                 <div class="toolbar">
                     <button class="btn-add-anime" id="addAnimeBtn" title="Add watched anime"><svg viewBox="0 0 24 24"
@@ -379,6 +418,7 @@
                 </div>
                 <div class="anime-list" id="animeList"></div>
                 <div class="stats-view" id="statsView" hidden></div>
+                <div class="goals-view" id="goalsView" hidden></div>
                 <div class="empty-state" id="emptyState">
                     <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                         <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" />
@@ -502,6 +542,8 @@
     <script src="src/popup/firebase-sync.js"></script>
     <script src="src/popup/stats-engine.js"></script>
     <script src="src/popup/stats-view.js"></script>
+    <script src="src/popup/achievements-engine.js"></script>
+    <script src="src/popup/goals-view.js"></script>
     <script src="src/popup/share-card.js"></script>
     <script src="src/popup/anime-card.js"></script>
     <script src="src/popup/main.js"></script>

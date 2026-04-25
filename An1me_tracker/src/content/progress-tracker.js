@@ -58,6 +58,8 @@ const ProgressTracker = {
     },
 
     isPlaceholderDuration(duration) {
+        const shared = globalThis.AnimeTrackerMergeUtils;
+        if (shared?.isPlaceholderDuration) return shared.isPlaceholderDuration(duration);
         const d = Number(duration) || 0;
         return d <= 0 || d === 1440 || d === 6000 || d === 7200;
     },

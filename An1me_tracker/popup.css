@@ -576,6 +576,17 @@ body {
   background: var(--bg-0)
 }
 
+.btn-icon.view-toggle.is-active {
+  background: rgba(79, 195, 247, 0.18);
+  border-color: rgba(79, 195, 247, 0.55);
+  color: var(--cyan);
+  box-shadow: 0 0 0 1px rgba(79, 195, 247, 0.2) inset, 0 0 8px rgba(79, 195, 247, 0.12)
+}
+
+.btn-icon.view-toggle.is-active svg {
+  filter: drop-shadow(0 0 3px rgba(79, 195, 247, 0.45))
+}
+
 #statsBar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(0, 1fr);
@@ -920,18 +931,23 @@ body {
   gap: 10px
 }
 
-#statsView {
+#statsView,
+#goalsView {
   display: none
 }
 
 .app.stats-mode .anime-list,
 .app.stats-mode .toolbar,
-.app.stats-mode .empty-state {
+.app.stats-mode .empty-state,
+.app.goals-mode .anime-list,
+.app.goals-mode .toolbar,
+.app.goals-mode .empty-state {
   display: none !important
 }
 
-.app.stats-mode #statsView {
-  display: flex;
+.app.stats-mode #statsView,
+.app.goals-mode #goalsView {
+  display: flex !important;
   flex-direction: column
 }
 
@@ -1670,6 +1686,39 @@ body {
   object-fit: cover;
   border: 1px solid var(--b2);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55)
+}
+
+/* ─── Shared cover thumbnail (UIHelpers.renderCoverFigure) ─────────────── */
+.at-cover {
+  flex-shrink: 0;
+  border-radius: 8px;
+  object-fit: cover;
+  display: block
+}
+
+.at-cover--default {
+  width: 44px;
+  height: 58px
+}
+
+.at-cover--placeholder {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff
+}
+
+/* When the new cover lives inside the legacy logo containers we want it
+   to override the older 50×66 rule above without touching that block. */
+.anime-cover-container .at-cover,
+.season-group-logo .at-cover,
+.movie-group-logo .at-cover {
+  width: 44px;
+  height: 58px
 }
 
 .anime-title {
@@ -4833,4 +4882,718 @@ body {
   text-align: center;
   color: var(--t2);
   font-size: 13px
+}
+
+.goals-view {
+  padding: 10px 12px 16px;
+  overflow: visible
+}
+
+.goals-view-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 16px
+}
+
+.goals-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t2);
+  margin: 0 0 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between
+}
+
+.badges-count {
+  font-size: 11px;
+  color: var(--t1);
+  background: var(--bg-3);
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--b1)
+}
+
+.goals-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px
+}
+
+.goal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--b1);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px
+}
+
+.goal-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px
+}
+
+.goal-card-title {
+  font-size: 13px;
+  color: var(--t1);
+  font-weight: 600
+}
+
+.goal-card-progress {
+  font-size: 12px;
+  color: var(--t2);
+  font-variant-numeric: tabular-nums
+}
+
+.goal-progress-track {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-3);
+  border-radius: 3px;
+  overflow: hidden
+}
+
+.goal-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 300ms ease
+}
+
+.goal-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 1px
+}
+
+.goal-target-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t2)
+}
+
+.goal-stepper {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  background: var(--bg-2);
+  border: 1px solid var(--b1);
+  border-radius: 999px;
+  padding: 1px;
+  gap: 0;
+  user-select: none;
+  transition: border-color var(--tf), box-shadow var(--tf)
+}
+
+.goal-stepper:hover {
+  border-color: rgba(79, 195, 247, 0.4)
+}
+
+.goal-stepper-btn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--t2);
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--tf), color var(--tf), transform 60ms ease
+}
+
+.goal-stepper-btn svg {
+  width: 11px;
+  height: 11px
+}
+
+.goal-stepper-btn:hover {
+  background: rgba(79, 195, 247, 0.15);
+  color: var(--cyan)
+}
+
+.goal-stepper-btn:active {
+  transform: scale(0.88);
+  background: rgba(79, 195, 247, 0.25)
+}
+
+.goal-stepper-value {
+  min-width: 28px;
+  padding: 0 4px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--t1);
+  font-variant-numeric: tabular-nums;
+  line-height: 1
+}
+
+.goal-stepper-unit {
+  padding-right: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--t2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em
+}
+
+.badges-section {
+  display: flex;
+  flex-direction: column
+}
+
+.badges-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 8px
+}
+
+.badge-tile {
+  background: var(--bg-card);
+  border: 1px solid var(--b1);
+  border-radius: 10px;
+  padding: 10px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  transition: transform 150ms ease, border-color 150ms ease
+}
+
+.badge-tile:hover {
+  transform: translateY(-1px);
+  border-color: rgba(79, 195, 247, 0.35)
+}
+
+.badge-tile--locked {
+  opacity: 0.55
+}
+
+.badge-tile--locked .badge-tile-icon-wrap {
+  filter: grayscale(0.7);
+  opacity: 0.85
+}
+
+.badge-tier-gold.badge-tile--unlocked {
+  border-color: rgba(255, 197, 61, 0.5);
+  background: linear-gradient(145deg, rgba(255, 197, 61, 0.08), var(--bg-card))
+}
+
+.badge-tier-silver.badge-tile--unlocked {
+  border-color: rgba(180, 195, 220, 0.45);
+  background: linear-gradient(145deg, rgba(180, 195, 220, 0.06), var(--bg-card))
+}
+
+.badge-tier-bronze.badge-tile--unlocked {
+  border-color: rgba(205, 127, 50, 0.45)
+}
+
+.badge-icon {
+  font-size: 26px;
+  line-height: 1;
+  margin-bottom: 2px
+}
+
+.badge-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t1);
+  line-height: 1.2
+}
+
+.badge-progress {
+  font-size: 10px;
+  color: var(--t2);
+  font-variant-numeric: tabular-nums
+}
+
+.next-up-section {
+  display: flex;
+  flex-direction: column
+}
+
+.next-up-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px
+}
+
+.badge-next-up-item {
+  background: var(--bg-card);
+  border: 1px solid var(--b1);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px
+}
+
+.badge-next-up-head {
+  display: flex;
+  align-items: center;
+  gap: 8px
+}
+
+.badge-next-up-icon {
+  font-size: 18px;
+  line-height: 1
+}
+
+.badge-next-up-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t1)
+}
+
+.badge-next-up-pct {
+  font-size: 11px;
+  color: var(--t2);
+  font-variant-numeric: tabular-nums
+}
+
+.badge-next-up-desc {
+  font-size: 11px;
+  color: var(--t2);
+  line-height: 1.4
+}
+
+/* ─── Goals empty-state banner ──────────────────────────────────────── */
+.goals-empty-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: linear-gradient(145deg, rgba(79, 195, 247, 0.08), var(--bg-card));
+  border: 1px solid rgba(79, 195, 247, 0.25);
+  border-radius: 12px
+}
+
+.goals-empty-icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(79, 195, 247, 0.12);
+  border-radius: 50%;
+  color: var(--cyan)
+}
+
+.goals-empty-icon svg {
+  width: 22px;
+  height: 22px
+}
+
+.goals-empty-text h3 {
+  margin: 0 0 2px 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--t1)
+}
+
+.goals-empty-text p {
+  margin: 0;
+  font-size: 11px;
+  color: var(--t2);
+  line-height: 1.4
+}
+
+/* ─── Badge group sections (collapsible) ────────────────────────────── */
+.badge-group-section {
+  margin-bottom: 10px;
+  border: 1px solid var(--b1);
+  border-radius: 10px;
+  background: var(--bg-2);
+  overflow: hidden
+}
+
+.badge-group-section[open] {
+  background: var(--bg-2)
+}
+
+.badge-group-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  font-size: 12px;
+  color: var(--t1);
+  transition: background var(--tf)
+}
+
+.badge-group-summary::-webkit-details-marker {
+  display: none
+}
+
+.badge-group-summary:hover {
+  background: var(--bg-3)
+}
+
+.badge-group-icon {
+  font-size: 14px;
+  line-height: 1
+}
+
+.badge-group-title {
+  flex: 1;
+  font-weight: 600;
+  letter-spacing: 0.02em
+}
+
+.badge-group-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--t2);
+  background: var(--bg-3);
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums
+}
+
+.badge-group-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--t2);
+  transition: transform 200ms ease
+}
+
+.badge-group-section[open] .badge-group-chevron {
+  transform: rotate(180deg)
+}
+
+.badge-group-section .badges-grid {
+  padding: 6px 8px 10px
+}
+
+/* ─── Badge tile icon wrap (custom SVG + tier ring) ─────────────────── */
+.badge-tile-icon-wrap {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  margin-bottom: 4px;
+  background: var(--bg-3);
+  border: 1px solid var(--b1);
+  transition: transform 150ms ease, box-shadow 200ms ease
+}
+
+.badge-svg {
+  width: 22px;
+  height: 22px;
+  color: var(--t2);
+  transition: color 150ms ease
+}
+
+.badge-emoji-fallback {
+  font-size: 20px;
+  line-height: 1
+}
+
+/* Tier-colored gradient rings for unlocked badges */
+.badge-tile--unlocked.badge-tier-gold .badge-tile-icon-wrap {
+  background: radial-gradient(circle at 30% 30%, rgba(255, 215, 100, 0.25), rgba(255, 197, 61, 0.05));
+  border-color: rgba(255, 197, 61, 0.7);
+  box-shadow: 0 0 10px rgba(255, 197, 61, 0.25), inset 0 0 0 1px rgba(255, 215, 100, 0.3)
+}
+
+.badge-tile--unlocked.badge-tier-gold .badge-svg {
+  color: #ffd166
+}
+
+.badge-tile--unlocked.badge-tier-silver .badge-tile-icon-wrap {
+  background: radial-gradient(circle at 30% 30%, rgba(220, 230, 245, 0.25), rgba(180, 195, 220, 0.05));
+  border-color: rgba(200, 215, 235, 0.7);
+  box-shadow: 0 0 8px rgba(200, 215, 235, 0.2), inset 0 0 0 1px rgba(220, 230, 245, 0.3)
+}
+
+.badge-tile--unlocked.badge-tier-silver .badge-svg {
+  color: #e3eaf5
+}
+
+.badge-tile--unlocked.badge-tier-bronze .badge-tile-icon-wrap {
+  background: radial-gradient(circle at 30% 30%, rgba(245, 175, 110, 0.25), rgba(205, 127, 50, 0.05));
+  border-color: rgba(225, 150, 80, 0.7);
+  box-shadow: 0 0 8px rgba(205, 127, 50, 0.2), inset 0 0 0 1px rgba(245, 175, 110, 0.3)
+}
+
+.badge-tile--unlocked.badge-tier-bronze .badge-svg {
+  color: #f5b890
+}
+
+.badge-tile:hover .badge-tile-icon-wrap {
+  transform: scale(1.05)
+}
+
+/* ─── Locked tile mini progress bar ─────────────────────────────────── */
+.badge-tile-mini-track {
+  width: 100%;
+  height: 3px;
+  background: var(--bg-3);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 4px
+}
+
+.badge-tile-mini-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 300ms ease
+}
+
+/* ─── Newly unlocked pulse animation ────────────────────────────────── */
+@keyframes badgePulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(79, 195, 247, 0)
+  }
+  35% {
+    transform: scale(1.06);
+    box-shadow: 0 0 14px rgba(79, 195, 247, 0.6)
+  }
+  70% {
+    transform: scale(1.02);
+    box-shadow: 0 0 8px rgba(79, 195, 247, 0.3)
+  }
+}
+
+.badge-tile.is-newly-unlocked .badge-tile-icon-wrap {
+  animation: badgePulse 1.4s ease-out 1
+}
+
+/* ─── Next-up icon override (small SVG) ─────────────────────────────── */
+.badge-next-up-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bg-3);
+  border: 1px solid var(--b1);
+  color: var(--t2)
+}
+
+.badge-next-up-icon .badge-svg {
+  width: 14px;
+  height: 14px
+}
+
+.badge-next-up-icon.badge-tier-gold {
+  color: #ffd166;
+  border-color: rgba(255, 197, 61, 0.5)
+}
+
+.badge-next-up-icon.badge-tier-silver {
+  color: #e3eaf5;
+  border-color: rgba(200, 215, 235, 0.5)
+}
+
+.badge-next-up-icon.badge-tier-bronze {
+  color: #f5b890;
+  border-color: rgba(225, 150, 80, 0.5)
+}
+
+/* ─── Inline confirm toast (deleteAnime, future destructive actions) ───── */
+.at-confirm-toast {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 280px;
+  max-width: 360px;
+  padding: 10px 12px;
+  background: var(--bg-card, #1c1f24);
+  border: 1px solid var(--b1, rgba(255, 255, 255, 0.12));
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  font-size: 12px;
+  color: var(--t1, #e8eaed);
+  transform: translate(-50%, 14px);
+  opacity: 0;
+  transition: transform 180ms ease, opacity 180ms ease
+}
+
+.at-confirm-toast--visible {
+  transform: translate(-50%, 0);
+  opacity: 1
+}
+
+.at-confirm-toast--leaving {
+  transform: translate(-50%, 14px);
+  opacity: 0
+}
+
+.at-confirm-toast--danger {
+  border-color: rgba(240, 80, 80, 0.45)
+}
+
+.at-confirm-text {
+  flex: 1;
+  min-width: 0
+}
+
+.at-confirm-title {
+  font-weight: 700;
+  margin-bottom: 2px;
+  color: var(--t1, #e8eaed)
+}
+
+.at-confirm-body {
+  font-size: 11px;
+  color: var(--t2, #9aa0a6);
+  line-height: 1.35
+}
+
+.at-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0
+}
+
+.at-confirm-toast button {
+  border: 1px solid var(--b1, rgba(255, 255, 255, 0.12));
+  background: var(--bg-2, #23262d);
+  color: var(--t1, #e8eaed);
+  font: inherit;
+  padding: 6px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background var(--tf, 150ms ease), border-color var(--tf, 150ms ease)
+}
+
+.at-confirm-toast button:hover {
+  background: var(--bg-3, #2a2e36)
+}
+
+.at-confirm-toast--danger .at-confirm-ok {
+  background: rgba(240, 80, 80, 0.18);
+  border-color: rgba(240, 80, 80, 0.45);
+  color: #ffcfcf
+}
+
+.at-confirm-toast--danger .at-confirm-ok:hover {
+  background: rgba(240, 80, 80, 0.28)
+}
+
+/* ─── Keyboard focus rings ─────────────────────────────────────────────── */
+.anime-card:focus-visible,
+.anime-season-group:focus-visible,
+.anime-movie-group:focus-visible {
+  outline: 2px solid rgba(79, 195, 247, 0.7);
+  outline-offset: 2px;
+  border-radius: 12px
+}
+
+.anime-card:focus:not(:focus-visible) {
+  outline: none
+}
+
+/* ─── Favorite (star) indicator & button ───────────────────────────────── */
+.anime-favorite-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  flex-shrink: 0;
+  color: #ffd166
+}
+
+.anime-favorite-indicator svg {
+  width: 14px;
+  height: 14px;
+  filter: drop-shadow(0 0 2px rgba(255, 209, 102, 0.4))
+}
+
+.anime-favorite-toggle.is-favorite {
+  color: #ffd166;
+  border-color: rgba(255, 209, 102, 0.45) !important;
+  background: rgba(255, 209, 102, 0.08) !important
+}
+
+.anime-favorite-toggle.is-favorite svg {
+  color: #ffd166
+}
+
+/* ─── One-shot status toast (UIHelpers.showToast) ──────────────────────── */
+.at-toast {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  z-index: 10000;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  background: var(--bg-card, #1c1f24);
+  color: var(--t1, #e8eaed);
+  border: 1px solid var(--b1, rgba(255, 255, 255, 0.12));
+  transform: translate(-50%, 14px);
+  opacity: 0;
+  transition: transform 200ms ease, opacity 200ms ease;
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: 80%
+}
+
+.at-toast--visible {
+  transform: translate(-50%, 0);
+  opacity: 1
+}
+
+.at-toast--leaving {
+  transform: translate(-50%, 14px);
+  opacity: 0
+}
+
+.at-toast--success {
+  border-color: rgba(54, 212, 116, 0.45);
+  color: #d4f7e1
+}
+
+.at-toast--error {
+  border-color: rgba(240, 80, 80, 0.45);
+  color: #ffd0d0
+}
+
+/* ─── Reduced motion ───────────────────────────────────────────────────
+   Respect users with vestibular sensitivity / OS-level reduced-motion.
+   We keep transforms/colors functional but neutralize duration. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important
+  }
 }

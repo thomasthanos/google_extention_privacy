@@ -47,7 +47,9 @@ const FirebaseSync = {
                 animeData: source.animeData || {},
                 videoProgress: source.videoProgress || {},
                 deletedAnime: source.deletedAnime || {},
-                groupCoverImages: source.groupCoverImages || {}
+                groupCoverImages: source.groupCoverImages || {},
+                goalSettings: source.goalSettings || {},
+                badgeUnlocks: source.badgeUnlocks || {}
             };
         }
 
@@ -92,7 +94,7 @@ const FirebaseSync = {
 
     async hydrateSyncData(data) {
         const payload = this.cloneSyncData(data);
-        const missingKeys = ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']
+        const missingKeys = ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'goalSettings', 'badgeUnlocks']
             .filter((key) => typeof payload[key] === 'undefined');
 
         if (missingKeys.length > 0) {
@@ -113,6 +115,8 @@ const FirebaseSync = {
         payload.videoProgress = payload.videoProgress || {};
         payload.deletedAnime = payload.deletedAnime || {};
         payload.groupCoverImages = payload.groupCoverImages || {};
+        payload.goalSettings = payload.goalSettings || {};
+        payload.badgeUnlocks = payload.badgeUnlocks || {};
         return payload;
     },
 
@@ -242,12 +246,14 @@ const FirebaseSync = {
                     videoProgress: dataToSave.videoProgress || {},
                     deletedAnime: dataToSave.deletedAnime || {},
                     groupCoverImages: dataToSave.groupCoverImages || {},
+                    goalSettings: dataToSave.goalSettings || {},
+                    badgeUnlocks: dataToSave.badgeUnlocks || {},
                     lastUpdated: new Date().toISOString(),
                     email: this.currentUser.email
                 };
 
                 await FirebaseLib.setDocument('users', this.currentUser.uid, savedDoc, {
-                    fields: ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'lastUpdated', 'email']
+                    fields: ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'goalSettings', 'badgeUnlocks', 'lastUpdated', 'email']
                 });
                 this.setCachedUserDocument(this.currentUser.uid, savedDoc);
                 PopupLogger.log('Firebase', 'Data saved to cloud');
@@ -377,7 +383,9 @@ const FirebaseSync = {
                 'videoProgress',
                 'userId',
                 'deletedAnime',
-                'groupCoverImages'
+                'groupCoverImages',
+                'goalSettings',
+                'badgeUnlocks'
             ]);
 
             // Read local once and reuse for both the pre-upload VP merge and
@@ -415,6 +423,15 @@ const FirebaseSync = {
                 const cloudGroupCovers = cloudData.groupCoverImages || {};
                 const mergedGroupCovers = AnimeTracker.MergeUtils.mergeGroupCoverImages(localGroupCovers, cloudGroupCovers);
 
+                const mergedGoalSettings = AnimeTracker.MergeUtils.mergeGoalSettings(
+                    localData.goalSettings || {},
+                    cloudData.goalSettings || {}
+                );
+                const mergedBadgeUnlocks = AnimeTracker.MergeUtils.mergeBadgeUnlocks(
+                    localData.badgeUnlocks || {},
+                    cloudData.badgeUnlocks || {}
+                );
+
                 const normalized = ProgressManager.normalizeCanonicalSlugs(
                     finalData.animeData || {},
                     finalData.videoProgress || {},
@@ -446,6 +463,8 @@ const FirebaseSync = {
                 finalData.videoProgress = cleanedProgress;
 
                 finalData.groupCoverImages = mergedGroupCovers;
+                finalData.goalSettings = mergedGoalSettings;
+                finalData.badgeUnlocks = mergedBadgeUnlocks;
 
                 // Only write to local storage when the merged result actually
                 // differs from what's already on disk. An unconditional Storage.set
@@ -457,6 +476,8 @@ const FirebaseSync = {
                     !areProgressMapsEqual(finalData.videoProgress || {}, localData.videoProgress || {}) ||
                     !shallowEqualDeletedAnime(finalData.deletedAnime || {}, localData.deletedAnime || {}) ||
                     !shallowEqualObjectMap(finalData.groupCoverImages || {}, localData.groupCoverImages || {}) ||
+                    !shallowEqualObjectMap(finalData.goalSettings || {}, localData.goalSettings || {}) ||
+                    !shallowEqualObjectMap(finalData.badgeUnlocks || {}, localData.badgeUnlocks || {}) ||
                     localData.userId !== this.currentUser.uid;
 
                 if (needsLocalWrite) {
@@ -465,6 +486,8 @@ const FirebaseSync = {
                         videoProgress: finalData.videoProgress,
                         deletedAnime: mergedDeletedAnime,
                         groupCoverImages: mergedGroupCovers,
+                        goalSettings: mergedGoalSettings,
+                        badgeUnlocks: mergedBadgeUnlocks,
                         userId: this.currentUser.uid
                     });
                 }
@@ -476,7 +499,9 @@ const FirebaseSync = {
                         !AnimeTracker.MergeUtils.areAnimeDataMapsEqual(finalData.animeData || {}, cloudData.animeData || {}) ||
                         !areProgressMapsEqual(finalData.videoProgress || {}, cloudData.videoProgress || {}) ||
                         !shallowEqualDeletedAnime(finalData.deletedAnime || {}, cloudData.deletedAnime || {}) ||
-                        !shallowEqualObjectMap(finalData.groupCoverImages || {}, cloudData.groupCoverImages || {});
+                        !shallowEqualObjectMap(finalData.groupCoverImages || {}, cloudData.groupCoverImages || {}) ||
+                        !shallowEqualObjectMap(finalData.goalSettings || {}, cloudData.goalSettings || {}) ||
+                        !shallowEqualObjectMap(finalData.badgeUnlocks || {}, cloudData.badgeUnlocks || {});
 
                     if (needsCloudWrite) {
                         if (this.saveToCloudTimeout) {
@@ -491,6 +516,8 @@ const FirebaseSync = {
                             videoProgress: finalData.videoProgress || {},
                             deletedAnime: finalData.deletedAnime || {},
                             groupCoverImages: finalData.groupCoverImages || {},
+                            goalSettings: finalData.goalSettings || {},
+                            badgeUnlocks: finalData.badgeUnlocks || {},
                             lastUpdated: cloudData?.lastUpdated || null,
                             email: this.currentUser?.email || cloudData?.email || null
                         });
@@ -513,7 +540,9 @@ const FirebaseSync = {
                         animeData: ProgressManager.removeDuplicateEpisodes(withoutAutoRepaired.cleanedData),
                         videoProgress: normalized.videoProgress || {},
                         deletedAnime: normalized.deletedAnime || {},
-                        groupCoverImages: localData.groupCoverImages || {}
+                        groupCoverImages: localData.groupCoverImages || {},
+                        goalSettings: localData.goalSettings || {},
+                        badgeUnlocks: localData.badgeUnlocks || {}
                     };
 
                     await Storage.set({
@@ -521,6 +550,8 @@ const FirebaseSync = {
                         videoProgress: finalData.videoProgress,
                         deletedAnime: finalData.deletedAnime,
                         groupCoverImages: finalData.groupCoverImages,
+                        goalSettings: finalData.goalSettings,
+                        badgeUnlocks: finalData.badgeUnlocks,
                         userId: this.currentUser.uid
                     });
 
@@ -531,12 +562,14 @@ const FirebaseSync = {
                     this.pendingSave = this.cloneSyncData(finalData);
                     await this.performCloudSave(elements);
                 } else {
-                    finalData = { animeData: {}, videoProgress: {}, deletedAnime: {}, groupCoverImages: {} };
+                    finalData = { animeData: {}, videoProgress: {}, deletedAnime: {}, groupCoverImages: {}, goalSettings: {}, badgeUnlocks: {} };
                     await Storage.set({
                         animeData: {},
                         videoProgress: {},
                         deletedAnime: {},
                         groupCoverImages: {},
+                        goalSettings: {},
+                        badgeUnlocks: {},
                         userId: this.currentUser.uid
                     });
                 }
@@ -581,11 +614,13 @@ const FirebaseSync = {
                 videoProgress:    dataToSave.videoProgress || {},
                 deletedAnime:     dataToSave.deletedAnime || {},
                 groupCoverImages: dataToSave.groupCoverImages || {},
+                goalSettings:     dataToSave.goalSettings || {},
+                badgeUnlocks:     dataToSave.badgeUnlocks || {},
                 lastUpdated:      new Date().toISOString(),
                 email:            this.currentUser.email
             }, {
                 keepalive: true,
-                fields: ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'lastUpdated', 'email']
+                fields: ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'goalSettings', 'badgeUnlocks', 'lastUpdated', 'email']
             }).catch(err => {
                 PopupLogger.error('Sync', 'Save on unload failed:', err);
             });

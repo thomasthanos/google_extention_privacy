@@ -1,6 +1,21 @@
 (function () {
     'use strict';
 
+    // ─── Placeholder durations ───────────────────────────────────────────
+    // Legacy default values that historic episodes were saved with before
+    // the video element reported a real duration. We treat any of these
+    // as "unknown / needs refresh" so a real measurement can replace them:
+    //   1440 = 24 min (default episode), 6000 = 100 min (legacy movie),
+    //   7200 = 120 min (alt legacy movie/special).
+    const PLACEHOLDER_DURATION_VALUES = Object.freeze([1440, 6000, 7200]);
+    const PLACEHOLDER_DURATION_SET = new Set(PLACEHOLDER_DURATION_VALUES);
+
+    function isPlaceholderDuration(duration) {
+        const d = Number(duration) || 0;
+        if (d <= 0) return true;
+        return PLACEHOLDER_DURATION_SET.has(d);
+    }
+
     function toMillis(value) {
         if (!value) return 0;
         const ts = new Date(value).getTime();
@@ -497,6 +512,49 @@
         return Number(entry.coverSetAt) || 0;
     }
 
+    function mergeGoalSettings(local, cloud) {
+        const localObj = local || {};
+        const cloudObj = cloud || {};
+        const keys = new Set([...Object.keys(localObj), ...Object.keys(cloudObj)]);
+        const result = {};
+
+        for (const key of keys) {
+            const localEntry = localObj[key] || {};
+            const cloudEntry = cloudObj[key] || {};
+            const localTs = toMillis(localEntry.updatedAt);
+            const cloudTs = toMillis(cloudEntry.updatedAt);
+            result[key] = cloudTs > localTs ? { ...cloudEntry } : { ...localEntry };
+        }
+
+        return result;
+    }
+
+    function mergeBadgeUnlocks(local, cloud) {
+        const localObj = local || {};
+        const cloudObj = cloud || {};
+        const keys = new Set([...Object.keys(localObj), ...Object.keys(cloudObj)]);
+        const result = {};
+
+        for (const key of keys) {
+            const localEntry = localObj[key];
+            const cloudEntry = cloudObj[key];
+            if (!localEntry) { result[key] = { ...cloudEntry }; continue; }
+            if (!cloudEntry) { result[key] = { ...localEntry }; continue; }
+            const localTs = toMillis(localEntry.unlockedAt);
+            const cloudTs = toMillis(cloudEntry.unlockedAt);
+            const earliest = (localTs && cloudTs) ? (localTs <= cloudTs ? localEntry : cloudEntry)
+                : (localEntry || cloudEntry);
+            result[key] = {
+                ...cloudEntry,
+                ...localEntry,
+                unlockedAt: earliest?.unlockedAt || localEntry.unlockedAt || cloudEntry.unlockedAt,
+                notified: !!(localEntry.notified || cloudEntry.notified)
+            };
+        }
+
+        return result;
+    }
+
     function mergeGroupCoverImages(local, cloud) {
         const localObj = local || {};
         const cloudObj = cloud || {};
@@ -524,6 +582,8 @@
         applyDeletedAnime,
         removeDeletedProgress,
         mergeGroupCoverImages,
+        mergeGoalSettings,
+        mergeBadgeUnlocks,
         getCoverUrl,
         getCoverSetAt,
         areAnimeDataMapsEqual,
@@ -531,6 +591,8 @@
         shallowEqualDeletedAnime,
         shallowEqualStringMap,
         shallowEqualObjectMap,
-        isLikelyMovieSlug
+        isLikelyMovieSlug,
+        isPlaceholderDuration,
+        PLACEHOLDER_DURATION_VALUES
     };
 })();

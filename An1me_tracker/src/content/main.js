@@ -583,12 +583,16 @@
             .episode-list-item.current-episode .at-current-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; font-size: 10px; font-weight: 700; line-height: 1.2; color: #0e1117; background: linear-gradient(135deg, #7dd3fc, #4fc3f7); border-radius: 4px; letter-spacing: 0.5px; vertical-align: middle; box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 0 8px rgba(79, 195, 247, 0.45); text-transform: uppercase; animation: at-current-pulse 2.2s ease-in-out infinite; }
             @keyframes at-current-pulse { 0%, 100% { box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 0 8px rgba(79, 195, 247, 0.45); } 50% { box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 0 14px rgba(79, 195, 247, 0.75); } }
             .episode-list-item.current-episode.at-watched-episode, .episode-list-item.current-episode.at-filler-episode { border-left-color: #4fc3f7 !important; opacity: 1 !important; }
+            @media (prefers-reduced-motion: reduce) {
+                .episode-list-item.current-episode .at-current-badge { animation: none !important; }
+            }
         `;
         (document.head || document.documentElement).appendChild(style);
         decorateCurrentEpisode();
     }
 
     let _currentEpisodeObserver = null;
+    let _currentEpisodeObserverTimeout = null;
     function decorateCurrentEpisode() {
         const apply = () => {
             document.querySelectorAll('.at-current-badge').forEach(badge => {
@@ -606,15 +610,32 @@
         };
         apply();
 
-        if (_currentEpisodeObserver) { try { _currentEpisodeObserver.disconnect(); } catch { } }
-        const target = document.querySelector('.episode-list-display-box')?.parentElement || document.body;
+        // Tear down any prior observer/timeout so re-runs (e.g. after SPA
+        // navigation between episodes) don't leak stacked watchers.
+        if (_currentEpisodeObserver) { try { _currentEpisodeObserver.disconnect(); } catch { } _currentEpisodeObserver = null; }
+        if (_currentEpisodeObserverTimeout) { clearTimeout(_currentEpisodeObserverTimeout); _currentEpisodeObserverTimeout = null; }
+
+        // Scope to the episode list container only — was previously falling
+        // back to document.body which fires for every unrelated mutation.
+        const target = document.querySelector('.episode-list-display-box')
+            || document.querySelector('.episode-list-display-box')?.parentElement
+            || document.querySelector('.episode-head')
+            || document.body;
         let _applyDebounce = null;
         _currentEpisodeObserver = new MutationObserver(() => {
             if (_applyDebounce) return;
             _applyDebounce = setTimeout(() => { _applyDebounce = null; apply(); }, 150);
         });
-        _currentEpisodeObserver.observe(target, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
-        setTimeout(() => { try { _currentEpisodeObserver?.disconnect(); } catch { } _currentEpisodeObserver = null; }, 15000);
+        _currentEpisodeObserver.observe(target, {
+            childList: true, subtree: true, attributes: true, attributeFilter: ['class']
+        });
+        // 60s — long enough for slow-loading episode lists, short enough to
+        // not be a forever-listener on long-lived pages.
+        _currentEpisodeObserverTimeout = setTimeout(() => {
+            try { _currentEpisodeObserver?.disconnect(); } catch { }
+            _currentEpisodeObserver = null;
+            _currentEpisodeObserverTimeout = null;
+        }, 60000);
     }
 
     function highlightFillerEpisodes(slug, title) {
@@ -746,13 +767,48 @@
                     while (fillerEpisodes.includes(nextCanon) && nextCanon <= maxSearch) nextCanon++;
                     if (nextCanon <= maxSearch) {
                         Logger.info(`⏭ Filler detected (Ep ${animeInfo.episodeNumber}), skipping to Ep ${nextCanon}`);
+                        // Build a dismissible toast — the previous version did
+                        // an unconditional `window.location.href = ...` after 1.5s
+                        // even if the user pressed Back or wanted to watch the
+                        // filler intentionally. Now they get a Cancel button and
+                        // a Skip Now button.
+                        let cancelled = false;
                         try {
                             const toast = document.createElement('div');
-                            toast.textContent = `⏭ Filler Ep ${animeInfo.episodeNumber} — skipping to Ep ${nextCanon}`;
-                            Object.assign(toast.style, { position: 'fixed', bottom: '30px', right: '30px', zIndex: '2147483647', padding: '12px 20px', borderRadius: '10px', fontSize: '14px', fontWeight: '600', color: '#fff', background: 'rgba(30,30,40,0.92)', backdropFilter: 'blur(12px)', boxShadow: '0 4px 20px rgba(0,0,0,0.4)', fontFamily: 'system-ui, sans-serif' });
+                            Object.assign(toast.style, {
+                                position: 'fixed', bottom: '30px', right: '30px', zIndex: '2147483647',
+                                padding: '12px 16px', borderRadius: '10px', fontSize: '14px', fontWeight: '600',
+                                color: '#fff', background: 'rgba(30,30,40,0.95)', backdropFilter: 'blur(12px)',
+                                boxShadow: '0 4px 20px rgba(0,0,0,0.4)', fontFamily: 'system-ui, sans-serif',
+                                display: 'flex', alignItems: 'center', gap: '12px',
+                                transition: 'opacity 200ms ease, transform 200ms ease'
+                            });
+                            const text = document.createElement('span');
+                            text.textContent = `⏭ Filler Ep ${animeInfo.episodeNumber} — skipping to Ep ${nextCanon}`;
+                            const cancelBtn = document.createElement('button');
+                            cancelBtn.textContent = 'Stay';
+                            Object.assign(cancelBtn.style, {
+                                padding: '6px 12px', border: '1px solid rgba(255,255,255,0.2)',
+                                background: 'rgba(255,255,255,0.05)', color: '#fff', borderRadius: '6px',
+                                fontWeight: '600', cursor: 'pointer', fontSize: '12px'
+                            });
+                            cancelBtn.addEventListener('click', () => {
+                                cancelled = true;
+                                try { toast.remove(); } catch {}
+                            });
+                            toast.appendChild(text);
+                            toast.appendChild(cancelBtn);
                             document.body.appendChild(toast);
+                            // Cancel-on-back: if user navigates away, abort the redirect.
+                            window.addEventListener('beforeunload', () => { cancelled = true; }, { once: true });
                         } catch { }
-                        setTimeout(() => { window.location.href = `https://an1me.to/watch/${animeInfo.animeSlug}-episode-${nextCanon}`; }, 1500);
+                        setTimeout(() => {
+                            if (cancelled) {
+                                Logger.info(`Filler skip cancelled for Ep ${animeInfo.episodeNumber}`);
+                                return;
+                            }
+                            window.location.href = `https://an1me.to/watch/${animeInfo.animeSlug}-episode-${nextCanon}`;
+                        }, 1500);
                         return;
                     }
                     Logger.info(`⏭ Filler detected (Ep ${animeInfo.episodeNumber}) but no more canon episodes found`);
