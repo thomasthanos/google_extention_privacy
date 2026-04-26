@@ -4,23 +4,17 @@
     const FIREBASE_API_KEY = 'AIzaSyCDF9US2OwARlyZ0AH_zDpjzmOXRtrGKMg';
     const FIREBASE_PROJECT_ID = 'anime-tracker-64d86';
     const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)`;
-    const LISTEN_URL = `${FIRESTORE_BASE}/documents:listen`;
-    const FIRESTORE_LISTEN_SUPPORTED = false;
     const CLOUD_POLL_INTERVAL_MS = 60000;
 
     const Logger = window.AnimeTrackerContent?.Logger;
 
     let initialized = false;
-    let listenAbortCtrl = null;
-    let startListeningInFlight = false;
-    let reconnectTimeout = null;
     let currentToken = null;
     let currentUser = null;
-    let reconnectDelay = 5000;
-    const MAX_RECONNECT = 60000;
     let lastCloudPollAt = 0;
     let pollInFlight = null;
     let teardownSyncTriggered = false;
+    let cloudPollingTimer = null;
 
     let csSyncPausedUntil = 0;
     function csPauseSync(ms = 4000) {
@@ -82,8 +76,7 @@
         } catch (e) {
             Logger?.warn(`Failed to clear auth storage during sign-out: ${e.message}`);
         }
-        if (listenAbortCtrl) listenAbortCtrl.abort();
-        if (reconnectTimeout) { clearTimeout(reconnectTimeout); reconnectTimeout = null; }
+        stopCloudPolling();
         currentToken = null;
         currentUser = null;
     }
@@ -690,123 +683,37 @@
         }
     }
 
-    async function startListening() {
-        if (startListeningInFlight) {
-            Logger?.debug('startListening: already in flight, skip');
-            return;
-        }
-        startListeningInFlight = true;
+    // Orion-mode cloud polling. Replaces the old Firestore documents:listen
+    // SSE stream — that path required gRPC and never opened over plain fetch
+    // (UNIMPLEMENTED on first byte). Plain polling on CLOUD_POLL_INTERVAL_MS
+    // is the supported fallback and what the SW already uses.
+    async function startCloudPolling() {
+        if (cloudPollingTimer) return;
 
-        if (listenAbortCtrl) listenAbortCtrl.abort();
-        listenAbortCtrl = new AbortController();
-
-        const token = await getValidToken();
-        const user = currentUser || await getUser();
-        if (!token || !user) { startListeningInFlight = false; scheduleReconnect(10000); return; }
-
-        currentToken = token;
-        currentUser = user;
-
-        if (!FIRESTORE_LISTEN_SUPPORTED) {
+        const tick = async () => {
             try {
-                await pollCloudDoc(token, user, 'listen-fallback');
-            } finally {
-                startListeningInFlight = false;
+                const token = await getValidToken();
+                const user = currentUser || await getUser();
+                if (!token || !user) return;
+                currentToken = token;
+                currentUser = user;
+                await pollCloudDoc(token, user, 'periodic');
+            } catch (e) {
+                Logger?.debug(`Cloud poll tick failed: ${e?.message || e}`);
             }
-            scheduleReconnect(CLOUD_POLL_INTERVAL_MS);
-            return;
-        }
+        };
 
-        const docPath = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${user.uid}`;
-        let tokenRefreshInterval = null;
-        const streamOpenedAt = Date.now();
-
-        try {
-            const res = await fetch(`${LISTEN_URL}?key=${FIREBASE_API_KEY}`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ addTarget: { documents: { documents: [docPath] }, targetId: 1 } }),
-                signal: listenAbortCtrl.signal
-            });
-
-            if (!res.ok) { scheduleReconnect(); return; }
-
-            Logger?.info('Firestore stream connected');
-
-            tokenRefreshInterval = setInterval(async () => {
-                const fresh = await getValidToken();
-                if (!fresh) {
-                    clearInterval(tokenRefreshInterval);
-                    tokenRefreshInterval = null;
-                    listenAbortCtrl?.abort();
-                    return;
-                }
-                if (fresh !== currentToken) {
-                    clearInterval(tokenRefreshInterval);
-                    tokenRefreshInterval = null;
-                    listenAbortCtrl?.abort();
-                    currentToken = fresh;
-                    startListening();
-                }
-            }, 45 * 60 * 1000);
-
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
-
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-                buffer += decoder.decode(value, { stream: true });
-                if (buffer.length > 256 * 1024) {
-                    Logger?.warn('SSE buffer overflow, reconnecting');
-                    listenAbortCtrl?.abort();
-                    scheduleReconnect(1000);
-                    return;
-                }
-                const lines = buffer.split('\n');
-                buffer = lines.pop();
-                for (const line of lines) {
-                    const t = line.trim();
-                    if (!t || t === '[' || t === ']' || t === ',') continue;
-                    const jsonStr = t.startsWith(',') ? t.slice(1) : t;
-                    if (!jsonStr) continue;
-                    try {
-                        const msg = JSON.parse(jsonStr);
-                        if (msg.documentChange?.document?.fields) {
-                            await applyCloudUpdate(fromFSDoc(msg.documentChange.document));
-                        }
-                        if (msg.targetChange?.targetChangeType === 'REMOVE' &&
-                            msg.targetChange?.cause?.code === 16) {
-                            listenAbortCtrl.abort();
-                            currentToken = await getValidToken();
-                            if (currentToken) startListening();
-                            return;
-                        }
-                    } catch { }
-                }
-            }
-        } catch (e) {
-            if (e.name === 'AbortError') { startListeningInFlight = false; return; }
-            Logger?.warn(`Stream error: ${e.message}`);
-        } finally {
-            if (tokenRefreshInterval) {
-                clearInterval(tokenRefreshInterval);
-                tokenRefreshInterval = null;
-            }
-            if (Date.now() - streamOpenedAt >= 15000) {
-                reconnectDelay = 5000;
-            }
-            startListeningInFlight = false;
-        }
-        scheduleReconnect();
+        // Fire one immediate poll so the page lands on fresh data without
+        // waiting CLOUD_POLL_INTERVAL_MS.
+        tick();
+        cloudPollingTimer = setInterval(tick, CLOUD_POLL_INTERVAL_MS);
     }
 
-    function scheduleReconnect(delay) {
-        if (reconnectTimeout) clearTimeout(reconnectTimeout);
-        const d = Math.max(5000, delay ?? reconnectDelay);
-        reconnectDelay = Math.min(reconnectDelay * 1.5, MAX_RECONNECT);
-        reconnectTimeout = setTimeout(startListening, d);
+    function stopCloudPolling() {
+        if (cloudPollingTimer) {
+            clearInterval(cloudPollingTimer);
+            cloudPollingTimer = null;
+        }
     }
 
     function watchStorage(isOrionMode) {
@@ -865,10 +772,16 @@
                 if (isOrionMode) {
                     scheduleFullPush(1500);
                 } else {
-                    setTimeout(async () => {
-                        const swAlive = await wakeBackgroundSW('SYNC_TO_FIREBASE');
-                        if (!swAlive) pushFullDirect();
-                    }, 500);
+                    // SW-mode: the BG service worker has its own storage.onChanged
+                    // listener that debounces and writes to Firestore. Just wake it
+                    // up — don't issue a CS-side push, that produced duplicate writes
+                    // (BG debounce 5s vs CS direct 500ms could race within the
+                    // pauseSync window). The fallback `pushFullDirect()` only fires
+                    // if the SW failed to respond, so we don't lose the change in
+                    // the rare SW-dead case.
+                    wakeBackgroundSW('SYNC_TO_FIREBASE').then((alive) => {
+                        if (!alive) pushFullDirect();
+                    });
                 }
                 return;
             }
@@ -936,25 +849,27 @@
         Logger?.info('No SW — starting full sync mode (Orion)');
         initialized = true;
         watchStorage(true);
-        startListening();
+        startCloudPolling();
         scheduleFullPush(4000);
 
         document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) startListening();
+            if (document.hidden) {
+                stopCloudPolling();
+            } else {
+                startCloudPolling();
+            }
         });
 
         const orionTokenRefreshTimer = setInterval(async () => {
             const newToken = await getValidToken();
-            if (!newToken) return;
-            if (newToken !== currentToken) {
+            if (newToken && newToken !== currentToken) {
                 currentToken = newToken;
-                startListening();
             }
         }, 50 * 60 * 1000);
 
         window.addEventListener('beforeunload', () => {
             clearInterval(orionTokenRefreshTimer);
-            listenAbortCtrl?.abort();
+            stopCloudPolling();
             pushOnTeardown(true);
         });
     }

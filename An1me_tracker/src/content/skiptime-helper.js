@@ -16,7 +16,7 @@
  *  - Reset (0) + quick disable action
  *  - Auto-fills outro-end from video duration on first capture
  *  - When all 4 captured → 3-sec countdown toast with Cancel → auto-submit
- *  - Cache survives reload (chrome.storage.local, keyed by canonical slug)
+ *  - Cache survives reload (chrome.storage.local, keyed per episode slug)
  *  - Cache cleared after successful submit OR after 7 days idle
  *  - Keyboard shortcuts active when player has focus (skipped while typing
  *    in another input)
@@ -57,7 +57,8 @@
     let videoObserver = null;
     let controlsObserver = null;
     let urlObserver = null;
-    let lastUrl = location.href;
+    let episodeWatchTimer = null;
+    let lastEpisodeIdentity = null;
     let submitCountdownTimer = null;
 
     // ─── Helpers ────────────────────────────────────────────────────────
@@ -71,32 +72,132 @@
         };
     }
 
-    function getCanonicalSlug() {
-        // Strip the `-episode-N` suffix so the cache shares state across
-        // episodes of the same anime (intro/outro usually identical).
+    function getFallbackEpisodeIdentity() {
         try {
             const path = location.pathname.replace(/^\/+|\/+$/g, '');
-            const watchMatch = path.match(/^watch\/(.+?)(?:-episode-\d+)?$/i);
-            return watchMatch ? watchMatch[1] : path;
+            const nestedWatchMatch = path.match(/^watch\/([^/]+)\/([^/]+)$/i);
+            if (nestedWatchMatch) {
+                const animeSlug = nestedWatchMatch[1];
+                const episodeMatch = nestedWatchMatch[2].match(/(?:^|[-_])ep(?:isode)?[-_]?(\d+)/i)
+                    || nestedWatchMatch[2].match(/(\d+)/);
+                const episodeNumber = parseInt(episodeMatch?.[1], 10);
+                if (animeSlug && Number.isFinite(episodeNumber) && episodeNumber > 0) {
+                    return `${animeSlug}__episode-${episodeNumber}`;
+                }
+            }
+
+            const flatWatchMatch = path.match(/^watch\/(.+?)-episode-(\d+)(?:$|[/?#])/i);
+            if (flatWatchMatch) {
+                return `${flatWatchMatch[1]}__episode-${parseInt(flatWatchMatch[2], 10)}`;
+            }
+
+            return path;
         } catch {
             return 'unknown';
         }
     }
 
+    function parseEpisodeNumberFromText(text) {
+        if (!text || typeof text !== 'string') return 0;
+        const match = text.match(/Episode\s*(\d+)/i)
+            || text.match(/\bEp\s*(\d+)/i)
+            || text.match(/\b(\d+)\b/);
+        const value = parseInt(match?.[1], 10);
+        return Number.isFinite(value) && value > 0 ? value : 0;
+    }
+
+    function getEpisodeNumberFromDom() {
+        const selectors = [
+            '.episode-list-item.current-episode',
+            '.episode-list-item.active',
+            '.episode-list .active',
+            '.episodes .current',
+            '[data-open-nav-episode].current-episode',
+            '[data-open-nav-episode].active'
+        ];
+
+        for (const selector of selectors) {
+            const node = document.querySelector(selector);
+            if (!node) continue;
+
+            const directValue = node.getAttribute?.('data-episode-search-query')
+                || node.getAttribute?.('data-open-nav-episode')
+                || node.dataset?.episodeSearchQuery
+                || node.dataset?.openNavEpisode;
+            const directNumber = parseInt(directValue, 10);
+            if (Number.isFinite(directNumber) && directNumber > 0) return directNumber;
+
+            const href = node.getAttribute?.('href')
+                || node.querySelector?.('a[href]')?.getAttribute?.('href')
+                || '';
+            const hrefMatch = href.match(/-episode-(\d+)(?:$|[/?#])/i);
+            const hrefNumber = parseInt(hrefMatch?.[1], 10);
+            if (Number.isFinite(hrefNumber) && hrefNumber > 0) return hrefNumber;
+
+            const textNumber = parseEpisodeNumberFromText(node.textContent || node.getAttribute?.('title') || '');
+            if (textNumber > 0) return textNumber;
+        }
+
+        return 0;
+    }
+
+    function getEpisodeIdentity() {
+        const domEpisodeNumber = getEpisodeNumberFromDom();
+        try {
+            const info = window.AnimeTrackerContent?.AnimeParser?.extractAnimeInfo?.();
+            if (info?.animeSlug && domEpisodeNumber > 0) {
+                return `${info.animeSlug}__episode-${domEpisodeNumber}`;
+            }
+            if (info?.animeSlug && Number.isFinite(Number(info.episodeNumber)) && Number(info.episodeNumber) > 0) {
+                return `${info.animeSlug}__episode-${Number(info.episodeNumber)}`;
+            }
+        } catch (e) {
+            Logger.debug('Skiptime: AnimeParser identity lookup failed', e);
+        }
+        return getFallbackEpisodeIdentity();
+    }
+
     function cacheKey() {
-        return STORAGE_CACHE_PREFIX + getCanonicalSlug();
+        // Key per actual parsed episode, not full href. This keeps the helper
+        // stable through in-page URL noise while still resetting on real
+        // episode changes.
+        return STORAGE_CACHE_PREFIX + getEpisodeIdentity();
+    }
+
+    function cancelSubmitCountdown() {
+        if (!submitCountdownTimer) return;
+        clearInterval(submitCountdownTimer);
+        submitCountdownTimer = null;
+    }
+
+    async function handleEpisodeIdentityChange(nextEpisodeIdentity) {
+        if (!nextEpisodeIdentity || nextEpisodeIdentity === lastEpisodeIdentity) return;
+        lastEpisodeIdentity = nextEpisodeIdentity;
+        Logger.info('Skiptime: episode changed, refreshing panel state');
+
+        cancelSubmitCountdown();
+        video = getVideoElement();
+        setDropdownOpen(false);
+
+        if (mounted && panelEl?.isConnected) {
+            await refreshPanelState();
+            return;
+        }
+
+        scheduleMount();
     }
 
     async function loadCache() {
         try {
-            const result = await chrome.storage.local.get([cacheKey()]);
-            const stored = result[cacheKey()];
+            const key = cacheKey();
+            const result = await chrome.storage.local.get([key]);
+            const stored = result[key];
             if (!stored) return defaultCache();
             // Auto-prune stale caches.
             if (stored.updatedAt) {
                 const age = Date.now() - new Date(stored.updatedAt).getTime();
                 if (age > CACHE_TTL_MS) {
-                    await chrome.storage.local.remove([cacheKey()]);
+                    await chrome.storage.local.remove([key]);
                     return defaultCache();
                 }
             }
@@ -109,15 +210,19 @@
 
     async function saveCache(cache) {
         try {
+            const key = cacheKey();
             const next = { ...cache, updatedAt: new Date().toISOString() };
-            await chrome.storage.local.set({ [cacheKey()]: next });
+            await chrome.storage.local.set({ [key]: next });
         } catch (e) {
             Logger.warn('Skiptime: saveCache failed', e);
         }
     }
 
     async function clearCache() {
-        try { await chrome.storage.local.remove([cacheKey()]); } catch {}
+        try {
+            const key = cacheKey();
+            await chrome.storage.local.remove([key]);
+        } catch {}
     }
 
     function isComplete(cache) {
@@ -354,10 +459,7 @@
     }
 
     async function resetCache() {
-        if (submitCountdownTimer) {
-            clearInterval(submitCountdownTimer);
-            submitCountdownTimer = null;
-        }
+        cancelSubmitCountdown();
         await clearCache();
 
         // Re-prime outro-end from video duration so subsequent captures still
@@ -412,7 +514,29 @@
     }
 
     function findField(selector) {
-        return document.querySelector(selector);
+        for (const doc of getSearchDocuments()) {
+            const node = doc?.querySelector?.(selector);
+            if (node) return node;
+        }
+        return null;
+    }
+
+    function findSkiptimeOpenButton() {
+        const directMatch = findField('#an1-skiptime-btn');
+        if (directMatch) return directMatch;
+
+        const selectors = [
+            '[data-target="#an1-skip-panel"]',
+            '[aria-controls="an1-skip-panel"]',
+            '[data-bs-target="#an1-skip-panel"]'
+        ];
+        for (const selector of selectors) {
+            const node = findField(selector);
+            if (node) return node;
+        }
+
+        const candidates = Array.from(document.querySelectorAll('button, a'));
+        return candidates.find((node) => /add\s*skip\s*time|skip\s*time/i.test((node.textContent || '').trim())) || null;
     }
 
     function dispatchFieldEvents(field) {
@@ -451,7 +575,7 @@
 
     async function ensureSkipPanelOpen() {
         if (findField('#an1-skip-panel')) return true;
-        const openBtn = findField('#an1-skiptime-btn');
+        const openBtn = findSkiptimeOpenButton();
         if (!openBtn) {
             showToast('Add Skiptime button not found', 'error');
             return false;
@@ -578,6 +702,18 @@
                 controlsObserver.observe(target, { childList: true, subtree: true });
             } catch {}
         });
+    }
+
+    function ensureEpisodeWatcher() {
+        if (episodeWatchTimer || !helperEnabled) return;
+        episodeWatchTimer = setInterval(() => {
+            if (!helperEnabled) return;
+            const nextEpisodeIdentity = getEpisodeIdentity();
+            if (!nextEpisodeIdentity || nextEpisodeIdentity === lastEpisodeIdentity) return;
+            handleEpisodeIdentityChange(nextEpisodeIdentity).catch((e) => {
+                Logger.debug('Skiptime: episode watcher refresh failed', e);
+            });
+        }, 1000);
     }
 
     function injectStyles(targetDoc = document) {
@@ -1057,11 +1193,11 @@
 
             if (!urlObserver) {
                 urlObserver = new MutationObserver(() => {
-                    if (location.href === lastUrl) return;
-                    lastUrl = location.href;
-                    Logger.info('Skiptime: URL changed, remounting dropdown');
-                    unmountPanel();
-                    if (helperEnabled) setTimeout(scheduleMount, 800);
+                    const nextEpisodeIdentity = getEpisodeIdentity();
+                    if (!nextEpisodeIdentity || nextEpisodeIdentity === lastEpisodeIdentity) return;
+                    handleEpisodeIdentityChange(nextEpisodeIdentity).catch((e) => {
+                        Logger.debug('Skiptime: mutation-driven refresh failed', e);
+                    });
                 });
                 if (document.body) {
                     urlObserver.observe(document.body, { childList: true, subtree: true });
@@ -1076,6 +1212,7 @@
             // ArtPlayer can re-render the controls immediately after we inject.
             // Re-arm observation and verify the panel actually survived.
             ensureControlsObserver();
+            ensureEpisodeWatcher();
             setTimeout(() => {
                 if (!helperEnabled || mountInProgress) return;
                 if (panelEl?.isConnected) return;
@@ -1094,10 +1231,7 @@
     }
 
     function unmountPanel() {
-        if (submitCountdownTimer) {
-            clearInterval(submitCountdownTimer);
-            submitCountdownTimer = null;
-        }
+        cancelSubmitCountdown();
         document.removeEventListener('keydown', onKeyDown, true);
         document.removeEventListener('pointerdown', onDocumentPointerDown, true);
         if (panelDoc && panelDoc !== document) {
@@ -1115,6 +1249,10 @@
         if (urlObserver) {
             urlObserver.disconnect();
             urlObserver = null;
+        }
+        if (episodeWatchTimer) {
+            clearInterval(episodeWatchTimer);
+            episodeWatchTimer = null;
         }
         if (panelEl) { try { panelEl.remove(); } catch {} panelEl = null; }
         panelDoc = null;
@@ -1144,8 +1282,10 @@
         if (!helperEnabled) return;
 
         Logger.info('Skiptime: scheduleMount -> controls dropdown');
+        lastEpisodeIdentity = getEpisodeIdentity();
         video = getVideoElement();
         ensureControlsObserver();
+        ensureEpisodeWatcher();
         mountPanel();
 
         if (!video) {
@@ -1189,6 +1329,7 @@
 
     async function init() {
         Logger.info('Skiptime: init() running on', location.pathname);
+        lastEpisodeIdentity = getEpisodeIdentity();
         listenForToggleChanges();
         try {
             const result = await chrome.storage.local.get([STORAGE_TOGGLE_KEY]);

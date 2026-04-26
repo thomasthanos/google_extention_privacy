@@ -2,8 +2,6 @@ const FIREBASE_API_KEY = "AIzaSyCDF9US2OwARlyZ0AH_zDpjzmOXRtrGKMg";
 const FIREBASE_PROJECT_ID = "anime-tracker-64d86";
 const FIRESTORE_DATABASE = `projects/${FIREBASE_PROJECT_ID}/databases/(default)`;
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/${FIRESTORE_DATABASE}`;
-const LISTEN_URL = `${FIRESTORE_BASE}/documents:listen`;
-const FIRESTORE_LISTEN_SUPPORTED = false;
 const CLOUD_POLL_INTERVAL_MS = 60000;
 
 importScripts('src/common/merge-utils.js');
@@ -360,19 +358,6 @@ function isSyncPaused() {
     return Date.now() < syncPausedUntil;
 }
 
-let rtListenAbort = null;
-let rtReconnectTimer = null;
-let rtReconnectDelay = 5000;
-const RT_MAX_DELAY = 5 * 60 * 1000;
-
-const RT_MAX_FAILURES = 5;
-const RT_PAUSE_AFTER_MAX_MS = 15 * 60 * 1000;
-let rtConsecutiveFailures = 0;
-let rtPausedAt = 0;
-let _lastRtFailSignature = '';
-let _lastRtFailRepeatCount = 0;
-let rtStreamPermanentlyDisabled = false;
-let _lastSuccessfulStreamOpenedAt = 0;
 let _lastCloudPollAt = 0;
 let _cloudPollInFlight = null;
 
@@ -394,17 +379,10 @@ function addStreamConsumer(id) {
         ddebug(`[BG-RT] Consumer ${id} reclaimed idle window`);
     }
 
-    if (wasEmpty && !FIRESTORE_LISTEN_SUPPORTED) {
+    if (wasEmpty) {
+        // Single consumer woke us up — fetch the cloud doc once so
+        // popup/content land on fresh data without waiting for a debounce.
         pollCloudData('consumer-connected').catch(() => { });
-        return;
-    }
-
-    if (wasEmpty && !rtStreamPermanentlyDisabled) {
-        ddebug(`[BG-RT] Consumer connected (${id}) — waking stream`);
-        const streamDead = !rtListenAbort || rtListenAbort.signal.aborted;
-        if (streamDead && !rtReconnectTimer) {
-            startRealtimeListener();
-        }
     }
 }
 
@@ -417,7 +395,8 @@ function removeStreamConsumer(id) {
     _idleTeardownTimer = setTimeout(() => {
         _idleTeardownTimer = null;
         if (activeStreamConsumers.size > 0) return;
-        ddebug('[BG-RT] Idle grace expired — pausing stream');
+        // Last consumer left — flush any pending progress write so we don't
+        // leave watch-time unflushed when the user closes the last tab.
         if (progressSyncDebounce) {
             clearTimeout(progressSyncDebounce);
             progressSyncDebounce = null;
@@ -425,10 +404,6 @@ function removeStreamConsumer(id) {
                 syncProgressOnly().catch(() => { });
             }
         }
-        if (rtListenAbort) { try { rtListenAbort.abort(); } catch { } }
-        rtListenAbort = null;
-        if (rtReconnectTimer) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
-        rtReconnectDelay = 5000;
     }, IDLE_TEARDOWN_GRACE_MS);
 }
 
@@ -439,8 +414,6 @@ async function signOutDueToTokenFailure() {
     } catch (e) {
         console.error('[BG] Failed to clear auth storage during sign-out:', e);
     }
-    if (rtListenAbort) rtListenAbort.abort();
-    if (rtReconnectTimer) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
 }
 
 async function getFirebaseToken() {
@@ -885,189 +858,10 @@ async function _doApplyCloudUpdate(cloudDoc) {
     }
 }
 
-async function startRealtimeListener() {
-    if (!FIRESTORE_LISTEN_SUPPORTED) {
-        if (!rtStreamPermanentlyDisabled) {
-            rtStreamPermanentlyDisabled = true;
-            console.warn('[BG-RT] Firestore documents:listen is not usable over plain fetch here; using polling sync instead.');
-        }
-        await pollCloudData('listen-fallback');
-        return;
-    }
-    if (rtStreamPermanentlyDisabled) return;
-    if (!hasStreamConsumers()) {
-        ddebug('[BG-RT] No active consumers, skipping stream start');
-        return;
-    }
-    if (rtConsecutiveFailures >= RT_MAX_FAILURES) {
-        if (!rtStreamPermanentlyDisabled) {
-            rtStreamPermanentlyDisabled = true;
-            console.warn('[BG-RT] breaker tripped — disabling real-time stream for this session. Falling back to polling sync.');
-            if (rtListenAbort) { try { rtListenAbort.abort(); } catch { } }
-            rtListenAbort = null;
-            if (rtReconnectTimer) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
-        }
-        return;
-    }
-
-    if (rtListenAbort) rtListenAbort.abort();
-    if (rtReconnectTimer) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
-
-    const user = await getFirebaseUser();
-    const token = await getFirebaseToken();
-    if (!user || !token) {
-        rtReconnectTimer = setTimeout(startRealtimeListener, 15000);
-        return;
-    }
-
-    const gapSinceLastMessage = Date.now() - lastStreamMessageAt;
-    const justHadSuccessfulOpen = _lastSuccessfulStreamOpenedAt > 0 &&
-        (Date.now() - _lastSuccessfulStreamOpenedAt) < 60000;
-    if (gapSinceLastMessage > 45000 && !justHadSuccessfulOpen) {
-        ddebug(`[BG-RT] Catching up after ${Math.round(gapSinceLastMessage / 1000)}s gap...`);
-        try {
-            const cloudDoc = await fetchCloudData(user, token);
-            if (cloudDoc) await applyCloudUpdate(cloudDoc);
-        } catch (e) {
-            console.warn('[BG-RT] Catch-up fetch failed:', e.message);
-        }
-    }
-
-    rtListenAbort = new AbortController();
-    const docPath = `${FIRESTORE_DATABASE}/documents/users/${user.uid}`;
-
-    ddebug('[BG-RT] Opening real-time stream...');
-    let streamSucceeded = false;
-    let streamOpenedAt = 0;
-    try {
-        const res = await fetch(`${LISTEN_URL}?key=${FIREBASE_API_KEY}`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                database: FIRESTORE_DATABASE,
-                addTarget: { documents: { documents: [docPath] }, targetId: 1 }
-            }),
-            signal: rtListenAbort.signal
-        });
-
-        if (!res.ok) {
-            const bodyText = await res.text().catch(() => '');
-            let innerCode = 0;
-            let innerMessage = '';
-            try {
-                const parsed = JSON.parse(bodyText);
-                innerCode = Number(parsed?.error?.code) || 0;
-                innerMessage = parsed?.error?.message || '';
-            } catch { }
-            if (res.status === 501 || innerCode === 501) {
-                rtStreamPermanentlyDisabled = true;
-                console.warn('[BG-RT] documents:listen returned UNIMPLEMENTED — disabling real-time stream. Falling back to polling sync.');
-                if (rtListenAbort) { try { rtListenAbort.abort(); } catch { } }
-                rtListenAbort = null;
-                if (rtReconnectTimer) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
-                return;
-            }
-            const serverError = res.status >= 500 || innerCode >= 500;
-            const signature = `${res.status}/${innerCode}`;
-            if (signature === _lastRtFailSignature) {
-                _lastRtFailRepeatCount++;
-                if (_lastRtFailRepeatCount % 10 === 0) {
-                    console.warn(`[BG-RT] Stream open still failing (${signature}) ×${_lastRtFailRepeatCount}`);
-                }
-            } else {
-                _lastRtFailSignature = signature;
-                _lastRtFailRepeatCount = 1;
-                console.warn(
-                    `[BG-RT] Stream open failed: HTTP ${res.status}` +
-                    `${innerCode ? ` (inner ${innerCode})` : ''}` +
-                    `${innerMessage ? ` - ${innerMessage}` : ''}`
-                );
-            }
-            rtConsecutiveFailures++;
-            if (serverError) {
-                rtReconnectDelay = Math.max(rtReconnectDelay, 60000);
-                rtConsecutiveFailures += 1;
-            } else if (res.status === 401 || res.status === 403 || innerCode === 401 || innerCode === 403) {
-                rtReconnectDelay = Math.max(rtReconnectDelay, 15000);
-            }
-            scheduleRtReconnect();
-            return;
-        }
-
-        streamSucceeded = true;
-        streamOpenedAt = Date.now();
-        markStreamAlive();
-        ddebug('[BG-RT] ✓ Real-time stream connected');
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-
-            markStreamAlive();
-
-            buffer += decoder.decode(value, { stream: true });
-            if (buffer.length > 256 * 1024) {
-                console.warn('[BG-RT] SSE buffer overflow, reconnecting');
-                rtListenAbort.abort();
-                scheduleRtReconnect();
-                return;
-            }
-            const lines = buffer.split('\n');
-            buffer = lines.pop();
-
-            for (const line of lines) {
-                const t = line.trim();
-                if (!t || t === '[' || t === ']' || t === ',') continue;
-                const jsonStr = t.startsWith(',') ? t.slice(1) : t;
-                if (!jsonStr) continue;
-                try {
-                    const msg = JSON.parse(jsonStr);
-                    if (msg.documentChange?.document?.fields) {
-                        await applyCloudUpdate(fromFSDoc(msg.documentChange.document));
-                    }
-                    if (msg.targetChange?.targetChangeType === 'REMOVE' &&
-                        msg.targetChange?.cause?.code === 16) {
-                        rtListenAbort.abort();
-                        setTimeout(startRealtimeListener, 1000);
-                        return;
-                    }
-                } catch {
-                }
-            }
-        }
-    } catch (e) {
-        if (e.name === 'AbortError') return;
-        console.warn('[BG-RT] Stream error:', e.message);
-    }
-
-    const uptimeMs = streamOpenedAt > 0 ? Date.now() - streamOpenedAt : 0;
-    if (streamSucceeded && uptimeMs >= 15000) {
-        rtConsecutiveFailures = 0;
-        rtPausedAt = 0;
-        rtReconnectDelay = 5000;
-        _lastSuccessfulStreamOpenedAt = streamOpenedAt;
-        _lastRtFailSignature = '';
-        _lastRtFailRepeatCount = 0;
-    } else {
-        rtConsecutiveFailures++;
-    }
-    scheduleRtReconnect();
-}
-
-function scheduleRtReconnect() {
-    if (rtStreamPermanentlyDisabled) return;
-    if (!hasStreamConsumers()) {
-        if (rtReconnectTimer) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
-        return;
-    }
-    const delay = Math.max(5000, rtReconnectDelay);
-    rtReconnectTimer = setTimeout(startRealtimeListener, delay);
-    rtReconnectDelay = Math.min(rtReconnectDelay * 1.5, RT_MAX_DELAY);
-}
+// Realtime Firestore listener removed — Firestore's documents:listen requires
+// gRPC streaming, which the plain `fetch` API in MV3 service workers cannot
+// drive (UNIMPLEMENTED on first byte). All sync goes through pollCloudData()
+// when consumers connect, plus chrome.storage.onChanged-driven write flushes.
 
 let progressSyncDebounce = null;
 
@@ -2625,8 +2419,11 @@ chrome.runtime.onConnect.addListener((port) => {
     });
 });
 
-chrome.alarms.create('keepAlive', { periodInMinutes: 1 });
-
+// keepAlive alarm removed — service worker is now woken on demand via the
+// `keepAlive` and `popupAlive` runtime ports (see chrome.runtime.onConnect
+// handler above). Periodic polling/stream restarts no longer need an alarm:
+// the metadata-repair tick reschedules itself via METADATA_REPAIR_ALARM and
+// pollCloudData runs whenever a fresh consumer connects.
 chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === METADATA_REPAIR_ALARM) {
         runMetadataRepairBatch().catch((error) => {
@@ -2639,48 +2436,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
         checkNewEpisodes().catch(e => console.warn('[BG] Smart notif check error:', e));
         return;
     }
-
-    if (alarm.name !== 'keepAlive') return;
-
-    resumeMetadataRepairIfNeeded().catch((error) => {
-        console.error('[BG] Failed to resume metadata repair from keepAlive:', error);
-    });
-
-    if (!hasStreamConsumers()) return;
-    if (!FIRESTORE_LISTEN_SUPPORTED || rtStreamPermanentlyDisabled) {
-        pollCloudData('keepAlive').catch(() => { });
-        return;
-    }
-    if (rtStreamPermanentlyDisabled) return;
-
-    const streamDead = !rtListenAbort || rtListenAbort.signal.aborted;
-    const reconnectPending = !!rtReconnectTimer;
-    if (streamDead && !reconnectPending) {
-        ddebug('[BG] keepAlive: stream dead and no reconnect pending, restarting...');
-        startRealtimeListener();
-    }
-
-    checkStreamHealth();
 });
-
-let lastStreamMessageAt = Date.now();
-
-function markStreamAlive() {
-    lastStreamMessageAt = Date.now();
-}
-
-function checkStreamHealth() {
-    if (rtStreamPermanentlyDisabled) return;
-    if (!hasStreamConsumers()) return;
-    if (rtReconnectTimer) return;
-    const elapsed = Date.now() - lastStreamMessageAt;
-    if (elapsed > 90000) {
-        ddebug(`[BG] Stream silent for ${Math.round(elapsed / 1000)}s, reconnecting`);
-        lastStreamMessageAt = Date.now();
-        if (rtListenAbort) rtListenAbort.abort();
-        startRealtimeListener();
-    }
-}
 
 maybeStartPendingMetadataRepair().catch((error) => {
     console.error('[BG] Failed to start pending metadata repair on boot:', error);

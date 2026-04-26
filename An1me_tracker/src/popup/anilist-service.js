@@ -73,7 +73,16 @@ const AnilistService = {
         }
     },
 
-    async autoFetchMissing(animeData, onComplete) {
+    /**
+     * Delegates the actual fetching to the BG service worker (which already
+     * rate-limits via batchFetchAnimeInfo). Progress is observed by listening
+     * to chrome.storage.onChanged for `animeinfo_${slug}` writes — the BG
+     * persists each result after a successful fetch, so we can count those
+     * as completed steps without adding any new BG-protocol surface.
+     *
+     * Signature now matches FillerService.autoFetchMissing(animeData, onComplete, onProgress).
+     */
+    async autoFetchMissing(animeData, onComplete, onProgress) {
         const { Storage } = window.AnimeTracker;
 
         try {
@@ -116,14 +125,60 @@ const AnilistService = {
 
             PopupLogger.log('AnimeInfo', `Delegating ${slugsToFetch.length} anime to background...`);
 
+            const total = slugsToFetch.length;
+            const expectedKeys = new Set(slugsToFetch.map(s => `animeinfo_${s}`));
+            let processed = 0;
+            let storageListener = null;
+            let timeoutId = null;
+            let finished = false;
+
+            const finish = () => {
+                if (finished) return;
+                finished = true;
+                if (storageListener) {
+                    try { chrome.storage.onChanged.removeListener(storageListener); } catch { }
+                    storageListener = null;
+                }
+                if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
+                if (onComplete) onComplete();
+            };
+
+            // Listen for `animeinfo_<slug>` writes that the BG emits as it
+            // works through the batch. Each write = one step of progress.
+            storageListener = (changes, namespace) => {
+                if (namespace !== 'local') return;
+                for (const key of Object.keys(changes)) {
+                    if (!expectedKeys.has(key)) continue;
+                    expectedKeys.delete(key);
+                    processed++;
+                    const slug = key.replace(/^animeinfo_/, '');
+                    const title = animeData[slug]?.title || slug;
+                    try {
+                        if (onProgress) onProgress(processed, total, title);
+                    } catch (e) {
+                        PopupLogger.warn('AnimeInfo', 'onProgress threw:', e);
+                    }
+                    if (expectedKeys.size === 0) {
+                        finish();
+                        return;
+                    }
+                }
+            };
+            chrome.storage.onChanged.addListener(storageListener);
+
+            // Safety net: BG batchFetchAnimeInfo paces ~3 anime per 1.2s, so
+            // give it generous headroom (max ≈ 5s/anime, capped at 5min). If
+            // anything stalls we still call onComplete so the UI unstucks.
+            const MAX_WAIT_MS = Math.min(5 * 60 * 1000, Math.max(30000, total * 5000));
+            timeoutId = setTimeout(finish, MAX_WAIT_MS);
+
             chrome.runtime.sendMessage(
                 { type: 'BATCH_FETCH_ANIME_INFO', slugs: slugsToFetch },
-                () => { if (chrome.runtime.lastError) { } }
+                () => { if (chrome.runtime.lastError) finish(); }
             );
-
-            if (onComplete) onComplete();
         } catch (error) {
             PopupLogger.error('AnimeInfo', 'Auto-fetch error:', error);
+            if (onComplete) onComplete();
         }
     }
 };

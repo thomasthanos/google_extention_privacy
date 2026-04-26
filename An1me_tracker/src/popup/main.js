@@ -32,15 +32,6 @@
         googleSignIn: document.getElementById('googleSignIn'),
         // Settings Menu
         settingsBtn: document.getElementById('settingsBtn'),
-        // Legacy dropdown removed in Settings-view migration. Stub kept so
-        // existing callsites like `elements.settingsDropdown.classList.remove('visible')`
-        // (≈ a dozen scattered through this file) keep no-op'ing instead of
-        // throwing. Real settings live in #settingsView (a view-mode).
-        settingsDropdown: (() => {
-            const noop = () => {};
-            const stubClassList = { add: noop, remove: noop, toggle: noop, contains: () => false };
-            return { classList: stubClassList, contains: () => false, setAttribute: noop };
-        })(),
         settingsAvatar: document.getElementById('settingsAvatar'),
         settingsUserName: document.getElementById('settingsUserName'),
         settingsUserEmail: document.getElementById('settingsUserEmail'),
@@ -132,7 +123,11 @@
     }
     let deferredListRefresh = null;
     let realignCategoryTabs = () => {};
-    const POPUP_CLOUD_REFRESH_MS = 60000;
+    // 5min interval — reuses the FirebaseSync user-document cache (TTL also
+    // 5min) and the SW's `_BG_CLOUD_TTL`, so each tick costs at most 1 read
+    // and only when the cache window has rolled over. Was 60s+forceFresh,
+    // which produced ~60 Firestore reads/hour just for an idle open popup.
+    const POPUP_CLOUD_REFRESH_MS = 5 * 60 * 1000;
     let popupCloudRefreshTimer = null;
 
     function getSettingsDonateButton() {
@@ -2007,8 +2002,12 @@
         stopPopupCloudRefresh();
         if (document.hidden || !AT?.FirebaseSync?.getUser?.()) return;
 
+        // forceFresh=false — reuse the local user-document cache. The cache
+        // is invalidated automatically when storage.onChanged fires for any
+        // synced key (see initEventListeners), so external updates still land.
+        // Forcing a fresh GET each tick was ~60 reads/hour for nothing.
         popupCloudRefreshTimer = setInterval(() => {
-            refreshPopupCloudData(true).catch((error) => {
+            refreshPopupCloudData(false).catch((error) => {
                 PopupLogger.debug('Sync', 'Background popup refresh skipped:', error?.message || error);
             });
         }, POPUP_CLOUD_REFRESH_MS);
@@ -3209,9 +3208,7 @@
 
         const exportTokenBtn = document.getElementById('settingsExportToken');
         if (exportTokenBtn) {
-            exportTokenBtn.addEventListener('click', async () => {
-                elements.settingsDropdown?.classList.remove('visible');
-                try {
+            exportTokenBtn.addEventListener('click', async () => {                try {
                     const tokenData = await FirebaseLib.exportSessionToken();
                     const tokenStr = JSON.stringify(tokenData);
                     const overlay = document.createElement('div');
@@ -3275,9 +3272,7 @@
         document.addEventListener('click', (e) => {
             const donateTrigger = e.target.closest('#settingsDonate');
             if (donateTrigger) {
-                e.stopPropagation();
-                elements.settingsDropdown.classList.remove('visible');
-                setSettingsDataToolsExpanded(false);
+                e.stopPropagation();                setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
                 setTimeout(openDonateDropdown, 80);
             }
@@ -3316,9 +3311,7 @@
 
         if (elements.settingsRefresh) {
             elements.settingsRefresh.addEventListener('click', async () => {
-                elements.settingsRefresh.classList.add('loading');
-                elements.settingsDropdown.classList.remove('visible');
-                setSettingsDataToolsExpanded(false);
+                elements.settingsRefresh.classList.add('loading');                setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
                 try {
                     if (FirebaseSync.getUser()) {
@@ -3337,9 +3330,7 @@
         if (elements.settingsRefreshInfo) {
             elements.settingsRefreshInfo.addEventListener('click', async () => {
                 const { Storage, AnilistService } = AT;
-                elements.settingsRefreshInfo.classList.add('loading');
-                elements.settingsDropdown.classList.remove('visible');
-                setSettingsDataToolsExpanded(false);
+                elements.settingsRefreshInfo.classList.add('loading');                setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
                 try {
                     // Clear all cached anime info from storage so autoFetchMissing re-fetches everything
@@ -3366,18 +3357,14 @@
         }
 
         if (elements.settingsClear) {
-            elements.settingsClear.addEventListener('click', () => {
-                elements.settingsDropdown.classList.remove('visible');
-                setSettingsDataToolsExpanded(false);
+            elements.settingsClear.addEventListener('click', () => {                setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
                 showDialog();
             });
         }
 
         if (elements.settingsExportData) {
-            elements.settingsExportData.addEventListener('click', () => {
-                elements.settingsDropdown.classList.remove('visible');
-                setSettingsDataToolsExpanded(false);
+            elements.settingsExportData.addEventListener('click', () => {                setSettingsDataToolsExpanded(false);
                 exportLibraryToJson().catch((err) => {
                     PopupLogger.error('Export', err);
                     AT.UIHelpers?.showToast?.('Export failed', { type: 'error', duration: 3500 });
@@ -3392,9 +3379,7 @@
             });
             elements.settingsImportFile.addEventListener('change', async (e) => {
                 const file = e.target.files?.[0];
-                if (!file) return;
-                elements.settingsDropdown.classList.remove('visible');
-                setSettingsDataToolsExpanded(false);
+                if (!file) return;                setSettingsDataToolsExpanded(false);
                 try {
                     await importLibraryFromFile(file);
                 } catch (err) {
@@ -3409,18 +3394,14 @@
         }
 
         if (elements.settingsSignOut) {
-            elements.settingsSignOut.addEventListener('click', () => {
-                elements.settingsDropdown.classList.remove('visible');
-                setSettingsDataToolsExpanded(false);
+            elements.settingsSignOut.addEventListener('click', () => {                setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
                 signOut();
             });
         }
 
         if (elements.settingsFetchFillers) {
-            elements.settingsFetchFillers.addEventListener('click', async () => {
-                elements.settingsDropdown.classList.remove('visible');
-                setSettingsDataToolsExpanded(false);
+            elements.settingsFetchFillers.addEventListener('click', async () => {                setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
                 await fetchAllFillers({ autoStart: true });
             });
@@ -4115,11 +4096,6 @@
             if (openDialog) {
                 const cancel = openDialog.querySelector('[data-dialog-cancel], .btn-cancel, .dialog-cancel');
                 if (cancel) { cancel.click(); return; }
-            }
-            if (elements.settingsDropdown?.classList.contains('visible')) {
-                elements.settingsDropdown.classList.remove('visible');
-                elements.settingsBtn?.setAttribute('aria-expanded', 'false');
-                return;
             }
             if (elements.sortDropdown?.classList.contains('visible')) {
                 elements.sortDropdown.classList.remove('visible');
