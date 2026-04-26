@@ -107,7 +107,8 @@ const AnimeParser = {
             }
 
             const originalSlug = animeSlug;
-            let totalEpisodes = this.detectTotalEpisodes(originalSlug);
+            const releaseStatus = this.detectReleaseStatus();
+            let totalEpisodes = this.detectTotalEpisodes(originalSlug, releaseStatus);
 
             const offsetMapping = window.AnimeTrackerContent?.EPISODE_OFFSET_MAPPING || {};
             const offset = offsetMapping[originalSlug] || 0;
@@ -212,8 +213,49 @@ const AnimeParser = {
         return null;
     },
 
-    detectTotalEpisodes(animeSlug) {
+    detectReleaseStatus() {
         try {
+            const text = document.body?.textContent?.replace(/\s+/g, ' ').trim() || '';
+            if (!text) return null;
+            if (/Currently\s+Airing|Προβάλλεται\s+τώρα/i.test(text)) return 'RELEASING';
+            if (/Finished\s+Airing|Ολοκληρώθηκε/i.test(text)) return 'FINISHED';
+        } catch {
+        }
+        return null;
+    },
+
+    detectExplicitTotalEpisodes() {
+        try {
+            const labelRegex = /^(episodes?|επεισόδια)\b/i;
+            const labelNodes = document.querySelectorAll('dt, th');
+
+            for (const labelNode of labelNodes) {
+                const labelText = (labelNode.textContent || '').replace(/\s+/g, ' ').trim();
+                if (!labelRegex.test(labelText)) continue;
+
+                const valueNode = labelNode.nextElementSibling;
+                const valueText = (valueNode?.textContent || '').replace(/\s+/g, ' ').trim();
+                const match = valueText.match(/\b(\d{1,4})\b/);
+                if (!match) continue;
+
+                const total = parseInt(match[1], 10);
+                if (Number.isFinite(total) && total > 0 && total <= 9999) {
+                    return total;
+                }
+            }
+        } catch {
+        }
+
+        return null;
+    },
+
+    detectTotalEpisodes(animeSlug, releaseStatus = null) {
+        try {
+            const explicitTotal = this.detectExplicitTotalEpisodes();
+            if (Number.isFinite(explicitTotal) && explicitTotal > 0) {
+                return explicitTotal;
+            }
+
             const episodeNumbers = new Set();
             const navEpisodeNumbers = new Set();
             const escapedSlug = (animeSlug || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -286,6 +328,10 @@ const AnimeParser = {
 
             const maxEpisode = Math.max(...sourceNumbers);
             if (!Number.isFinite(maxEpisode) || maxEpisode <= 0 || maxEpisode > 9999) return null;
+            // On airing pages the episode nav only tells us what is currently
+            // available, not the final episode count, so don't persist it as
+            // the library total unless the page is clearly marked finished.
+            if (releaseStatus !== 'FINISHED') return null;
             return maxEpisode;
         } catch {
             return null;

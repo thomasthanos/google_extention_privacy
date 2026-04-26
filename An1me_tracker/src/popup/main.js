@@ -32,7 +32,15 @@
         googleSignIn: document.getElementById('googleSignIn'),
         // Settings Menu
         settingsBtn: document.getElementById('settingsBtn'),
-        settingsDropdown: document.getElementById('settingsDropdown'),
+        // Legacy dropdown removed in Settings-view migration. Stub kept so
+        // existing callsites like `elements.settingsDropdown.classList.remove('visible')`
+        // (≈ a dozen scattered through this file) keep no-op'ing instead of
+        // throwing. Real settings live in #settingsView (a view-mode).
+        settingsDropdown: (() => {
+            const noop = () => {};
+            const stubClassList = { add: noop, remove: noop, toggle: noop, contains: () => false };
+            return { classList: stubClassList, contains: () => false, setAttribute: noop };
+        })(),
         settingsAvatar: document.getElementById('settingsAvatar'),
         settingsUserName: document.getElementById('settingsUserName'),
         settingsUserEmail: document.getElementById('settingsUserEmail'),
@@ -126,6 +134,57 @@
     let realignCategoryTabs = () => {};
     const POPUP_CLOUD_REFRESH_MS = 60000;
     let popupCloudRefreshTimer = null;
+
+    function getSettingsDonateButton() {
+        return document.getElementById('settingsDonate');
+    }
+
+    function closeDonateDropdown() {
+        if (!elements.donateDropdown) return;
+        elements.donateDropdown.classList.remove('visible');
+        delete elements.donateDropdown.dataset.placement;
+    }
+
+    function positionDonateDropdown() {
+        const dropdown = elements.donateDropdown;
+        const trigger = getSettingsDonateButton();
+        const content = dropdown?.querySelector('.donate-dropdown-content');
+        if (!dropdown || !trigger || !content) return;
+
+        const triggerRect = trigger.getBoundingClientRect();
+        const dropdownWidth = Math.ceil(content.offsetWidth || 220);
+        const dropdownHeight = Math.ceil(content.offsetHeight || 132);
+        const gap = 8;
+        const viewportPadding = 10;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        let left = triggerRect.right - dropdownWidth;
+        left = Math.max(viewportPadding, Math.min(left, viewportWidth - dropdownWidth - viewportPadding));
+
+        let top = triggerRect.top - dropdownHeight - gap;
+        let placement = 'above';
+
+        if (top < viewportPadding) {
+            top = Math.min(triggerRect.bottom + gap, viewportHeight - dropdownHeight - viewportPadding);
+            placement = 'below';
+        }
+
+        const arrowOffset = triggerRect.left + (triggerRect.width / 2) - left;
+        const clampedArrow = Math.max(22, Math.min(arrowOffset, dropdownWidth - 22));
+
+        dropdown.style.left = `${Math.round(left)}px`;
+        dropdown.style.top = `${Math.round(top)}px`;
+        dropdown.style.setProperty('--donate-arrow-offset', `${Math.round(clampedArrow)}px`);
+        dropdown.dataset.placement = placement;
+    }
+
+    function openDonateDropdown() {
+        if (!elements.donateDropdown || !getSettingsDonateButton()) return;
+        positionDonateDropdown();
+        elements.donateDropdown.classList.add('visible');
+        requestAnimationFrame(positionDonateDropdown);
+    }
 
     // Cached markup from the last full anime-list render. When the next render
     // would produce the same markup (common: storage.onChanged fires for keys
@@ -266,6 +325,38 @@
         }
     }
 
+    // ── Skiptime Helper setting ──
+    // Toggle exposed in Settings view → Playback & Tracking card. The actual
+    // floating panel lives in src/content/skiptime-helper.js and listens for
+    // chrome.storage changes on this key to mount/unmount itself live.
+    const SKIPTIME_HELPER_KEY = 'skiptimeHelperEnabled';
+
+    function renderSkiptimeHelperSetting(enabled) {
+        const btn = document.getElementById('settingsSkiptime');
+        if (!btn) return;
+        btn.dataset.enabled = enabled ? 'true' : 'false';
+        btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+        const subtitle = document.getElementById('settingsSkiptimeSubtitle');
+        if (subtitle) {
+            subtitle.textContent = enabled
+                ? 'Capture intro/outro on an1me.to/watch'
+                : 'Floating panel for intro/outro contributions';
+        }
+    }
+
+    async function loadSkiptimeHelperSetting() {
+        try {
+            const result = await chrome.storage.local.get([SKIPTIME_HELPER_KEY]);
+            const enabled = result[SKIPTIME_HELPER_KEY] === true;
+            renderSkiptimeHelperSetting(enabled);
+            return enabled;
+        } catch (error) {
+            PopupLogger.warn('Settings', 'Failed to load skiptime helper setting:', error);
+            renderSkiptimeHelperSetting(false);
+            return false;
+        }
+    }
+
     function setSettingsDataToolsExpanded(expanded) {
         if (!elements.settingsDataTools || !elements.settingsDataToolsToggle) return;
         const isExpanded = !!expanded;
@@ -353,6 +444,45 @@
     function normalizeCompactStatus(value) {
         const allowed = new Set(['airing', 'on_hold', 'completed', 'dropped']);
         return allowed.has(value) ? value : 'airing';
+    }
+
+    function getKnownTotalEpisodesForRepair(slug, anime) {
+        const localTotal = Number(anime?.totalEpisodes) || 0;
+        const cachedTotal = Number(AT.AnilistService?.getTotalEpisodes(String(slug || '').toLowerCase())) || 0;
+        return Math.max(localTotal, cachedTotal, 0);
+    }
+
+    function repairAiringCompletedEntries(data, options = {}) {
+        const targetData = data || {};
+        const requestedSlugs = Array.isArray(options.slugs) ? options.slugs : null;
+        const slugs = requestedSlugs && requestedSlugs.length
+            ? requestedSlugs
+            : Object.keys(targetData);
+        let changed = false;
+
+        for (const slug of slugs) {
+            const anime = targetData?.[slug];
+            if (!anime || anime.droppedAt || anime.onHoldAt) continue;
+
+            const listState = String(anime.listState || '').toLowerCase();
+            if (!anime.completedAt && listState !== 'completed') continue;
+            if (AT.SeasonGrouping.isMovie(slug, anime)) continue;
+
+            const watchedCount = Array.isArray(anime.episodes) ? anime.episodes.length : 0;
+            if (watchedCount <= 0) continue;
+
+            const lowerSlug = String(slug || '').toLowerCase();
+            const anilistStatus = AT.AnilistService?.getStatus(lowerSlug);
+            if (anilistStatus !== 'RELEASING') continue;
+
+            const knownTotal = getKnownTotalEpisodesForRepair(lowerSlug, anime);
+            if (knownTotal <= watchedCount) continue;
+
+            setManualListState(anime, 'active', new Date().toISOString());
+            changed = true;
+        }
+
+        return changed;
     }
 
     function getCalendarDayDiff(isoString) {
@@ -1406,16 +1536,20 @@
 
     function setViewMode(mode) {
         const appRoot = document.querySelector('.app');
+        const mainContent = document.querySelector('.main-content');
         const statsView = document.getElementById('statsView');
         const goalsView = document.getElementById('goalsView');
+        const settingsView = document.getElementById('settingsView');
         const viewStatsBtn = document.getElementById('viewStatsBtn');
         const viewGoalsBtn = document.getElementById('viewGoalsBtn');
+        const settingsBtn = document.getElementById('settingsBtn');
 
         currentViewMode = mode || null;
 
         if (appRoot) {
             appRoot.classList.toggle('stats-mode', mode === 'stats');
             appRoot.classList.toggle('goals-mode', mode === 'goals');
+            appRoot.classList.toggle('settings-mode', mode === 'settings');
         }
         if (viewStatsBtn) {
             viewStatsBtn.classList.toggle('is-active', mode === 'stats');
@@ -1424,6 +1558,10 @@
         if (viewGoalsBtn) {
             viewGoalsBtn.classList.toggle('is-active', mode === 'goals');
             viewGoalsBtn.setAttribute('aria-pressed', mode === 'goals' ? 'true' : 'false');
+        }
+        if (settingsBtn) {
+            settingsBtn.classList.toggle('is-active', mode === 'settings');
+            settingsBtn.setAttribute('aria-pressed', mode === 'settings' ? 'true' : 'false');
         }
 
         if (mode === 'stats' && statsView) {
@@ -1437,7 +1575,71 @@
         } else if (mode === 'goals') {
             if (goalsView) goalsView.removeAttribute('hidden');
             renderGoalsView();
+        } else if (mode === 'settings') {
+            if (mainContent) mainContent.scrollTop = 0;
+            if (settingsView) settingsView.scrollTop = 0;
+            if (settingsView) settingsView.removeAttribute('hidden');
+            renderSettingsView();
         }
+    }
+
+    /**
+     * Render the Settings view with the current user, version and toggle states.
+     * Safe to call repeatedly — re-renders idempotently. Settings IDs are
+     * stable so any pre-bound handlers continue to work after re-render
+     * (handlers attach via event delegation in `initEventListeners`).
+     */
+    async function renderSettingsView() {
+        const container = document.getElementById('settingsView');
+        const mainContent = document.querySelector('.main-content');
+        if (!container) return;
+        container.removeAttribute('hidden');
+        container.scrollTop = 0;
+        if (mainContent) mainContent.scrollTop = 0;
+
+        const SettingsView = window.AnimeTracker?.SettingsView;
+        if (!SettingsView) {
+            container.textContent = 'Settings unavailable.';
+            return;
+        }
+
+        const user = AT?.FirebaseSync?.getUser?.() || null;
+        const version = chrome.runtime?.getManifest?.()?.version || null;
+
+        // Read all toggle states from storage so the UI matches reality. We
+        // can avoid this if main.js already has them in memory — but reading
+        // here keeps the view self-sufficient and tolerant of out-of-band
+        // changes (e.g. another popup tab toggled something).
+        let storedSettings = {};
+        try {
+            const stored = await chrome.storage.local.get([
+                COPY_GUARD_STORAGE_KEY,
+                SMART_NOTIF_STORAGE_KEY,
+                AUTO_SKIP_FILLER_STORAGE_KEY,
+                SKIPTIME_HELPER_KEY
+            ]);
+            storedSettings = {
+                copyGuard: stored[COPY_GUARD_STORAGE_KEY] !== false,
+                smartNotif: stored[SMART_NOTIF_STORAGE_KEY] === true,
+                autoSkipFiller: stored[AUTO_SKIP_FILLER_STORAGE_KEY] === true,
+                skiptimeHelper: stored[SKIPTIME_HELPER_KEY] === true
+            };
+        } catch (e) {
+            PopupLogger.warn('Settings', 'Failed to load toggle state for view:', e);
+        }
+
+        SettingsView.render(container, {
+            user,
+            version,
+            settings: storedSettings
+        });
+
+        container.scrollTop = 0;
+        if (mainContent) mainContent.scrollTop = 0;
+        requestAnimationFrame(() => {
+            container.scrollTop = 0;
+            if (mainContent) mainContent.scrollTop = 0;
+        });
     }
 
     function renderGoalsView() {
@@ -1651,6 +1853,12 @@
             await FillerService.loadCachedEpisodeTypes(animeData);
             await AT.AnilistService.loadCachedData(animeData);
 
+            if (repairAiringCompletedEntries(animeData)) {
+                const payload = { animeData };
+                markInternalSave(payload);
+                await Storage.set(payload);
+            }
+
             const slugsList = Object.keys(animeData);
             const { allFillersCached, allAnilistCached } = checkAllCached(slugsList);
 
@@ -1740,6 +1948,12 @@
 
                 await FillerService.loadCachedEpisodeTypes(animeData);
                 await AT.AnilistService.loadCachedData(animeData);
+
+                if (repairAiringCompletedEntries(animeData)) {
+                    const payload = { animeData };
+                    markInternalSave(payload);
+                    await Storage.set(payload);
+                }
 
                 const slugsList = Object.keys(animeData);
                 const { allFillersCached, allAnilistCached } = checkAllCached(slugsList);
@@ -2706,6 +2920,14 @@
         } else {
             delete AT.AnilistService.cache[slug];
         }
+
+        if (animeData?.[slug] && repairAiringCompletedEntries(animeData, { slugs: [slug] })) {
+            const payload = { animeData };
+            markInternalSave(payload);
+            AT.Storage.set(payload).catch((error) => {
+                PopupLogger.warn('AnimeInfo', 'Failed to persist repaired completion state:', error);
+            });
+        }
     }
 
     function applyEpisodeTypesCacheChange(storageKey, value) {
@@ -3027,42 +3249,52 @@
         }
 
         if (elements.settingsBtn) {
+            // Settings is now a view-mode (full popup) like Stats/Goals.
+            // Click toggles between settings view and library; click any other
+            // view button to switch directly.
             elements.settingsBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (elements.donateDropdown) elements.donateDropdown.classList.remove('visible');
                 if (elements.sortDropdown) elements.sortDropdown.classList.remove('visible');
                 if (elements.sortBtn) elements.sortBtn.classList.remove('active');
-                const willOpen = !elements.settingsDropdown.classList.contains('visible');
-                elements.settingsDropdown.classList.toggle('visible');
-                elements.settingsBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-                if (!willOpen) { setSettingsDataToolsExpanded(false); setSettingsPreferencesExpanded(false); }
+                const next = currentViewMode === 'settings' ? null : 'settings';
+                setViewMode(next);
             });
         }
 
         document.addEventListener('click', (e) => {
-            if (elements.settingsDropdown && elements.settingsBtn &&
-                !elements.settingsDropdown.contains(e.target) && !elements.settingsBtn.contains(e.target)) {
-                elements.settingsDropdown.classList.remove('visible');
-                elements.settingsBtn.setAttribute('aria-expanded', 'false');
-                setSettingsDataToolsExpanded(false);
-                setSettingsPreferencesExpanded(false);
-            }
+            // Donate sub-popover still works the same way (it's not part of
+            // the settings view; it's a small floating panel).
             if (elements.donateDropdown &&
                 !elements.donateDropdown.contains(e.target) &&
-                (!elements.settingsDonate || !elements.settingsDonate.contains(e.target))) {
-                elements.donateDropdown.classList.remove('visible');
+                (!getSettingsDonateButton() || !getSettingsDonateButton().contains(e.target))) {
+                closeDonateDropdown();
             }
         });
 
-        if (elements.settingsDonate) {
-            elements.settingsDonate.addEventListener('click', (e) => {
+        document.addEventListener('click', (e) => {
+            const donateTrigger = e.target.closest('#settingsDonate');
+            if (donateTrigger) {
                 e.stopPropagation();
                 elements.settingsDropdown.classList.remove('visible');
                 setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
-                setTimeout(() => elements.donateDropdown.classList.add('visible'), 150);
-            });
-        }
+                setTimeout(openDonateDropdown, 80);
+            }
+        });
+
+        const settingsViewEl = document.getElementById('settingsView');
+        settingsViewEl?.addEventListener('scroll', () => {
+            if (elements.donateDropdown?.classList.contains('visible')) {
+                positionDonateDropdown();
+            }
+        }, { passive: true });
+
+        window.addEventListener('resize', () => {
+            if (elements.donateDropdown?.classList.contains('visible')) {
+                positionDonateDropdown();
+            }
+        });
 
         if (elements.settingsDataToolsToggle) {
             elements.settingsDataToolsToggle.addEventListener('click', (e) => {
@@ -3236,6 +3468,30 @@
                 } catch (error) {
                     PopupLogger.error('Settings', 'Failed to update auto-skip filler setting:', error);
                     renderAutoSkipFillerSetting(currentlyEnabled);
+                }
+            });
+        }
+
+        // Skiptime contributor toggle — separate node from the cached toggle
+        // shortcuts above because settings-view.js re-renders only on demand.
+        // Look it up at click time via document so it survives any partial
+        // re-render (and we don't need to bump the elements cache).
+        const skiptimeToggle = document.getElementById('settingsSkiptime');
+        if (skiptimeToggle) {
+            skiptimeToggle.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                const currentlyEnabled = skiptimeToggle.dataset.enabled === 'true';
+                const nextEnabled = !currentlyEnabled;
+                renderSkiptimeHelperSetting(nextEnabled);
+                try {
+                    await chrome.storage.local.set({ [SKIPTIME_HELPER_KEY]: nextEnabled });
+                    AT.UIHelpers?.showToast?.(
+                        nextEnabled ? 'Skiptime helper enabled' : 'Skiptime helper disabled',
+                        { type: 'success', duration: 1600 }
+                    );
+                } catch (error) {
+                    PopupLogger.error('Settings', 'Failed to update skiptime helper setting:', error);
+                    renderSkiptimeHelperSetting(currentlyEnabled);
                 }
             });
         }
@@ -3703,7 +3959,8 @@
         await Promise.all([
             loadCopyGuardSetting(),
             loadSmartNotifSetting(),
-            loadAutoSkipFillerSetting()
+            loadAutoSkipFillerSetting(),
+            loadSkiptimeHelperSetting()
         ]);
 
         // Auto-cleanup stale data on every popup open

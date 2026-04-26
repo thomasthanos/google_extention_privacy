@@ -7,7 +7,7 @@
         monthly: { label: 'Monthly episodes', field: 'targetEpisodes', min: 1, max: 400, step: 1, unit: 'ep' }
     };
 
-    const TIER_LABEL = { gold: 'Gold', silver: 'Silver', bronze: 'Bronze' };
+    const TIER_LABEL = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Platinum' };
 
     // Inline SVG icon registry. Each id matches BADGE_DEFS[].svg.
     // Style: 24×24 viewBox, currentColor stroke, no fill (tier color via CSS).
@@ -40,6 +40,7 @@
     };
 
     let _lastBadgeEvaluation = [];
+    const MANUAL_OVERRIDE_MS = 3 * 24 * 60 * 60 * 1000;
 
     function escapeHtml(value) {
         return String(value ?? '').replace(/[&<>"']/g, (c) => ({
@@ -64,7 +65,6 @@
     }
 
     function formatBadgeProgress(badge) {
-        if (badge.unlocked) return 'Unlocked';
         const { current, target, unit } = badge.progress;
         if (unit === 'seconds') {
             return `${Math.round(current / 3600)} / ${Math.round(target / 3600)}h`;
@@ -82,8 +82,8 @@
     function badgeTooltip(badge) {
         const tier = TIER_LABEL[badge.tier] || '';
         const status = badge.unlocked
-            ? (badge.unlockedAt ? `Unlocked ${formatUnlockedAt(badge.unlockedAt)}` : 'Unlocked')
-            : `Locked • ${Math.round((badge.progress.pct || 0) * 100)}%`;
+            ? (badge.unlockedAt ? `Unlocked ${formatUnlockedAt(badge.unlockedAt)} • ${formatBadgeProgress(badge)}` : `Unlocked • ${formatBadgeProgress(badge)}`)
+            : `Locked • ${formatBadgeProgress(badge)} • ${Math.round((badge.progress.pct || 0) * 100)}%`;
         return `${badge.desc} • ${tier} • ${status}`;
     }
 
@@ -105,18 +105,44 @@
         `;
     }
 
-    function renderGoalsSection(goals, goalSettings) {
+    function renderSmartGoalsBanner(smartPlan, isEmpty) {
+        if (!smartPlan?.summary?.text) return '';
+        return `
+            <div class="goals-smart-banner${isEmpty ? ' goals-smart-banner--empty' : ''}">
+                <span class="goals-smart-badge">Smart goals</span>
+                <span class="goals-smart-text">${escapeHtml(smartPlan.summary.text)}</span>
+            </div>
+        `;
+    }
+
+    function renderGoalsSection(goals, goalSettings, smartPlan) {
         const rows = Object.entries(GOAL_META).map(([key, meta]) => {
             const goal = goals[key];
             const pct = Math.round((goal.pct || 0) * 100);
             const currentTarget = goalSettings?.[key]?.[meta.field]
                 ?? (meta.field === 'targetMinutes' ? 60 : (key === 'weekly' ? 5 : 20));
+            const smart = smartPlan?.suggestions?.[key] || null;
+            const smartLabel = smart
+                ? (smart.manualHold ? 'Suggest' : 'Auto')
+                : '';
+            const smartLabelClass = smart?.manualHold
+                ? 'goal-card-chip goal-card-chip--suggested'
+                : 'goal-card-chip';
+            const smartNote = smart
+                ? (smart.manualHold
+                    ? `Manual hold active. Suggested ${smart.display}.`
+                    : smart.note)
+                : '';
             return `
                 <div class="goal-card" data-goal-key="${key}">
                     <div class="goal-card-head">
-                        <span class="goal-card-title">${escapeHtml(meta.label)}</span>
+                        <span class="goal-card-title-wrap">
+                            <span class="goal-card-title">${escapeHtml(meta.label)}</span>
+                            ${smart ? `<span class="${smartLabelClass}">${escapeHtml(smartLabel)}</span>` : ''}
+                        </span>
                         <span class="goal-card-progress">${escapeHtml(formatGoalProgress(goal))}</span>
                     </div>
+                    ${smartNote ? `<div class="goal-card-note">${escapeHtml(smartNote)}</div>` : ''}
                     <div class="goal-progress-track">
                         <div class="goal-progress-bar" style="width:${pct}%"></div>
                     </div>
@@ -153,16 +179,17 @@
         const lockedClass = badge.unlocked ? 'badge-tile--unlocked' : 'badge-tile--locked';
         const newlyClass = badge.justUnlocked ? ' is-newly-unlocked' : '';
         const iconHtml = renderSvgIcon(badge.svg, badge.icon);
-        const miniBar = badge.unlocked
-            ? ''
-            : `<div class="badge-tile-mini-track"><div class="badge-tile-mini-bar" style="width:${pct}%"></div></div>`;
         return `
             <div class="badge-tile ${lockedClass} badge-tier-${badge.tier}${newlyClass}"
                  title="${escapeHtml(badgeTooltip(badge))}">
-                <div class="badge-tile-icon-wrap">${iconHtml}</div>
-                <div class="badge-title">${escapeHtml(badge.title)}</div>
-                <div class="badge-progress">${escapeHtml(formatBadgeProgress(badge))}</div>
-                ${miniBar}
+                <div class="badge-tile-main">
+                    <div class="badge-tile-icon-wrap">${iconHtml}</div>
+                    <div class="badge-title">${escapeHtml(badge.title)}</div>
+                    <div class="badge-progress badge-progress--top${badge.unlocked ? ' badge-progress--unlocked' : ''}">${escapeHtml(formatBadgeProgress(badge))}</div>
+                    <div class="badge-track-row">
+                        <div class="badge-tile-mini-track"><div class="badge-tile-mini-bar" style="width:${badge.unlocked ? 100 : pct}%"></div></div>
+                    </div>
+                </div>
             </div>
         `;
     }
@@ -181,7 +208,7 @@
                 .map(renderBadgeTile)
                 .join('');
             return `
-                <details class="badge-group-section" open>
+                <details class="badge-group-section">
                     <summary class="badge-group-summary">
                         <span class="badge-group-icon">${escapeHtml(group.icon)}</span>
                         <span class="badge-group-title">${escapeHtml(group.title)}</span>
@@ -220,13 +247,18 @@
                 <div class="badge-next-up-item">
                     <div class="badge-next-up-head">
                         <span class="badge-next-up-icon badge-tier-${b.tier}">${renderSvgIcon(b.svg, b.icon)}</span>
-                        <span class="badge-next-up-title">${escapeHtml(b.title)}</span>
+                        <span class="badge-next-up-title-wrap">
+                            <span class="badge-next-up-title">${escapeHtml(b.title)}</span>
+                        </span>
                         <span class="badge-next-up-pct">${pct}%</span>
                     </div>
                     <div class="goal-progress-track">
                         <div class="goal-progress-bar" style="width:${pct}%"></div>
                     </div>
                     <div class="badge-next-up-desc">${escapeHtml(b.desc)}</div>
+                    <div class="badge-next-up-meta">
+                        <span class="badge-next-up-target">${escapeHtml(formatBadgeProgress(b))}</span>
+                    </div>
                 </div>
             `;
         }).join('');
@@ -250,8 +282,23 @@
             return;
         }
 
+        const smartPlan = AchievementsEngine.buildSmartGoalPlan
+            ? AchievementsEngine.buildSmartGoalPlan(animeData, index, goalSettings)
+            : null;
+        const effectiveGoalSettings = smartPlan?.goalSettings || goalSettings;
+
+        if (smartPlan?.shouldPersist) {
+            params.goalSettings = effectiveGoalSettings;
+            if (typeof params.onGoalsChanged === 'function') {
+                params.onGoalsChanged(effectiveGoalSettings);
+            }
+            chrome.storage.local.set({ goalSettings: effectiveGoalSettings }).catch((err) => {
+                console.warn('[GoalsView] Failed to save smart goals:', err);
+            });
+        }
+
         const badges = AchievementsEngine.evaluateBadges(animeData, index, hourIndex, { badgeState });
-        const goals = AchievementsEngine.evaluateGoals(goalSettings, index);
+        const goals = AchievementsEngine.evaluateGoals(effectiveGoalSettings, index);
         _lastBadgeEvaluation = badges;
 
         const isEmpty = !index?.totals?.episodes || index.totals.episodes === 0;
@@ -259,12 +306,14 @@
         container.innerHTML = `
             <div class="goals-view-inner">
                 ${isEmpty ? renderEmptyBanner() : ''}
-                ${renderGoalsSection(goals, goalSettings)}
+                ${renderSmartGoalsBanner(smartPlan, isEmpty)}
+                ${renderGoalsSection(goals, effectiveGoalSettings, smartPlan)}
                 ${renderNextUpSection(badges)}
                 ${renderBadgesSection(badges)}
             </div>
         `;
 
+        params.goalSettings = effectiveGoalSettings;
         wireInputs(container, params);
     }
 
@@ -294,12 +343,15 @@
         const steppers = container.querySelectorAll('.goal-stepper');
 
         const persist = async (key, field, value) => {
+            const now = new Date();
             const nextSettings = {
                 ...(params.goalSettings || {}),
                 [key]: {
                     ...((params.goalSettings || {})[key] || {}),
                     [field]: value,
-                    updatedAt: new Date().toISOString()
+                    smartManaged: true,
+                    updatedAt: now.toISOString(),
+                    manualOverrideUntil: new Date(now.getTime() + MANUAL_OVERRIDE_MS).toISOString()
                 }
             };
             params.goalSettings = nextSettings;

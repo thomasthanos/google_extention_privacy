@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "An1me.to Tracker",
-  "version": "6.3.5",
+  "version": "6.3.6",
   "description": "Track your anime watching progress on an1me.to with cloud sync across all browsers",
   "author": "ThomasThanos",
   "permissions": [
@@ -76,6 +76,7 @@
         "src/content/progress-tracker.js",
         "src/content/watchlist-sync.js",
         "src/content/video-monitor.js",
+        "src/content/skiptime-helper.js",
         "src/content/main.js",
         "src/common/merge-utils.js",
         "src/content/merge-utils.js",

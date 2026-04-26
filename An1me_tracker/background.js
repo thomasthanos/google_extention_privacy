@@ -1463,10 +1463,6 @@ async function fetchAnimePageInfo(slug) {
         if (maxEp > 0) latestEpisode = maxEp;
     }
 
-    if (!totalEpisodes && latestEpisode) {
-        totalEpisodes = latestEpisode;
-    }
-
     let status = null;
     const dateMatch = html.match(
         /(?:Προβλήθηκε|Aired?)<\/dt>[\s\S]{0,300}?<time[^>]*>([\s\S]*?)<\/time>/
@@ -1487,6 +1483,12 @@ async function fetchAnimePageInfo(slug) {
 
     if (status === 'FINISHED' && totalEpisodes && latestEpisode && latestEpisode < totalEpisodes) {
         status = 'RELEASING';
+    }
+
+    // For finished entries, the highest uploaded episode is a reasonable
+    // fallback total. For airing shows it is only the current availability.
+    if (!totalEpisodes && latestEpisode && status === 'FINISHED') {
+        totalEpisodes = latestEpisode;
     }
 
     let nextEpisodeAt = null;
