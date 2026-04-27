@@ -1846,6 +1846,7 @@
             }
 
             await FillerService.loadCachedEpisodeTypes(animeData);
+            await FillerService.loadStayedFillers();
             await AT.AnilistService.loadCachedData(animeData);
 
             if (repairAiringCompletedEntries(animeData)) {
@@ -1942,6 +1943,7 @@
                 }
 
                 await FillerService.loadCachedEpisodeTypes(animeData);
+                await FillerService.loadStayedFillers();
                 await AT.AnilistService.loadCachedData(animeData);
 
                 if (repairAiringCompletedEntries(animeData)) {
@@ -3715,6 +3717,13 @@
             }
             if (changes.groupCoverImages) {
                 window.AnimeTracker.groupCoverImages = changes.groupCoverImages.newValue || {};
+                needsFullRender = true;
+                if (!isOwn) isExternalUpdate = true;
+            }
+            if (changes.fillerStaySelections) {
+                try {
+                    AT.FillerService.setStayedFillersCache(changes.fillerStaySelections.newValue || {});
+                } catch {}
                 needsFullRender = true;
                 if (!isOwn) isExternalUpdate = true;
             }

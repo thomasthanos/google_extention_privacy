@@ -120,6 +120,30 @@ const FirebaseSync = {
         return payload;
     },
 
+    summarizeSyncData(data) {
+        const animeData = data?.animeData || {};
+        const videoProgress = data?.videoProgress || {};
+        const deletedAnime = data?.deletedAnime || {};
+        const groupCoverImages = data?.groupCoverImages || {};
+        const goalSettings = data?.goalSettings || {};
+        const badgeUnlocks = data?.badgeUnlocks || {};
+
+        const animeCount = Object.keys(animeData).length;
+        const episodeCount = Object.values(animeData).reduce((sum, anime) => {
+            return sum + (Array.isArray(anime?.episodes) ? anime.episodes.length : 0);
+        }, 0);
+
+        return {
+            animeCount,
+            episodeCount,
+            progressCount: Object.keys(videoProgress).length,
+            deletedCount: Object.keys(deletedAnime).length,
+            coverCount: Object.keys(groupCoverImages).length,
+            goalCount: Object.keys(goalSettings).length,
+            badgeCount: Object.keys(badgeUnlocks).length
+        };
+    },
+
     /**
      * Get current user
      */
@@ -183,6 +207,13 @@ const FirebaseSync = {
         if (!this.currentUser) return Promise.resolve();
 
         this.pendingSave = await this.hydrateSyncData(data);
+        PopupLogger.throttled(
+            'Firebase',
+            `queue-save:${this.currentUser.uid}`,
+            5000,
+            'Queued cloud save',
+            { immediate, ...this.summarizeSyncData(this.pendingSave) }
+        );
 
         if (this.saveToCloudTimeout) {
             clearTimeout(this.saveToCloudTimeout);
@@ -256,7 +287,7 @@ const FirebaseSync = {
                     fields: ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'goalSettings', 'badgeUnlocks', 'lastUpdated', 'email']
                 });
                 this.setCachedUserDocument(this.currentUser.uid, savedDoc);
-                PopupLogger.log('Firebase', 'Data saved to cloud');
+                PopupLogger.log('Firebase', 'Cloud save complete', this.summarizeSyncData(savedDoc));
 
                 this.cloudSaveRetryCount = 0;
 
@@ -396,6 +427,7 @@ const FirebaseSync = {
             // below (line ~389). No pre-merge needed — the main merge already
             // handles the local/cloud combination correctly.
             let finalData;
+            let syncSource = 'empty-init';
 
             if (cloudData) {
                 const shouldMerge = localData.userId === this.currentUser.uid;
@@ -406,12 +438,14 @@ const FirebaseSync = {
                 );
 
                 if (shouldMerge && localData.animeData && Object.keys(localData.animeData).length > 0) {
+                    syncSource = 'merged-cloud-local';
                     finalData = {
                         animeData:     AnimeTracker.MergeUtils.mergeAnimeData(localData.animeData || {}, cloudData.animeData || {}),
                         videoProgress: AnimeTracker.MergeUtils.mergeVideoProgress(localData.videoProgress || {}, cloudData.videoProgress || {})
                     };
                     PopupLogger.log('Sync', 'Merged episodes:', UIHelpers.countEpisodes(finalData.animeData));
                 } else {
+                    syncSource = 'cloud-only';
                     finalData = {
                         animeData: cloudData.animeData || {},
                         videoProgress: cloudData.videoProgress || {}
@@ -529,6 +563,7 @@ const FirebaseSync = {
                 }
             } else {
                 if (localData.userId === this.currentUser.uid && localData.animeData && Object.keys(localData.animeData).length > 0) {
+                    syncSource = 'local-bootstrap';
                     const normalized = ProgressManager.normalizeCanonicalSlugs(
                         localData.animeData || {},
                         localData.videoProgress || {},
@@ -562,6 +597,7 @@ const FirebaseSync = {
                     this.pendingSave = this.cloneSyncData(finalData);
                     await this.performCloudSave(elements);
                 } else {
+                    syncSource = 'empty-init';
                     finalData = { animeData: {}, videoProgress: {}, deletedAnime: {}, groupCoverImages: {}, goalSettings: {}, badgeUnlocks: {} };
                     await Storage.set({
                         animeData: {},
@@ -582,6 +618,11 @@ const FirebaseSync = {
                 elements.syncStatus.classList.add('synced');
                 elements.syncText.textContent = 'Cloud Synced';
             }
+
+            PopupLogger.log('Sync', 'Cloud sync complete', {
+                source: syncSource,
+                ...this.summarizeSyncData(finalData)
+            });
 
             return finalData;
         } catch (error) {

@@ -44,7 +44,8 @@
     ];
 
     const Logger = window.AnimeTrackerContent?.Logger || {
-        info: () => {}, debug: () => {}, error: () => {}, warn: () => {}, success: () => {}
+        info: () => {}, debug: () => {}, error: () => {}, warn: () => {}, success: () => {},
+        once: () => {}, throttled: () => {}
     };
 
     let mounted = false;
@@ -144,7 +145,7 @@
     function getEpisodeIdentity() {
         const domEpisodeNumber = getEpisodeNumberFromDom();
         try {
-            const info = window.AnimeTrackerContent?.AnimeParser?.extractAnimeInfo?.();
+            const info = window.AnimeTrackerContent?.AnimeParser?.extractAnimeInfo?.({ silent: true });
             if (info?.animeSlug && domEpisodeNumber > 0) {
                 return `${info.animeSlug}__episode-${domEpisodeNumber}`;
             }
@@ -172,8 +173,12 @@
 
     async function handleEpisodeIdentityChange(nextEpisodeIdentity) {
         if (!nextEpisodeIdentity || nextEpisodeIdentity === lastEpisodeIdentity) return;
+        const previousEpisodeIdentity = lastEpisodeIdentity;
         lastEpisodeIdentity = nextEpisodeIdentity;
-        Logger.info('Skiptime: episode changed, refreshing panel state');
+        Logger.debug('Skiptime: episode changed, refreshing panel state', {
+            from: previousEpisodeIdentity,
+            to: nextEpisodeIdentity
+        });
 
         cancelSubmitCountdown();
         video = getVideoElement();
@@ -421,7 +426,7 @@
         if (!isVideoConnected(video)) {
             video = getVideoElement();
             if (video) {
-                Logger.info('Skiptime: video resolved lazily, attaching metadata hooks');
+                Logger.debug('Skiptime: video resolved lazily, attaching metadata hooks');
                 attachVideoMetadataHooks();
             }
         }
@@ -577,12 +582,26 @@
         if (findField('#an1-skip-panel')) return true;
         const openBtn = findSkiptimeOpenButton();
         if (!openBtn) {
+            Logger.throttled(
+                `skiptime-open-btn-missing:${getEpisodeIdentity()}`,
+                'WARN',
+                10000,
+                'Skiptime: Add Skiptime button not found',
+                { episodeId: getEpisodeIdentity() }
+            );
             showToast('Add Skiptime button not found', 'error');
             return false;
         }
         openBtn.click();
         const panel = await waitForSelector('#an1-skip-panel', 3500);
         if (!panel) {
+            Logger.throttled(
+                `skiptime-panel-open-timeout:${getEpisodeIdentity()}`,
+                'WARN',
+                10000,
+                'Skiptime: panel did not open after trigger',
+                { episodeId: getEpisodeIdentity() }
+            );
             showToast('Skiptime panel did not open', 'error');
             return false;
         }
@@ -614,14 +633,23 @@
 
         const submitBtn = findField('#an1-save-btn');
         if (!submitBtn) {
+            Logger.warn('Skiptime: submit button not found', { episodeId: getEpisodeIdentity() });
             showToast('Submit button not found', 'error');
             return false;
         }
         if (submitBtn.disabled || submitBtn.hasAttribute('disabled')) {
+            Logger.throttled(
+                `skiptime-submit-blocked:${getEpisodeIdentity()}`,
+                'WARN',
+                10000,
+                'Skiptime: submit blocked, captcha likely required',
+                { episodeId: getEpisodeIdentity() }
+            );
             showToast('Solve captcha then click Contribute', 'info', 3500);
             return false;
         }
         submitBtn.click();
+        Logger.info('Skiptime: contribution submitted', { episodeId: getEpisodeIdentity() });
         return true;
     }
 
@@ -688,7 +716,7 @@
             if (mounted && panelEl?.isConnected) return;
             if (!host) return;
 
-            Logger.info('Skiptime: controls host available, mounting dropdown');
+            Logger.debug('Skiptime: controls host available, mounting dropdown');
             mountPanel();
         });
 
@@ -1110,7 +1138,7 @@
     }
 
     async function mountPanel() {
-        Logger.info('Skiptime: mountPanel() entered, mounted=', mounted, 'video=', !!video);
+        Logger.debug(`Skiptime: mountPanel() entered (mounted=${mounted}, video=${!!video})`);
 
         if (mountInProgress) return;
         if (mounted && panelEl?.isConnected) return;
@@ -1123,7 +1151,7 @@
             const mountTarget = getControlsMountTarget();
             const host = mountTarget?.host;
             if (!host || !mountTarget) {
-                Logger.info('Skiptime: controls host not ready yet');
+                Logger.debug('Skiptime: controls host not ready yet');
                 ensureControlsObserver();
                 return;
             }
@@ -1133,7 +1161,7 @@
                 panelEl = existingPanel;
                 panelDoc = host.ownerDocument || document;
                 mounted = true;
-                Logger.info('Skiptime: existing dropdown found, skipping duplicate mount');
+                Logger.debug('Skiptime: existing dropdown found, skipping duplicate mount');
                 return;
             }
 
@@ -1141,7 +1169,7 @@
 
             panelDoc = host.ownerDocument || document;
             injectStyles(panelDoc);
-            Logger.info('Skiptime: styles injected');
+            Logger.debug('Skiptime: styles injected');
             ensureControlsHostVisible(host);
 
             panelEl = panelDoc.createElement('div');
@@ -1149,7 +1177,7 @@
             panelEl.classList.toggle('at-skip-overlay-center', mountTarget.mode === 'overlay-center');
             panelEl.innerHTML = buildPanelHtml();
             host.appendChild(panelEl);
-            Logger.info(`Skiptime: dropdown appended to ${mountTarget.mode}`);
+            Logger.debug(`Skiptime: dropdown appended to ${mountTarget.mode}`);
 
             panelEl.querySelector('.at-skip-toggle')?.addEventListener('click', (event) => {
                 event.preventDefault();
@@ -1207,7 +1235,15 @@
             await refreshPanelState();
             setDropdownOpen(false);
             mounted = true;
-            Logger.info('Skiptime helper mounted inside controls');
+            Logger.once(
+                `skiptime-mounted:${lastEpisodeIdentity || 'unknown'}`,
+                'INFO',
+                'Skiptime helper mounted inside controls',
+                {
+                    episodeId: lastEpisodeIdentity || 'unknown',
+                    mode: mountTarget.mode
+                }
+            );
 
             // ArtPlayer can re-render the controls immediately after we inject.
             // Re-arm observation and verify the panel actually survived.
@@ -1216,14 +1252,14 @@
             setTimeout(() => {
                 if (!helperEnabled || mountInProgress) return;
                 if (panelEl?.isConnected) return;
-                Logger.info('Skiptime: dropdown was removed after mount, retrying');
+                Logger.debug('Skiptime: dropdown was removed after mount, retrying');
                 mounted = false;
                 panelEl = null;
                 panelDoc = null;
                 scheduleMount();
             }, 250);
         } catch (err) {
-            Logger.info('Skiptime: mountPanel CRASHED with error:', err && err.message ? err.message : String(err));
+            Logger.error('Skiptime: mountPanel crashed', err && err.message ? err.message : String(err));
             console.error('[Skiptime] full error:', err);
         } finally {
             mountInProgress = false;
@@ -1281,7 +1317,7 @@
     function scheduleMount() {
         if (!helperEnabled) return;
 
-        Logger.info('Skiptime: scheduleMount -> controls dropdown');
+        Logger.debug('Skiptime: scheduleMount -> controls dropdown');
         lastEpisodeIdentity = getEpisodeIdentity();
         video = getVideoElement();
         ensureControlsObserver();
@@ -1297,7 +1333,7 @@
                     video = v;
                     videoObserver.disconnect();
                     videoObserver = null;
-                    Logger.info('Skiptime: video element appeared, attaching metadata hook');
+                    Logger.debug('Skiptime: video element appeared, attaching metadata hook');
                     attachVideoMetadataHooks();
                     return;
                 }
@@ -1328,19 +1364,19 @@
     }
 
     async function init() {
-        Logger.info('Skiptime: init() running on', location.pathname);
+        Logger.debug('Skiptime: init() running on', location.pathname);
         lastEpisodeIdentity = getEpisodeIdentity();
         listenForToggleChanges();
         try {
             const result = await chrome.storage.local.get([STORAGE_TOGGLE_KEY]);
             const enabled = result[STORAGE_TOGGLE_KEY] === true;
-            Logger.info('Skiptime: toggle state =', enabled);
+            Logger.debug('Skiptime: toggle state =', enabled);
             helperEnabled = enabled;
             if (enabled) {
-                Logger.info('Skiptime: scheduling mount for controls dropdown');
+                Logger.debug('Skiptime: scheduling mount for controls dropdown');
                 await applyEnabledState(true);
             } else {
-                Logger.info('Skiptime: helper is OFF - toggle from popup Settings -> Playback & Tracking');
+                Logger.debug('Skiptime: helper is OFF - toggle from popup Settings -> Playback & Tracking');
             }
         } catch (e) {
             Logger.warn('Skiptime: init failed', e);

@@ -235,7 +235,7 @@ const VideoMonitor = {
             document.removeEventListener('visibilitychange', visibilityHandler);
         });
 
-        Logger.success('Video monitoring active');
+        Logger.debug('Video monitoring active');
     },
 
     findAndMonitorVideo(animeInfo, eventHandlers) {

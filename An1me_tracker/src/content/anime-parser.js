@@ -15,7 +15,7 @@ const AnimeParser = {
             .replace(/\//g, '&#x2F;');
     },
 
-    extractAnimeInfo() {
+    extractAnimeInfo(options = {}) {
         const { Logger } = window.AnimeTrackerContent;
 
         try {
@@ -137,7 +137,9 @@ const AnimeParser = {
 
             const uniqueId = `${animeSlug}__episode-${episodeNumber}`;
 
-            Logger.info(`${animeTitle} Ep${episodeNumber}`, { id: uniqueId });
+            if (options.silent !== true) {
+                Logger.info(`${animeTitle} Ep${episodeNumber}`, { id: uniqueId });
+            }
 
             const coverImageElement = document.querySelector('.anime-featured img')
                 || document.querySelector('.anime-main-image');

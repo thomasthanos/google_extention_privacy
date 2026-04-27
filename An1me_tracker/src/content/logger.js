@@ -1,6 +1,8 @@
 const ContentLogger = {
     levels: { DEBUG: 0, INFO: 1, SUCCESS: 1, WARN: 2, ERROR: 3 },
     prefix: '🎬 Anime Tracker',
+    onceKeys: new Set(),
+    throttleState: new Map(),
 
     get currentLevel() {
         return window.AnimeTrackerContent?.CONFIG?.LOG_LEVEL || 'INFO';
@@ -30,21 +32,22 @@ const ContentLogger = {
         return this.levels[level] >= this.levels[this.currentLevel];
     },
 
-    log(level, message, data = null) {
+    log(level, message, ...args) {
         if (!this.shouldLog(level)) return;
 
         const L = this.config[level];
         const ts = this.getTimestamp();
         const method = level === 'ERROR' ? console.error : level === 'WARN' ? console.warn : console.log;
+        const extras = args.filter((arg) => arg !== undefined);
 
-        if (data !== null) {
+        if (extras.length > 0) {
             method(
                 `%c${this.prefix}%c %c${L.icon} ${level}%c %c${ts}%c %c${message}`,
                 this.styles.prefix, '',
                 this.styles.badge(L.color, L.bg), '',
                 this.styles.timestamp, '',
                 this.styles.message(L.color),
-                data
+                ...extras
             );
         } else {
             method(
@@ -55,6 +58,22 @@ const ContentLogger = {
                 this.styles.message(L.color)
             );
         }
+    },
+
+    once(key, level, message, ...args) {
+        if (!key) return this.log(level, message, ...args);
+        if (this.onceKeys.has(key)) return;
+        this.onceKeys.add(key);
+        this.log(level, message, ...args);
+    },
+
+    throttled(key, level, intervalMs, message, ...args) {
+        if (!key) return this.log(level, message, ...args);
+        const now = Date.now();
+        const last = this.throttleState.get(key) || 0;
+        if ((now - last) < Math.max(0, Number(intervalMs) || 0)) return;
+        this.throttleState.set(key, now);
+        this.log(level, message, ...args);
     },
 
     progress(uniqueId, pct, time) {
@@ -70,11 +89,11 @@ const ContentLogger = {
         );
     },
 
-    debug(msg, data) { this.log('DEBUG', msg, data); },
-    info(msg, data) { this.log('INFO', msg, data); },
-    success(msg, data) { this.log('SUCCESS', msg, data); },
-    warn(msg, data) { this.log('WARN', msg, data); },
-    error(msg, data) { this.log('ERROR', msg, data); }
+    debug(msg, ...args) { this.log('DEBUG', msg, ...args); },
+    info(msg, ...args) { this.log('INFO', msg, ...args); },
+    success(msg, ...args) { this.log('SUCCESS', msg, ...args); },
+    warn(msg, ...args) { this.log('WARN', msg, ...args); },
+    error(msg, ...args) { this.log('ERROR', msg, ...args); }
 };
 
 window.AnimeTrackerContent = window.AnimeTrackerContent || {};

@@ -4,6 +4,7 @@
     if (window.self !== window.top) return;
 
     const AT = window.AnimeTrackerContent;
+    const FILLER_STAY_SELECTIONS_KEY = 'fillerStaySelections';
 
     const TrackingState = { IDLE: 'idle', TRACKING: 'tracking', COMPLETED: 'completed' };
     let trackingState = TrackingState.IDLE;
@@ -16,6 +17,71 @@
     let lastTimeupdateTime = 0;
     let lastVideoSource = '';
     let earlyTrackDone = false;
+
+    function normalizeStayedFillers(rawSelections) {
+        if (!rawSelections || typeof rawSelections !== 'object') return {};
+
+        const normalized = {};
+        for (const [slug, values] of Object.entries(rawSelections)) {
+            if (!slug) continue;
+
+            const episodes = Array.isArray(values) ? values : Object.keys(values || {});
+            const cleaned = [...new Set(
+                episodes
+                    .map((ep) => Number(ep))
+                    .filter((ep) => Number.isInteger(ep) && ep > 0)
+            )].sort((a, b) => a - b);
+
+            if (cleaned.length > 0) {
+                normalized[String(slug).toLowerCase()] = cleaned;
+            }
+        }
+
+        return normalized;
+    }
+
+    async function rememberStayedFillerEpisode(slug, episodeNumber) {
+        const { Storage, Logger } = AT;
+        if (!slug || !Number.isInteger(Number(episodeNumber))) return;
+
+        try {
+            const result = await Storage.get([FILLER_STAY_SELECTIONS_KEY]);
+            const selections = normalizeStayedFillers(result?.[FILLER_STAY_SELECTIONS_KEY] || {});
+            const key = String(slug).toLowerCase();
+            const nextEpisodes = new Set(selections[key] || []);
+            nextEpisodes.add(Number(episodeNumber));
+            selections[key] = [...nextEpisodes].sort((a, b) => a - b);
+            await Storage.set({ [FILLER_STAY_SELECTIONS_KEY]: selections });
+            Logger.debug(`Remembered filler stay for ${key} Ep ${episodeNumber}`);
+        } catch (error) {
+            Logger.warn('Failed to remember filler stay selection:', error);
+        }
+    }
+
+    async function clearStayedFillerEpisode(slug, episodeNumber) {
+        const { Storage, Logger } = AT;
+        if (!slug || !Number.isInteger(Number(episodeNumber))) return;
+
+        try {
+            const result = await Storage.get([FILLER_STAY_SELECTIONS_KEY]);
+            const selections = normalizeStayedFillers(result?.[FILLER_STAY_SELECTIONS_KEY] || {});
+            const key = String(slug).toLowerCase();
+            const current = selections[key];
+            if (!Array.isArray(current) || current.length === 0) return;
+
+            const nextEpisodes = current.filter((ep) => ep !== Number(episodeNumber));
+            if (nextEpisodes.length > 0) {
+                selections[key] = nextEpisodes;
+            } else {
+                delete selections[key];
+            }
+
+            await Storage.set({ [FILLER_STAY_SELECTIONS_KEY]: selections });
+            Logger.debug(`Cleared filler stay for ${key} Ep ${episodeNumber}`);
+        } catch (error) {
+            Logger.warn('Failed to clear filler stay selection:', error);
+        }
+    }
 
     function resetPlaybackAccumulator(reason = '') {
         if (reason && AT?.Logger) AT.Logger.debug(`Reset playback accumulator: ${reason}`);
@@ -93,6 +159,7 @@
             if (written) {
                 delete deletedAnime[animeInfo.animeSlug];
                 await chrome.storage.local.set({ animeData, deletedAnime });
+                await clearStayedFillerEpisode(animeInfo.animeSlug, animeInfo.episodeNumber);
                 trackingState = TrackingState.COMPLETED;
                 Logger.success('✓ Immediate track successful');
                 Notifications.showCompletion(animeInfo);
@@ -688,7 +755,7 @@
 
     async function init() {
         const { Logger, AnimeParser, ProgressTracker, VideoMonitor, Notifications } = AT;
-        Logger.info('Init', window.location.pathname);
+        Logger.debug('Init', window.location.pathname);
 
         VideoMonitor.cleanup();
         Notifications.cleanup();
@@ -754,18 +821,23 @@
             } catch (e) { Logger.warn('Cover image update failed:', e); }
         }
 
-        Logger.info(`Detected: ${animeInfo.animeTitle} Ep${animeInfo.episodeNumber}`);
+        Logger.debug(`Detected: ${animeInfo.animeTitle} Ep${animeInfo.episodeNumber}`);
 
         try {
-            const skipResult = await chrome.storage.local.get(['autoSkipFillers']);
+            const skipResult = await chrome.storage.local.get(['autoSkipFillers', FILLER_STAY_SELECTIONS_KEY]);
             if (skipResult.autoSkipFillers === true) {
+                const stayedFillers = normalizeStayedFillers(skipResult[FILLER_STAY_SELECTIONS_KEY] || {});
+                const stayedEpisodes = stayedFillers[String(animeInfo.animeSlug).toLowerCase()] || [];
                 const fillerResponse = await chrome.runtime.sendMessage({ type: 'GET_FILLER_EPISODES', animeSlug: animeInfo.animeSlug });
                 const fillerEpisodes = fillerResponse?.fillers;
                 if (Array.isArray(fillerEpisodes) && fillerEpisodes.includes(animeInfo.episodeNumber)) {
-                    let nextCanon = animeInfo.episodeNumber + 1;
-                    const maxSearch = (animeInfo.totalEpisodes || 9999);
-                    while (fillerEpisodes.includes(nextCanon) && nextCanon <= maxSearch) nextCanon++;
-                    if (nextCanon <= maxSearch) {
+                    if (stayedEpisodes.includes(animeInfo.episodeNumber)) {
+                        Logger.info(`Filler stay remembered for Ep ${animeInfo.episodeNumber}; auto-skip suppressed`);
+                    } else {
+                        let nextCanon = animeInfo.episodeNumber + 1;
+                        const maxSearch = (animeInfo.totalEpisodes || 9999);
+                        while (fillerEpisodes.includes(nextCanon) && nextCanon <= maxSearch) nextCanon++;
+                        if (nextCanon <= maxSearch) {
                         Logger.info(`⏭ Filler detected (Ep ${animeInfo.episodeNumber}), skipping to Ep ${nextCanon}`);
                         // Build a dismissible toast — the previous version did
                         // an unconditional `window.location.href = ...` after 1.5s
@@ -773,31 +845,55 @@
                         // filler intentionally. Now they get a Cancel button and
                         // a Skip Now button.
                         let cancelled = false;
+                        const skipDelayMs = 4500;
                         try {
                             const toast = document.createElement('div');
                             Object.assign(toast.style, {
-                                position: 'fixed', bottom: '30px', right: '30px', zIndex: '2147483647',
-                                padding: '12px 16px', borderRadius: '10px', fontSize: '14px', fontWeight: '600',
-                                color: '#fff', background: 'rgba(30,30,40,0.95)', backdropFilter: 'blur(12px)',
-                                boxShadow: '0 4px 20px rgba(0,0,0,0.4)', fontFamily: 'system-ui, sans-serif',
-                                display: 'flex', alignItems: 'center', gap: '12px',
+                                position: 'fixed', top: '22px', left: '50%', transform: 'translateX(-50%)', zIndex: '2147483647',
+                                width: 'min(620px, calc(100vw - 28px))', padding: '18px 20px', borderRadius: '20px',
+                                fontSize: '15px', fontWeight: '700', color: '#f7f7ff',
+                                background: 'linear-gradient(180deg, rgba(28,29,44,0.97), rgba(20,21,34,0.98))', backdropFilter: 'blur(16px)',
+                                boxShadow: '0 18px 45px rgba(0,0,0,0.42)', fontFamily: 'system-ui, sans-serif',
+                                border: '1px solid rgba(140,160,255,0.18)', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap',
                                 transition: 'opacity 200ms ease, transform 200ms ease'
                             });
-                            const text = document.createElement('span');
+                            const text = document.createElement('div');
+                            text.style.flex = '1';
+                            text.style.minWidth = '0';
                             text.textContent = `⏭ Filler Ep ${animeInfo.episodeNumber} — skipping to Ep ${nextCanon}`;
+                            text.innerHTML = `<div style="font-size:11px;font-weight:800;letter-spacing:.12em;color:#8eb5ff;margin-bottom:4px;">AUTO SKIP FILLER</div><div style="font-size:24px;line-height:1.1;font-weight:800;color:#fff;">Episode ${animeInfo.episodeNumber} is filler</div><div style="margin-top:6px;font-size:14px;line-height:1.45;color:rgba(235,238,255,0.84);">Jumping to canon Episode ${nextCanon} soon unless you stay here.</div>`;
+                            const actionWrap = document.createElement('div');
+                            Object.assign(actionWrap.style, {
+                                display: 'flex', alignItems: 'center', gap: '10px', flexShrink: '0', marginLeft: 'auto'
+                            });
+                            const skipBtn = document.createElement('button');
+                            skipBtn.textContent = 'Skip Now';
+                            Object.assign(skipBtn.style, {
+                                padding: '11px 16px', border: 'none', borderRadius: '12px',
+                                background: 'linear-gradient(135deg, #6ea8ff, #8f7dff)', color: '#0f1320',
+                                fontWeight: '800', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap',
+                                boxShadow: '0 8px 20px rgba(110,168,255,0.28)'
+                            });
                             const cancelBtn = document.createElement('button');
-                            cancelBtn.textContent = 'Stay';
+                            cancelBtn.textContent = 'Stay Here';
                             Object.assign(cancelBtn.style, {
-                                padding: '6px 12px', border: '1px solid rgba(255,255,255,0.2)',
-                                background: 'rgba(255,255,255,0.05)', color: '#fff', borderRadius: '6px',
-                                fontWeight: '600', cursor: 'pointer', fontSize: '12px'
+                                padding: '11px 16px', border: '1px solid rgba(255,255,255,0.16)',
+                                background: 'rgba(255,255,255,0.06)', color: '#fff', borderRadius: '12px',
+                                fontWeight: '800', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap'
                             });
                             cancelBtn.addEventListener('click', () => {
                                 cancelled = true;
+                                void rememberStayedFillerEpisode(animeInfo.animeSlug, animeInfo.episodeNumber);
                                 try { toast.remove(); } catch {}
                             });
+                            skipBtn.addEventListener('click', () => {
+                                cancelled = false;
+                                window.location.href = `https://an1me.to/watch/${animeInfo.animeSlug}-episode-${nextCanon}`;
+                            });
                             toast.appendChild(text);
-                            toast.appendChild(cancelBtn);
+                            actionWrap.appendChild(skipBtn);
+                            actionWrap.appendChild(cancelBtn);
+                            toast.appendChild(actionWrap);
                             document.body.appendChild(toast);
                             // Cancel-on-back: if user navigates away, abort the redirect.
                             window.addEventListener('beforeunload', () => { cancelled = true; }, { once: true });
@@ -808,11 +904,12 @@
                                 return;
                             }
                             window.location.href = `https://an1me.to/watch/${animeInfo.animeSlug}-episode-${nextCanon}`;
-                        }, 1500);
+                        }, skipDelayMs);
                         return;
                     }
                     Logger.info(`⏭ Filler detected (Ep ${animeInfo.episodeNumber}) but no more canon episodes found`);
                 }
+                    }
             }
         } catch (e) { Logger.warn('Auto-skip filler check failed:', e); }
 

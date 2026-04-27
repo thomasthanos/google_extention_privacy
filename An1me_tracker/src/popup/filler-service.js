@@ -4,6 +4,8 @@
  */
 
 const FillerService = {
+    STAY_SELECTIONS_KEY: 'fillerStaySelections',
+
     // Known filler episodes - populated dynamically from animefillerlist.com
     KNOWN_FILLERS: {},
 
@@ -12,6 +14,51 @@ const FillerService = {
 
     // Episode types cache
     episodeTypesCache: {},
+
+    // Episodes where the user explicitly chose "Stay Here" instead of auto-skip
+    stayedFillersCache: {},
+
+    normalizeStayedFillers(rawSelections) {
+        if (!rawSelections || typeof rawSelections !== 'object') return {};
+
+        const normalized = {};
+        for (const [slug, values] of Object.entries(rawSelections)) {
+            if (!slug) continue;
+            const episodes = Array.isArray(values) ? values : Object.keys(values || {});
+            const cleaned = [...new Set(
+                episodes
+                    .map((ep) => Number(ep))
+                    .filter((ep) => Number.isInteger(ep) && ep > 0)
+            )].sort((a, b) => a - b);
+
+            if (cleaned.length > 0) {
+                normalized[String(slug).toLowerCase()] = cleaned;
+            }
+        }
+
+        return normalized;
+    },
+
+    setStayedFillersCache(rawSelections) {
+        this.stayedFillersCache = this.normalizeStayedFillers(rawSelections);
+    },
+
+    async loadStayedFillers() {
+        const { Storage } = window.AnimeTracker;
+
+        try {
+            const result = await Storage.get([this.STAY_SELECTIONS_KEY]);
+            this.setStayedFillersCache(result?.[this.STAY_SELECTIONS_KEY] || {});
+        } catch {
+            this.stayedFillersCache = {};
+        }
+    },
+
+    isStayedFillerEpisode(slug, episodeNum) {
+        if (!slug || !Number.isInteger(Number(episodeNum))) return false;
+        const storedEpisodes = this.stayedFillersCache[String(slug).toLowerCase()] || [];
+        return storedEpisodes.includes(Number(episodeNum));
+    },
 
     /**
      * Get normalized slug for filler lookup.
@@ -339,7 +386,7 @@ const FillerService = {
 
         for (const [start, end] of fillers) {
             for (let ep = start; ep <= end; ep++) {
-                if (ep < currentEpisode && !watchedEpisodeNumbers.has(ep)) {
+                if (ep < currentEpisode && !watchedEpisodeNumbers.has(ep) && !this.isStayedFillerEpisode(slug, ep)) {
                     skippedFillers.push(ep);
                 }
             }

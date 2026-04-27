@@ -829,7 +829,7 @@
         const swAvailable = await wakeBackgroundSW('GET_VERSION');
 
         if (swAvailable) {
-            Logger?.info('SW available — acting as wake-up agent');
+            Logger?.debug('SW available — acting as wake-up agent');
             initialized = true;
             watchStorage(false);
             // No initial scheduleProgressPush — BG's storage.onChanged debounce handles it.

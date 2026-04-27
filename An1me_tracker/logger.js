@@ -12,6 +12,8 @@
     const rawWarn = console.warn.bind(console);
     const rawError = console.error.bind(console);
     const rawDebug = (console.debug || console.log).bind(console);
+    const onceKeys = new Set();
+    const throttleState = new Map();
 
     const TAG_COLORS = {
         Firebase:    { bg: 'rgba(240,192,64,0.2)',  text: '#f0c040' },
@@ -42,10 +44,36 @@
         logFn(`%c${tag}`, tagStyle, ...args);
     }
 
+    function once(tag, key, logFn, args) {
+        if (!key) {
+            styled(logFn, tag, args);
+            return;
+        }
+        const scopedKey = `${tag}:${key}`;
+        if (onceKeys.has(scopedKey)) return;
+        onceKeys.add(scopedKey);
+        styled(logFn, tag, args);
+    }
+
+    function throttled(tag, key, intervalMs, logFn, args) {
+        if (!key) {
+            styled(logFn, tag, args);
+            return;
+        }
+        const scopedKey = `${tag}:${key}`;
+        const now = Date.now();
+        const last = throttleState.get(scopedKey) || 0;
+        if ((now - last) < Math.max(0, Number(intervalMs) || 0)) return;
+        throttleState.set(scopedKey, now);
+        styled(logFn, tag, args);
+    }
+
     window.PopupLogger = {
         log(tag, ...args)   { styled(rawLog, tag, args); },
         warn(tag, ...args)  { styled(rawWarn, tag, args); },
         error(tag, ...args) { styled(rawError, tag, args); },
         debug(tag, ...args) { styled(rawDebug, tag, args); },
+        once(tag, key, ...args) { once(tag, key, rawLog, args); },
+        throttled(tag, key, intervalMs, ...args) { throttled(tag, key, intervalMs, rawLog, args); },
     };
 })();

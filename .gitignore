@@ -5,3 +5,5 @@
 *.zip
 /An1me_tracker/.claude
 An1me_tracker/An1me_tracker
+An1me_tracker/_metadata/generated_indexed_rulesets/_ruleset1
+An1me_tracker/FILLER_AUTOSKIP_TODO.txt
