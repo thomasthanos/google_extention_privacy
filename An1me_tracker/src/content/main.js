@@ -46,6 +46,10 @@
 
         try {
             const result = await Storage.get([FILLER_STAY_SELECTIONS_KEY]);
+            if (result?.__timedOut) {
+                Logger.warn('Skip rememberStayedFillerEpisode: storage read timed out');
+                return;
+            }
             const selections = normalizeStayedFillers(result?.[FILLER_STAY_SELECTIONS_KEY] || {});
             const key = String(slug).toLowerCase();
             const nextEpisodes = new Set(selections[key] || []);
@@ -64,6 +68,10 @@
 
         try {
             const result = await Storage.get([FILLER_STAY_SELECTIONS_KEY]);
+            if (result?.__timedOut) {
+                Logger.warn('Skip clearStayedFillerEpisode: storage read timed out');
+                return;
+            }
             const selections = normalizeStayedFillers(result?.[FILLER_STAY_SELECTIONS_KEY] || {});
             const key = String(slug).toLowerCase();
             const current = selections[key];
@@ -125,6 +133,19 @@
         return remaining <= 30 || progress >= 0.95;
     }
 
+    // Returns true when the misclick guard should block a completion attempt.
+    // Combines the legacy near-end bypass with a hard floor on real playback so
+    // mobile "scrub-to-end" gestures (which produce progress ≥ 0.95 instantly)
+    // can no longer auto-complete an episode the user never actually watched.
+    function shouldBlockCompletion(currentTime, duration) {
+        const { CONFIG } = AT;
+        const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
+        const hardMin = CONFIG.HARD_MIN_WATCH_SECONDS ?? 30;
+        if (accumulatedPlaybackSeconds < hardMin) return true;
+        if (accumulatedPlaybackSeconds < minWatch && !isNearEnd(currentTime, duration)) return true;
+        return false;
+    }
+
     function writeSyncEpisode(info, duration, animeData, logPrefix) {
         const { EpisodeWriter } = AT;
         const result = EpisodeWriter.writeEpisode(info, duration, animeData, { logPrefix });
@@ -142,8 +163,8 @@
 
         if (!duration || !ProgressTracker.shouldMarkComplete(currentTime, duration)) return;
 
-        const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
-        if (accumulatedPlaybackSeconds < minWatch && !isNearEnd(currentTime, duration)) {
+        if (shouldBlockCompletion(currentTime, duration)) {
+            const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
             Logger.debug(`trackImmediately: only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), skipping`);
             return;
         }
@@ -254,8 +275,8 @@
         }
 
         if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
-            const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
-            if (accumulatedPlaybackSeconds < minWatch && !isNearEnd(currentTime, duration)) {
+            if (shouldBlockCompletion(currentTime, duration)) {
+                const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
                 Logger.debug(`Threshold reached but only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), waiting...`);
                 return;
             }
@@ -297,8 +318,8 @@
         if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
             if (trackingState !== TrackingState.IDLE) return;
 
-            const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
-            if (accumulatedPlaybackSeconds < minWatch && !isNearEnd(currentTime, duration)) {
+            if (shouldBlockCompletion(currentTime, duration)) {
+                const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
                 Logger.debug(`Debounced: threshold reached but only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), waiting...`);
                 return;
             }
@@ -363,14 +384,13 @@
         if (animeInfo && videoElement) {
             const duration = videoElement.duration || 0;
             const currentTime = videoElement.currentTime || 0;
-            const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
-            // The `ended` event fires at the natural end of the video — this is
-            // definitionally not a misclick. Skip the accumulator guard when we're
-            // at or near the real end, so a mid-episode quality/src switch (which
-            // resets the accumulator) can't block a legitimate completion.
+            // The `ended` event fires at the natural end of the video. Mostly
+            // not a misclick, but on mobile a touch-scrub to the end also fires
+            // `ended` with accumulator near 0 — shouldBlockCompletion enforces
+            // the HARD_MIN floor so those cases are still rejected.
             if (trackingState !== TrackingState.COMPLETED
-                && accumulatedPlaybackSeconds < minWatch
-                && !isNearEnd(currentTime, duration)) {
+                && shouldBlockCompletion(currentTime, duration)) {
+                const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
                 Logger.debug(`Video ended but only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), not tracking`);
                 return;
             }
@@ -414,8 +434,8 @@
             const currentTime = videoElement.currentTime;
 
             if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
-                const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
-                if (accumulatedPlaybackSeconds < minWatch && !isNearEnd(currentTime, duration)) {
+                if (shouldBlockCompletion(currentTime, duration)) {
+                    const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
                     Logger.debug(`Visibility change: only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), saving progress instead`);
                     ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration, true, true);
                     return;
@@ -457,8 +477,7 @@
         if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
             if (trackingState === TrackingState.COMPLETED) return;
 
-            const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
-            if (accumulatedPlaybackSeconds < minWatch && !isNearEnd(currentTime, duration)) {
+            if (shouldBlockCompletion(currentTime, duration)) {
                 ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration, true, true);
                 return;
             }
@@ -685,7 +704,6 @@
         // Scope to the episode list container only — was previously falling
         // back to document.body which fires for every unrelated mutation.
         const target = document.querySelector('.episode-list-display-box')
-            || document.querySelector('.episode-list-display-box')?.parentElement
             || document.querySelector('.episode-head')
             || document.body;
         let _applyDebounce = null;
@@ -743,9 +761,19 @@
 
                 if (applyFiller() === 0) {
                     const target = document.querySelector('.episode-list-display-box') || document.body;
-                    const obs = new MutationObserver(() => { if (applyFiller() > 0) obs.disconnect(); });
+                    let fillerRetryDebounce = null;
+                    const obs = new MutationObserver(() => {
+                        if (fillerRetryDebounce) return;
+                        fillerRetryDebounce = setTimeout(() => {
+                            fillerRetryDebounce = null;
+                            if (applyFiller() > 0) obs.disconnect();
+                        }, 150);
+                    });
                     obs.observe(target, { childList: true, subtree: true });
-                    setTimeout(() => obs.disconnect(), 10000);
+                    setTimeout(() => {
+                        obs.disconnect();
+                        if (fillerRetryDebounce) clearTimeout(fillerRetryDebounce);
+                    }, 10000);
                 } else {
                     Logger.debug(`Tagged filler episodes for ${slug}`);
                 }
@@ -989,11 +1017,16 @@
 
         navigationObserver = new MutationObserver(() => {
             if (location.href === lastUrl) return;
+            // Snapshot the URL we're navigating away from so trackImmediately()
+            // runs once per SPA navigation. Without this, every subsequent
+            // mutation in the 200ms debounce window sees a still-stale lastUrl
+            // and re-triggers trackImmediately — wasted work on mobile.
+            const previousUrl = lastUrl;
+            lastUrl = location.href;
             trackImmediately();
             if (navigationDebounceTimeout) clearTimeout(navigationDebounceTimeout);
             navigationDebounceTimeout = setTimeout(() => {
-                if (location.href !== lastUrl) {
-                    lastUrl = location.href;
+                if (location.href !== previousUrl) {
                     Logger.info('URL changed, reinit...');
                     trackingState = TrackingState.IDLE;
                     currentEpisodeId = null;

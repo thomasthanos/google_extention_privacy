@@ -10,6 +10,11 @@ const ContentConfig = {
     MIN_PROGRESS_TO_SAVE: 5,
     NEW_ANIME_GRACE_SECONDS: 120,
     MIN_WATCH_SECONDS_BEFORE_COMPLETE: 120,
+    // Hard floor: even when isNearEnd() exempts the misclick guard, completion
+    // is still blocked if the user accumulated less than this many seconds of
+    // genuine playback. Stops mobile "scrub-to-end" from auto-completing an
+    // episode the user never actually watched.
+    HARD_MIN_WATCH_SECONDS: 30,
     COMPLETED_PERCENTAGE: 85,
     LOG_LEVEL: 'INFO',
     MAX_PROGRESS_ENTRIES: 20,

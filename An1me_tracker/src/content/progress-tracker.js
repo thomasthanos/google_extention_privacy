@@ -247,6 +247,10 @@ const ProgressTracker = {
                 if (!vpCacheHit) keys.push('videoProgress');
                 if (!adCacheHit) keys.push('animeData');
                 const result = await Storage.get(keys);
+                if (result.__timedOut) {
+                    Logger.warn('Skip progress save: storage read timed out (would clobber data)');
+                    return;
+                }
                 videoProgress = vpCacheHit ? this._vpCache : (result.videoProgress || {});
                 animeData = adCacheHit ? this._adCache : (result.animeData || {});
                 if (!adCacheHit) { this._adCache = animeData; this._adCacheTime = now; }
@@ -337,7 +341,6 @@ const ProgressTracker = {
             Logger.debug(`Progress saved: ${uniqueId} → ${videoProgress[uniqueId].percentage}% (${newCurrentTime}s/${Math.floor(duration)}s)`);
 
             if (!this._watchlistSynced && newCurrentTime >= 120) {
-                this._watchlistSynced = true;
                 try {
                     const { WatchlistSync } = window.AnimeTrackerContent;
                     if (WatchlistSync) {
@@ -356,7 +359,10 @@ const ProgressTracker = {
                             }
                         }
                     }
-                } catch { }
+                    this._watchlistSynced = true;
+                } catch (err) {
+                    Logger.warn('Watchlist sync failed, will retry on next save:', err);
+                }
             }
         } catch (e) {
             if (e.message && e.message.includes('Extension context invalidated')) {
@@ -455,6 +461,10 @@ const ProgressTracker = {
 
         try {
             const result = await Storage.get(['videoProgress']);
+            if (result.__timedOut) {
+                Logger.warn('Skip clearSavedProgress: storage read timed out (would clobber videoProgress)');
+                return;
+            }
             const videoProgress = result.videoProgress || {};
             delete videoProgress[uniqueId];
             await Storage.set({ videoProgress });
@@ -509,6 +519,10 @@ const ProgressTracker = {
             if (!validDuration) return false;
 
             const result = await Storage.get(['animeData', 'deletedAnime']);
+            if (result.__timedOut) {
+                Logger.warn('Skip refreshTrackedEpisodeDuration: storage read timed out');
+                return false;
+            }
             const animeData = result.animeData || {};
             const deletedAnime = { ...(result.deletedAnime || {}) };
             const animeKey = info.animeSlug;
@@ -587,6 +601,10 @@ const ProgressTracker = {
             }
 
             const result = await Storage.get(['animeData', 'deletedAnime', 'videoProgress']);
+            if (result.__timedOut) {
+                Logger.error('Skip saveWatchedEpisode: storage read timed out (would clobber animeData)');
+                throw new Error('Storage read timeout');
+            }
             const animeData = result.animeData || {};
             const deletedAnime = { ...(result.deletedAnime || {}) };
             const videoProgress = { ...(result.videoProgress || {}) };

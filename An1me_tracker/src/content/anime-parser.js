@@ -64,13 +64,22 @@ const AnimeParser = {
                 /^(.+?)[-_]part[-_]?(\d+)$/i,
                 /^(.+?)[-_](\d+)$/
             ];
+            const fallbackPattern = episodePatterns[episodePatterns.length - 1];
 
             for (const pattern of episodePatterns) {
                 if (episodeFound) break;
                 const match = animeSlug.match(pattern);
                 if (match) {
+                    const candidate = parseInt(match[2], 10);
+                    // The bare `-NN` fallback is greedy: slugs ending in a
+                    // 4-digit year (e.g. `some-anime-2024`) would otherwise be
+                    // parsed as episode 2024. Reject year-shaped numbers when
+                    // the slug carried no explicit ep/ch/part keyword.
+                    if (pattern === fallbackPattern && candidate >= 1900 && candidate <= 2099) {
+                        continue;
+                    }
                     animeSlug = match[1];
-                    episodeNumber = parseInt(match[2], 10);
+                    episodeNumber = candidate;
                     episodeSlug = `episode-${episodeNumber}`;
                     episodeFound = true;
                     break;

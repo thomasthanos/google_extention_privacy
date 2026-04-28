@@ -48,7 +48,7 @@ const AnimeCardRenderer = {
             }
 
             const minutes = Math.floor(progress.currentTime / 60);
-            const seconds = progress.currentTime % 60;
+            const seconds = Math.floor(progress.currentTime % 60);
             episodesWithProgress.push({
                 number: epNum,
                 timeStr: `${minutes}:${seconds.toString().padStart(2, '0')}`,

@@ -234,6 +234,15 @@
         return !!(cache.introStart && cache.introEnd && cache.outroStart && cache.outroEnd);
     }
 
+    // Partial-submit support: user can choose to contribute just intro or just
+    // outro (e.g. anime with no opening, or they captured only one half).
+    // Returns true when at least one full pair (start + end) is captured.
+    function isSubmittable(cache) {
+        const introPair = !!(cache.introStart && cache.introEnd);
+        const outroPair = !!(cache.outroStart && cache.outroEnd);
+        return introPair || outroPair;
+    }
+
     function formatTime(seconds) {
         const total = Math.max(0, Math.floor(Number(seconds) || 0));
         const h = Math.floor(total / 3600);
@@ -619,13 +628,19 @@
         if (introToggle) introToggle.dataset.linked = 'false';
         if (outroToggle) outroToggle.dataset.linked = 'false';
 
+        // Skip targets the user didn't capture (partial intro-only or
+        // outro-only contribution). Writing `null` here previously stuck a
+        // literal "null" string into the form field, which the site then
+        // either rejected or submitted as bogus data.
         for (const t of TARGETS) {
+            const value = cache[t.key];
+            if (!value) continue;
             const field = await waitForSelector('#' + t.fieldId, 3000);
             if (!field) {
                 showToast(`Field #${t.fieldId} not found`, 'error');
                 return false;
             }
-            field.textContent = cache[t.key];
+            field.textContent = value;
             dispatchFieldEvents(field);
         }
 
@@ -1001,10 +1016,30 @@
             #${PANEL_ID} .at-skip-reset:hover {
                 background: rgba(255, 120, 120, 0.22);
             }
+            #${PANEL_ID} .at-skip-submit {
+                padding: 5px 12px;
+                font: inherit;
+                font-size: 11px;
+                font-weight: 700;
+                color: #9dffbf;
+                background: rgba(80, 220, 140, 0.14);
+                border: 1px solid rgba(80, 220, 140, 0.45);
+                border-radius: 6px;
+                cursor: pointer;
+                transition: background 120ms ease, opacity 120ms ease;
+            }
+            #${PANEL_ID} .at-skip-submit:hover:not(:disabled) {
+                background: rgba(80, 220, 140, 0.26);
+            }
+            #${PANEL_ID} .at-skip-submit:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+            }
             #${PANEL_ID} .at-skip-progress {
                 font-size: 10px;
                 font-weight: 700;
                 color: rgba(255, 255, 255, 0.5);
+                margin-left: auto;
             }
             #${PANEL_ID}.is-complete .at-skip-progress { color: #9dffbf; }
 
@@ -1103,6 +1138,7 @@
                 <div class="at-skip-rows">${rows}</div>
                 <div class="at-skip-footer">
                     <button class="at-skip-reset" type="button">Reset</button>
+                    <button class="at-skip-submit" type="button" disabled>Submit Now</button>
                     <span class="at-skip-progress">0/4 captured</span>
                 </div>
             </div>
@@ -1134,6 +1170,14 @@
         if (countEl) countEl.textContent = `${captured}/4`;
         panelEl.classList.toggle('is-active', captured > 0);
         panelEl.classList.toggle('is-complete', captured === 4);
+
+        // Enable the manual Submit button as soon as a full intro pair OR a
+        // full outro pair is captured, so users contributing only one half
+        // don't have to wait for the auto-submit countdown that fires only
+        // when all 4 are filled.
+        const submitBtn = panelEl.querySelector('.at-skip-submit');
+        if (submitBtn) submitBtn.disabled = !isSubmittable(cache);
+
         return cache;
     }
 
@@ -1197,6 +1241,28 @@
                 event.preventDefault();
                 event.stopPropagation();
                 resetCache();
+            });
+
+            panelEl.querySelector('.at-skip-submit')?.addEventListener('click', async (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                const cache = await loadCache();
+                if (!isSubmittable(cache)) {
+                    showToast('Capture intro pair or outro pair first', 'info');
+                    return;
+                }
+                cancelSubmitCountdown();
+                try {
+                    const ok = await applyAndSubmit(cache);
+                    if (ok) {
+                        await clearCache();
+                        await refreshPanelState();
+                        showToast('Submitted ✓', 'success', 2400);
+                    }
+                } catch (err) {
+                    Logger.warn('Skiptime: manual submit failed', err);
+                    showToast('Submit failed — try again', 'error', 2800);
+                }
             });
 
             const closeBtn = panelEl.querySelector('.at-skip-close');

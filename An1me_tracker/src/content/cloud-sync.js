@@ -149,7 +149,7 @@
         areProgressMapsEqual,
         shallowEqualDeletedAnime,
         shallowEqualObjectMap
-    } = window.AnimeTrackerContent.MergeUtils;
+    } = (window.AnimeTrackerContent.MergeUtils || globalThis.AnimeTrackerMergeUtils);
 
     let lastPushedProgress = null;
     let isPushingProgressDirect = false;

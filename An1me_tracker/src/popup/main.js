@@ -243,11 +243,14 @@
     }
 
     function renderCopyGuardSetting(enabled) {
-        if (!elements.settingsCopyGuard) return;
-        elements.settingsCopyGuard.dataset.enabled = enabled ? 'true' : 'false';
-        elements.settingsCopyGuard.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-        if (elements.settingsCopyGuardSubtitle) {
-            elements.settingsCopyGuardSubtitle.textContent = enabled
+        // Settings DOM is rendered lazily by SettingsView, so look up live.
+        const btn = document.getElementById('settingsCopyGuard');
+        if (!btn) return;
+        btn.dataset.enabled = enabled ? 'true' : 'false';
+        btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+        const subtitle = document.getElementById('settingsCopyGuardSubtitle');
+        if (subtitle) {
+            subtitle.textContent = enabled
                 ? 'Block copy outside allowed text'
                 : 'Copy protection is turned off';
         }
@@ -270,11 +273,13 @@
     const SMART_NOTIF_STORAGE_KEY = 'smartNotificationsEnabled';
 
     function renderSmartNotifSetting(enabled) {
-        if (!elements.settingsSmartNotif) return;
-        elements.settingsSmartNotif.dataset.enabled = enabled ? 'true' : 'false';
-        elements.settingsSmartNotif.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-        if (elements.settingsSmartNotifSubtitle) {
-            elements.settingsSmartNotifSubtitle.textContent = enabled
+        const btn = document.getElementById('settingsSmartNotif');
+        if (!btn) return;
+        btn.dataset.enabled = enabled ? 'true' : 'false';
+        btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+        const subtitle = document.getElementById('settingsSmartNotifSubtitle');
+        if (subtitle) {
+            subtitle.textContent = enabled
                 ? 'You will be notified of new episodes'
                 : 'Notify when new episodes drop';
         }
@@ -297,11 +302,13 @@
     const AUTO_SKIP_FILLER_STORAGE_KEY = 'autoSkipFillers';
 
     function renderAutoSkipFillerSetting(enabled) {
-        if (!elements.settingsAutoSkipFiller) return;
-        elements.settingsAutoSkipFiller.dataset.enabled = enabled ? 'true' : 'false';
-        elements.settingsAutoSkipFiller.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-        if (elements.settingsAutoSkipFillerSubtitle) {
-            elements.settingsAutoSkipFillerSubtitle.textContent = enabled
+        const btn = document.getElementById('settingsAutoSkipFiller');
+        if (!btn) return;
+        btn.dataset.enabled = enabled ? 'true' : 'false';
+        btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+        const subtitle = document.getElementById('settingsAutoSkipFillerSubtitle');
+        if (subtitle) {
+            subtitle.textContent = enabled
                 ? 'Filler episodes will be auto-skipped'
                 : 'Skip filler, jump to next canon ep';
         }
@@ -353,17 +360,21 @@
     }
 
     function setSettingsDataToolsExpanded(expanded) {
-        if (!elements.settingsDataTools || !elements.settingsDataToolsToggle) return;
+        const dataTools = document.getElementById('settingsDataTools');
+        const toggle = document.getElementById('settingsDataToolsToggle');
+        if (!dataTools || !toggle) return;
         const isExpanded = !!expanded;
-        elements.settingsDataTools.classList.toggle('expanded', isExpanded);
-        elements.settingsDataToolsToggle.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+        dataTools.classList.toggle('expanded', isExpanded);
+        toggle.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
     }
 
     function setSettingsPreferencesExpanded(expanded) {
-        if (!elements.settingsPreferences || !elements.settingsPreferencesToggle) return;
+        const prefs = document.getElementById('settingsPreferences');
+        const toggle = document.getElementById('settingsPreferencesToggle');
+        if (!prefs || !toggle) return;
         const isExpanded = !!expanded;
-        elements.settingsPreferences.classList.toggle('expanded', isExpanded);
-        elements.settingsPreferencesToggle.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+        prefs.classList.toggle('expanded', isExpanded);
+        toggle.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
     }
 
     function doesProgressChangeAffectLists(oldProgress = {}, newProgress = {}) {
@@ -692,23 +703,33 @@
         elements.mainApp.style.display = 'flex';
         realignCategoryTabs();
 
+        // Settings avatar/name/email live inside #settingsView, which is built
+        // lazily by settings-view.js when the user opens it. Look these up
+        // live: they're null until that first render, and SettingsView itself
+        // re-applies user data from FirebaseSync.getUser() on every render.
+        const avatar = document.getElementById('settingsAvatar');
+        const userName = document.getElementById('settingsUserName');
+        const userEmail = document.getElementById('settingsUserEmail');
+
         if (user) {
-            if (user.photoURL) {
-                elements.settingsAvatar.src = user.photoURL;
-                elements.settingsAvatar.onerror = () => { elements.settingsAvatar.src = 'src/icons/icon48.png'; };
-            } else {
-                elements.settingsAvatar.src = 'src/icons/icon48.png';
+            if (avatar) {
+                if (user.photoURL) {
+                    avatar.src = user.photoURL;
+                    avatar.onerror = () => { avatar.src = 'src/icons/icon48.png'; };
+                } else {
+                    avatar.src = 'src/icons/icon48.png';
+                }
             }
-            elements.settingsUserName.textContent = user.displayName || user.email?.split('@')[0] || 'User';
-            elements.settingsUserEmail.textContent = user.email || '';
-            elements.syncStatus.classList.add('synced');
-            elements.syncText.textContent = 'Cloud Synced';
+            if (userName) userName.textContent = user.displayName || user.email?.split('@')[0] || 'User';
+            if (userEmail) userEmail.textContent = user.email || '';
+            elements.syncStatus?.classList.add('synced');
+            if (elements.syncText) elements.syncText.textContent = 'Cloud Synced';
         } else {
-            elements.settingsAvatar.src = 'src/icons/icon48.png';
-            elements.settingsUserName.textContent = 'User';
-            elements.settingsUserEmail.textContent = '';
-            elements.syncStatus.classList.remove('synced');
-            elements.syncText.textContent = 'Local Only';
+            if (avatar) avatar.src = 'src/icons/icon48.png';
+            if (userName) userName.textContent = 'User';
+            if (userEmail) userEmail.textContent = '';
+            elements.syncStatus?.classList.remove('synced');
+            if (elements.syncText) elements.syncText.textContent = 'Local Only';
         }
     }
 
@@ -3293,27 +3314,96 @@
             }
         });
 
-        if (elements.settingsDataToolsToggle) {
-            elements.settingsDataToolsToggle.addEventListener('click', (e) => {
+        // ── Settings view delegated handlers ─────────────────────────────
+        // The settings view DOM is built lazily by settings-view.js when the
+        // user opens it, so the buttons don't exist when initEventListeners
+        // runs. Caching them at IIFE-init time gave us null references and
+        // every toggle silently did nothing. Single delegator below survives
+        // every (re-)render and keeps wiring in one place.
+        const handleToggle = async (key, renderFn, getNext, onAfterSave) => {
+            const btn = document.getElementById(key.btnId);
+            if (!btn) return;
+            const currentlyEnabled = getNext.read(btn);
+            const nextEnabled = !currentlyEnabled;
+            renderFn(nextEnabled);
+            try {
+                await chrome.storage.local.set({ [key.storageKey]: nextEnabled });
+                if (onAfterSave) onAfterSave(nextEnabled);
+            } catch (error) {
+                PopupLogger.error('Settings', `Failed to update ${key.btnId}:`, error);
+                renderFn(currentlyEnabled);
+            }
+        };
+
+        document.addEventListener('click', async (e) => {
+            // Walk through known settings buttons. closest() handles clicks on
+            // child nodes (icons, labels) inside each button.
+            if (e.target.closest('#settingsCopyGuard')) {
                 e.stopPropagation();
-                const isExpanded = elements.settingsDataTools?.classList.contains('expanded');
+                await handleToggle(
+                    { btnId: 'settingsCopyGuard', storageKey: COPY_GUARD_STORAGE_KEY },
+                    renderCopyGuardSetting,
+                    { read: (btn) => btn.dataset.enabled !== 'false' }
+                );
+                return;
+            }
+            if (e.target.closest('#settingsSmartNotif')) {
+                e.stopPropagation();
+                await handleToggle(
+                    { btnId: 'settingsSmartNotif', storageKey: SMART_NOTIF_STORAGE_KEY },
+                    renderSmartNotifSetting,
+                    { read: (btn) => btn.dataset.enabled === 'true' },
+                    (enabled) => chrome.runtime.sendMessage({ type: 'SET_SMART_NOTIFICATIONS', enabled })
+                );
+                return;
+            }
+            if (e.target.closest('#settingsAutoSkipFiller')) {
+                e.stopPropagation();
+                await handleToggle(
+                    { btnId: 'settingsAutoSkipFiller', storageKey: AUTO_SKIP_FILLER_STORAGE_KEY },
+                    renderAutoSkipFillerSetting,
+                    { read: (btn) => btn.dataset.enabled === 'true' }
+                );
+                return;
+            }
+            if (e.target.closest('#settingsSkiptime')) {
+                e.stopPropagation();
+                await handleToggle(
+                    { btnId: 'settingsSkiptime', storageKey: SKIPTIME_HELPER_KEY },
+                    renderSkiptimeHelperSetting,
+                    { read: (btn) => btn.dataset.enabled === 'true' },
+                    (enabled) => AT.UIHelpers?.showToast?.(
+                        enabled ? 'Skiptime helper enabled' : 'Skiptime helper disabled',
+                        { type: 'success', duration: 1600 }
+                    )
+                );
+                return;
+            }
+
+            const dataToolsToggle = e.target.closest('#settingsDataToolsToggle');
+            if (dataToolsToggle) {
+                e.stopPropagation();
+                const dataTools = document.getElementById('settingsDataTools');
+                const isExpanded = dataTools?.classList.contains('expanded');
                 setSettingsDataToolsExpanded(!isExpanded);
                 setSettingsPreferencesExpanded(false);
-            });
-        }
+                return;
+            }
 
-        if (elements.settingsPreferencesToggle) {
-            elements.settingsPreferencesToggle.addEventListener('click', (e) => {
+            const prefsToggle = e.target.closest('#settingsPreferencesToggle');
+            if (prefsToggle) {
                 e.stopPropagation();
-                const isExpanded = elements.settingsPreferences?.classList.contains('expanded');
+                const prefs = document.getElementById('settingsPreferences');
+                const isExpanded = prefs?.classList.contains('expanded');
                 setSettingsPreferencesExpanded(!isExpanded);
                 setSettingsDataToolsExpanded(false);
-            });
-        }
+                return;
+            }
 
-        if (elements.settingsRefresh) {
-            elements.settingsRefresh.addEventListener('click', async () => {
-                elements.settingsRefresh.classList.add('loading');                setSettingsDataToolsExpanded(false);
+            const refreshBtn = e.target.closest('#settingsRefresh');
+            if (refreshBtn) {
+                refreshBtn.classList.add('loading');
+                setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
                 try {
                     if (FirebaseSync.getUser()) {
@@ -3324,24 +3414,22 @@
                 } catch (error) {
                     PopupLogger.error('RefreshData', 'Error:', error);
                 } finally {
-                    elements.settingsRefresh.classList.remove('loading');
+                    refreshBtn.classList.remove('loading');
                 }
-            });
-        }
+                return;
+            }
 
-        if (elements.settingsRefreshInfo) {
-            elements.settingsRefreshInfo.addEventListener('click', async () => {
+            const refreshInfoBtn = e.target.closest('#settingsRefreshInfo');
+            if (refreshInfoBtn) {
                 const { Storage, AnilistService } = AT;
-                elements.settingsRefreshInfo.classList.add('loading');                setSettingsDataToolsExpanded(false);
+                refreshInfoBtn.classList.add('loading');
+                setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
                 try {
-                    // Clear all cached anime info from storage so autoFetchMissing re-fetches everything
                     const allKeys = await new Promise(resolve => chrome.storage.local.get(null, resolve));
                     const infoKeys = Object.keys(allKeys).filter(k => k.startsWith('animeinfo_'));
                     if (infoKeys.length > 0) await Storage.remove(infoKeys);
-                    // Clear in-memory cache too
                     AnilistService.cache = {};
-                    // Re-fetch for all tracked anime with sync status
                     startAutoSync();
                     await AnilistService.autoFetchMissing(animeData, () => {
                         scheduleDeferredListRefresh();
@@ -3349,39 +3437,60 @@
                         setMetadataRepairStatus(`${done}/${total} — ${_truncTitle(title, 18)}`);
                     });
                     endAutoSync();
-                } catch (e) {
-                    PopupLogger.error('RefreshInfo', 'Error:', e);
+                } catch (err) {
+                    PopupLogger.error('RefreshInfo', 'Error:', err);
                     endAutoSync();
                 } finally {
-                    elements.settingsRefreshInfo.classList.remove('loading');
+                    refreshInfoBtn.classList.remove('loading');
                 }
-            });
-        }
+                return;
+            }
 
-        if (elements.settingsClear) {
-            elements.settingsClear.addEventListener('click', () => {                setSettingsDataToolsExpanded(false);
+            if (e.target.closest('#settingsClear')) {
+                setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
                 showDialog();
-            });
-        }
+                return;
+            }
 
-        if (elements.settingsExportData) {
-            elements.settingsExportData.addEventListener('click', () => {                setSettingsDataToolsExpanded(false);
+            if (e.target.closest('#settingsExportData')) {
+                setSettingsDataToolsExpanded(false);
                 exportLibraryToJson().catch((err) => {
                     PopupLogger.error('Export', err);
                     AT.UIHelpers?.showToast?.('Export failed', { type: 'error', duration: 3500 });
                 });
-            });
-        }
+                return;
+            }
 
-        if (elements.settingsImportData && elements.settingsImportFile) {
-            elements.settingsImportData.addEventListener('click', () => {
-                elements.settingsImportFile.value = '';
-                elements.settingsImportFile.click();
-            });
-            elements.settingsImportFile.addEventListener('change', async (e) => {
+            if (e.target.closest('#settingsImportData')) {
+                const fileInput = document.getElementById('settingsImportFile');
+                if (fileInput) {
+                    fileInput.value = '';
+                    fileInput.click();
+                }
+                return;
+            }
+
+            if (e.target.closest('#settingsSignOut')) {
+                setSettingsDataToolsExpanded(false);
+                setSettingsPreferencesExpanded(false);
+                signOut();
+                return;
+            }
+
+            if (e.target.closest('#settingsFetchFillers')) {
+                setSettingsDataToolsExpanded(false);
+                setSettingsPreferencesExpanded(false);
+                await fetchAllFillers({ autoStart: true });
+                return;
+            }
+        });
+
+        document.addEventListener('change', async (e) => {
+            if (e.target?.id === 'settingsImportFile') {
                 const file = e.target.files?.[0];
-                if (!file) return;                setSettingsDataToolsExpanded(false);
+                if (!file) return;
+                setSettingsDataToolsExpanded(false);
                 try {
                     await importLibraryFromFile(file);
                 } catch (err) {
@@ -3392,92 +3501,8 @@
                 } finally {
                     e.target.value = '';
                 }
-            });
-        }
-
-        if (elements.settingsSignOut) {
-            elements.settingsSignOut.addEventListener('click', () => {                setSettingsDataToolsExpanded(false);
-                setSettingsPreferencesExpanded(false);
-                signOut();
-            });
-        }
-
-        if (elements.settingsFetchFillers) {
-            elements.settingsFetchFillers.addEventListener('click', async () => {                setSettingsDataToolsExpanded(false);
-                setSettingsPreferencesExpanded(false);
-                await fetchAllFillers({ autoStart: true });
-            });
-        }
-
-        if (elements.settingsCopyGuard) {
-            elements.settingsCopyGuard.addEventListener('click', async (event) => {
-                event.stopPropagation();
-                const currentlyEnabled = elements.settingsCopyGuard.dataset.enabled !== 'false';
-                const nextEnabled = !currentlyEnabled;
-                renderCopyGuardSetting(nextEnabled);
-                try {
-                    await chrome.storage.local.set({ [COPY_GUARD_STORAGE_KEY]: nextEnabled });
-                } catch (error) {
-                    PopupLogger.error('Settings', 'Failed to update copy guard setting:', error);
-                    renderCopyGuardSetting(currentlyEnabled);
-                }
-            });
-        }
-
-        if (elements.settingsSmartNotif) {
-            elements.settingsSmartNotif.addEventListener('click', async (event) => {
-                event.stopPropagation();
-                const currentlyEnabled = elements.settingsSmartNotif.dataset.enabled === 'true';
-                const nextEnabled = !currentlyEnabled;
-                renderSmartNotifSetting(nextEnabled);
-                try {
-                    await chrome.storage.local.set({ [SMART_NOTIF_STORAGE_KEY]: nextEnabled });
-                    chrome.runtime.sendMessage({ type: 'SET_SMART_NOTIFICATIONS', enabled: nextEnabled });
-                } catch (error) {
-                    PopupLogger.error('Settings', 'Failed to update smart notif setting:', error);
-                    renderSmartNotifSetting(currentlyEnabled);
-                }
-            });
-        }
-
-        if (elements.settingsAutoSkipFiller) {
-            elements.settingsAutoSkipFiller.addEventListener('click', async (event) => {
-                event.stopPropagation();
-                const currentlyEnabled = elements.settingsAutoSkipFiller.dataset.enabled === 'true';
-                const nextEnabled = !currentlyEnabled;
-                renderAutoSkipFillerSetting(nextEnabled);
-                try {
-                    await chrome.storage.local.set({ [AUTO_SKIP_FILLER_STORAGE_KEY]: nextEnabled });
-                } catch (error) {
-                    PopupLogger.error('Settings', 'Failed to update auto-skip filler setting:', error);
-                    renderAutoSkipFillerSetting(currentlyEnabled);
-                }
-            });
-        }
-
-        // Skiptime contributor toggle — separate node from the cached toggle
-        // shortcuts above because settings-view.js re-renders only on demand.
-        // Look it up at click time via document so it survives any partial
-        // re-render (and we don't need to bump the elements cache).
-        const skiptimeToggle = document.getElementById('settingsSkiptime');
-        if (skiptimeToggle) {
-            skiptimeToggle.addEventListener('click', async (event) => {
-                event.stopPropagation();
-                const currentlyEnabled = skiptimeToggle.dataset.enabled === 'true';
-                const nextEnabled = !currentlyEnabled;
-                renderSkiptimeHelperSetting(nextEnabled);
-                try {
-                    await chrome.storage.local.set({ [SKIPTIME_HELPER_KEY]: nextEnabled });
-                    AT.UIHelpers?.showToast?.(
-                        nextEnabled ? 'Skiptime helper enabled' : 'Skiptime helper disabled',
-                        { type: 'success', duration: 1600 }
-                    );
-                } catch (error) {
-                    PopupLogger.error('Settings', 'Failed to update skiptime helper setting:', error);
-                    renderSkiptimeHelperSetting(currentlyEnabled);
-                }
-            });
-        }
+            }
+        });
 
         if (elements.searchInput) {
             let searchTimeout = null;

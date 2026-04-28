@@ -34,7 +34,7 @@ const ContentStorage = {
 
             const timeoutId = setTimeout(() => {
                 Logger.warn('Storage.get() timeout after 15s');
-                resolve({});
+                resolve({ __timedOut: true });
             }, 15000);
 
             chrome.storage.local.get(keys, (localResult) => {

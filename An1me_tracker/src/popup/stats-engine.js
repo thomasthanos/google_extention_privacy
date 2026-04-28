@@ -197,12 +197,19 @@
 
                 let bucket = byDay.get(dk);
                 if (!bucket) {
-                    bucket = { episodes: 0, seconds: 0, animes: new Set() };
+                    bucket = { episodes: 0, seconds: 0, animes: new Set(), byAnime: new Map() };
                     byDay.set(dk, bucket);
                 }
                 bucket.episodes++;
                 bucket.seconds += dur;
                 bucket.animes.add(slug);
+                let animeStat = bucket.byAnime.get(slug);
+                if (!animeStat) {
+                    animeStat = { episodes: 0, seconds: 0 };
+                    bucket.byAnime.set(slug, animeStat);
+                }
+                animeStat.episodes++;
+                animeStat.seconds += dur;
 
                 byMonth.set(mk, (byMonth.get(mk) || 0) + dur);
             }
@@ -522,6 +529,11 @@
                 out.activeDays++;
                 for (const slug of bucket.animes) {
                     const row = out.perAnime.get(slug) || { episodes: 0, seconds: 0 };
+                    const stat = bucket.byAnime?.get(slug);
+                    if (stat) {
+                        row.episodes += stat.episodes;
+                        row.seconds += stat.seconds;
+                    }
                     out.perAnime.set(slug, row);
                 }
             }

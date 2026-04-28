@@ -310,30 +310,33 @@ setTimeout(() => {
 }, 2500);
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message.type === 'WATCHLIST_SYNC_EXECUTE') {
-        const { animeId, watchlistType } = message;
-        if (animeId && watchlistType) {
-            const action = watchlistType === 'remove' ? 'remove_from_watchlist' : 'add_to_watchlist';
-            const formData = new FormData();
-            formData.append('action', action);
-            formData.append('anime_id', animeId.toString());
-            formData.append('type', watchlistType);
+    if (!message || message.type !== 'WATCHLIST_SYNC_EXECUTE') return false;
 
-            fetch('https://an1me.to/wp-admin/admin-ajax.php', {
-                method: 'POST',
-                credentials: 'include',
-                body: formData
-            })
-                .then(res => res.text())
-                .then(text => {
-                    console.log(`[WatchlistSync] via tab: ${action} type="${watchlistType}" #${animeId} -> ${text.substring(0, 200)}`);
-                    sendResponse({ success: true });
-                })
-                .catch(e => {
-                    console.warn('[WatchlistSync] via tab error:', e.message);
-                    sendResponse({ success: false });
-                });
-            return true;
-        }
+    const { animeId, watchlistType } = message;
+    if (!animeId || !watchlistType) {
+        sendResponse({ success: false, error: 'invalid_payload' });
+        return false;
     }
+
+    const action = watchlistType === 'remove' ? 'remove_from_watchlist' : 'add_to_watchlist';
+    const formData = new FormData();
+    formData.append('action', action);
+    formData.append('anime_id', animeId.toString());
+    formData.append('type', watchlistType);
+
+    fetch('https://an1me.to/wp-admin/admin-ajax.php', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
+    })
+        .then(res => res.text())
+        .then(text => {
+            console.log(`[WatchlistSync] via tab: ${action} type="${watchlistType}" #${animeId} -> ${text.substring(0, 200)}`);
+            sendResponse({ success: true });
+        })
+        .catch(e => {
+            console.warn('[WatchlistSync] via tab error:', e.message);
+            sendResponse({ success: false, error: e.message });
+        });
+    return true;
 });

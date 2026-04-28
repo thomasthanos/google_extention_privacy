@@ -205,7 +205,7 @@ const Notifications = {
     },
 
     showResumePrompt(savedProgress, onResume, onStartOver) {
-        const timeStr = `${Math.floor(savedProgress.currentTime / 60)}:${(savedProgress.currentTime % 60).toString().padStart(2, '0')}`;
+        const timeStr = `${Math.floor(savedProgress.currentTime / 60)}:${Math.floor(savedProgress.currentTime % 60).toString().padStart(2, '0')}`;
 
         document.querySelectorAll('#anime-tracker-resume-prompt').forEach(el => el.remove());
         document.querySelectorAll('iframe').forEach(f => {

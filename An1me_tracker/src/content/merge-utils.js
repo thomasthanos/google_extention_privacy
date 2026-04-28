@@ -1,3 +1,6 @@
+// Re-exposes the shared merge utils (loaded by src/common/merge-utils.js into
+// globalThis.AnimeTrackerMergeUtils) on the content-script namespace so callers
+// can do `window.AnimeTrackerContent.MergeUtils.foo(...)`. Tiny shim by design.
 (function () {
     'use strict';
 

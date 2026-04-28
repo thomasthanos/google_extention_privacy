@@ -288,12 +288,17 @@
         const effectiveGoalSettings = smartPlan?.goalSettings || goalSettings;
 
         if (smartPlan?.shouldPersist) {
+            const previousGoalSettings = goalSettings;
             params.goalSettings = effectiveGoalSettings;
             if (typeof params.onGoalsChanged === 'function') {
                 params.onGoalsChanged(effectiveGoalSettings);
             }
             chrome.storage.local.set({ goalSettings: effectiveGoalSettings }).catch((err) => {
-                console.warn('[GoalsView] Failed to save smart goals:', err);
+                console.warn('[GoalsView] Failed to save smart goals — reverting in-memory state:', err);
+                params.goalSettings = previousGoalSettings;
+                if (typeof params.onGoalsChanged === 'function') {
+                    params.onGoalsChanged(previousGoalSettings);
+                }
             });
         }
 
