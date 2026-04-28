@@ -1515,12 +1515,28 @@
     async function persistBadgeUnlocks(newlyUnlocked) {
         if (!Array.isArray(newlyUnlocked) || newlyUnlocked.length === 0) return;
         const nowIso = new Date().toISOString();
-        const next = { ...(badgeState || {}) };
+        const previousState = badgeState || {};
+        const next = { ...previousState };
+
+        // Only badges that aren't yet in `badgeState` are *truly* new for this
+        // user. Without this filter, the first goals-view render of every
+        // popup session — where `lastBadgeSnapshot` starts as [] — diffs every
+        // currently-unlocked badge as "newly unlocked" and re-fires a system
+        // notification for each one (the bug surfaced as the post-logout
+        // achievements toast spam).
+        const trulyNew = [];
         for (const badge of newlyUnlocked) {
-            if (!next[badge.id]) {
+            if (!previousState[badge.id]) {
                 next[badge.id] = { unlockedAt: nowIso, notified: false };
+                trulyNew.push(badge);
             }
         }
+
+        if (trulyNew.length === 0) {
+            // Snapshot caught up with persisted state; nothing fresh to notify.
+            return;
+        }
+
         badgeState = next;
         try {
             await chrome.storage.local.set({ [BADGE_STATE_KEY]: next });
@@ -1528,15 +1544,15 @@
             PopupLogger.warn('Goals', 'Failed to persist badge unlocks:', e);
         }
 
-        if (newlyUnlocked.length > 3) {
+        if (trulyNew.length > 3) {
             try {
                 chrome.runtime.sendMessage({
                     type: 'BADGES_UNLOCKED_BATCH',
-                    count: newlyUnlocked.length
+                    count: trulyNew.length
                 }, () => { if (chrome.runtime.lastError) { } });
             } catch { }
         } else {
-            for (const badge of newlyUnlocked) {
+            for (const badge of trulyNew) {
                 try {
                     chrome.runtime.sendMessage({
                         type: 'BADGE_UNLOCKED',

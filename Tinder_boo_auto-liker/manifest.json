@@ -1,11 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Auto Liker for Tinder & Boo",
-  "version": "4.6",
+  "version": "4.7",
   "description": "Auto Like with neon button, live counter & smart pause for Tinder & Boo 💘",
   "default_locale": "en",
   "author": "ThomasT",
-  "permissions": ["activeTab"],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "tabs",
+    "webNavigation"
+  ],
   "host_permissions": [
     "https://tinder.com/*",
     "https://boo.world/*"
@@ -16,10 +21,13 @@
   "content_scripts": [
     {
       "matches": [
-        "https://tinder.com/app/recs",
-        "https://boo.world/*/match"
+        "https://tinder.com/app/recs*",
+        "https://tinder.com/app/explore*",
+        "https://boo.world/*/match*"
       ],
-      "js": ["content.js"]
+      "js": [
+        "content.js"
+      ]
     }
   ],
   "action": {

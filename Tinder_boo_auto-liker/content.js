@@ -1,3 +1,9 @@
+// Guard against double-injection (SPA navigation re-injects the script)
+if (window.__autoLikerInjected) {
+  // Already running, skip
+} else {
+window.__autoLikerInjected = true;
+
 let intervalId = null;
 let likeCount = 0;
 let failCount = 0;
@@ -363,3 +369,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
     }
 });
+
+// Hide/show button based on URL (handles SPA navigation)
+function checkUrlVisibility() {
+    if (!container) return;
+    const hidden = location.pathname.startsWith('/app/messages') || location.pathname.startsWith('/app/profile');
+    container.style.display = hidden ? 'none' : 'block';
+    if (hidden && intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+        updateButtonState();
+    }
+}
+
+// Watch for SPA URL changes
+let _lastUrl = location.href;
+const _urlObserver = new MutationObserver(() => {
+    if (location.href !== _lastUrl) {
+        _lastUrl = location.href;
+        checkUrlVisibility();
+    }
+});
+_urlObserver.observe(document.body, { childList: true, subtree: true });
+
+// Initial check
+checkUrlVisibility();
+
+} // end double-injection guard

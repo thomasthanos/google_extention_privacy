@@ -369,7 +369,12 @@
         });
     }
 
-    const SMART_GOAL_AUTO_INTERVAL_MS = 18 * 60 * 60 * 1000;
+    // Cooldown between consecutive auto-applies of a smart suggestion. Was
+    // 18h — too long: a user opening the popup once a day would only see one
+    // adjustment per session, even if their watch pattern shifted noticeably.
+    // 2h is short enough that the target tracks reality on the next popup
+    // open, but still gates against thrashing within a single sitting.
+    const SMART_GOAL_AUTO_INTERVAL_MS = 2 * 60 * 60 * 1000;
 
     function toMillis(value) {
         if (!value) return 0;

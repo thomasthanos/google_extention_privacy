@@ -361,6 +361,39 @@ function isSyncPaused() {
 let _lastCloudPollAt = 0;
 let _cloudPollInFlight = null;
 
+// Persist the last-poll timestamp so cold starts (especially on mobile, where
+// the MV3 service worker is killed aggressively) don't trigger a fresh
+// Firestore read every time a consumer reconnects. Without this, opening the
+// popup on Orion right after the SW is recycled spends a read on every poll
+// even though the cloud doc hasn't changed.
+const _LAST_POLL_KEY = '_bgLastCloudPollAt';
+const _LAST_PROGRESS_SYNC_KEY = '_bgLastProgressSyncAt';
+
+async function hydrateBgPollState() {
+    try {
+        const stored = await bgStorageGet([_LAST_POLL_KEY, _LAST_PROGRESS_SYNC_KEY]);
+        const cloud = Number(stored[_LAST_POLL_KEY]) || 0;
+        const progress = Number(stored[_LAST_PROGRESS_SYNC_KEY]) || 0;
+        // Only hydrate values from the past — guards against future-dated
+        // timestamps after a clock change.
+        const now = Date.now();
+        if (cloud > 0 && cloud <= now) _lastCloudPollAt = cloud;
+        if (progress > 0 && progress <= now) _lastProgressSyncAt = progress;
+    } catch {
+        // Best-effort — fall back to zero (poll on next consumer connect).
+    }
+}
+
+function persistBgPollState(updates) {
+    try {
+        const payload = {};
+        if (typeof updates.cloudPollAt === 'number') payload[_LAST_POLL_KEY] = updates.cloudPollAt;
+        if (typeof updates.progressSyncAt === 'number') payload[_LAST_PROGRESS_SYNC_KEY] = updates.progressSyncAt;
+        if (Object.keys(payload).length === 0) return;
+        bgStorageSet(payload).catch(() => {});
+    } catch {}
+}
+
 const activeStreamConsumers = new Set();
 const IDLE_TEARDOWN_GRACE_MS = 10000;
 let _idleTeardownTimer = null;
@@ -541,7 +574,9 @@ async function pollCloudData(reason = 'poll') {
             const token = await getFirebaseToken();
             if (!user || !token) return null;
 
-            _lastCloudPollAt = Date.now();
+            const pollAt = Date.now();
+            _lastCloudPollAt = pollAt;
+            persistBgPollState({ cloudPollAt: pollAt });
             const cloudDoc = await fetchCloudData(user, token);
             if (cloudDoc) {
                 await applyCloudUpdate(cloudDoc);
@@ -622,6 +657,7 @@ async function syncProgressOnly() {
             _lastAppliedCloudUpdatedAt = pushedAt;
             bgRememberOwnWrite(pushedAt);
             _lastProgressSyncAt = Date.now();
+            persistBgPollState({ progressSyncAt: _lastProgressSyncAt });
         } else {
             console.warn('[BG] Progress sync failed:', response.status);
             if (response.status >= 500) invalidateBgCloudDocCache();
@@ -2444,3 +2480,4 @@ maybeStartPendingMetadataRepair().catch((error) => {
 resumeMetadataRepairIfNeeded().catch((error) => {
     console.error('[BG] Failed to resume metadata repair on boot:', error);
 });
+hydrateBgPollState();

@@ -40,7 +40,9 @@
     };
 
     let _lastBadgeEvaluation = [];
-    const MANUAL_OVERRIDE_MS = 3 * 24 * 60 * 60 * 1000;
+    // 1 hour: short enough that the AI keeps driving the target, long enough
+    // that a manual click sticks while the user is actively reviewing it.
+    const MANUAL_OVERRIDE_MS = 60 * 60 * 1000;
 
     function escapeHtml(value) {
         return String(value ?? '').replace(/[&<>"']/g, (c) => ({
@@ -356,6 +358,10 @@
                     [field]: value,
                     smartManaged: true,
                     updatedAt: now.toISOString(),
+                    // Treat the manual click as a short hint, not a 3-day veto.
+                    // The user expects the AI to keep adapting the target on
+                    // its own — a short window (1 hour) gives them time to
+                    // see the manual value before auto-apply kicks in again.
                     manualOverrideUntil: new Date(now.getTime() + MANUAL_OVERRIDE_MS).toISOString()
                 }
             };

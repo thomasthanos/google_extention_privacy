@@ -7,8 +7,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const progressText = document.getElementById('progressText');
 
     // Get initial status
-    chrome.runtime.sendMessage({action: 'getStatus'}, function(response) {
-        updateUI(response);
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+        const tab = tabs[0];
+        if (!tab) return;
+        chrome.tabs.sendMessage(tab.id, {action: 'getStatus'}, function(response) {
+            if (chrome.runtime.lastError || !response) return; // content script not ready yet
+            updateUI(response);
+        });
     });
 
     // Set up live updates
@@ -24,7 +29,27 @@ document.addEventListener('DOMContentLoaded', function() {
     // Toggle button click
     toggleButton.addEventListener('click', function() {
         chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-            chrome.tabs.sendMessage(tabs[0].id, {action: 'toggle'});
+            const tab = tabs[0];
+            if (!tab) return;
+
+            // Try to send message; if content script not injected, inject it first
+            chrome.tabs.sendMessage(tab.id, {action: 'toggle'}, function(response) {
+                if (chrome.runtime.lastError) {
+                    // Content script not present — inject it then toggle
+                    chrome.scripting.executeScript({
+                        target: {tabId: tab.id},
+                        files: ['content.js']
+                    }, function() {
+                        if (chrome.runtime.lastError) {
+                            console.warn('Could not inject content script:', chrome.runtime.lastError.message);
+                            return;
+                        }
+                        setTimeout(function() {
+                            chrome.tabs.sendMessage(tab.id, {action: 'toggle'});
+                        }, 300);
+                    });
+                }
+            });
         });
     });
 
