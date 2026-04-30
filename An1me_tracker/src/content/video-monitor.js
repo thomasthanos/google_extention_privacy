@@ -164,13 +164,17 @@ const VideoMonitor = {
         });
 
         if (animeInfo) {
-            const savedProgress = await ProgressTracker.getSavedProgress(animeInfo.uniqueId);
-            if (savedProgress && savedProgress.currentTime > CONFIG.MIN_PROGRESS_TO_SAVE) {
+            // Track whether we've already shown the prompt for this episode
+            // so that a late-arriving cloud sync doesn't double-prompt.
+            let resumePromptShown = false;
+            const showPromptOnce = (savedProgress) => {
+                if (resumePromptShown) return;
+                if (!savedProgress || !(savedProgress.currentTime > CONFIG.MIN_PROGRESS_TO_SAVE)) return;
+                resumePromptShown = true;
                 savedProgress.uniqueId = animeInfo.uniqueId;
 
                 let retryCount = 0;
                 const MAX_RETRIES = 20;
-
                 const checkReady = () => {
                     if (video.readyState >= 2 && video.duration > 0) {
                         Notifications.showResumePrompt(
@@ -195,6 +199,38 @@ const VideoMonitor = {
                     }
                 };
                 setTimeout(checkReady, 1000);
+            };
+
+            const initialProgress = await ProgressTracker.getSavedProgress(animeInfo.uniqueId);
+            if (initialProgress && initialProgress.currentTime > CONFIG.MIN_PROGRESS_TO_SAVE) {
+                showPromptOnce(initialProgress);
+            } else {
+                // Cross-device case: progress was saved on another device but
+                // hasn't synced down to this tab yet. Watch chrome.storage for
+                // the videoProgress key to update within ~15s, then show the
+                // resume prompt the moment the cloud delivers it.
+                let resumeWaitTimer = null;
+                const onProgressArrive = (changes, namespace) => {
+                    if (namespace !== 'local' || !changes.videoProgress) return;
+                    const newVP = changes.videoProgress.newValue || {};
+                    const entry = newVP[animeInfo.uniqueId];
+                    if (entry && !entry.deleted && entry.currentTime > CONFIG.MIN_PROGRESS_TO_SAVE) {
+                        chrome.storage.onChanged.removeListener(onProgressArrive);
+                        if (resumeWaitTimer) { clearTimeout(resumeWaitTimer); resumeWaitTimer = null; }
+                        showPromptOnce(entry);
+                    }
+                };
+                chrome.storage.onChanged.addListener(onProgressArrive);
+
+                resumeWaitTimer = setTimeout(() => {
+                    resumeWaitTimer = null;
+                    try { chrome.storage.onChanged.removeListener(onProgressArrive); } catch {}
+                }, 15000);
+
+                this.addCleanup(() => {
+                    try { chrome.storage.onChanged.removeListener(onProgressArrive); } catch {}
+                    if (resumeWaitTimer) { clearTimeout(resumeWaitTimer); resumeWaitTimer = null; }
+                });
             }
         }
 

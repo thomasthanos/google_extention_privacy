@@ -2258,6 +2258,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return true;
     }
 
+    if (message.type === 'WAKE_AND_POLL_CLOUD') {
+        // Fired from any an1me.to content script on page load so freshly
+        // landing on the site picks up watch progress from other devices
+        // without forcing the user to open the popup. `pollCloudData` is
+        // self-rate-limited (60s gate + 5-min cache via fetchCloudDataCached)
+        // so calling this on every page navigation is cheap.
+        sendResponse({ received: true });
+        pollCloudData('content-page-open').catch(() => {});
+        return true;
+    }
+
     if (message.type === 'GET_CLOUD_DOC') {
         (async () => {
             try {

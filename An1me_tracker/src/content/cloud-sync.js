@@ -591,11 +591,18 @@
             _lastIdleSnapshot = snap;
 
             if (isOrionMode) {
-                pushFullDirect().then(() => { lastPushAt = Date.now(); });
+                pushFullDirect()
+                    .then(() => { lastPushAt = Date.now(); })
+                    .catch((e) => { Logger?.warn('Periodic pushFullDirect failed', e); });
             } else {
                 const swAlive = await wakeBackgroundSW('SYNC_PROGRESS_ONLY');
-                if (!swAlive) pushProgressDirect().then(() => { lastPushAt = Date.now(); });
-                else lastPushAt = Date.now();
+                if (!swAlive) {
+                    pushProgressDirect()
+                        .then(() => { lastPushAt = Date.now(); })
+                        .catch((e) => { Logger?.warn('Periodic pushProgressDirect failed', e); });
+                } else {
+                    lastPushAt = Date.now();
+                }
             }
         }, PERIODIC_PUSH_INTERVAL);
     }

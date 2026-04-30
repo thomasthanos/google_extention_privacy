@@ -309,6 +309,21 @@ setTimeout(() => {
     WatchlistSync.repairPendingStatusesOnce().catch(() => {});
 }, 2500);
 
+// Wake the background SW and trigger one cloud poll on every an1me.to page
+// load. Without this, mobile Orion (which kills the SW aggressively) only
+// pulls fresh cloud data when the popup opens — the user has to manually
+// open the extension just to see episodes they watched on another device.
+// `pollCloudData` in the SW already gates by 60s so this is rate-limited.
+try {
+    chrome.runtime.sendMessage({ type: 'WAKE_AND_POLL_CLOUD' }, () => {
+        if (chrome.runtime.lastError) {
+            // SW unreachable (e.g. signed-out, freshly installed). Safe to ignore.
+        }
+    });
+} catch {
+    // Extension context invalidated — ignore.
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (!message || message.type !== 'WATCHLIST_SYNC_EXECUTE') return false;
 
