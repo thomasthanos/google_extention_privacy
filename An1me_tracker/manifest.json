@@ -1,9 +1,8 @@
 {
   "manifest_version": 3,
-  "default_locale": "en",
-  "name": "__MSG_extName__",
+  "name": "An1me.to Tracker",
   "version": "6.4.3",
-  "description": "__MSG_extDescription__",
+  "description": "Track your anime watching progress on an1me.to with cloud sync across all browsers",
   "author": "ThomasThanos",
   "permissions": [
     "storage",
