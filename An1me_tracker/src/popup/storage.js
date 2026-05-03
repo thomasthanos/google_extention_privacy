@@ -3,21 +3,12 @@
  * Uses local storage with sync migration support
  */
 
-// Slug normalization for merging multi-part anime (migration)
-const STORAGE_SLUG_NORMALIZATION = {
-    'bleach-sennen-kessen-hen-ketsubetsu-tan': 'bleach-sennen-kessen-hen',
-    'bleach-sennen-kessen-hen-soukoku-tan': 'bleach-sennen-kessen-hen',
-    'fate-zero-season-2': 'fate-zero',
-    'fate-zero-2nd-season': 'fate-zero',
-};
-
-// Episode offsets for multi-part anime (migration)
-const STORAGE_EPISODE_OFFSET_MAPPING = {
-    'bleach-sennen-kessen-hen-ketsubetsu-tan': 13,
-    'bleach-sennen-kessen-hen-soukoku-tan': 26,
-    'fate-zero-season-2': 13,
-    'fate-zero-2nd-season': 13,
-};
+// Multi-part mappings now live in src/common/multipart-mappings.js — loaded
+// before this file by popup.html. Single source of truth shared with content
+// scripts and background.
+const _multipartMaps = (typeof window !== 'undefined' && window.AnimeTrackerMultipartMappings) || {};
+const STORAGE_SLUG_NORMALIZATION = _multipartMaps.SLUG_NORMALIZATION || {};
+const STORAGE_EPISODE_OFFSET_MAPPING = _multipartMaps.EPISODE_OFFSET_MAPPING || {};
 
 const LEGACY_SYNC_KEYS = new Set(['animeData', 'trackedEpisodes', 'videoProgress']);
 
@@ -55,7 +46,7 @@ const Storage = {
 
             chrome.storage.local.get(keys, (localResult) => {
                 if (chrome.runtime.lastError) {
-                    console.error('[Storage] Local get error:', chrome.runtime.lastError.message);
+                    (window.PopupLogger || console).error?.('Storage', 'Local get error:', chrome.runtime.lastError.message);
                     resolve({});
                     return;
                 }
@@ -84,7 +75,7 @@ const Storage = {
                         const hasSyncData = missingLegacyKeys.some((key) => hasStoredValue(syncResult[key]));
 
                         if (hasSyncData) {
-                            console.log('[Storage] Migrating from sync to local');
+                            (window.PopupLogger || console).log?.('Storage', 'Migrating from sync to local');
                             chrome.storage.local.set(syncResult, () => {
                                 chrome.storage.sync.remove(missingLegacyKeys);
                             });
@@ -105,8 +96,9 @@ const Storage = {
             chrome.storage.local.set(data, () => {
                 if (chrome.runtime.lastError) {
                     const msg = chrome.runtime.lastError.message || '';
-                    if (msg.includes('QUOTA') || msg.includes('quota') || msg.includes('exceeded')) {
-                        console.error('[Storage] ⚠ Quota exceeded! Consider clearing old data.', msg);
+                    if (msg.includes('QUOTA') || msg.includes('quota') || msg.includes('exceeded') ||
+                        msg.includes('storage capacity') || msg.includes('MAX_ITEMS') || msg.includes('MAX_WRITE_OPERATIONS')) {
+                        (window.PopupLogger || console).error?.('Storage', '⚠ Quota exceeded! Consider clearing old data.', msg);
                     }
                     reject(new Error(msg));
                 } else {
@@ -162,7 +154,7 @@ const Storage = {
         try {
             const lockResult = await new Promise(r => chrome.storage.local.get([LOCK_KEY], r));
             if (lockResult[LOCK_KEY] && Date.now() - lockResult[LOCK_KEY] < LOCK_MAX_AGE) {
-                console.log('[Storage] Migration already in progress, skipping');
+                (window.PopupLogger || console).log?.('Storage', 'Migration already in progress, skipping');
                 return false;
             }
             await new Promise(r => chrome.storage.local.set({ [LOCK_KEY]: Date.now() }, r));
@@ -218,7 +210,7 @@ const Storage = {
                 const migrateSlug = (oldSlug, newSlug, offset = 0, titleTransform = null) => {
                     if (!animeData[oldSlug] || oldSlug === newSlug) return;
 
-                    console.log(`[Storage] Migrating ${oldSlug} -> ${newSlug}`);
+                    (window.PopupLogger || console).log?.('Storage', `Migrating ${oldSlug} -> ${newSlug}`);
                     migrated = true;
 
                     const oldEntry = animeData[oldSlug];
@@ -379,7 +371,7 @@ const Storage = {
                 if (migrated) {
                     chrome.storage.local.set({ animeData, videoProgress, deletedAnime }, () => {
                         releaseLock();
-                        console.log('[Storage] Anime slug migration complete');
+                        (window.PopupLogger || console).log?.('Storage', 'Anime slug migration complete');
                         resolve(true);
                     });
                 } else {

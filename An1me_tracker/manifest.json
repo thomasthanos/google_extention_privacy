@@ -1,15 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "An1me.to Tracker",
-  "version": "6.4.2",
-  "description": "Track your anime watching progress on an1me.to with cloud sync across all browsers",
+  "default_locale": "en",
+  "name": "__MSG_extName__",
+  "version": "6.4.3",
+  "description": "__MSG_extDescription__",
   "author": "ThomasThanos",
   "permissions": [
     "storage",
     "scripting",
     "identity",
     "alarms",
-    "notifications"
+    "notifications",
+    "sidePanel"
   ],
   "host_permissions": [
     "https://an1me.to/*",
@@ -18,7 +20,6 @@
     "https://securetoken.googleapis.com/*",
     "https://firestore.googleapis.com/*",
     "https://www.animefillerlist.com/*",
-    "https://graphql.anilist.co/*",
     "https://api.jikan.moe/*"
   ],
   "action": {
@@ -29,6 +30,9 @@
       "48": "src/icons/icon48.png",
       "128": "src/icons/icon128.png"
     }
+  },
+  "side_panel": {
+    "default_path": "popup.html"
   },
   "icons": {
     "16": "src/icons/icon16.png",
@@ -67,6 +71,7 @@
         "https://an1me.to/watch/*"
       ],
       "js": [
+        "src/common/multipart-mappings.js",
         "src/content/config.js",
         "src/content/logger.js",
         "src/content/storage.js",

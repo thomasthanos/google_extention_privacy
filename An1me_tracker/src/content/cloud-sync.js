@@ -272,6 +272,18 @@
         return cleaned;
     }
 
+    // Cross-function lock: pushProgressDirect and pushFullDirect would
+    // otherwise race because each only checks its own in-progress flag, so
+    // both can fire PATCH requests with overlapping field masks (videoProgress
+    // appears in both) and clobber each other. Keepalive writes (page-unload)
+    // bypass the wait — we accept the small overlap risk to ensure they flush.
+    let _csCloudWriteBusy = false;
+    async function _csWaitForCloudWrite() {
+        while (_csCloudWriteBusy) {
+            await new Promise(r => setTimeout(r, 50));
+        }
+    }
+
     async function pushProgressDirect(options = {}) {
         const { keepalive = false } = options;
         if (isPushingProgressDirect && !keepalive) {
@@ -282,6 +294,8 @@
         const user = currentUser || await getUser();
         if (!token || !user) return;
         isPushingProgressDirect = true;
+        if (!keepalive) await _csWaitForCloudWrite();
+        if (!keepalive) _csCloudWriteBusy = true;
 
         try {
             const localSnapshot = await chrome.storage.local.get(['videoProgress', 'animeData', 'deletedAnime']);
@@ -361,6 +375,7 @@
             Logger?.warn(`Direct progress push error: ${e.message}`);
         } finally {
             isPushingProgressDirect = false;
+            if (!keepalive) _csCloudWriteBusy = false;
             if (progressPushPending && !keepalive) {
                 progressPushPending = false;
                 setTimeout(() => {
@@ -384,6 +399,8 @@
         if (!token || !user) return;
 
         fullPushInProgress = true;
+        if (!keepalive) await _csWaitForCloudWrite();
+        if (!keepalive) _csCloudWriteBusy = true;
         try {
             const localSnapshot = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
 
@@ -477,6 +494,7 @@
             Logger?.warn(`Full push error: ${e.message}`);
         } finally {
             fullPushInProgress = false;
+            if (!keepalive) _csCloudWriteBusy = false;
             if (fullPushPending) { fullPushPending = false; setTimeout(pushFullDirect, 1000); }
         }
     }

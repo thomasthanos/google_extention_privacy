@@ -509,11 +509,18 @@
         return finalCanvas;
     }
 
+    function _toast(msg, type) {
+        const fn = window.AnimeTracker?.showToast;
+        if (typeof fn === 'function') return fn(msg, type);
+        // Fallback for very-early errors before main.js has run.
+        return (window.PopupLogger || console).warn?.('ShareCard', msg);
+    }
+
     async function generateAndOpen(animeData, index) {
         try {
             const canvas = await render(animeData, index);
             const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-            if (!blob) { alert('Could not generate share card.'); return; }
+            if (!blob) { _toast('Could not generate share card.', 'error'); return; }
             const url = URL.createObjectURL(blob);
             try {
                 if (navigator.clipboard?.write && window.ClipboardItem) {
@@ -530,8 +537,8 @@
                 document.body.appendChild(a); a.click(); a.remove();
             }
         } catch (e) {
-            console.error('[ShareCard]', e);
-            alert('Failed to create card: ' + (e?.message || e));
+            (window.PopupLogger || console).error?.('ShareCard', e);
+            _toast('Failed to create card: ' + (e?.message || e), 'error');
         }
     }
 

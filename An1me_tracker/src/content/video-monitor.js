@@ -315,12 +315,15 @@ const VideoMonitor = {
             });
 
             let observerTimeout;
+            let observerWatchdog;
             const observer = new MutationObserver(() => {
                 clearTimeout(observerTimeout);
                 observerTimeout = setTimeout(() => {
                     if (this.findAndMonitorVideo(animeInfo, eventHandlers)) {
                         observer.disconnect();
                         if (this.checkInterval) clearInterval(this.checkInterval);
+                        // Cancel watchdog so it doesn't fire after we already found the video.
+                        if (observerWatchdog) { clearTimeout(observerWatchdog); observerWatchdog = null; }
                         Logger.debug('Video found via observer');
                     }
                 }, 100);
@@ -332,7 +335,7 @@ const VideoMonitor = {
             });
 
             const observerBudgetMs = CONFIG.VIDEO_CHECK_INTERVAL * CONFIG.MAX_RETRIES;
-            const observerWatchdog = setTimeout(() => {
+            observerWatchdog = setTimeout(() => {
                 observer.disconnect();
                 clearTimeout(observerTimeout);
                 Logger.debug('Video observer watchdog — disconnected after budget elapsed');

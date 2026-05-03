@@ -4,15 +4,28 @@
     const ROOT = document.documentElement;
     const STYLE_ID = 'anime-tracker-copy-guard-style';
     const STORAGE_KEY = 'copyGuardEnabled';
+    // Allowed-selector list intentionally combines:
+    //   1. Current Tailwind utility combos used on an1me.to synopsis blocks
+    //      (most precise — but brittle if the site re-themes).
+    //   2. A semantic fallback (`[data-at-allow-copy]`) so we can mark
+    //      elements explicitly without relying on Tailwind.
+    //   3. A loose `.line-clamp-2` fallback that still scopes to truncated
+    //      text blocks — wide enough to keep working through minor markup
+    //      tweaks, narrow enough not to allow whole-page copying.
+    // A self-test on install warns if zero matches are found, so we notice
+    // when the site's structure has drifted before users do.
     const ALLOWED_SELECTORS = [
+        '[data-at-allow-copy]',
         '.group-data-\\[language\\=jp\\]\\/body\\:hidden.line-clamp-2.leading-relaxed',
         '.line-clamp-2.leading-relaxed',
-        '.group-data-\\[language\\=jp\\]\\/body\\:hidden'
+        '.group-data-\\[language\\=jp\\]\\/body\\:hidden',
+        '.line-clamp-2'
     ];
     const ALLOWED_SELECTOR = ALLOWED_SELECTORS.join(', ');
     const EDITABLE_SELECTOR = 'input, textarea, [contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"]';
     let enabled = true;
     let styleObserver = null;
+    let _selectorAuditDone = false;
 
     function getElement(target) {
         if (!target) return null;
@@ -139,6 +152,36 @@
         }
     }
 
+    function auditSelectorsOnce() {
+        if (_selectorAuditDone) return;
+        // Defer one tick so DOM has rendered most of the synopsis blocks
+        // before we count matches. document_start scripts otherwise audit
+        // an empty page and false-alarm.
+        const run = () => {
+            _selectorAuditDone = true;
+            try {
+                const matches = document.querySelectorAll(ALLOWED_SELECTOR).length;
+                if (matches === 0 && document.body) {
+                    // Surface the regression in the console so developers
+                    // notice copy-guard is now blocking everything (or letting
+                    // everything through, depending on user perspective)
+                    // because the site's markup drifted away from our
+                    // hardcoded selectors.
+                    console.warn(
+                        '[CopyGuard] No allowed-copy elements matched on this page — ' +
+                        'an1me.to markup may have changed. Consider updating ALLOWED_SELECTORS in ' +
+                        'src/content/copy-guard.js or marking allowed elements with data-at-allow-copy.'
+                    );
+                }
+            } catch {}
+        };
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => setTimeout(run, 1500), { once: true });
+        } else {
+            setTimeout(run, 1500);
+        }
+    }
+
     function install() {
         document.addEventListener('copy', blockEvent, true);
         document.addEventListener('cut', blockEvent, true);
@@ -146,6 +189,7 @@
         document.addEventListener('dragstart', blockEvent, true);
         document.addEventListener('contextmenu', blockEvent, true);
         setEnabled(true);
+        auditSelectorsOnce();
 
         chrome.storage.local.get([STORAGE_KEY], (result) => {
             if (chrome.runtime.lastError) return;

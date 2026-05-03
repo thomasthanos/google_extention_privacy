@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Bebas+Neue&display=swap');
+/* Google Fonts (Inter + Bebas Neue) is loaded via <link rel="stylesheet">
+   in popup.html so the browser can fetch it in parallel with this CSS.
+   The previous @import here forced a serial fetch that blocked first paint. */
 
 @font-face {
   font-family: 'PROXON';
@@ -30,7 +32,7 @@
   --grad-cyan: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
   --grad-amber: linear-gradient(135deg, #f0c040 0%, #e6a817 100%);
   --t1: #e8edf8;
-  --t2: #6b7694;
+  --t2: #8593b0;  /* WCAG AA: ~5.0:1 against --bg-0 (#0e1117). Was #6b7694 ≈4.16:1, just below AA. */
   --t3: #353d55;
   --b0: rgba(255, 255, 255, 0.04);
   --b1: rgba(255, 255, 255, 0.07);
@@ -1654,7 +1656,13 @@ body {
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2)
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  /* Native browser-level virtualization: skip layout/paint for offscreen
+     cards. contain-intrinsic-size hints the unrendered height so the
+     scrollbar still represents the full list. ~78px is the collapsed-card
+     height; expanded cards re-paint when scrolled into view. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 78px;
 }
 
 .anime-card:hover {
@@ -2818,9 +2826,47 @@ body {
 
 .empty-state p {
   font-size: 12px;
-  color: var(--t3);
+  color: var(--t2);
   max-width: 240px;
   line-height: 1.6
+}
+
+.empty-state-tips {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 14px 16px;
+  background: var(--b0);
+  border: 1px solid var(--b1);
+  border-radius: var(--r-md);
+  max-width: 280px;
+  font-size: 11.5px;
+  color: var(--t2);
+  text-align: left;
+  line-height: 1.5;
+}
+
+.empty-state-tips li {
+  position: relative;
+  padding-left: 16px;
+  margin-bottom: 8px;
+}
+
+.empty-state-tips li:last-child {
+  margin-bottom: 0;
+}
+
+.empty-state-tips li::before {
+  content: "•";
+  position: absolute;
+  left: 4px;
+  top: 0;
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+.empty-state-tips strong {
+  color: var(--t1);
+  font-weight: 600;
 }
 
 .footer {
@@ -3646,6 +3692,9 @@ body {
   border-radius: var(--r-lg);
   padding: 10px 12px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  /* See .anime-card — native virtualization for offscreen items. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 88px;
   position: relative;
   overflow: hidden;
   box-shadow: var(--s2)
@@ -4043,6 +4092,9 @@ body {
   transition: border-color var(--tn), box-shadow var(--tn);
   position: relative;
   overflow: hidden;
+  /* See .anime-card — native virtualization for offscreen items. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 88px;
   box-shadow: var(--s2)
 }
 
@@ -6235,6 +6287,39 @@ body {
 
 .anime-card:focus:not(:focus-visible) {
   outline: none
+}
+
+/* Broad :focus-visible coverage for elements that previously had no
+   keyboard focus indicator. Keyboard users need a visible affordance even
+   though :focus is suppressed elsewhere for click users. */
+.btn-icon:focus-visible,
+.btn-add-anime:focus-visible,
+.btn-sort:focus-visible,
+.btn:focus-visible,
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.btn-danger:focus-visible,
+.dialog-close:focus-visible,
+.category-tab:focus-visible,
+.sort-option:focus-visible,
+.anime-favorite-toggle:focus-visible,
+.anime-onhold-toggle:focus-visible,
+.anime-complete-toggle:focus-visible,
+.anime-drop-toggle:focus-visible,
+.anime-delete:focus-visible,
+.progress-delete-btn:focus-visible,
+.show-more-episodes:focus-visible,
+.dialog-overlay [type="checkbox"]:focus-visible {
+  outline: 2px solid rgba(79, 195, 247, 0.85);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* High-contrast focus ring for the accent-colored confirm button so it
+   stays visible against the gradient background. */
+.btn-primary:focus-visible {
+  outline-color: rgba(255, 255, 255, 0.9);
+  outline-offset: 2px;
 }
 
 /* ─── Favorite (star) indicator & button ───────────────────────────────── */

@@ -2095,7 +2095,7 @@
             }
         } catch (e) {
             PopupLogger.error('Delete', 'Error:', e);
-            alert('Failed to delete progress. Please try again.');
+            showToast('Failed to delete progress. Please try again.', 'error');
         }
     }
 
@@ -2224,7 +2224,7 @@
         } catch (e) {
             PopupLogger.error('Delete', 'Error:', e);
             try { AT.UIHelpers?.showToast?.('Failed to delete anime', { type: 'error', duration: 3500 }); }
-            catch { alert('Failed to delete anime. Please try again.'); }
+            catch { showToast('Failed to delete anime. Please try again.', 'error'); }
         } finally {
             _deletingSlugs.delete(slug);
         }
@@ -2447,8 +2447,57 @@
         hideDialog();
     }
 
-    function showDialog() { elements.confirmDialog.classList.add('visible'); }
-    function hideDialog() { elements.confirmDialog.classList.remove('visible'); }
+    // Tracks the element that had focus before a modal opened so we can
+    // restore focus on close (a11y best practice — without this, keyboard
+    // users land back at the top of the popup instead of where they were).
+    const _dialogState = new WeakMap();
+    function _focusableIn(root) {
+        return Array.from(root.querySelectorAll(
+            'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )).filter(el => !el.hasAttribute('hidden') && el.offsetParent !== null);
+    }
+    function openDialogA11y(overlay, opts = {}) {
+        if (!overlay) return;
+        const restoreTo = document.activeElement;
+        overlay.classList.add('visible');
+        overlay.setAttribute('aria-hidden', 'false');
+        const trapHandler = (e) => {
+            if (e.key === 'Escape' && opts.dismissOnEscape !== false) {
+                e.preventDefault();
+                closeDialogA11y(overlay);
+                opts.onCancel?.();
+                return;
+            }
+            if (e.key !== 'Tab') return;
+            const focusables = _focusableIn(overlay);
+            if (focusables.length === 0) return;
+            const first = focusables[0];
+            const last = focusables[focusables.length - 1];
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        };
+        overlay.addEventListener('keydown', trapHandler);
+        _dialogState.set(overlay, { restoreTo, trapHandler });
+        // Focus first focusable element on next tick so the dialog renders first.
+        requestAnimationFrame(() => {
+            const focusables = _focusableIn(overlay);
+            (opts.initialFocus || focusables[0])?.focus();
+        });
+    }
+    function closeDialogA11y(overlay) {
+        if (!overlay) return;
+        const state = _dialogState.get(overlay);
+        if (state) {
+            overlay.removeEventListener('keydown', state.trapHandler);
+            _dialogState.delete(overlay);
+            try { state.restoreTo?.focus?.(); } catch {}
+        }
+        overlay.classList.remove('visible');
+        overlay.setAttribute('aria-hidden', 'true');
+    }
+
+    function showDialog() { openDialogA11y(elements.confirmDialog); }
+    function hideDialog() { closeDialogA11y(elements.confirmDialog); }
 
     function showAddAnimeDialog() {
         elements.animeSlugInput.value = '';
@@ -2461,12 +2510,14 @@
         const includeFillerLabel = document.getElementById('includeFillerLabel');
         if (includeFillerLabel) includeFillerLabel.style.display = 'none';
         updateEpisodesPreview('');
-        elements.addAnimeDialog.classList.add('visible');
-        elements.animeSlugInput.focus();
+        openDialogA11y(elements.addAnimeDialog, {
+            initialFocus: elements.animeSlugInput,
+            onCancel: hideAddAnimeDialog
+        });
     }
 
     function hideAddAnimeDialog() {
-        elements.addAnimeDialog.classList.remove('visible');
+        closeDialogA11y(elements.addAnimeDialog);
     }
 
     function buildRangeString(episodeNumbers) {
@@ -2791,7 +2842,7 @@
             }
         } catch (error) {
             PopupLogger.error('AddAnime', 'Error:', error);
-            alert('Failed to add anime. Please try again.');
+            showToast('Failed to add anime. Please try again.', 'error');
         } finally {
             elements.confirmAddAnime.disabled = false;
             elements.confirmAddAnime.textContent = 'Add Anime';
@@ -2802,13 +2853,16 @@
         if (!animeData[slug]) { PopupLogger.warn('EditTitle', 'Anime not found:', slug); return; }
         editingSlug = slug;
         elements.editTitleInput.value = animeData[slug].title || '';
-        elements.editTitleDialog.classList.add('visible');
-        elements.editTitleInput.focus();
-        elements.editTitleInput.select();
+        openDialogA11y(elements.editTitleDialog, {
+            initialFocus: elements.editTitleInput,
+            onCancel: hideEditTitleDialog
+        });
+        // Pre-select text so user can replace immediately.
+        try { elements.editTitleInput.select(); } catch {}
     }
 
     function hideEditTitleDialog() {
-        elements.editTitleDialog.classList.remove('visible');
+        closeDialogA11y(elements.editTitleDialog);
         editingSlug = null;
     }
 
@@ -2847,7 +2901,7 @@
         } catch (error) {
             PopupLogger.error('EditTitle', 'Error:', error);
             try { AT.UIHelpers?.showToast?.('Failed to update title', { type: 'error', duration: 3500 }); }
-            catch { alert('Failed to update title. Please try again.'); }
+            catch { showToast('Failed to update title. Please try again.', 'error'); }
         }
     }
 
@@ -3155,6 +3209,31 @@
         setTimeout(() => toast.remove(), 3000);
     }
 
+    // Non-blocking toast that replaces native alert() in error paths. alert()
+    // freezes the popup and feels broken; this matches the rest of the toast UX.
+    function showToast(message, type = 'error') {
+        const existing = document.getElementById('atGenericToast');
+        if (existing) existing.remove();
+        const toast = document.createElement('div');
+        toast.id = 'atGenericToast';
+        toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        toast.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+        toast.textContent = String(message || '');
+        toast.style.cssText = `
+            position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+            background:${type === 'error' ? 'rgba(240,69,69,0.95)' : 'rgba(54,212,116,0.95)'};
+            color:#fff; padding:10px 18px; border-radius:14px; font-size:13px;
+            font-weight:600; z-index:10001; max-width:calc(100vw - 32px);
+            box-shadow:0 6px 22px rgba(0,0,0,0.45); animation:fadeIn 0.18s ease;
+            word-wrap:break-word; text-align:center;`;
+        document.body.appendChild(toast);
+        setTimeout(() => { try { toast.remove(); } catch {} }, 4000);
+    }
+    // Expose so other popup modules (share-card, etc.) can use the same
+    // toast UX instead of falling back to native alert().
+    window.AnimeTracker = window.AnimeTracker || {};
+    window.AnimeTracker.showToast = showToast;
+
     async function signOut() {
         const { Storage, FirebaseSync } = AT;
         animeData = {};
@@ -3260,7 +3339,7 @@
                             </div>
                             <div class="export-token-body">
                                 <p>Copy this token and paste it in the <strong>Import Token</strong> panel on Orion/Safari. Valid for 20 minutes.</p>
-                                <textarea class="export-token-text" readonly>${tokenStr}</textarea>
+                                <textarea class="export-token-text" readonly></textarea>
                                 <div class="export-token-actions">
                                     <button class="btn-copy-token">Copy Token</button>
                                     <button class="btn-close-token">Close</button>
@@ -3268,6 +3347,7 @@
                             </div>
                         </div>
                     `;
+                    overlay.querySelector('.export-token-text').value = tokenStr;
                     overlay.querySelector('.btn-copy-token').addEventListener('click', async () => {
                         try {
                             await navigator.clipboard.writeText(tokenStr);
@@ -3279,7 +3359,7 @@
                     document.body.appendChild(overlay);
                     setTimeout(() => overlay.querySelector('.export-token-text')?.select(), 50);
                 } catch (err) {
-                    alert('Export failed: ' + err.message);
+                    showToast('Export failed: ' + (err?.message || err), 'error');
                 }
             });
         }
@@ -3442,7 +3522,15 @@
                 setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
                 try {
-                    const allKeys = await new Promise(resolve => chrome.storage.local.get(null, resolve));
+                    const allKeys = await new Promise((resolve) => chrome.storage.local.get(null, (r) => {
+                        // Surface storage failures instead of silently treating them as empty.
+                        if (chrome.runtime.lastError) {
+                            PopupLogger.warn('Storage', 'get(null) error:', chrome.runtime.lastError.message);
+                            resolve({});
+                            return;
+                        }
+                        resolve(r || {});
+                    }));
                     const infoKeys = Object.keys(allKeys).filter(k => k.startsWith('animeinfo_'));
                     if (infoKeys.length > 0) await Storage.remove(infoKeys);
                     AnilistService.cache = {};

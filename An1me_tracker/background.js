@@ -383,19 +383,27 @@ let _cloudPollInFlight = null;
 const _LAST_POLL_KEY = '_bgLastCloudPollAt';
 const _LAST_PROGRESS_SYNC_KEY = '_bgLastProgressSyncAt';
 
-async function hydrateBgPollState() {
-    try {
-        const stored = await bgStorageGet([_LAST_POLL_KEY, _LAST_PROGRESS_SYNC_KEY]);
-        const cloud = Number(stored[_LAST_POLL_KEY]) || 0;
-        const progress = Number(stored[_LAST_PROGRESS_SYNC_KEY]) || 0;
-        // Only hydrate values from the past — guards against future-dated
-        // timestamps after a clock change.
-        const now = Date.now();
-        if (cloud > 0 && cloud <= now) _lastCloudPollAt = cloud;
-        if (progress > 0 && progress <= now) _lastProgressSyncAt = progress;
-    } catch {
-        // Best-effort — fall back to zero (poll on next consumer connect).
-    }
+// Tracks whether hydration has completed. pollCloudData and other timestamp
+// readers await this so they don't make decisions based on the default 0
+// values (which would force a Firestore read on every SW cold start).
+let _bgHydrationPromise = null;
+function hydrateBgPollState() {
+    if (_bgHydrationPromise) return _bgHydrationPromise;
+    _bgHydrationPromise = (async () => {
+        try {
+            const stored = await bgStorageGet([_LAST_POLL_KEY, _LAST_PROGRESS_SYNC_KEY]);
+            const cloud = Number(stored[_LAST_POLL_KEY]) || 0;
+            const progress = Number(stored[_LAST_PROGRESS_SYNC_KEY]) || 0;
+            // Only hydrate values from the past — guards against future-dated
+            // timestamps after a clock change.
+            const now = Date.now();
+            if (cloud > 0 && cloud <= now) _lastCloudPollAt = cloud;
+            if (progress > 0 && progress <= now) _lastProgressSyncAt = progress;
+        } catch {
+            // Best-effort — fall back to zero (poll on next consumer connect).
+        }
+    })();
+    return _bgHydrationPromise;
 }
 
 function persistBgPollState(updates) {
@@ -580,10 +588,15 @@ async function fetchCloudData(user, token) {
 
 async function pollCloudData(reason = 'poll') {
     if (_cloudPollInFlight) return _cloudPollInFlight;
-    if ((Date.now() - _lastCloudPollAt) < CLOUD_POLL_INTERVAL_MS) return null;
 
     _cloudPollInFlight = (async () => {
         try {
+            // Wait for hydrated timestamps before deciding to skip — otherwise
+            // a freshly-woken SW reads _lastCloudPollAt = 0 and pays a wasted
+            // Firestore read even when a previous incarnation polled seconds ago.
+            await hydrateBgPollState();
+            if ((Date.now() - _lastCloudPollAt) < CLOUD_POLL_INTERVAL_MS) return null;
+
             const user = await getFirebaseUser();
             const token = await getFirebaseToken();
             if (!user || !token) return null;
@@ -635,6 +648,15 @@ let lastPushedProgressBG = null;
 
 let _lastProgressSyncAt = 0;
 
+// Serializes ALL Firestore writes (full sync + progress-only) so two PATCH
+// requests with overlapping field masks can't race and clobber each other.
+let _firestoreWriteQueue = Promise.resolve();
+function enqueueFirestoreWrite(fn) {
+    const next = _firestoreWriteQueue.then(fn, fn);
+    _firestoreWriteQueue = next.catch(() => {});
+    return next;
+}
+
 async function syncProgressOnly() {
     if (progressSyncInProgress) { progressSyncPending = true; return; }
 
@@ -644,6 +666,7 @@ async function syncProgressOnly() {
 
     progressSyncInProgress = true;
     try {
+        await enqueueFirestoreWrite(async () => {
         const result = await bgStorageGet(['videoProgress', 'animeData', 'deletedAnime']);
         let localVP = result.videoProgress || {};
 
@@ -676,6 +699,7 @@ async function syncProgressOnly() {
             console.warn('[BG] Progress sync failed:', response.status);
             if (response.status >= 500) invalidateBgCloudDocCache();
         }
+        });
     } catch (error) {
         console.error('[BG] Progress sync error:', error);
     } finally {
@@ -697,6 +721,7 @@ async function syncToFirebase() {
 
     syncInProgress = true;
     try {
+        await enqueueFirestoreWrite(async () => {
         const cloudDoc = await fetchCloudDataCached(user, token);
 
         const result = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
@@ -787,6 +812,7 @@ async function syncToFirebase() {
             console.error('[BG] Sync failed:', response.status);
             if (response.status >= 500) invalidateBgCloudDocCache();
         }
+        });
     } catch (error) {
         console.error('[BG] Sync error:', error);
     } finally {
@@ -1035,7 +1061,25 @@ const KNOWN_FILLER_SLUGS = {
     'shingeki-no-kyojin-the-final-season': 'attack-on-titan',
 };
 
-const fillerSlugCache = {};
+// LRU-bounded filler-slug resolver cache. The previous unbounded `{}` could
+// grow indefinitely on long-lived service workers (e.g. mobile Orion), since
+// every distinct slug-candidate pair landed here forever. Cap to 500 entries
+// which covers a heavy library while keeping memory predictable.
+const FILLER_SLUG_CACHE_MAX = 500;
+const _fillerSlugLru = new Map();
+const fillerSlugCache = {
+    has(key) { return _fillerSlugLru.has(key); },
+    get(key) { return _fillerSlugLru.get(key); },
+    set(key, value) {
+        if (_fillerSlugLru.has(key)) _fillerSlugLru.delete(key);
+        else if (_fillerSlugLru.size >= FILLER_SLUG_CACHE_MAX) {
+            const oldest = _fillerSlugLru.keys().next().value;
+            if (oldest !== undefined) _fillerSlugLru.delete(oldest);
+        }
+        _fillerSlugLru.set(key, value);
+    },
+    delete(key) { _fillerSlugLru.delete(key); }
+};
 
 function generateFillerSlugCandidates(an1meSlug, animeTitle) {
     const seen = new Set();
@@ -1118,17 +1162,17 @@ async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
     const { forceRefresh = false } = options;
     const cacheKey = an1meSlug.toLowerCase();
 
-    if (!forceRefresh && cacheKey in fillerSlugCache) return fillerSlugCache[cacheKey];
+    if (!forceRefresh && fillerSlugCache.has(cacheKey)) return fillerSlugCache.get(cacheKey);
 
     if (cacheKey in KNOWN_FILLER_SLUGS) {
         const known = KNOWN_FILLER_SLUGS[cacheKey];
-        fillerSlugCache[cacheKey] = known;
+        fillerSlugCache.set(cacheKey, known);
         return known;
     }
 
     const storageKey = `fillerslug_${cacheKey}`;
     if (forceRefresh) {
-        delete fillerSlugCache[cacheKey];
+        fillerSlugCache.delete(cacheKey);
         try {
             await bgStorageRemove([storageKey]);
         } catch (e) {
@@ -1141,13 +1185,13 @@ async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
         const cached = stored[storageKey];
         if (cached !== undefined) {
             if (typeof cached === 'string') {
-                fillerSlugCache[cacheKey] = cached;
+                fillerSlugCache.set(cacheKey, cached);
                 return cached;
             }
             if (cached?.notFound) {
                 const age = cached.cachedAt ? Date.now() - cached.cachedAt : Infinity;
                 if (age < 3 * 24 * 60 * 60 * 1000) {
-                    fillerSlugCache[cacheKey] = null;
+                    fillerSlugCache.set(cacheKey, null);
                     return null;
                 }
                 await bgStorageRemove([storageKey]);
@@ -1191,14 +1235,14 @@ async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
     }
 
     if (found) {
-        fillerSlugCache[cacheKey] = found;
+        fillerSlugCache.set(cacheKey, found);
         await bgStorageSet({ [storageKey]: found });
         dlog(`[AnimeTracker] Filler slug discovered: ${an1meSlug} → ${found}`);
         return found;
     }
 
     const notFoundEntry = { notFound: true, cachedAt: Date.now() };
-    fillerSlugCache[cacheKey] = null;
+    fillerSlugCache.set(cacheKey, null);
     try {
         await bgStorageSet({ [storageKey]: notFoundEntry });
     } catch (e) {
@@ -2262,15 +2306,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     if (message.type === 'SYNC_PROGRESS_ONLY') {
         sendResponse({ received: true });
-        // Min-interval guard: if a successful progress sync happened in the last
-        // ~4 min, skip this immediate sync and let the next scheduled push handle it.
-        // Prevents back-to-back writes when BG debounce and CS periodic push collide.
-        const sinceLast = Date.now() - _lastProgressSyncAt;
-        if (_lastProgressSyncAt && sinceLast < 4 * 60 * 1000) {
-            return true;
-        }
-        if (progressSyncDebounce) { clearTimeout(progressSyncDebounce); progressSyncDebounce = null; }
-        syncProgressOnly();
+        // Wait for hydration before reading _lastProgressSyncAt — otherwise a
+        // freshly-woken SW always sees 0 and skips the min-interval guard,
+        // burning a Firestore write seconds after the previous one.
+        (async () => {
+            await hydrateBgPollState();
+            const sinceLast = Date.now() - _lastProgressSyncAt;
+            if (_lastProgressSyncAt && sinceLast < 4 * 60 * 1000) return;
+            if (progressSyncDebounce) { clearTimeout(progressSyncDebounce); progressSyncDebounce = null; }
+            syncProgressOnly();
+        })();
         return true;
     }
 
@@ -2340,7 +2385,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === 'CLEAR_FILLER_CACHE') {
         const slug = (message.animeSlug || '').toLowerCase();
         if (slug) {
-            delete fillerSlugCache[slug];
+            fillerSlugCache.delete(slug);
             const storageKey = `fillerslug_${slug}`;
             bgStorageRemove([storageKey])
                 .then(() => sendResponse({ success: true }))

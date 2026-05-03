@@ -173,21 +173,25 @@
                         </svg>Movies</button>
                 </div>
                 <div class="toolbar">
-                    <button class="btn-add-anime" id="addAnimeBtn" title="Add watched anime"><svg viewBox="0 0 24 24"
-                            fill="none" stroke="currentColor" stroke-width="2">
+                    <button class="btn-add-anime" id="addAnimeBtn" type="button" title="Add watched anime"
+                        aria-label="Add watched anime"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" aria-hidden="true" focusable="false">
                             <line x1="12" y1="5" x2="12" y2="19" />
                             <line x1="5" y1="12" x2="19" y2="12" />
                         </svg></button>
                     <div class="search-container">
-                        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            aria-hidden="true" focusable="false">
                             <circle cx="11" cy="11" r="8" />
                             <line x1="21" y1="21" x2="16.65" y2="16.65" />
                         </svg>
-                        <input type="text" class="search-input" id="searchInput" placeholder="Search anime...">
+                        <input type="text" class="search-input" id="searchInput" placeholder="Search anime..."
+                            aria-label="Search anime">
                     </div>
                     <div class="sort-container">
-                        <button class="btn-sort" id="sortBtn" title="Sort"><svg viewBox="0 0 24 24" fill="none"
-                                stroke="currentColor" stroke-width="2">
+                        <button class="btn-sort" id="sortBtn" type="button" title="Sort" aria-label="Sort options"
+                            aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
                                 <line x1="4" y1="6" x2="11" y2="6" />
                                 <line x1="4" y1="12" x2="16" y2="12" />
                                 <line x1="4" y1="18" x2="20" y2="18" />
@@ -224,7 +228,8 @@
                 <div class="goals-view" id="goalsView" hidden></div>
                 <div class="settings-view" id="settingsView" hidden></div>
                 <div class="empty-state" id="emptyState">
-                    <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                        aria-hidden="true" focusable="false">
                         <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" />
                         <line x1="7" y1="2" x2="7" y2="22" />
                         <line x1="17" y1="2" x2="17" y2="22" />
@@ -234,8 +239,13 @@
                         <line x1="17" y1="17" x2="22" y2="17" />
                         <line x1="17" y1="7" x2="22" y2="7" />
                     </svg>
-                    <h3>No Data</h3>
-                    <p>Start watching anime on an1me.to and they'll be tracked automatically here!</p>
+                    <h3>Nothing tracked yet</h3>
+                    <p>Start watching anime on <strong>an1me.to</strong> and progress will land here automatically.</p>
+                    <ul class="empty-state-tips" aria-label="Quick tips">
+                        <li>Sign in with Google in <strong>Settings</strong> to sync across devices.</li>
+                        <li>Click <strong>+</strong> above to add anime you've already watched.</li>
+                        <li>Open the player on an1me.to — episodes you complete are detected automatically.</li>
+                    </ul>
                 </div>
             </main>
 
@@ -267,11 +277,13 @@
         </div>
     </div>
 
-    <div class="dialog-overlay" id="addAnimeDialog">
+    <div class="dialog-overlay" id="addAnimeDialog" role="dialog" aria-modal="true"
+        aria-labelledby="addAnimeDialogTitle" aria-hidden="true">
         <div class="dialog add-anime-dialog">
             <div class="dialog-header">
-                <h3>Add Watched Anime</h3><button class="dialog-close" id="closeAddAnime"><svg viewBox="0 0 24 24"
-                        fill="none" stroke="currentColor" stroke-width="2">
+                <h3 id="addAnimeDialogTitle">Add Watched Anime</h3><button class="dialog-close" id="closeAddAnime"
+                    type="button" aria-label="Close dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" aria-hidden="true" focusable="false">
                         <line x1="18" y1="6" x2="6" y2="18" />
                         <line x1="6" y1="6" x2="18" y2="18" />
                     </svg></button>
@@ -299,11 +311,13 @@
         </div>
     </div>
 
-    <div class="dialog-overlay" id="editTitleDialog">
+    <div class="dialog-overlay" id="editTitleDialog" role="dialog" aria-modal="true"
+        aria-labelledby="editTitleDialogTitle" aria-hidden="true">
         <div class="dialog add-anime-dialog">
             <div class="dialog-header">
-                <h3>Edit Title</h3><button class="dialog-close" id="closeEditTitle"><svg viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" stroke-width="2">
+                <h3 id="editTitleDialogTitle">Edit Title</h3><button class="dialog-close" id="closeEditTitle"
+                    type="button" aria-label="Close dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" aria-hidden="true" focusable="false">
                         <line x1="18" y1="6" x2="6" y2="18" />
                         <line x1="6" y1="6" x2="18" y2="18" />
                     </svg></button>
@@ -317,15 +331,18 @@
         </div>
     </div>
 
-    <div class="dialog-overlay" id="confirmDialog">
+    <div class="dialog-overlay" id="confirmDialog" role="alertdialog" aria-modal="true"
+        aria-labelledby="confirmDialogTitle" aria-describedby="confirmDialogDesc" aria-hidden="true">
         <div class="dialog">
-            <div class="dialog-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <div class="dialog-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    aria-hidden="true" focusable="false">
                     <circle cx="12" cy="12" r="10" />
                     <line x1="12" y1="8" x2="12" y2="12" />
                     <line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg></div>
-            <h3>Clear Data</h3>
-            <p>Are you sure you want to delete all tracking data? This action cannot be undone.</p>
+            <h3 id="confirmDialogTitle">Clear Data</h3>
+            <p id="confirmDialogDesc">Are you sure you want to delete all tracking data? This action cannot be undone.
+            </p>
             <div class="dialog-actions"><button class="btn btn-secondary" id="cancelClear">Cancel</button><button
                     class="btn btn-danger" id="confirmClear">Delete</button></div>
         </div>
@@ -334,6 +351,7 @@
     <script src="logger.js"></script>
     <script src="firebase-config.js"></script>
     <script src="firebase-lib.js"></script>
+    <script src="src/common/multipart-mappings.js"></script>
     <script src="src/popup/config.js"></script>
     <script src="src/popup/slug-utils.js"></script>
     <script src="src/popup/storage.js"></script>

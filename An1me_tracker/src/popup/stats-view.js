@@ -14,7 +14,6 @@
         for (const k in attrs) {
             if (k === 'class') node.className = attrs[k];
             else if (k === 'text') node.textContent = attrs[k];
-            else if (k === 'html') node.innerHTML = attrs[k];
             else node.setAttribute(k, attrs[k]);
         }
         for (const c of children) {

@@ -296,6 +296,23 @@
         if (versionLabel) versionLabel.textContent = `Anime Tracker v${escapeHtml(version || '-')}`;
     }
 
+    // Lazy-create a hidden aria-live region so screen readers announce toggle
+    // state changes. Without this, sighted users get the visual cue but
+    // keyboard / SR users get silent toggling — confusing if the change
+    // actually went through.
+    function _ensureSettingsLiveRegion() {
+        let live = document.getElementById('settingsLiveRegion');
+        if (live) return live;
+        live = document.createElement('div');
+        live.id = 'settingsLiveRegion';
+        live.setAttribute('role', 'status');
+        live.setAttribute('aria-live', 'polite');
+        live.setAttribute('aria-atomic', 'true');
+        live.style.cssText = 'position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;';
+        document.body.appendChild(live);
+        return live;
+    }
+
     /**
      * Live-update a single toggle row without re-rendering the whole view.
      * Called from main.js when chrome.storage changes.
@@ -303,6 +320,7 @@
     function updateToggle(id, enabled, subtitle) {
         const btn = document.getElementById(id);
         if (!btn) return;
+        const prev = btn.getAttribute('aria-pressed') === 'true';
         const en = !!enabled;
         btn.dataset.enabled = en ? 'true' : 'false';
         btn.setAttribute('aria-pressed', en ? 'true' : 'false');
@@ -312,6 +330,19 @@
                 const subEl = document.getElementById(subtitleId);
                 if (subEl) subEl.textContent = subtitle;
             }
+        }
+        // Announce only when state actually flipped (skip silent no-op updates
+        // and the initial render).
+        if (prev !== en) {
+            const titleEl = btn.querySelector('.settings-toggle-title');
+            const titleText = titleEl?.textContent?.trim() || 'Setting';
+            const live = _ensureSettingsLiveRegion();
+            // Force re-announce by clearing first — some SRs ignore identical
+            // sequential text in the same live region.
+            live.textContent = '';
+            requestAnimationFrame(() => {
+                live.textContent = `${titleText} ${en ? 'enabled' : 'disabled'}`;
+            });
         }
     }
 

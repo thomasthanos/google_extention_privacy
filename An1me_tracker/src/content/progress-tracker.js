@@ -16,6 +16,21 @@ const ProgressTracker = {
     _adCacheTime: 0,
     _AD_CACHE_TTL: 15000,
 
+    // Detects quota errors across Chrome locales/versions. Older code only
+    // string-matched 'QUOTA' which fails on translated error messages and
+    // some Chromium forks. We now also accept the canonical "exceeded the
+    // quota" phrasing and the chrome.runtime.lastError name when available.
+    _isQuotaError(err) {
+        if (!err) return false;
+        const msg = String(err.message || err || '').toLowerCase();
+        if (!msg) return false;
+        return msg.includes('quota')
+            || msg.includes('exceeds the quota')
+            || msg.includes('storage capacity')
+            || msg.includes('max_items')
+            || msg.includes('max_write_operations');
+    },
+
     _emergencyPruneProgress(videoProgress, keepId) {
         const entries = Object.entries(videoProgress);
         entries.sort((a, b) => {
@@ -321,8 +336,7 @@ const ProgressTracker = {
             try {
                 await Storage.set({ videoProgress });
             } catch (err) {
-                const msg = (err && err.message) || '';
-                if (msg.includes('QUOTA') || msg.includes('quota')) {
+                if (this._isQuotaError(err)) {
                     Logger.warn('Storage quota hit — pruning videoProgress and retrying');
                     const pruned = this._emergencyPruneProgress(videoProgress, uniqueId);
                     try {
@@ -365,7 +379,12 @@ const ProgressTracker = {
                 }
             }
         } catch (e) {
-            if (e.message && e.message.includes('Extension context invalidated')) {
+            // Expected when the user reloads/disables the extension mid-write.
+            // The next page load will pick up where we left off via stored state,
+            // so swallowing here is correct — but we now also log a debug line
+            // so the silence isn't surprising during dev.
+            if (e?.message?.includes('Extension context invalidated')) {
+                Logger.debug('Save aborted: extension context invalidated');
             } else {
                 Logger.error('Save progress exception:', e);
                 throw e;

@@ -299,7 +299,7 @@ const FirebaseLib = (function () {
 
                 if (response.status >= 500 && retryCount < 3) {
                     const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
-                    console.warn(`[Firestore] Server error ${response.status}, retrying in ${delay}ms...`);
+                    (window.PopupLogger || console).warn?.('Firebase', `Server error ${response.status}, retrying in ${delay}ms...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                     return getDocument(collection, docId, retryCount + 1);
                 }
@@ -312,12 +312,12 @@ const FirebaseLib = (function () {
         } catch (error) {
             if (error.name === 'TypeError' && retryCount < 3) {
                 const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
-                console.warn('[Firestore] Network error, retrying in', delay, 'ms...');
+                (window.PopupLogger || console).warn?.('Firebase', 'Network error, retrying in', delay, 'ms...');
                 await new Promise(resolve => setTimeout(resolve, delay));
                 return getDocument(collection, docId, retryCount + 1);
             }
 
-            console.error('[Firestore] Get error:', error);
+            (window.PopupLogger || console).error?.('Firebase', 'Get error:', error);
             return null;
         }
     }

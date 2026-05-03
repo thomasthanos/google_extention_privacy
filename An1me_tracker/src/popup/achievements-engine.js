@@ -330,7 +330,29 @@
         { id: 'lifestyle', title: 'Lifestyle', icon: '🌙' }
     ];
 
+    // Memoize the heavy badge progress loop. evaluateBadges() runs through
+    // every BADGE_DEFS entry on every popup render — for a large library
+    // (200+ anime) and ~25 badges this means ~5000 inner iterations per call.
+    // We key on the cached index+hourIndex object identity (these come from
+    // buildWatchIndex/buildHourIndex which are themselves memoized via sig)
+    // plus a JSON snapshot of the relevant existingUnlocks fields, so badge
+    // unlock-time state still flows through.
+    let _badgeCache = null;
     function evaluateBadges(animeData, index, hourIndex, options) {
+        const existingUnlocks = options?.badgeState || {};
+        // Cheap cache key: identity check on index/hourIndex (they're cached
+        // already so identity ≡ data) + lightweight stringify of unlocks.
+        let unlocksKey = '';
+        try { unlocksKey = JSON.stringify(existingUnlocks); } catch { unlocksKey = String(Date.now()); }
+        if (
+            _badgeCache &&
+            _badgeCache.index === index &&
+            _badgeCache.hourIndex === hourIndex &&
+            _badgeCache.unlocksKey === unlocksKey
+        ) {
+            return _badgeCache.result;
+        }
+
         const StatsEngine = window.AnimeTracker?.StatsEngine;
         const streak = StatsEngine ? StatsEngine.computeStreak(index) : { longestStreak: 0, currentStreak: 0 };
 
@@ -345,10 +367,9 @@
         };
 
         const ctx = { animeData, index, hourIndex, streak, categorize };
-        const existingUnlocks = options?.badgeState || {};
         const nowIso = new Date().toISOString();
 
-        return BADGE_DEFS.map(def => {
+        const result = BADGE_DEFS.map(def => {
             const progress = def.progress(ctx);
             const pct = progress.target > 0 ? Math.min(1, progress.current / progress.target) : 0;
             const unlocked = progress.current >= progress.target;
@@ -367,6 +388,9 @@
                 justUnlocked: unlocked && !stored?.unlockedAt
             };
         });
+
+        _badgeCache = { index, hourIndex, unlocksKey, result };
+        return result;
     }
 
     // Cooldown between consecutive auto-applies of a smart suggestion. Was

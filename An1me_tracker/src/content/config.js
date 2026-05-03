@@ -23,19 +23,12 @@ const ContentConfig = {
     MAX_SAVED_PROGRESS_ENTRIES: 10
 };
 
-const EPISODE_OFFSET_MAPPING = {
-    'bleach-sennen-kessen-hen-ketsubetsu-tan': 13,
-    'bleach-sennen-kessen-hen-soukoku-tan': 26,
-    'fate-zero-season-2': 13,
-    'fate-zero-2nd-season': 13,
-};
-
-const SLUG_NORMALIZATION = {
-    'bleach-sennen-kessen-hen-ketsubetsu-tan': 'bleach-sennen-kessen-hen',
-    'bleach-sennen-kessen-hen-soukoku-tan': 'bleach-sennen-kessen-hen',
-    'fate-zero-season-2': 'fate-zero',
-    'fate-zero-2nd-season': 'fate-zero',
-};
+// Multi-part anime mappings now live in src/common/multipart-mappings.js
+// (loaded before this file by manifest) — single source of truth across
+// content, popup, and background.
+const _multipart = (typeof window !== 'undefined' && window.AnimeTrackerMultipartMappings) || {};
+const EPISODE_OFFSET_MAPPING = _multipart.EPISODE_OFFSET_MAPPING || {};
+const SLUG_NORMALIZATION = _multipart.SLUG_NORMALIZATION || {};
 
 window.AnimeTrackerContent = window.AnimeTrackerContent || {};
 window.AnimeTrackerContent.CONFIG = ContentConfig;

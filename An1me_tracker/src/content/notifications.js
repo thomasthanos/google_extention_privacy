@@ -388,24 +388,44 @@ const Notifications = {
         (doc.head || doc.documentElement).appendChild(style);
     },
 
-    showCompletion(info) {
-        document.querySelectorAll('#anime-tracker-notification').forEach(el => el.remove());
-        document.querySelectorAll('iframe').forEach(f => {
-            try { f.contentDocument?.querySelectorAll('#anime-tracker-notification').forEach(el => el.remove()); } catch { }
-        });
+    _MAX_STACKED_NOTIFICATIONS: 3,
 
+    _getNotificationStack(doc, container) {
+        let stack = container.querySelector('#anime-tracker-notification-stack');
+        if (stack) return stack;
+        stack = doc.createElement('div');
+        stack.id = 'anime-tracker-notification-stack';
+        container.appendChild(stack);
+        return stack;
+    },
+
+    showCompletion(info) {
         this.ensureFont();
         this.injectRootStyles();
 
         const { doc, container } = this._resolveTarget();
         this._ensureRootStyles(doc);
+        this.injectNotificationStyles(doc);
+
         const rawTitle = info?.animeTitle || '';
         const safeTitle = typeof rawTitle === 'string'
             ? rawTitle.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;')
             : '';
 
+        const stack = this._getNotificationStack(doc, container);
+
+        // Cap stack to N — drop oldest first so a binge session doesn't
+        // overflow the screen with a tower of "Episode Complete!" toasts.
+        while (stack.children.length >= this._MAX_STACKED_NOTIFICATIONS) {
+            const oldest = stack.firstElementChild;
+            if (!oldest) break;
+            this.removeElement(oldest);
+        }
+
         const notification = doc.createElement('div');
-        notification.id = 'anime-tracker-notification';
+        notification.className = 'at-notification-item';
+        notification.setAttribute('role', 'status');
+        notification.setAttribute('aria-live', 'polite');
         notification.innerHTML = `
             <div class="at-notif-shine"></div>
             <div class="at-notif-icon-wrap">
@@ -417,14 +437,18 @@ const Notifications = {
                 <span>${safeTitle}</span>
                 <span class="at-notif-ep">Episode ${info.episodeNumber}</span>
             </div>
+            <button class="at-notif-close" type="button" aria-label="Dismiss notification" title="Dismiss">×</button>
             <div class="at-notif-progress"></div>
         `;
 
-        this.injectNotificationStyles(doc);
-        container.appendChild(notification);
+        stack.appendChild(notification);
 
-        this.addCleanup(() => notification.remove());
-        setTimeout(() => notification.remove(), 4500);
+        const closeBtn = notification.querySelector('.at-notif-close');
+        const dismiss = () => this.removeElement(notification);
+        closeBtn?.addEventListener('click', dismiss);
+
+        const autoTimer = setTimeout(dismiss, 4500);
+        this.addCleanup(() => { clearTimeout(autoTimer); notification.remove(); });
     },
 
     injectNotificationStyles(doc = document) {
@@ -432,17 +456,24 @@ const Notifications = {
         const style = Object.assign(doc.createElement('style'), {
             id: 'anime-tracker-styles',
             textContent: `
-                #anime-tracker-notification {
+                #anime-tracker-notification-stack {
                     position: fixed;
                     bottom: 30px;
                     right: 30px;
+                    z-index: 2147483647;
+                    display: flex;
+                    flex-direction: column-reverse;
+                    gap: 12px;
+                    pointer-events: none;
+                    max-width: 360px;
+                }
+                .at-notification-item {
                     background: var(--at-bg-secondary);
                     backdrop-filter: blur(24px) saturate(200%);
                     -webkit-backdrop-filter: blur(24px) saturate(200%);
                     border: 1px solid var(--at-border-accent);
                     border-radius: 22px;
                     padding: 20px 26px;
-                    z-index: 2147483647;
                     display: flex;
                     align-items: center;
                     gap: 18px;
@@ -453,13 +484,38 @@ const Notifications = {
                         0 -1px 2px var(--at-inset-bottom) inset,
                         0 1px 0 var(--at-inset-top) inset;
                     opacity: 0;
-                    animation: atNotifIn .6s cubic-bezier(.16,1.11,.3,1) forwards, atNotifOut .4s cubic-bezier(.4,0,1,1) 4s forwards;
+                    animation: atNotifIn .5s cubic-bezier(.16,1.11,.3,1) forwards;
                     user-select: none;
                     max-width: 340px;
                     overflow: hidden;
                     transform-style: preserve-3d;
+                    position: relative;
+                    pointer-events: auto;
                 }
-                #anime-tracker-notification * { user-select: none; font-family: inherit }
+                .at-notification-item.at-hiding {
+                    animation: atNotifOut .35s cubic-bezier(.4,0,1,1) forwards;
+                }
+                .at-notification-item * { user-select: none; font-family: inherit }
+                .at-notif-close {
+                    position: absolute;
+                    top: 6px; right: 8px;
+                    width: 22px; height: 22px;
+                    background: transparent;
+                    border: none;
+                    color: var(--at-text-secondary);
+                    font-size: 18px;
+                    line-height: 1;
+                    cursor: pointer;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 0;
+                    transition: background 120ms ease, color 120ms ease;
+                    z-index: 2;
+                }
+                .at-notif-close:hover { background: var(--at-bg-no-hover); color: var(--at-text-primary); }
+                .at-notif-close:focus-visible { outline: 2px solid var(--at-accent-resume); outline-offset: 2px; }
                 
                 .at-notif-shine {
                     position: absolute;
@@ -533,6 +589,16 @@ const Notifications = {
                 @keyframes atProgress {
                     0% { width: 100% }
                     100% { width: 0% }
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    .at-notification-item,
+                    .at-notification-item.at-hiding {
+                        animation: none !important;
+                        transition: opacity 0.18s linear;
+                    }
+                    .at-notif-shine,
+                    .at-notif-icon-ring,
+                    .at-notif-progress { animation: none !important; }
                 }
             `
         });

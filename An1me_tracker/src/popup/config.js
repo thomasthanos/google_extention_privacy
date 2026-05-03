@@ -37,12 +37,9 @@ const ANIME_PARTS_CONFIG = {
     ],
 };
 
-const CANONICAL_EPISODE_OFFSET_MAPPING = {
-    'bleach-sennen-kessen-hen-ketsubetsu-tan': 13,
-    'bleach-sennen-kessen-hen-soukoku-tan': 26,
-    'fate-zero-season-2': 13,
-    'fate-zero-2nd-season': 13,
-};
+// Single source of truth lives in src/common/multipart-mappings.js.
+const CANONICAL_EPISODE_OFFSET_MAPPING =
+    (typeof window !== 'undefined' && window.AnimeTrackerMultipartMappings?.EPISODE_OFFSET_MAPPING) || {};
 
 const SERIES_MOVIE_MERGE_SLUGS = new Set([
     'trinity-seven',

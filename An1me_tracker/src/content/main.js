@@ -888,8 +888,16 @@
                             const text = document.createElement('div');
                             text.style.flex = '1';
                             text.style.minWidth = '0';
-                            text.textContent = `⏭ Filler Ep ${animeInfo.episodeNumber} — skipping to Ep ${nextCanon}`;
-                            text.innerHTML = `<div style="font-size:11px;font-weight:800;letter-spacing:.12em;color:#8eb5ff;margin-bottom:4px;">AUTO SKIP FILLER</div><div style="font-size:24px;line-height:1.1;font-weight:800;color:#fff;">Episode ${animeInfo.episodeNumber} is filler</div><div style="margin-top:6px;font-size:14px;line-height:1.45;color:rgba(235,238,255,0.84);">Jumping to canon Episode ${nextCanon} soon unless you stay here.</div>`;
+                            const kicker = document.createElement('div');
+                            kicker.style.cssText = 'font-size:11px;font-weight:800;letter-spacing:.12em;color:#8eb5ff;margin-bottom:4px;';
+                            kicker.textContent = 'AUTO SKIP FILLER';
+                            const headline = document.createElement('div');
+                            headline.style.cssText = 'font-size:24px;line-height:1.1;font-weight:800;color:#fff;';
+                            headline.textContent = `Episode ${animeInfo.episodeNumber} is filler`;
+                            const subline = document.createElement('div');
+                            subline.style.cssText = 'margin-top:6px;font-size:14px;line-height:1.45;color:rgba(235,238,255,0.84);';
+                            subline.textContent = `Jumping to canon Episode ${nextCanon} soon unless you stay here.`;
+                            text.append(kicker, headline, subline);
                             const actionWrap = document.createElement('div');
                             Object.assign(actionWrap.style, {
                                 display: 'flex', alignItems: 'center', gap: '10px', flexShrink: '0', marginLeft: 'auto'
@@ -979,13 +987,70 @@
     else setTimeout(init, 1000);
 
     let lastUrl = location.href;
-    let navigationObserver = null;
     let navigationDebounceTimeout = null;
+    let historyPatched = false;
 
     const setupNavigationObserver = () => {
         const { Logger, ProgressTracker, VideoMonitor } = AT;
 
-        if (navigationObserver) navigationObserver.disconnect();
+        // Patch history.pushState / replaceState once per page so SPA
+        // navigations that don't go through a click (programmatic routing,
+        // browser back/forward via popstate) still trigger a re-init. This
+        // is much cheaper than the MutationObserver fallback that previously
+        // fired on every body subtree mutation.
+        //
+        // Window-level guard (not just historyPatched module flag) — if the
+        // content script is re-injected during SPA navigation, this module's
+        // closure resets but the previous patch is still chained on
+        // history.pushState. Without this guard, every re-injection adds
+        // another wrapper and dispatches N copies of at:locationchange.
+        if (!historyPatched && !window.__atHistoryPatched) {
+            historyPatched = true;
+            window.__atHistoryPatched = true;
+            const dispatchUrlChange = () => {
+                try { window.dispatchEvent(new Event('at:locationchange')); } catch {}
+            };
+            const origPush = history.pushState;
+            const origReplace = history.replaceState;
+            history.pushState = function (...args) {
+                const ret = origPush.apply(this, args);
+                dispatchUrlChange();
+                return ret;
+            };
+            history.replaceState = function (...args) {
+                const ret = origReplace.apply(this, args);
+                dispatchUrlChange();
+                return ret;
+            };
+            window.addEventListener('popstate', dispatchUrlChange);
+        }
+
+        const handleUrlChange = () => {
+            if (location.href === lastUrl) return;
+            const previousUrl = lastUrl;
+            lastUrl = location.href;
+            trackImmediately();
+            if (navigationDebounceTimeout) clearTimeout(navigationDebounceTimeout);
+            navigationDebounceTimeout = setTimeout(() => {
+                if (location.href !== previousUrl) {
+                    Logger.info('URL changed, reinit...');
+                    trackingState = TrackingState.IDLE;
+                    currentEpisodeId = null;
+                    earlyTrackDone = false;
+                    durationRefreshAttempted = false;
+                    durationRefreshAttempts = 0;
+                    resetPlaybackAccumulator('spa navigation');
+                    lastVideoSource = '';
+                    clearHighlightStorageListener();
+                    ProgressTracker.reset();
+                    setTimeout(init, 1000);
+                }
+            }, 200);
+        };
+        window.addEventListener('at:locationchange', handleUrlChange);
+        VideoMonitor.addCleanup(() => {
+            window.removeEventListener('at:locationchange', handleUrlChange);
+        });
 
         document.addEventListener('click', (e) => {
             const target = e.target.closest('[data-open-nav-episode], .episode-navigation, .next-episode, .prev-episode, .episode-list-item, a, button');
@@ -1015,37 +1080,10 @@
             if (isNavigation) { Logger.debug('Navigation click detected, tracking immediately'); trackImmediately(); }
         }, { capture: true, passive: true });
 
-        navigationObserver = new MutationObserver(() => {
-            if (location.href === lastUrl) return;
-            // Snapshot the URL we're navigating away from so trackImmediately()
-            // runs once per SPA navigation. Without this, every subsequent
-            // mutation in the 200ms debounce window sees a still-stale lastUrl
-            // and re-triggers trackImmediately — wasted work on mobile.
-            const previousUrl = lastUrl;
-            lastUrl = location.href;
-            trackImmediately();
-            if (navigationDebounceTimeout) clearTimeout(navigationDebounceTimeout);
-            navigationDebounceTimeout = setTimeout(() => {
-                if (location.href !== previousUrl) {
-                    Logger.info('URL changed, reinit...');
-                    trackingState = TrackingState.IDLE;
-                    currentEpisodeId = null;
-                    earlyTrackDone = false;
-                    durationRefreshAttempted = false;
-                    durationRefreshAttempts = 0;
-                    resetPlaybackAccumulator('spa navigation');
-                    lastVideoSource = '';
-                    clearHighlightStorageListener();
-                    ProgressTracker.reset();
-                    setTimeout(init, 1000);
-                }
-            }, 200);
-        });
-
-        if (document.body) navigationObserver.observe(document.body, { subtree: true, childList: true, attributes: false, characterData: false });
+        // History-based detection (above) replaces the previous body-subtree
+        // MutationObserver. Keep a tiny cleanup hook for the debounce timer.
         VideoMonitor.addCleanup(() => {
-            if (navigationDebounceTimeout) clearTimeout(navigationDebounceTimeout);
-            if (navigationObserver) navigationObserver.disconnect();
+            if (navigationDebounceTimeout) { clearTimeout(navigationDebounceTimeout); navigationDebounceTimeout = null; }
         });
     };
 
