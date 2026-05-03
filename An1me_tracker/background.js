@@ -33,6 +33,20 @@ const COMPLETED_PERCENTAGE = 85;
 const DELETED_ANIME_MAX_AGE_MS = 10 * 24 * 60 * 60 * 1000;
 const MAX_PROGRESS_ENTRIES = 200;
 
+// Survives SW kills: when a setTimeout(syncToFirebase, ...) is scheduled we
+// stamp this key. If the SW is terminated before the timer fires, the next
+// SW wake-up sees the stamp and flushes a sync immediately so the user's
+// change isn't lost until they happen to reopen the popup.
+const PENDING_SYNC_KEY = 'pendingSyncFlush';
+const PENDING_SYNC_STALE_MS = 8000;
+
+function markSyncPending() {
+    try { chrome.storage.local.set({ [PENDING_SYNC_KEY]: Date.now() }); } catch {}
+}
+function clearSyncPending() {
+    try { chrome.storage.local.remove([PENDING_SYNC_KEY]); } catch {}
+}
+
 function cleanTrackedProgressBg(animeData, videoProgress, deletedAnime = {}) {
     if (!videoProgress || !animeData) return videoProgress;
 
@@ -768,6 +782,7 @@ async function syncToFirebase() {
             invalidateBgCloudDocCache();
             _lastAppliedCloudUpdatedAt = pushedAt;
             bgRememberOwnWrite(pushedAt);
+            clearSyncPending();
         } else {
             console.error('[BG] Sync failed:', response.status);
             if (response.status >= 500) invalidateBgCloudDocCache();
@@ -776,7 +791,11 @@ async function syncToFirebase() {
         console.error('[BG] Sync error:', error);
     } finally {
         syncInProgress = false;
-        if (pendingSync) { pendingSync = false; setTimeout(syncToFirebase, 5000); }
+        if (pendingSync) {
+            pendingSync = false;
+            markSyncPending();
+            setTimeout(syncToFirebase, 5000);
+        }
     }
 }
 
@@ -972,6 +991,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     if (_pendingFullSync) {
         if (progressSyncDebounce) { clearTimeout(progressSyncDebounce); progressSyncDebounce = null; }
         if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
+        markSyncPending();
         syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 5000);
     } else if (_pendingProgressSync) {
         if (progressSyncDebounce) clearTimeout(progressSyncDebounce);
@@ -2218,6 +2238,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === 'SYNC_TO_FIREBASE') {
         sendResponse({ received: true });
         if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
+        markSyncPending();
         syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 500);
         return true;
     }
@@ -2492,3 +2513,20 @@ resumeMetadataRepairIfNeeded().catch((error) => {
     console.error('[BG] Failed to resume metadata repair on boot:', error);
 });
 hydrateBgPollState();
+
+// Recover from SW kills: if a previous incarnation scheduled a sync via
+// setTimeout but was terminated before it fired, the PENDING_SYNC_KEY stamp
+// is still in storage. Run the sync now so the user's last change isn't
+// stranded until they reopen the popup.
+(async () => {
+    try {
+        const stored = await bgStorageGet([PENDING_SYNC_KEY]);
+        const ts = Number(stored?.[PENDING_SYNC_KEY]) || 0;
+        if (!ts) return;
+        if (Date.now() - ts < PENDING_SYNC_STALE_MS) return;
+        dlog('[BG] Recovering stranded sync from previous SW incarnation');
+        syncToFirebase();
+    } catch (e) {
+        console.warn('[BG] Pending-sync recovery check failed:', e);
+    }
+})();

@@ -217,22 +217,34 @@ const WatchlistSync = {
 
     async repairPendingStatusesOnce() {
         const Logger = this._logger();
+        const LOCK_KEY = 'watchlistRepairLock';
+        const LOCK_TTL_MS = 5 * 60 * 1000;
 
         if (!this._isLoggedIn()) {
             Logger.debug('WatchlistSync: repair skipped, site user not logged in');
             return false;
         }
 
+        let lockHeld = false;
         try {
-            const { animeData = {}, watchlistRepairVersion = 0 } = await chrome.storage.local.get([
-                'animeData',
-                'watchlistRepairVersion'
-            ]);
+            const {
+                animeData = {},
+                watchlistRepairVersion = 0,
+                [LOCK_KEY]: lockTs = 0
+            } = await chrome.storage.local.get(['animeData', 'watchlistRepairVersion', LOCK_KEY]);
 
             if ((Number(watchlistRepairVersion) || 0) >= this._REPAIR_VERSION) {
                 Logger.debug('WatchlistSync: repair already completed for current version');
                 return true;
             }
+
+            if (Number(lockTs) && Date.now() - Number(lockTs) < LOCK_TTL_MS) {
+                Logger.debug('WatchlistSync: repair lock held by another tab, skipping');
+                return false;
+            }
+
+            await chrome.storage.local.set({ [LOCK_KEY]: Date.now() });
+            lockHeld = true;
 
             const entries = Object.entries(animeData).filter(([slug, entry]) =>
                 !!entry?.siteAnimeId && !!this.resolveRepairStatus(entry, slug)
@@ -266,6 +278,10 @@ const WatchlistSync = {
         } catch (e) {
             Logger.warn(`WatchlistSync: repair failed: ${e.message}`);
             return false;
+        } finally {
+            if (lockHeld) {
+                try { await chrome.storage.local.remove([LOCK_KEY]); } catch {}
+            }
         }
     },
 
