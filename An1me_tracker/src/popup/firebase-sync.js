@@ -145,6 +145,15 @@ const FirebaseSync = {
     },
 
     /**
+     * Compact one-liner of sync counts for log messages.
+     * Returns e.g. "89a/3049e/3p/0d/98c/3g/32b" — readable without click-to-expand.
+     */
+    summarizeSyncDataString(data) {
+        const s = this.summarizeSyncData(data);
+        return `${s.animeCount}a/${s.episodeCount}e/${s.progressCount}p/${s.deletedCount}d/${s.coverCount}c/${s.goalCount}g/${s.badgeCount}b`;
+    },
+
+    /**
      * Get current user
      */
     getUser() {
@@ -167,7 +176,7 @@ const FirebaseSync = {
                     this.clearCachedUserDocument();
                 }
                 if (user) {
-                    PopupLogger.log('Firebase', 'User signed in:', user.email);
+                    PopupLogger.log('Firebase', `User signed in: ${user.email}`);
                     if (onUserSignedIn) onUserSignedIn(user);
                 } else {
                     PopupLogger.log('Firebase', 'No user');
@@ -211,8 +220,7 @@ const FirebaseSync = {
             'Firebase',
             `queue-save:${this.currentUser.uid}`,
             5000,
-            'Queued cloud save',
-            { immediate, ...this.summarizeSyncData(this.pendingSave) }
+            `Queued cloud save${immediate ? ' (immediate)' : ''} · ${this.summarizeSyncDataString(this.pendingSave)}`
         );
 
         if (this.saveToCloudTimeout) {
@@ -287,7 +295,7 @@ const FirebaseSync = {
                     fields: ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'goalSettings', 'badgeUnlocks', 'lastUpdated', 'email']
                 });
                 this.setCachedUserDocument(this.currentUser.uid, savedDoc);
-                PopupLogger.log('Firebase', 'Cloud save complete', this.summarizeSyncData(savedDoc));
+                PopupLogger.log('Firebase', `Cloud save complete · ${this.summarizeSyncDataString(savedDoc)}`);
 
                 this.cloudSaveRetryCount = 0;
 
@@ -311,7 +319,7 @@ const FirebaseSync = {
                 }
 
                 const retryDelay = Math.min(2000 * Math.pow(2, this.cloudSaveRetryCount - 1), CONFIG.MAX_RETRY_DELAY_MS);
-                PopupLogger.log('Firebase', 'Will retry in', retryDelay, 'ms');
+                PopupLogger.log('Firebase', `Will retry in ${retryDelay}ms`);
 
                 // Schedule retry without recursion — reuse the same data
                 this.pendingSave = dataToSave;
@@ -443,7 +451,7 @@ const FirebaseSync = {
                         animeData:     AnimeTracker.MergeUtils.mergeAnimeData(localData.animeData || {}, cloudData.animeData || {}),
                         videoProgress: AnimeTracker.MergeUtils.mergeVideoProgress(localData.videoProgress || {}, cloudData.videoProgress || {})
                     };
-                    PopupLogger.log('Sync', 'Merged episodes:', UIHelpers.countEpisodes(finalData.animeData));
+                    PopupLogger.log('Sync', `Merged episodes: ${UIHelpers.countEpisodes(finalData.animeData)}`);
                 } else {
                     syncSource = 'cloud-only';
                     finalData = {
@@ -619,10 +627,7 @@ const FirebaseSync = {
                 elements.syncText.textContent = 'Cloud Synced';
             }
 
-            PopupLogger.log('Sync', 'Cloud sync complete', {
-                source: syncSource,
-                ...this.summarizeSyncData(finalData)
-            });
+            PopupLogger.log('Sync', `Cloud sync complete (${syncSource}) · ${this.summarizeSyncDataString(finalData)}`);
 
             return finalData;
         } catch (error) {

@@ -164,13 +164,30 @@ const VideoMonitor = {
         });
 
         if (animeInfo) {
-            // Track whether we've already shown the prompt for this episode
-            // so that a late-arriving cloud sync doesn't double-prompt.
+            // Window-level guard so the prompt is shown at most once per
+            // (uniqueId, page-load), even if setupVideoMonitoring runs more
+            // than once (SPA re-init, multiple finders racing). Each instance
+            // also has its own resumePromptShown closure flag to short-circuit
+            // its OWN listener; the window flag covers cross-instance dedup.
+            window.__atResumeShownFor = window.__atResumeShownFor || new Set();
+            const promptKey = animeInfo.uniqueId;
+
             let resumePromptShown = false;
-            const showPromptOnce = (savedProgress) => {
+            const showPromptOnce = (savedProgress, source) => {
                 if (resumePromptShown) return;
+                if (window.__atResumeShownFor.has(promptKey)) { resumePromptShown = true; return; }
                 if (!savedProgress || !(savedProgress.currentTime > CONFIG.MIN_PROGRESS_TO_SAVE)) return;
+
+                // If the video is already at (or past) the saved position,
+                // there's nothing to resume to — don't bother the user. This
+                // is the case after the user seeks forward; their own save
+                // would otherwise re-trigger the prompt every seek.
+                const here = video.currentTime || 0;
+                if (here > 0 && Math.abs(here - savedProgress.currentTime) < 5) return;
+                if (here > savedProgress.currentTime) return;
+
                 resumePromptShown = true;
+                window.__atResumeShownFor.add(promptKey);
                 savedProgress.uniqueId = animeInfo.uniqueId;
 
                 let retryCount = 0;
@@ -203,29 +220,55 @@ const VideoMonitor = {
 
             const initialProgress = await ProgressTracker.getSavedProgress(animeInfo.uniqueId);
             if (initialProgress && initialProgress.currentTime > CONFIG.MIN_PROGRESS_TO_SAVE) {
-                showPromptOnce(initialProgress);
+                showPromptOnce(initialProgress, 'initial');
             } else {
                 // Cross-device case: progress was saved on another device but
                 // hasn't synced down to this tab yet. Watch chrome.storage for
-                // the videoProgress key to update within ~15s, then show the
-                // resume prompt the moment the cloud delivers it.
+                // the videoProgress key to update within a short window, then
+                // show the resume prompt the moment the cloud delivers it.
+                //
+                // CRITICAL: ignore writes that originated from THIS tab (the
+                // user's own playback / seeking). Storage doesn't tell us the
+                // origin directly, so we compare the new currentTime against
+                // the video's live position — if the saved value matches what
+                // we're already playing, it's our own write echoing back, not
+                // a fresh cross-device sync.
                 let resumeWaitTimer = null;
+                const mountAt = Date.now();
+                const RESUME_LISTEN_WINDOW_MS = 15000;
+                const SAME_POSITION_TOLERANCE = 5;
+
                 const onProgressArrive = (changes, namespace) => {
                     if (namespace !== 'local' || !changes.videoProgress) return;
+                    // Stop listening after the cross-device window — protects
+                    // against the user's own forward-seek triggering a stale
+                    // prompt 30 seconds into the episode.
+                    if (Date.now() - mountAt > RESUME_LISTEN_WINDOW_MS) {
+                        chrome.storage.onChanged.removeListener(onProgressArrive);
+                        return;
+                    }
                     const newVP = changes.videoProgress.newValue || {};
                     const entry = newVP[animeInfo.uniqueId];
-                    if (entry && !entry.deleted && entry.currentTime > CONFIG.MIN_PROGRESS_TO_SAVE) {
-                        chrome.storage.onChanged.removeListener(onProgressArrive);
-                        if (resumeWaitTimer) { clearTimeout(resumeWaitTimer); resumeWaitTimer = null; }
-                        showPromptOnce(entry);
+                    if (!entry || entry.deleted) return;
+                    if (!(entry.currentTime > CONFIG.MIN_PROGRESS_TO_SAVE)) return;
+
+                    // Local-echo guard: if the entry's position matches our
+                    // current playhead, this is our own save echoing back.
+                    const livePos = video.currentTime || 0;
+                    if (livePos > 0 && Math.abs(livePos - entry.currentTime) < SAME_POSITION_TOLERANCE) {
+                        return;
                     }
+
+                    chrome.storage.onChanged.removeListener(onProgressArrive);
+                    if (resumeWaitTimer) { clearTimeout(resumeWaitTimer); resumeWaitTimer = null; }
+                    showPromptOnce(entry, 'cloud');
                 };
                 chrome.storage.onChanged.addListener(onProgressArrive);
 
                 resumeWaitTimer = setTimeout(() => {
                     resumeWaitTimer = null;
                     try { chrome.storage.onChanged.removeListener(onProgressArrive); } catch {}
-                }, 15000);
+                }, RESUME_LISTEN_WINDOW_MS);
 
                 this.addCleanup(() => {
                     try { chrome.storage.onChanged.removeListener(onProgressArrive); } catch {}

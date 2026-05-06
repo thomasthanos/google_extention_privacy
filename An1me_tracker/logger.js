@@ -38,26 +38,34 @@
 
     const DEFAULT_COLOR = { bg: 'rgba(148,163,184,0.15)', text: '#94a3b8' };
 
-    function styled(logFn, tag, args) {
+    function styled(logFn, tag, args, opts) {
         const c = TAG_COLORS[tag] || DEFAULT_COLOR;
         const tagStyle = `color:${c.text};font-weight:700;background:${c.bg};padding:1px 6px;border-radius:3px;`;
+        // For info-level (compact) calls, drop ALL extras — keep the line to
+        // just `Tag message`. If you need the payload, inline it into the
+        // message string at the call site, or use warn/error.
+        if (opts && opts.compact) {
+            const msg = args && args.length ? args[0] : '';
+            logFn(`%c${tag}`, tagStyle, msg);
+            return;
+        }
         logFn(`%c${tag}`, tagStyle, ...args);
     }
 
-    function once(tag, key, logFn, args) {
+    function once(tag, key, logFn, args, opts) {
         if (!key) {
-            styled(logFn, tag, args);
+            styled(logFn, tag, args, opts);
             return;
         }
         const scopedKey = `${tag}:${key}`;
         if (onceKeys.has(scopedKey)) return;
         onceKeys.add(scopedKey);
-        styled(logFn, tag, args);
+        styled(logFn, tag, args, opts);
     }
 
-    function throttled(tag, key, intervalMs, logFn, args) {
+    function throttled(tag, key, intervalMs, logFn, args, opts) {
         if (!key) {
-            styled(logFn, tag, args);
+            styled(logFn, tag, args, opts);
             return;
         }
         const scopedKey = `${tag}:${key}`;
@@ -65,15 +73,19 @@
         const last = throttleState.get(scopedKey) || 0;
         if ((now - last) < Math.max(0, Number(intervalMs) || 0)) return;
         throttleState.set(scopedKey, now);
-        styled(logFn, tag, args);
+        styled(logFn, tag, args, opts);
     }
 
+    const COMPACT = { compact: true };
+
     window.PopupLogger = {
-        log(tag, ...args)   { styled(rawLog, tag, args); },
+        // log → compact (drops extras; inline data into the message string).
+        log(tag, ...args)   { styled(rawLog, tag, args, COMPACT); },
+        once(tag, key, ...args) { once(tag, key, rawLog, args, COMPACT); },
+        throttled(tag, key, intervalMs, ...args) { throttled(tag, key, intervalMs, rawLog, args, COMPACT); },
+        // debug/warn/error → full objects (devs poke at debug; warn/error need detail).
+        debug(tag, ...args) { styled(rawDebug, tag, args); },
         warn(tag, ...args)  { styled(rawWarn, tag, args); },
         error(tag, ...args) { styled(rawError, tag, args); },
-        debug(tag, ...args) { styled(rawDebug, tag, args); },
-        once(tag, key, ...args) { once(tag, key, rawLog, args); },
-        throttled(tag, key, intervalMs, ...args) { throttled(tag, key, intervalMs, rawLog, args); },
     };
 })();

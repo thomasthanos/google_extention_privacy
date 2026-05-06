@@ -2,7 +2,16 @@ const FIREBASE_API_KEY = "AIzaSyCDF9US2OwARlyZ0AH_zDpjzmOXRtrGKMg";
 const FIREBASE_PROJECT_ID = "anime-tracker-64d86";
 const FIRESTORE_DATABASE = `projects/${FIREBASE_PROJECT_ID}/databases/(default)`;
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/${FIRESTORE_DATABASE}`;
-const CLOUD_POLL_INTERVAL_MS = 60000;
+// Poll interval was 60s — too aggressive for an anime tracker. A user
+// watching a 24-min episode would pay 24 Firestore reads just to detect
+// cross-device writes that almost never happen mid-episode. 3 min keeps
+// cross-device sync responsive while dropping read cost by 3×.
+const CLOUD_POLL_INTERVAL_MS = 180000;
+// Stricter minimum gap between "consumer-connected" polls. Without this,
+// a user clicking the popup repeatedly or rapidly opening watch tabs would
+// each trigger a fresh read. Caps these "convenience" reads to once per
+// 3 min regardless of how often consumers connect.
+const CLOUD_CONSUMER_POLL_MIN_GAP_MS = 3 * 60 * 1000;
 
 importScripts('src/common/merge-utils.js');
 
@@ -595,7 +604,14 @@ async function pollCloudData(reason = 'poll') {
             // a freshly-woken SW reads _lastCloudPollAt = 0 and pays a wasted
             // Firestore read even when a previous incarnation polled seconds ago.
             await hydrateBgPollState();
-            if ((Date.now() - _lastCloudPollAt) < CLOUD_POLL_INTERVAL_MS) return null;
+
+            // "Convenience" polls (consumer-connected, content-page-open) get
+            // a stricter gate so rapid popup opens / page navigations don't
+            // burn reads. Only the explicit periodic 'poll' reason uses the
+            // base interval.
+            const isConvenience = reason === 'consumer-connected' || reason === 'content-page-open';
+            const gate = isConvenience ? CLOUD_CONSUMER_POLL_MIN_GAP_MS : CLOUD_POLL_INTERVAL_MS;
+            if ((Date.now() - _lastCloudPollAt) < gate) return null;
 
             const user = await getFirebaseUser();
             const token = await getFirebaseToken();

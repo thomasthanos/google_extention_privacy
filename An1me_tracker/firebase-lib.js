@@ -32,7 +32,7 @@ const FirebaseLib = (function () {
             const ru = getRedirectUrl();
             if (ru) {
                 const shortUrl = ru.replace(/https:\/\/([a-z0-9]+)\.chromiumapp\.org.*/, 'chrome-extension://$1');
-                PopupLogger.log('Firebase', 'Extension redirect:', shortUrl);
+                PopupLogger.log('Firebase', `Extension redirect: ${shortUrl}`);
             }
         } catch { }
 
@@ -213,7 +213,7 @@ const FirebaseLib = (function () {
             };
 
             await chrome.storage.local.set({ [STORAGE_KEYS.TOKENS]: tokens });
-            PopupLogger.log('Firebase', 'Token refreshed, expires at:', new Date(tokens.expiresAt));
+            PopupLogger.log('Firebase', `Token refreshed, expires at ${new Date(tokens.expiresAt).toLocaleTimeString()}`);
             return tokens;
         } catch (error) {
             PopupLogger.error('Firebase', 'Token refresh error:', error);

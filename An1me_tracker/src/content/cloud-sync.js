@@ -4,7 +4,10 @@
     const FIREBASE_API_KEY = 'AIzaSyCDF9US2OwARlyZ0AH_zDpjzmOXRtrGKMg';
     const FIREBASE_PROJECT_ID = 'anime-tracker-64d86';
     const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)`;
-    const CLOUD_POLL_INTERVAL_MS = 60000;
+    // Orion / Safari fallback polling — kept in sync with the BG service
+    // worker constant (background.js: CLOUD_POLL_INTERVAL_MS). 3 min keeps
+    // cross-device sync responsive without burning Firestore reads.
+    const CLOUD_POLL_INTERVAL_MS = 180000;
 
     const Logger = window.AnimeTrackerContent?.Logger;
 

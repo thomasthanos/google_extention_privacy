@@ -11,6 +11,31 @@ const WatchlistSync = {
         };
     },
 
+    // Human-readable label for each watchlist status. Used in log messages
+    // so users see "Watching" / "On Hold" instead of internal `on_hold`.
+    _STATUS_LABEL: {
+        watching: 'Watching',
+        completed: 'Completed',
+        on_hold: 'On Hold',
+        plan_to_watch: 'Plan to Watch',
+        dropped: 'Dropped',
+        remove: 'Removed'
+    },
+
+    _statusLabel(type) {
+        return this._STATUS_LABEL[type] || String(type || '');
+    },
+
+    _shortName(animeSlug, fallbackTitle) {
+        // Prefer the human title if available; fall back to the slug with
+        // dashes turned into spaces and Title Case so the log is readable.
+        if (fallbackTitle) return String(fallbackTitle);
+        if (!animeSlug) return 'this anime';
+        return String(animeSlug)
+            .replace(/-/g, ' ')
+            .replace(/\b\w/g, (c) => c.toUpperCase());
+    },
+
     _looksStandaloneOneShot(entry, animeSlug = '') {
         const slug = String(animeSlug || '').toLowerCase();
         const title = String(entry?.title || '').toLowerCase();
@@ -130,7 +155,10 @@ const WatchlistSync = {
     async _sendWatchlistRequest(animeId, type, Logger) {
         const action = type === 'remove' ? 'remove_from_watchlist' : 'add_to_watchlist';
 
-        Logger.info(`WatchlistSync: ${action} type="${type}" anime #${animeId}`);
+        // Verbose technical log kept at debug so it stays accessible while
+        // dev-mode debugging the AJAX endpoint, but doesn't spam the console
+        // for normal users.
+        Logger.debug(`WatchlistSync: POST ${action} type="${type}" anime #${animeId}`);
 
         try {
             const formData = new FormData();
@@ -144,31 +172,26 @@ const WatchlistSync = {
                 body: formData
             });
 
-            Logger.debug(`WatchlistSync: HTTP ${res.status}`);
-
             if (!res.ok) {
-                Logger.warn(`WatchlistSync: HTTP ${res.status}`);
+                Logger.warn(`Watchlist: server returned HTTP ${res.status}`);
                 return false;
             }
 
             const text = await res.text();
-            Logger.info(`WatchlistSync: response for ${type}: ${text.substring(0, 300)}`);
+            Logger.debug(`WatchlistSync: response for ${type}: ${text.substring(0, 300)}`);
 
             try {
                 const data = JSON.parse(text);
-                if (data?.data?.message) {
-                    Logger.info(`WatchlistSync: ${data.data.message}`);
-                }
                 return data?.success !== false;
             } catch {
                 if (text === '0' || text === '-1') {
-                    Logger.warn('WatchlistSync: WP returned failure');
+                    Logger.warn('Watchlist: site rejected the change (you may need to re-login on an1me.to)');
                     return false;
                 }
                 return true;
             }
         } catch (e) {
-            Logger.warn(`WatchlistSync: request error for ${type}: ${e.message}`);
+            Logger.warn(`Watchlist: network error — ${e.message}`);
             return false;
         }
     },
@@ -178,20 +201,22 @@ const WatchlistSync = {
         const force = options.force === true;
 
         if (!animeId || !type) {
-            Logger.debug('WatchlistSync: missing animeId or type');
+            Logger.debug('Watchlist: missing animeId or type, skipping');
             return;
         }
 
         if (!this._isLoggedIn()) {
-            Logger.debug('WatchlistSync: user not logged in on site, skipping');
+            Logger.debug('Watchlist: not logged in on an1me.to, skipping sync');
             return;
         }
 
         const entry = animeSlug ? await this._loadAnimeEntry(animeSlug) : null;
         const previousType = entry?.watchlistSyncedType || null;
+        const name = this._shortName(animeSlug, entry?.title);
+        const newLabel = this._statusLabel(type);
 
         if (!force && animeSlug && type !== 'remove' && previousType === type) {
-            Logger.debug(`WatchlistSync: ${type} already synced for ${animeSlug}, skip`);
+            Logger.debug(`Watchlist: "${name}" already marked as "${newLabel}", nothing to do`);
             return true;
         }
 
@@ -200,17 +225,48 @@ const WatchlistSync = {
             previousType &&
             previousType !== type;
 
+        // Build a single user-friendly intent line so the user sees ONE
+        // message describing what we're doing, instead of two raw HTTP logs
+        // for the remove + add pair.
+        let intent;
+        if (type === 'remove') {
+            intent = `Watchlist: removing "${name}" from your an1me.to list…`;
+        } else if (shouldResetBeforeAdd) {
+            const prevLabel = this._statusLabel(previousType);
+            intent = `Watchlist: updating "${name}" — ${prevLabel} → ${newLabel}…`;
+        } else if (previousType === type) {
+            intent = `Watchlist: re-syncing "${name}" as ${newLabel}…`;
+        } else {
+            intent = `Watchlist: marking "${name}" as ${newLabel}…`;
+        }
+        Logger.info(intent);
+
         if (shouldResetBeforeAdd) {
             const removed = await this._sendWatchlistRequest(animeId, 'remove', Logger);
             if (removed) {
                 await this._persistSyncedType(animeSlug, 'remove');
                 await new Promise(resolve => setTimeout(resolve, 200));
+            } else {
+                Logger.warn(`Watchlist: couldn't clear previous "${this._statusLabel(previousType)}" status for "${name}"`);
             }
         }
 
         const success = await this._sendWatchlistRequest(animeId, type, Logger);
-        if (success && animeSlug) {
-            await this._persistSyncedType(animeSlug, type);
+        if (success) {
+            if (animeSlug) await this._persistSyncedType(animeSlug, type);
+            // Outcome line, distinct verbs depending on context.
+            if (type === 'remove') {
+                Logger.success?.(`Watchlist: ✓ removed "${name}"`)
+                    || Logger.info(`Watchlist: ✓ removed "${name}"`);
+            } else if (shouldResetBeforeAdd) {
+                Logger.success?.(`Watchlist: ✓ updated "${name}" to ${newLabel}`)
+                    || Logger.info(`Watchlist: ✓ updated "${name}" to ${newLabel}`);
+            } else {
+                Logger.success?.(`Watchlist: ✓ added "${name}" as ${newLabel}`)
+                    || Logger.info(`Watchlist: ✓ added "${name}" as ${newLabel}`);
+            }
+        } else {
+            Logger.warn(`Watchlist: ✗ failed to ${type === 'remove' ? 'remove' : 'mark as ' + newLabel} "${name}"`);
         }
         return success;
     },
@@ -269,9 +325,9 @@ const WatchlistSync = {
 
             if (!hadFailure) {
                 await chrome.storage.local.set({ watchlistRepairVersion: this._REPAIR_VERSION });
-                Logger.info(`WatchlistSync: repaired ${entries.length} existing watchlist entries`);
+                Logger.info(`Watchlist: ✓ resynced ${entries.length} existing entries with an1me.to`);
             } else {
-                Logger.warn('WatchlistSync: repair had failures, will retry on a later page load');
+                Logger.warn('Watchlist: some entries failed to resync — will retry on a later page load');
             }
 
             return !hadFailure;
@@ -325,19 +381,25 @@ setTimeout(() => {
     WatchlistSync.repairPendingStatusesOnce().catch(() => {});
 }, 2500);
 
-// Wake the background SW and trigger one cloud poll on every an1me.to page
-// load. Without this, mobile Orion (which kills the SW aggressively) only
-// pulls fresh cloud data when the popup opens — the user has to manually
-// open the extension just to see episodes they watched on another device.
-// `pollCloudData` in the SW already gates by 60s so this is rate-limited.
-try {
-    chrome.runtime.sendMessage({ type: 'WAKE_AND_POLL_CLOUD' }, () => {
-        if (chrome.runtime.lastError) {
-            // SW unreachable (e.g. signed-out, freshly installed). Safe to ignore.
-        }
-    });
-} catch {
-    // Extension context invalidated — ignore.
+// Wake the background SW and trigger one cloud poll — but only on /watch/
+// pages. Previously this fired on every an1me.to page load (homepage,
+// listing, anime details), which paid a Firestore read every time the user
+// browsed the site even when they weren't using the tracker. Cross-device
+// sync still feels instant because:
+//   - the popup itself triggers a poll on open (popupAlive port connect)
+//   - the watch page triggers it via cloud-sync.js content script
+// The SW's `pollCloudData` self-rate-limits (5-min gate for convenience
+// reasons) so this is cheap regardless.
+if (/\/watch\//.test(location.pathname)) {
+    try {
+        chrome.runtime.sendMessage({ type: 'WAKE_AND_POLL_CLOUD' }, () => {
+            if (chrome.runtime.lastError) {
+                // SW unreachable (e.g. signed-out, freshly installed). Safe to ignore.
+            }
+        });
+    } catch {
+        // Extension context invalidated — ignore.
+    }
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

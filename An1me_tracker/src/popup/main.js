@@ -2690,7 +2690,7 @@
                 );
             }
         } catch (e) {
-            PopupLogger.log('WatchlistSync', 'popup error:', e.message);
+            PopupLogger.warn('WatchlistSync', 'popup error:', e.message);
         }
     }
 

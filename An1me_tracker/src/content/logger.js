@@ -32,15 +32,58 @@ const ContentLogger = {
         return this.levels[level] >= this.levels[this.currentLevel];
     },
 
+    formatPlainMessage(level, message) {
+        const L = this.config[level];
+        // WARN/ERROR keep timestamp (useful when something breaks).
+        // INFO/SUCCESS skip it for compactness.
+        const needsTs = level === 'WARN' || level === 'ERROR' || level === 'DEBUG';
+        const ts = needsTs ? ` ${this.getTimestamp()}` : '';
+        return `[${this.prefix}] ${L.icon} ${level}${ts} ${message}`;
+    },
+
+    // Render object/non-string extras inline as a compact one-liner so the
+    // console doesn't show expandable "Object" placeholders next to every
+    // INFO/SUCCESS line. At DEBUG we keep the full objects so devs can
+    // still inspect them (just switch LOG_LEVEL to DEBUG).
+    _inlineExtras(extras) {
+        if (!extras.length) return '';
+        const parts = [];
+        for (const e of extras) {
+            if (e == null) { parts.push(String(e)); continue; }
+            if (typeof e !== 'object') { parts.push(String(e)); continue; }
+            try {
+                const s = JSON.stringify(e);
+                if (!s) { parts.push('[Object]'); continue; }
+                if (s.length <= 120) { parts.push(s); continue; }
+                // Too long — emit just the top-level keys so the line stays
+                // readable but still tells you what kind of object it was.
+                const keys = Object.keys(e).slice(0, 4).join(', ');
+                parts.push(`{${keys}${Object.keys(e).length > 4 ? ', …' : ''}}`);
+            } catch {
+                parts.push('[Object]');
+            }
+        }
+        return parts.length ? ' ' + parts.join(' ') : '';
+    },
+
     log(level, message, ...args) {
         if (!this.shouldLog(level)) return;
 
         const L = this.config[level];
-        const ts = this.getTimestamp();
         const method = level === 'ERROR' ? console.error : level === 'WARN' ? console.warn : console.log;
         const extras = args.filter((arg) => arg !== undefined);
 
-        if (extras.length > 0) {
+        if (level === 'WARN' || level === 'ERROR') {
+            // WARN/ERROR keep the full objects — they're rare and the detail
+            // is usually what we want when something went wrong.
+            method(this.formatPlainMessage(level, message), ...extras);
+            return;
+        }
+
+        if (level === 'DEBUG') {
+            // DEBUG keeps full objects (still expandable in console) so devs
+            // can poke at them, plus a timestamp.
+            const ts = this.getTimestamp();
             method(
                 `%c${this.prefix}%c %c${L.icon} ${level}%c %c${ts}%c %c${message}`,
                 this.styles.prefix, '',
@@ -49,15 +92,18 @@ const ContentLogger = {
                 this.styles.message(L.color),
                 ...extras
             );
-        } else {
-            method(
-                `%c${this.prefix}%c %c${L.icon} ${level}%c %c${ts}%c %c${message}`,
-                this.styles.prefix, '',
-                this.styles.badge(L.color, L.bg), '',
-                this.styles.timestamp, '',
-                this.styles.message(L.color)
-            );
+            return;
         }
+
+        // INFO / SUCCESS → minimal: prefix + icon + message. No timestamp,
+        // no extras (they were producing noisy {"id":"…"} tails). Switch
+        // LOG_LEVEL to DEBUG when you actually need the payload.
+        method(
+            `%c${this.prefix}%c %c${L.icon} ${level}%c %c${message}`,
+            this.styles.prefix, '',
+            this.styles.badge(L.color, L.bg), '',
+            this.styles.message(L.color)
+        );
     },
 
     once(key, level, message, ...args) {

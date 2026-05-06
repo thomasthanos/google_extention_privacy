@@ -175,7 +175,7 @@ const ProgressTracker = {
 
         const removedCount = entries.length - limited.length;
         if (removedCount > 0) {
-            Logger.info('Cleaned', removedCount, 'old progress entries');
+            Logger.info(`Cleaned ${removedCount} old progress entries`);
         }
 
         return cleaned;

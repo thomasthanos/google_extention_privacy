@@ -153,7 +153,7 @@
     }
 
     async function trackImmediately() {
-        const { Logger, ProgressTracker, VideoMonitor, Notifications, CONFIG } = AT;
+        const { Logger, ProgressTracker, VideoMonitor, Notifications, CONFIG, Storage } = AT;
         const videoElement = VideoMonitor.getVideoElement();
 
         if (!animeInfo || trackingState !== TrackingState.IDLE || !videoElement) return;
@@ -172,14 +172,20 @@
         trackingState = TrackingState.TRACKING;
 
         try {
-            const result = await chrome.storage.local.get(['animeData', 'deletedAnime']);
+            const result = await Storage.get(['animeData', 'deletedAnime']);
+            if (result?.__timedOut) {
+                Logger.warn('Immediate track skipped: storage read timed out');
+                trackingState = TrackingState.IDLE;
+                earlyTrackDone = false;
+                return;
+            }
             const animeData = result.animeData || {};
             const deletedAnime = { ...(result.deletedAnime || {}) };
             const written = writeSyncEpisode(animeInfo, duration, animeData, 'Immediate');
 
             if (written) {
                 delete deletedAnime[animeInfo.animeSlug];
-                await chrome.storage.local.set({ animeData, deletedAnime });
+                await Storage.set({ animeData, deletedAnime });
                 await clearStayedFillerEpisode(animeInfo.animeSlug, animeInfo.episodeNumber);
                 trackingState = TrackingState.COMPLETED;
                 Logger.success('✓ Immediate track successful');
@@ -199,10 +205,11 @@
                 } catch { }
 
                 try {
-                    const progressResult = await chrome.storage.local.get(['videoProgress']);
+                    const progressResult = await Storage.get(['videoProgress']);
+                    if (progressResult?.__timedOut) return;
                     const videoProgress = progressResult.videoProgress || {};
                     delete videoProgress[animeInfo.uniqueId];
-                    await chrome.storage.local.set({ videoProgress });
+                    await Storage.set({ videoProgress });
                 } catch { }
             } else {
                 trackingState = TrackingState.COMPLETED;
@@ -214,6 +221,10 @@
             // raw handler never calls trackImmediately again.
             trackingState = TrackingState.IDLE;
             earlyTrackDone = false;
+            if (e?.message?.includes('Extension context invalidated') || !Storage.isContextValid()) {
+                Logger.debug('Immediate track aborted: extension context invalidated');
+                return;
+            }
             Logger.error('Immediate track failed:', e);
         }
     }
@@ -1025,14 +1036,39 @@
             window.addEventListener('popstate', dispatchUrlChange);
         }
 
+        // Strip query / hash when comparing URLs so an1me.to's pushState
+        // calls that only update tracking params or in-page anchors don't
+        // count as real navigation. Without this, EVERY pushState fires
+        // trackImmediately() and re-init — which can mark the current
+        // episode as "watched" while the user is just browsing/scrolling.
+        const _pathOf = (href) => {
+            try { return new URL(href, location.origin).pathname; }
+            catch { return href; }
+        };
+        const _isWatchPath = (href) => /\/watch\//.test(_pathOf(href));
+
         const handleUrlChange = () => {
-            if (location.href === lastUrl) return;
+            const prevPath = _pathOf(lastUrl);
+            const currPath = _pathOf(location.href);
+            if (prevPath === currPath) return;        // hash/query-only — ignore
             const previousUrl = lastUrl;
             lastUrl = location.href;
-            trackImmediately();
+
+            // Only flush the in-flight episode if we WERE on a watch page —
+            // otherwise we'd fire trackImmediately() on every back-button on
+            // the homepage, listing pages, etc.
+            if (_isWatchPath(previousUrl)) {
+                trackImmediately();
+            }
+
+            // Only re-init if the new URL is ALSO a watch page. Leaving the
+            // watch context just lets the existing tracking session unwind
+            // through the cleanup hooks naturally.
+            if (!_isWatchPath(location.href)) return;
+
             if (navigationDebounceTimeout) clearTimeout(navigationDebounceTimeout);
             navigationDebounceTimeout = setTimeout(() => {
-                if (location.href !== previousUrl) {
+                if (_pathOf(location.href) === currPath) {
                     Logger.info('URL changed, reinit...');
                     trackingState = TrackingState.IDLE;
                     currentEpisodeId = null;
