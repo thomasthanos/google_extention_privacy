@@ -211,7 +211,7 @@ const VideoMonitor = {
                         if (retryCount < MAX_RETRIES) {
                             setTimeout(checkReady, 500);
                         } else {
-                            Logger.warn('Video not ready after', MAX_RETRIES, 'retries');
+                            Logger.warn(`Video not ready after ${MAX_RETRIES} retries`);
                         }
                     }
                 };

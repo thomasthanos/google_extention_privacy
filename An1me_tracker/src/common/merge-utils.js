@@ -269,6 +269,18 @@
         return true;
     }
 
+    // Order-stable JSON.stringify — sorts object keys recursively so two
+    // objects with the same data but different insertion order produce the
+    // same string. Without this, shallowEqualObjectMap reports "different"
+    // for cloud↔local data that is actually identical, triggering noisy
+    // unnecessary cloud writes.
+    function stableStringify(value) {
+        if (value === null || typeof value !== 'object') return JSON.stringify(value);
+        if (Array.isArray(value)) return '[' + value.map(stableStringify).join(',') + ']';
+        const keys = Object.keys(value).sort();
+        return '{' + keys.map((k) => JSON.stringify(k) + ':' + stableStringify(value[k])).join(',') + '}';
+    }
+
     function shallowEqualObjectMap(aMap, bMap) {
         const a = aMap || {};
         const b = bMap || {};
@@ -279,7 +291,7 @@
 
         for (const key of aKeys) {
             if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
-            if (JSON.stringify(a[key] ?? null) !== JSON.stringify(b[key] ?? null)) return false;
+            if (stableStringify(a[key] ?? null) !== stableStringify(b[key] ?? null)) return false;
         }
 
         return true;

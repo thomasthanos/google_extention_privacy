@@ -215,7 +215,7 @@ const FillerService = {
                     }
                 }
             }
-            Logger.success(`Updated KNOWN_FILLERS for ${animeSlug}`, fillerRanges);
+            Logger.success(`Updated KNOWN_FILLERS for ${animeSlug} (${fillerRanges.length} ranges)`);
         }
 
         slugVariations.forEach(slug => {

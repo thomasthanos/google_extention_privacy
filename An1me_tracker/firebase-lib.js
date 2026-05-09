@@ -134,17 +134,22 @@ const FirebaseLib = (function () {
                             }
                         );
 
-                        const data = await response.json();
+                        const data = await response.json().catch(() => null);
+
+                        if (!data) {
+                            reject(new Error('Empty/invalid OAuth response'));
+                            return;
+                        }
 
                         if (data.error) {
-                            reject(new Error(data.error.message));
+                            reject(new Error(data.error?.message || 'OAuth error'));
                             return;
                         }
 
                         currentUser = {
                             uid: data.localId,
                             email: data.email,
-                            displayName: data.displayName || data.email.split('@')[0],
+                            displayName: data.displayName || (data.email || '').split('@')[0],
                             photoURL: data.photoUrl || null
                         };
 
@@ -194,10 +199,14 @@ const FirebaseLib = (function () {
                 throw new Error(`HTTP error: ${response.status}`);
             }
 
-            const data = await response.json();
+            const data = await response.json().catch(() => null);
+
+            if (!data) {
+                throw new Error('Empty/invalid token refresh response');
+            }
 
             if (data.error) {
-                throw new Error(data.error.message || 'Token refresh failed');
+                throw new Error(data.error?.message || 'Token refresh failed');
             }
 
             if (!data.id_token || !data.refresh_token || !data.expires_in) {
@@ -429,9 +438,13 @@ const FirebaseLib = (function () {
                     refresh_token: tokenData.tokens.refreshToken
                 })
             });
-            data = await response.json();
+            data = await response.json().catch(() => null);
         } catch (networkError) {
             throw new Error('Network error during token validation. Please check your connection.');
+        }
+
+        if (!data) {
+            throw new Error('Empty/invalid token validation response');
         }
 
         if (data.error) throw new Error('Token expired or invalid. Please export a fresh token from Chrome.');

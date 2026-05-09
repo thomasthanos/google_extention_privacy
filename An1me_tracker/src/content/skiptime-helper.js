@@ -664,7 +664,7 @@
             return false;
         }
         submitBtn.click();
-        Logger.info('Skiptime: contribution submitted', { episodeId: getEpisodeIdentity() });
+        Logger.info(`Skiptime: contribution submitted (${getEpisodeIdentity()})`);
         return true;
     }
 

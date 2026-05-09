@@ -1,12 +1,4 @@
 const UIHelpers = {
-    DEBUG: false,
-    Logger: {
-        info: (msg, data) => { if (UIHelpers.DEBUG) console.log('[Anime Tracker]', msg, data !== undefined ? data : ''); },
-        success: (msg, data) => { if (UIHelpers.DEBUG) console.log('[Anime Tracker] ✓', msg, data !== undefined ? data : ''); },
-        error: (msg, data) => console.error('[Anime Tracker] ✗', msg, data !== undefined ? data : ''),
-        warn: (msg, data) => { if (UIHelpers.DEBUG) console.warn('[Anime Tracker] ⚠', msg, data !== undefined ? data : ''); }
-    },
-
     getUniqueId(animeSlug, episodeNumber) {
         return `${animeSlug}__episode-${episodeNumber}`;
     },
@@ -221,4 +213,17 @@ const UIHelpers = {
 
 window.AnimeTracker = window.AnimeTracker || {};
 window.AnimeTracker.UIHelpers = UIHelpers;
-window.AnimeTracker.Logger = UIHelpers.Logger;
+
+// Compatibility shim for filler-service.js (and any future consumers) that
+// destructure `Logger` from `window.AnimeTracker`. The original Logger
+// gated info/success/warn behind a DEBUG flag that was always false (so
+// they were silent in production), and only `error` actually logged.
+// We preserve that behavior but route through PopupLogger so the styling
+// is consistent with the rest of the popup, and warn/error keep full
+// objects (PopupLogger.warn/error don't drop extras).
+window.AnimeTracker.Logger = {
+    info:    () => {},
+    success: () => {},
+    warn:    (...args) => { try { window.PopupLogger?.warn?.('FillerService', ...args); } catch {} },
+    error:   (...args) => { try { window.PopupLogger?.error?.('FillerService', ...args); } catch {} }
+};

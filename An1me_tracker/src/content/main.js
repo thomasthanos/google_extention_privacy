@@ -429,7 +429,7 @@
                 try {
                     const refreshed = await ProgressTracker.refreshTrackedEpisodeDuration(animeInfo, videoElement.duration);
                     if (refreshed) await ProgressTracker.clearSavedProgress(animeInfo.uniqueId);
-                } catch (error) { Logger.warn('Failed to refresh duration on end:', error); }
+                } catch (error) { Logger.warn(`Failed to refresh duration on end: ${error?.message}`); }
                 Logger.info('Episode ended (was tracked before), showing notification');
                 Notifications.showCompletion(animeInfo);
             }
@@ -857,7 +857,7 @@
                     if (groupChanged) patch.groupCoverImages = groupCoverImages;
                     chrome.storage.local.set(patch);
                 });
-            } catch (e) { Logger.warn('Cover image update failed:', e); }
+            } catch (e) { Logger.warn(`Cover image update failed: ${e?.message}`); }
         }
 
         Logger.debug(`Detected: ${animeInfo.animeTitle} Ep${animeInfo.episodeNumber}`);
@@ -958,7 +958,7 @@
                 }
                     }
             }
-        } catch (e) { Logger.warn('Auto-skip filler check failed:', e); }
+        } catch (e) { Logger.warn(`Auto-skip filler check failed: ${e?.message}`); }
 
         highlightWatchedEpisodes(animeInfo.animeSlug);
         highlightFillerEpisodes(animeInfo.animeSlug, animeInfo.animeTitle);

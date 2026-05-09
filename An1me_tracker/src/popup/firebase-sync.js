@@ -104,7 +104,7 @@ const FirebaseSync = {
                     payload[key] = stored[key] || this.pendingSave?.[key] || {};
                 }
             } catch (error) {
-                PopupLogger.warn('Firebase', 'Failed to hydrate sync payload from storage:', error);
+                PopupLogger.warn('Firebase', `Failed to hydrate sync payload: ${error?.message}`);
                 for (const key of missingKeys) {
                     payload[key] = this.pendingSave?.[key] || {};
                 }
@@ -438,7 +438,15 @@ const FirebaseSync = {
             let syncSource = 'empty-init';
 
             if (cloudData) {
-                const shouldMerge = localData.userId === this.currentUser.uid;
+                // shouldMerge=true when local was already tagged with this user,
+                // OR when local has no userId at all (anonymous local — first
+                // sign-in or 2nd device). Without the second clause, the cloud-
+                // only path silently overwrites a fresh anonymous library on
+                // first login. We refuse to merge only when local was tagged
+                // for a *different* account (security: don't leak data between
+                // users on a shared browser).
+                const shouldMerge =
+                    !localData.userId || localData.userId === this.currentUser.uid;
 
                 let mergedDeletedAnime = AnimeTracker.MergeUtils.mergeDeletedAnime(
                     localData.deletedAnime || {},
@@ -570,7 +578,13 @@ const FirebaseSync = {
                     }
                 }
             } else {
-                if (localData.userId === this.currentUser.uid && localData.animeData && Object.keys(localData.animeData).length > 0) {
+                // Same userId rule as the merge path above: bootstrap if local
+                // is tagged for this user OR untagged (anonymous data on a
+                // device that just signed in). Refuse only when tagged for a
+                // different account.
+                const localBelongsToUser =
+                    !localData.userId || localData.userId === this.currentUser.uid;
+                if (localBelongsToUser && localData.animeData && Object.keys(localData.animeData).length > 0) {
                     syncSource = 'local-bootstrap';
                     const normalized = ProgressManager.normalizeCanonicalSlugs(
                         localData.animeData || {},

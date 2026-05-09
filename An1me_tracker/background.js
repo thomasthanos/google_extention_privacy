@@ -162,6 +162,9 @@ function bgStorageRemove(keys) {
 const METADATA_REPAIR_STATE_KEY = 'metadataRepairState';
 const PENDING_METADATA_REPAIR_KEY = 'pendingBackgroundMetadataRepair';
 const METADATA_REPAIR_ALARM = 'metadataRepairTick';
+// 5-min progress-sync debounce. Uses chrome.alarms instead of setTimeout so
+// it survives MV3 service-worker kills (setTimeout >30s is unreliable in MV3).
+const PROGRESS_SYNC_ALARM = 'progressSyncDebounce';
 const METADATA_REPAIR_INFO_TTL_MS = 24 * 60 * 60 * 1000;
 const METADATA_REPAIR_INFO_TTL_AIRING_MS = 60 * 60 * 1000;
 const METADATA_REPAIR_EPISODE_TYPES_TTL_MS = 24 * 60 * 60 * 1000;
@@ -461,13 +464,7 @@ function removeStreamConsumer(id) {
         if (activeStreamConsumers.size > 0) return;
         // Last consumer left — flush any pending progress write so we don't
         // leave watch-time unflushed when the user closes the last tab.
-        if (progressSyncDebounce) {
-            clearTimeout(progressSyncDebounce);
-            progressSyncDebounce = null;
-            if (!syncDebounceTimeout && !syncInProgress) {
-                syncProgressOnly().catch(() => { });
-            }
-        }
+        flushPendingProgressSync().catch(() => {});
     }, IDLE_TEARDOWN_GRACE_MS);
 }
 
@@ -515,8 +512,8 @@ async function refreshFirebaseToken(refreshToken) {
                 }
             );
             if (!response.ok) return null;
-            const data = await response.json();
-            if (data.error) return null;
+            const data = await response.json().catch(() => null);
+            if (!data || data.error) return null;
             const tokens = {
                 idToken: data.id_token,
                 refreshToken: data.refresh_token,
@@ -626,7 +623,7 @@ async function pollCloudData(reason = 'poll') {
             }
             return cloudDoc;
         } catch (e) {
-            console.warn(`[BG-RT] Poll sync failed (${reason}):`, e.message);
+            console.warn(`[BG-RT] Poll sync failed (${reason}): ${e.message}`);
             return null;
         } finally {
             _cloudPollInFlight = null;
@@ -960,7 +957,17 @@ async function _doApplyCloudUpdate(cloudDoc) {
 // drive (UNIMPLEMENTED on first byte). All sync goes through pollCloudData()
 // when consumers connect, plus chrome.storage.onChanged-driven write flushes.
 
-let progressSyncDebounce = null;
+// Flush any pending progress-sync alarm immediately. Used when we want to
+// short-circuit the 5-min debounce (e.g. last viewer closing the tab, or
+// receiving an explicit FLUSH request).
+async function flushPendingProgressSync() {
+    let cleared = false;
+    try { cleared = await chrome.alarms.clear(PROGRESS_SYNC_ALARM); } catch {}
+    if (cleared && !syncDebounceTimeout && !syncInProgress) {
+        syncProgressOnly().catch(() => {});
+    }
+    return cleared;
+}
 
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace !== 'local') return;
@@ -1031,19 +1038,15 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     }
 
     if (_pendingFullSync) {
-        if (progressSyncDebounce) { clearTimeout(progressSyncDebounce); progressSyncDebounce = null; }
+        chrome.alarms.clear(PROGRESS_SYNC_ALARM).catch(() => {});
         if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
         markSyncPending();
         syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 5000);
     } else if (_pendingProgressSync) {
-        if (progressSyncDebounce) clearTimeout(progressSyncDebounce);
         // 5-min debounce matches CS periodic push cadence — on natural pauses this
         // fires so the cloud stays close to local state without over-writing.
-        progressSyncDebounce = setTimeout(() => {
-            progressSyncDebounce = null;
-            if (syncDebounceTimeout || syncInProgress) return;
-            syncProgressOnly();
-        }, 5 * 60 * 1000);
+        // Uses chrome.alarms (not setTimeout) so it survives SW kills.
+        chrome.alarms.create(PROGRESS_SYNC_ALARM, { delayInMinutes: 5 });
     }
 
     if (changes.animeData) {
@@ -1606,7 +1609,7 @@ async function fetchEpisodeTypesFromAnimeFillerList(animeSlug) {
         dlog(`[Anime Tracker] ✓ Fetched episode types for ${animeSlug}:`, episodeTypes);
         return episodeTypes;
     } catch (error) {
-        console.error(`[Anime Tracker] ✗ Failed for ${animeSlug}:`, error);
+        console.error(`[Anime Tracker] ✗ Failed for ${animeSlug}: ${error?.message}`, error);
         throw error;
     }
 }
@@ -2329,7 +2332,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             await hydrateBgPollState();
             const sinceLast = Date.now() - _lastProgressSyncAt;
             if (_lastProgressSyncAt && sinceLast < 4 * 60 * 1000) return;
-            if (progressSyncDebounce) { clearTimeout(progressSyncDebounce); progressSyncDebounce = null; }
+            try { await chrome.alarms.clear(PROGRESS_SYNC_ALARM); } catch {}
             syncProgressOnly();
         })();
         return true;
@@ -2563,6 +2566,12 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
     if (alarm.name === SMART_NOTIF_ALARM) {
         checkNewEpisodes().catch(e => console.warn('[BG] Smart notif check error:', e));
+        return;
+    }
+
+    if (alarm.name === PROGRESS_SYNC_ALARM) {
+        if (syncDebounceTimeout || syncInProgress) return;
+        syncProgressOnly();
         return;
     }
 });

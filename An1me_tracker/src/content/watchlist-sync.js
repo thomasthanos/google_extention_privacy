@@ -424,11 +424,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     })
         .then(res => res.text())
         .then(text => {
-            console.log(`[WatchlistSync] via tab: ${action} type="${watchlistType}" #${animeId} -> ${text.substring(0, 200)}`);
+            console.log(`[WatchlistSync] via tab: ${action} type="${watchlistType}" #${animeId}`);
             sendResponse({ success: true });
         })
         .catch(e => {
-            console.warn('[WatchlistSync] via tab error:', e.message);
+            console.warn(`[WatchlistSync] via tab error: ${e.message}`);
             sendResponse({ success: false, error: e.message });
         });
     return true;

@@ -98,8 +98,8 @@
                     }
                 );
                 if (!res.ok) return null;
-                const data = await res.json();
-                if (data.error) return null;
+                const data = await res.json().catch(() => null);
+                if (!data || data.error) return null;
                 const tokens = {
                     idToken: data.id_token,
                     refreshToken: data.refresh_token,
