@@ -148,16 +148,27 @@ const Storage = {
      * Also fixes accidental slugs that end with -episode/-ep.
      */
     async migrateMultiPartAnime() {
-        // Prevent concurrent migrations (e.g. two popup windows open simultaneously)
+        // Prevent concurrent migrations (e.g. two popup windows open simultaneously).
+        // Uses a token-based CAS: write our unique token, brief wait, re-read; if
+        // our token isn't there, another popup won the race and we abort.
         const LOCK_KEY = '_migrationLock';
         const LOCK_MAX_AGE = 30000; // 30s — stale lock safety net
+        const myToken = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
         try {
             const lockResult = await new Promise(r => chrome.storage.local.get([LOCK_KEY], r));
-            if (lockResult[LOCK_KEY] && Date.now() - lockResult[LOCK_KEY] < LOCK_MAX_AGE) {
+            const existing = lockResult[LOCK_KEY];
+            const existingTime = typeof existing === 'object' ? existing?.time : existing;
+            if (existingTime && Date.now() - existingTime < LOCK_MAX_AGE) {
                 (window.PopupLogger || console).log?.('Storage', 'Migration already in progress, skipping');
                 return false;
             }
-            await new Promise(r => chrome.storage.local.set({ [LOCK_KEY]: Date.now() }, r));
+            await new Promise(r => chrome.storage.local.set({ [LOCK_KEY]: { time: Date.now(), token: myToken } }, r));
+            await new Promise(r => setTimeout(r, 50));
+            const verify = await new Promise(r => chrome.storage.local.get([LOCK_KEY], r));
+            if (verify[LOCK_KEY]?.token !== myToken) {
+                (window.PopupLogger || console).log?.('Storage', 'Migration lock contended, deferring');
+                return false;
+            }
         } catch {
             // If lock check fails, proceed anyway — better than skipping migration
         }

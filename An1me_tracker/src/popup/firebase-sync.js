@@ -295,6 +295,15 @@ const FirebaseSync = {
                     fields: ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'goalSettings', 'badgeUnlocks', 'lastUpdated', 'email']
                 });
                 this.setCachedUserDocument(this.currentUser.uid, savedDoc);
+                try {
+                    // Seed the SW cache with the doc we just wrote so the SW's
+                    // follow-up storage-listener sync doesn't burn a Firestore
+                    // read fetching what we already have. Falls back to plain
+                    // invalidate if the SW doesn't recognise the new message.
+                    chrome.runtime.sendMessage({ type: 'UPDATE_BG_CLOUD_DOC_CACHE', doc: savedDoc }, () => {
+                        void chrome.runtime.lastError;
+                    });
+                } catch { /* best-effort */ }
                 PopupLogger.log('Firebase', `Cloud save complete · ${this.summarizeSyncDataString(savedDoc)}`);
 
                 this.cloudSaveRetryCount = 0;
@@ -377,6 +386,7 @@ const FirebaseSync = {
                 // to a direct GET on cache hit, but costs zero Firestore reads.
                 // Falls through to FirebaseLib.getDocument on cache miss or when
                 // the SW isn't reachable (e.g. signed-out state, rare race).
+                let swAuthoritative = false;
                 try {
                     const swResp = await new Promise((resolve) => {
                         try {
@@ -389,13 +399,14 @@ const FirebaseSync = {
                     if (swResp?.success) {
                         cloudData = swResp.doc || null;
                         this.setCachedUserDocument(this.currentUser.uid, cloudData);
+                        swAuthoritative = true;
                         PopupLogger.debug('Sync', 'Using SW-cached cloud document');
                     }
                 } catch (e) {
                     PopupLogger.debug('Sync', 'SW cloud-doc fetch skipped:', e?.message || e);
                 }
 
-                if (!cloudData) {
+                if (!swAuthoritative && !cloudData) {
                     let retryCount = 0;
                     const maxRetries = 3;
 

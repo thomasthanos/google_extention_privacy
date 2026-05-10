@@ -27,6 +27,17 @@ const FirebaseLib = (function () {
     let currentUser = null;
     let authStateListeners = [];
 
+    async function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
+        if (options?.keepalive) return fetch(url, options);
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+        try {
+            return await fetch(url, { ...options, signal: ctrl.signal });
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
     async function init() {
         try {
             const ru = getRedirectUrl();
@@ -120,7 +131,7 @@ const FirebaseLib = (function () {
                             return;
                         }
 
-                        const response = await fetch(
+                        const response = await fetchWithTimeout(
                             `https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${API_KEY}`,
                             {
                                 method: 'POST',
@@ -181,7 +192,7 @@ const FirebaseLib = (function () {
                 throw new Error('Invalid refresh token');
             }
 
-            const response = await fetch(
+            const response = await fetchWithTimeout(
                 `https://securetoken.googleapis.com/v1/token?key=${API_KEY}`,
                 {
                     method: 'POST',
@@ -299,7 +310,7 @@ const FirebaseLib = (function () {
         const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collection}/${docId}`;
 
         try {
-            const response = await fetch(url, {
+            const response = await fetchWithTimeout(url, {
                 headers: { 'Authorization': `Bearer ${idToken}` }
             });
 
@@ -348,7 +359,7 @@ const FirebaseLib = (function () {
         const body = JSON.stringify({ fields: jsonToFirestoreFields(data) });
         const useKeepalive = !!options.keepalive && body.length < 63000;
 
-        const response = await fetch(url, {
+        const response = await fetchWithTimeout(url, {
             method: 'PATCH',
             headers: {
                 'Authorization': `Bearer ${idToken}`,
@@ -430,7 +441,7 @@ const FirebaseLib = (function () {
 
         let response, data;
         try {
-            response = await fetch(`https://securetoken.googleapis.com/v1/token?key=${API_KEY}`, {
+            response = await fetchWithTimeout(`https://securetoken.googleapis.com/v1/token?key=${API_KEY}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

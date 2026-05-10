@@ -166,11 +166,19 @@ const WatchlistSync = {
             formData.append('anime_id', animeId.toString());
             formData.append('type', type);
 
-            const res = await fetch(this._AJAX_URL, {
-                method: 'POST',
-                credentials: 'include',
-                body: formData
-            });
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 30000);
+            let res;
+            try {
+                res = await fetch(this._AJAX_URL, {
+                    method: 'POST',
+                    credentials: 'include',
+                    body: formData,
+                    signal: ctrl.signal
+                });
+            } finally {
+                clearTimeout(timer);
+            }
 
             if (!res.ok) {
                 Logger.warn(`Watchlist: server returned HTTP ${res.status}`);

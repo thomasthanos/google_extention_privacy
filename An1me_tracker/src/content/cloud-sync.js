@@ -8,6 +8,9 @@
     // worker constant (background.js: CLOUD_POLL_INTERVAL_MS). 3 min keeps
     // cross-device sync responsive without burning Firestore reads.
     const CLOUD_POLL_INTERVAL_MS = 180000;
+    // Keep videoProgress tombstones (`deleted:true`) for this long so cross-device
+    // deletions propagate. Mirrors PROGRESS_TOMBSTONE_KEEP_MS in background.js.
+    const PROGRESS_TOMBSTONE_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 
     const Logger = window.AnimeTrackerContent?.Logger;
 
@@ -25,6 +28,17 @@
     }
     function csIsSyncPaused() {
         return Date.now() < csSyncPausedUntil;
+    }
+
+    async function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
+        if (options?.keepalive) return fetch(url, options);
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+        try {
+            return await fetch(url, { ...options, signal: ctrl.signal });
+        } finally {
+            clearTimeout(timer);
+        }
     }
 
     function toFSValue(v) {
@@ -89,7 +103,7 @@
         if (_refreshInflight) return _refreshInflight;
         _refreshInflight = (async () => {
             try {
-                const res = await fetch(
+                const res = await fetchWithTimeout(
                     `https://securetoken.googleapis.com/v1/token?key=${FIREBASE_API_KEY}`,
                     {
                         method: 'POST',
@@ -179,6 +193,14 @@
         _cloudDocCacheTime = 0;
     }
 
+    function notifyBgInvalidateCloudDoc() {
+        try {
+            chrome.runtime.sendMessage({ type: 'INVALIDATE_BG_CLOUD_DOC_CACHE' }, () => {
+                void chrome.runtime.lastError;
+            });
+        } catch { /* best-effort */ }
+    }
+
     async function getCloudDocCached(token, user) {
         const now = Date.now();
         if (_cloudDocCache && (now - _cloudDocCacheTime) < _CLOUD_DOC_TTL) {
@@ -186,7 +208,7 @@
         }
         const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         try {
-            const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+            const r = await fetchWithTimeout(url, { headers: { Authorization: `Bearer ${token}` } });
             if (!r.ok) return null;
             const doc = fromFSDoc(await r.json());
             _cloudDocCache = doc;
@@ -206,7 +228,7 @@
             try {
                 lastCloudPollAt = Date.now();
                 const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
-                const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+                const response = await fetchWithTimeout(url, { headers: { Authorization: `Bearer ${token}` } });
                 if (!response.ok) {
                     Logger?.warn(`Cloud poll failed (${reason}): ${response.status}`);
                     return null;
@@ -240,10 +262,18 @@
             }
         }
         const out = {};
+        const now = Date.now();
         for (const [id, p] of Object.entries(baseProgress)) {
             if (id === '__slugIndex') continue;
             if (trackedIds.has(id)) continue;
-            if (p?.deleted) continue;
+            if (p?.deleted) {
+                // Keep recent tombstones so they propagate cross-device.
+                const deletedAt = p.deletedAt ? new Date(p.deletedAt).getTime() : 0;
+                if (deletedAt && (now - deletedAt) < PROGRESS_TOMBSTONE_KEEP_MS) {
+                    out[id] = p;
+                }
+                continue;
+            }
             out[id] = p;
         }
         return out;
@@ -264,9 +294,18 @@
 
         const completedPct = window.AnimeTrackerContent?.CONFIG?.COMPLETED_PERCENTAGE || 85;
         const cleaned = {};
+        const now = Date.now();
 
         for (const [id, progress] of Object.entries(baseProgress)) {
-            if (!progress || progress.deleted) continue;
+            if (!progress) continue;
+            if (progress.deleted) {
+                // Keep recent tombstones so they propagate cross-device.
+                const deletedAt = progress.deletedAt ? new Date(progress.deletedAt).getTime() : 0;
+                if (deletedAt && (now - deletedAt) < PROGRESS_TOMBSTONE_KEEP_MS) {
+                    cleaned[id] = progress;
+                }
+                continue;
+            }
             if (trackedIds.has(id)) continue;
             if ((Number(progress.percentage) || 0) >= completedPct) continue;
             cleaned[id] = progress;
@@ -356,7 +395,7 @@
                     lastUpdated: pushedAt
                 })
             });
-            const res = await fetch(`${url}?${updateMask}`, {
+            const res = await fetchWithTimeout(`${url}?${updateMask}`, {
                 method: 'PATCH',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body,
@@ -367,6 +406,7 @@
                 lastPushedProgress = mergedSnap;
                 lastPushAt = Date.now();
                 invalidateCloudDocCache();
+                notifyBgInvalidateCloudDoc();
                 _lastAppliedCloudUpdatedAt = pushedAt;
                 rememberOwnWrite(pushedAt);
                 Logger?.info('videoProgress pushed (merged)');
@@ -475,7 +515,13 @@
 
             const useKeepalive = keepalive && body.length < 63000;
 
-            const res = await fetch(url, {
+            // updateMask scopes the PATCH to the fields we manage from the
+            // content script. Without it, Firestore replaces the document and
+            // wipes popup-only fields (goalSettings, badgeUnlocks).
+            const fullMask = ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'lastUpdated', 'email']
+                .map(f => `updateMask.fieldPaths=${f}`).join('&');
+
+            const res = await fetchWithTimeout(`${url}?${fullMask}`, {
                 method: 'PATCH',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body,
@@ -486,6 +532,7 @@
                 lastPushedFullSnap = uploadSnap;
                 lastPushAt = Date.now();
                 invalidateCloudDocCache();
+                notifyBgInvalidateCloudDoc();
                 _lastAppliedCloudUpdatedAt = pushedAt;
                 rememberOwnWrite(pushedAt);
                 Logger?.info('Full push to Firestore complete');
@@ -906,7 +953,6 @@
 
     window.AnimeTrackerContent = window.AnimeTrackerContent || {};
     window.AnimeTrackerContent.CloudSync = {
-        pushFullKeepalive: () => pushFullDirect({ keepalive: true }),
         pushKeepaliveWithPayload(payload) {
             try {
                 const user = currentUser;
@@ -932,7 +978,7 @@
                     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                     body,
                     keepalive: true
-                }).catch(() => { });
+                }).then((res) => { if (res.ok) notifyBgInvalidateCloudDoc(); }).catch(() => { });
                 return true;
             } catch {
                 return false;

@@ -41,6 +41,11 @@ const ddebug = (...a) => { if (BG_DEBUG) console.debug(...a); };
 const COMPLETED_PERCENTAGE = 85;
 const DELETED_ANIME_MAX_AGE_MS = 10 * 24 * 60 * 60 * 1000;
 const MAX_PROGRESS_ENTRIES = 200;
+// Keep videoProgress tombstones (`deleted:true`) for this long so cross-device
+// deletions propagate even if the receiving device only syncs days later.
+// Without the grace period, the SW's syncProgressOnly path stripped tombstones
+// ~5 minutes after deletion, leaving the deletion to silently disappear.
+const PROGRESS_TOMBSTONE_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 
 // Survives SW kills: when a setTimeout(syncToFirebase, ...) is scheduled we
 // stamp this key. If the SW is terminated before the timer fires, the next
@@ -54,6 +59,17 @@ function markSyncPending() {
 }
 function clearSyncPending() {
     try { chrome.storage.local.remove([PENDING_SYNC_KEY]); } catch {}
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
+    if (options?.keepalive) return fetch(url, options);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+        return await fetch(url, { ...options, signal: ctrl.signal });
+    } finally {
+        clearTimeout(timer);
+    }
 }
 
 function cleanTrackedProgressBg(animeData, videoProgress, deletedAnime = {}) {
@@ -81,7 +97,16 @@ function cleanTrackedProgressBg(animeData, videoProgress, deletedAnime = {}) {
 
         if (isTracked) continue;
         if (isCompleted) continue;
-        if (progress.deleted) continue;
+        if (progress.deleted) {
+            // Keep recent tombstones so they propagate cross-device. Strip
+            // only ones older than the keep window — those have had plenty
+            // of time to reach every device.
+            const deletedAt = progress.deletedAt ? new Date(progress.deletedAt).getTime() : 0;
+            if (deletedAt && (now - deletedAt) < PROGRESS_TOMBSTONE_KEEP_MS) {
+                cleaned[id] = progress;
+            }
+            continue;
+        }
 
         if (progress.coverImage) {
             const slugMatch = id.match(/^(.+)__episode-\d+$/);
@@ -503,7 +528,7 @@ async function refreshFirebaseToken(refreshToken) {
     if (_bgRefreshInflight) return _bgRefreshInflight;
     const p = (async () => {
         try {
-            const response = await fetch(
+            const response = await fetchWithTimeout(
                 `https://securetoken.googleapis.com/v1/token?key=${FIREBASE_API_KEY}`,
                 {
                     method: 'POST',
@@ -583,7 +608,7 @@ function fromFSDoc(doc) {
 async function fetchCloudData(user, token) {
     try {
         const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
-        const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        const response = await fetchWithTimeout(url, { headers: { 'Authorization': `Bearer ${token}` } });
         if (!response.ok) return null;
         return fromFSDoc(await response.json());
     } catch (e) {
@@ -690,7 +715,7 @@ async function syncProgressOnly() {
         const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         const fieldMask = 'updateMask.fieldPaths=videoProgress&updateMask.fieldPaths=lastUpdated';
         const pushedAt = new Date().toISOString();
-        const response = await fetch(`${url}?${fieldMask}`, {
+        const response = await fetchWithTimeout(`${url}?${fieldMask}`, {
             method: 'PATCH',
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -801,7 +826,7 @@ async function syncToFirebase() {
         ].map(f => `updateMask.fieldPaths=${f}`).join('&');
 
         const pushedAt = new Date().toISOString();
-        const response = await fetch(`${url}?${fieldMask}`, {
+        const response = await fetchWithTimeout(`${url}?${fieldMask}`, {
             method: 'PATCH',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1726,7 +1751,12 @@ async function checkNewEpisodes() {
                             priority: 1
                         });
                     }
+                }
 
+                // Update cache whenever we have fresh info — even when prevLatest is 0
+                // (e.g. anime cached before first episode aired). Without this, the
+                // notification gate stays stuck because prevLatest never advances.
+                if (info.latestEpisode !== prevLatest || cached.status !== info.status) {
                     await bgStorageSet({ [cachedKey]: { ...cached, ...info, cachedAt: now } });
                 }
 
@@ -2274,7 +2304,7 @@ async function directWatchlistFetch(animeId, type) {
         formData.append('anime_id', animeId.toString());
         formData.append('type', type);
 
-        const res = await fetch(AJAX_URL, {
+        const res = await fetchWithTimeout(AJAX_URL, {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -2372,6 +2402,26 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return true;
     }
 
+    if (message.type === 'INVALIDATE_BG_CLOUD_DOC_CACHE') {
+        invalidateBgCloudDocCache();
+        sendResponse({ ok: true });
+        return true;
+    }
+
+    if (message.type === 'UPDATE_BG_CLOUD_DOC_CACHE') {
+        // Popup just wrote `doc` to Firestore — seed the SW cache with it so
+        // the SW's next storage.onChanged-driven sync skips the Firestore read.
+        // Saves ~1 read per popup-side save.
+        if (message.doc && typeof message.doc === 'object') {
+            _bgCloudDocCache = message.doc;
+            _bgCloudDocCacheTime = Date.now();
+        } else {
+            invalidateBgCloudDocCache();
+        }
+        sendResponse({ ok: true });
+        return true;
+    }
+
     if (message.type === 'FETCH_ANIME_INFO') {
         if (!message.slug) { sendResponse({ error: 'Missing slug' }); return true; }
         fetchAnimePageInfo(message.slug)
@@ -2462,6 +2512,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === 'GET_FILLER_EPISODES') {
         if (!message.animeSlug) { sendResponse({ fillers: null }); return true; }
         const slug = message.animeSlug;
+        if (isLikelyMovieSlug(slug)) { sendResponse({ fillers: null }); return true; }
         const title = message.animeTitle || null;
         const key = `episodeTypes_${slug}`;
         (async () => {

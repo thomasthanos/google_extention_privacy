@@ -57,7 +57,9 @@
     let toggleListener = null;
     let videoObserver = null;
     let controlsObserver = null;
+    let controlsObserverThrottle = null;
     let urlObserver = null;
+    let urlObserverThrottle = null;
     let episodeWatchTimer = null;
     let lastEpisodeIdentity = null;
     let submitCountdownTimer = null;
@@ -722,7 +724,12 @@
 
     function ensureControlsObserver() {
         if (controlsObserver || !helperEnabled) return;
-        controlsObserver = new MutationObserver(() => {
+        // Throttle the callback: ArtPlayer + ad scripts produce constant DOM
+        // mutations during playback. Without throttling, every batch triggers
+        // a querySelector chain (getControlsHost) which is wasted work on
+        // mobile. 250ms is small enough that re-mount feels instantaneous.
+        const runCheck = () => {
+            controlsObserverThrottle = null;
             if (!helperEnabled) return;
             const host = getControlsHost();
             if (host) ensureControlsHostVisible(host);
@@ -733,6 +740,10 @@
 
             Logger.debug('Skiptime: controls host available, mounting dropdown');
             mountPanel();
+        };
+        controlsObserver = new MutationObserver(() => {
+            if (controlsObserverThrottle) return;
+            controlsObserverThrottle = setTimeout(runCheck, 250);
         });
 
         const observeTargets = getSearchDocuments()
@@ -1286,12 +1297,19 @@
             }
 
             if (!urlObserver) {
-                urlObserver = new MutationObserver(() => {
+                // Throttled: episode identity rarely changes, but document.body
+                // subtree mutations fire constantly during playback.
+                const runIdentityCheck = () => {
+                    urlObserverThrottle = null;
                     const nextEpisodeIdentity = getEpisodeIdentity();
                     if (!nextEpisodeIdentity || nextEpisodeIdentity === lastEpisodeIdentity) return;
                     handleEpisodeIdentityChange(nextEpisodeIdentity).catch((e) => {
                         Logger.debug('Skiptime: mutation-driven refresh failed', e);
                     });
+                };
+                urlObserver = new MutationObserver(() => {
+                    if (urlObserverThrottle) return;
+                    urlObserverThrottle = setTimeout(runIdentityCheck, 500);
                 });
                 if (document.body) {
                     urlObserver.observe(document.body, { childList: true, subtree: true });
@@ -1348,9 +1366,17 @@
             controlsObserver.disconnect();
             controlsObserver = null;
         }
+        if (controlsObserverThrottle) {
+            clearTimeout(controlsObserverThrottle);
+            controlsObserverThrottle = null;
+        }
         if (urlObserver) {
             urlObserver.disconnect();
             urlObserver = null;
+        }
+        if (urlObserverThrottle) {
+            clearTimeout(urlObserverThrottle);
+            urlObserverThrottle = null;
         }
         if (episodeWatchTimer) {
             clearInterval(episodeWatchTimer);
