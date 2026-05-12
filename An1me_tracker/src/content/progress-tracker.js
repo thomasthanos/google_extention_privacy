@@ -89,13 +89,28 @@ const ProgressTracker = {
         }
     },
 
-    shouldMarkComplete(currentTime, duration) {
+    shouldMarkComplete(currentTime, duration, outroStartSec = null) {
         const { CONFIG } = window.AnimeTrackerContent;
 
         if (!duration || duration <= 0) return false;
 
         const progress = currentTime / duration;
         const remainingTime = duration - currentTime;
+
+        // Preferred path: if the skiptime helper has captured this episode's
+        // outroStart, treat it as authoritative. The legacy 85% fallback is
+        // skipped because it would override the outro signal (e.g. an
+        // episode with story until 22:00 in a 24min runtime would otherwise
+        // fire at 20:24 mid-story).
+        if (outroStartSec && outroStartSec > 0 && outroStartSec < duration) {
+            const MIN_STORY_PROGRESS = 0.50;
+            if (currentTime >= outroStartSec && progress >= MIN_STORY_PROGRESS) return true;
+            // Defensive: if the captured outroStart turns out wrong (stale
+            // metadata, sub vs dub mismatch), still fire when we're very near
+            // the actual end so the episode doesn't go untracked.
+            if (progress >= 0.95) return true;
+            return false;
+        }
 
         const progressThreshold = (CONFIG.COMPLETED_PERCENTAGE || 85) / 100;
         const outroThreshold = CONFIG.REMAINING_TIME_THRESHOLD || 120;
@@ -409,7 +424,8 @@ const ProgressTracker = {
             return;
         }
 
-        if (!force && this.shouldMarkComplete(currentTime, duration)) return;
+        const outroStartSec = window.AnimeTrackerContent?.getCachedOutroStartSec?.() || null;
+        if (!force && this.shouldMarkComplete(currentTime, duration, outroStartSec)) return;
 
         const now = Date.now();
         const regularThrottleMs = Math.max(5000, Number(CONFIG.PROGRESS_WRITE_THROTTLE_MS) || 45000);

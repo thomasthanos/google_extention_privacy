@@ -17,6 +17,74 @@
     let lastTimeupdateTime = 0;
     let lastVideoSource = '';
     let earlyTrackDone = false;
+    // Dedup the "episode complete" notification: it can fire from the early
+    // 85%-completion path AND from the `ended` event at 100%. Without this
+    // flag, both paths show the toast for the same episode.
+    let completionNotificationShown = false;
+    function showCompletionOnce() {
+        if (completionNotificationShown) return;
+        completionNotificationShown = true;
+        AT.Notifications.showCompletion(animeInfo);
+    }
+    // outroStart (in seconds) for the current episode, sourced from the
+    // skiptime-helper cache. When present, completion fires when the user
+    // hits the start of the credits — far more accurate than the static 85%
+    // threshold which can fall mid-story (long credits) or mid-credits
+    // (short credits) depending on the anime.
+    let cachedOutroStartSec = null;
+    function parseSkipTime(text) {
+        if (!text || typeof text !== 'string') return 0;
+        const parts = text.trim().split(':').map(Number);
+        if (parts.some(Number.isNaN)) return 0;
+        if (parts.length === 2) return parts[0] * 60 + parts[1];
+        if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+        return 0;
+    }
+    async function loadOutroStartFor(info) {
+        cachedOutroStartSec = null;
+        if (!info?.animeSlug || !info?.episodeNumber) return;
+        const epNum = Number(info.episodeNumber);
+
+        // 1. Manually-captured timestamps take priority — the user explicitly
+        //    captured this episode, so respect their data over a community DB.
+        try {
+            const key = `skiptimeCache:${info.animeSlug}__episode-${epNum}`;
+            const result = await chrome.storage.local.get([key]);
+            const stored = result?.[key];
+            if (stored?.outroStart) {
+                const sec = parseSkipTime(stored.outroStart);
+                if (sec > 0) { cachedOutroStartSec = sec; return; }
+            }
+        } catch { /* fall through to AniSkip */ }
+
+        // 2. AniSkip community DB. The SW caches results aggressively (90 days
+        //    on hit, 7 on miss) so this is at most one network call per
+        //    (anime, episode) per ~3 months, regardless of rewatches.
+        try {
+            const video = AT.VideoMonitor?.getVideoElement?.();
+            const len = (video?.duration && Number.isFinite(video.duration)) ? Math.round(video.duration) : 0;
+            const resp = await new Promise((resolve) => {
+                try {
+                    chrome.runtime.sendMessage({
+                        type: 'GET_OUTRO_START',
+                        animeSlug: info.animeSlug,
+                        animeTitle: info.animeTitle || null,
+                        episodeNumber: epNum,
+                        episodeLength: len
+                    }, (r) => {
+                        if (chrome.runtime.lastError) { resolve(null); return; }
+                        resolve(r || null);
+                    });
+                } catch { resolve(null); }
+            });
+            const sec = Number(resp?.outroStart) || 0;
+            if (sec > 0) cachedOutroStartSec = sec;
+        } catch { /* leave null — fall through to legacy 85% threshold */ }
+    }
+    // Expose for progress-tracker.saveVideoProgress() so its internal
+    // "stop saving progress when complete" gate uses the same smart logic.
+    window.AnimeTrackerContent = window.AnimeTrackerContent || {};
+    window.AnimeTrackerContent.getCachedOutroStartSec = () => cachedOutroStartSec;
 
     function normalizeStayedFillers(rawSelections) {
         if (!rawSelections || typeof rawSelections !== 'object') return {};
@@ -103,6 +171,7 @@
         trackingState = TrackingState.IDLE;
         durationRefreshAttempted = false;
         durationRefreshAttempts = 0;
+        completionNotificationShown = false;
     }
 
     function syncVideoSourceEpisodeBoundary(videoElement) {
@@ -161,7 +230,7 @@
         const duration = videoElement.duration;
         const currentTime = videoElement.currentTime;
 
-        if (!duration || !ProgressTracker.shouldMarkComplete(currentTime, duration)) return;
+        if (!duration || !ProgressTracker.shouldMarkComplete(currentTime, duration, cachedOutroStartSec)) return;
 
         if (shouldBlockCompletion(currentTime, duration)) {
             const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
@@ -189,7 +258,7 @@
                 await clearStayedFillerEpisode(animeInfo.animeSlug, animeInfo.episodeNumber);
                 trackingState = TrackingState.COMPLETED;
                 Logger.success('✓ Immediate track successful');
-                Notifications.showCompletion(animeInfo);
+                showCompletionOnce();
 
                 try {
                     const { WatchlistSync } = AT;
@@ -301,6 +370,12 @@
         const { VideoMonitor } = AT;
         const videoElement = VideoMonitor.getVideoElement();
         await tryRefreshTrackedDuration(videoElement, 'loadedmetadata');
+        // Re-load outroStart now that we know the actual duration. AniSkip
+        // can use episodeLength to disambiguate when multiple timings exist
+        // for the same (mal_id, episode) — typical for re-cut releases.
+        if (animeInfo && cachedOutroStartSec === null) {
+            loadOutroStartFor(animeInfo);
+        }
     };
 
     const handleTimeUpdate = debounce(async function () {
@@ -406,8 +481,8 @@
                 return;
             }
             if (trackingState === TrackingState.COMPLETED) {
-                Logger.info('Episode ended (already tracked), showing notification');
-                Notifications.showCompletion(animeInfo);
+                Logger.info('Episode ended (already tracked)');
+                showCompletionOnce();
                 return;
             }
 
@@ -430,8 +505,8 @@
                     const refreshed = await ProgressTracker.refreshTrackedEpisodeDuration(animeInfo, videoElement.duration);
                     if (refreshed) await ProgressTracker.clearSavedProgress(animeInfo.uniqueId);
                 } catch (error) { Logger.warn(`Failed to refresh duration on end: ${error?.message}`); }
-                Logger.info('Episode ended (was tracked before), showing notification');
-                Notifications.showCompletion(animeInfo);
+                Logger.info('Episode ended (was tracked before)');
+                showCompletionOnce();
             }
         }
     };
@@ -812,6 +887,7 @@
         animeInfo = AnimeParser.extractAnimeInfo();
         if (!animeInfo) { Logger.debug('No anime info found'); return; }
         currentEpisodeId = animeInfo.uniqueId;
+        loadOutroStartFor(animeInfo);
 
         const hasDetectedTotal = Number.isFinite(animeInfo.totalEpisodes) && animeInfo.totalEpisodes > 0 && animeInfo.totalEpisodes < 10000;
 

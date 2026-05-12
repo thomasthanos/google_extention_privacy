@@ -1695,6 +1695,87 @@ async function fetchJikanEpisodes(title) {
     }
 }
 
+// AniSkip: open community database of intro/outro timings, keyed by MAL ID.
+// Used to auto-detect when the actual story ends so the "episode complete"
+// fires at the start of the credits — far more accurate than a static 85%.
+// Cache hit serves indefinitely (timestamps don't change once submitted);
+// "not found" cached for 7 days so we retry occasionally for newly-added
+// timings.
+const ANISKIP_OUTRO_KEY_PREFIX = 'aniSkipOutro:';
+const ANISKIP_FOUND_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+const ANISKIP_MISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const SLUG_TO_MAL_KEY_PREFIX = 'malIdForSlug:';
+const SLUG_TO_MAL_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+async function getMalIdForSlug(slug, title) {
+    if (!slug) return null;
+    const cacheKey = `${SLUG_TO_MAL_KEY_PREFIX}${slug}`;
+    try {
+        const cached = (await bgStorageGet([cacheKey]))[cacheKey];
+        if (cached && (Date.now() - (cached.cachedAt || 0)) < SLUG_TO_MAL_TTL_MS) {
+            return cached.malId || null;
+        }
+    } catch { /* fall through to fetch */ }
+    if (!title) return null;
+    try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 10000);
+        const res = await fetch(
+            `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(title)}&limit=1`,
+            { signal: ctrl.signal }
+        );
+        clearTimeout(timer);
+        if (!res.ok) return null;
+        const data = await res.json();
+        const malId = data?.data?.[0]?.mal_id || null;
+        await bgStorageSet({ [cacheKey]: { malId, cachedAt: Date.now() } });
+        return malId;
+    } catch { return null; }
+}
+
+async function fetchAniSkipOutroStart(slug, title, episodeNumber, episodeLength) {
+    if (!slug || !episodeNumber) return null;
+    const malId = await getMalIdForSlug(slug, title);
+    if (!malId) return null;
+
+    const cacheKey = `${ANISKIP_OUTRO_KEY_PREFIX}${malId}:${episodeNumber}`;
+    try {
+        const cached = (await bgStorageGet([cacheKey]))[cacheKey];
+        if (cached) {
+            const age = Date.now() - (cached.cachedAt || 0);
+            const ttl = cached.outroStart ? ANISKIP_FOUND_TTL_MS : ANISKIP_MISS_TTL_MS;
+            if (age < ttl) return cached.outroStart || null;
+        }
+    } catch { /* fall through to fetch */ }
+
+    try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 8000);
+        const lengthParam = Number.isFinite(episodeLength) && episodeLength > 0
+            ? `&episodeLength=${Math.round(episodeLength)}`
+            : '';
+        const res = await fetch(
+            `https://api.aniskip.com/v2/skip-times/${malId}/${episodeNumber}?types[]=ed${lengthParam}`,
+            { signal: ctrl.signal }
+        );
+        clearTimeout(timer);
+        if (!res.ok) {
+            await bgStorageSet({ [cacheKey]: { outroStart: null, cachedAt: Date.now() } });
+            return null;
+        }
+        const data = await res.json();
+        let outroStart = null;
+        if (data?.found && Array.isArray(data.results)) {
+            const ed = data.results.find(r => r?.skipType === 'ed' && r?.interval?.startTime > 0);
+            if (ed) outroStart = Math.round(Number(ed.interval.startTime));
+        }
+        await bgStorageSet({ [cacheKey]: { outroStart, cachedAt: Date.now() } });
+        return outroStart;
+    } catch {
+        return null;
+    }
+}
+
 const SMART_NOTIF_ALARM = 'smartNotifCheck';
 const SMART_NOTIF_INTERVAL_MINUTES = 60;
 // Cap how many anime we hit per tick to keep an1me.to load polite. The
@@ -2528,6 +2609,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 sendResponse({ fillers });
             } catch {
                 sendResponse({ fillers: null });
+            }
+        })();
+        return true;
+    }
+
+    if (message.type === 'GET_OUTRO_START') {
+        const slug = message.animeSlug;
+        const title = message.animeTitle || null;
+        const ep = Number(message.episodeNumber) || 0;
+        const len = Number(message.episodeLength) || 0;
+        if (!slug || !ep) { sendResponse({ outroStart: null }); return true; }
+        (async () => {
+            try {
+                const outroStart = await fetchAniSkipOutroStart(slug, title, ep, len);
+                sendResponse({ outroStart });
+            } catch {
+                sendResponse({ outroStart: null });
             }
         })();
         return true;

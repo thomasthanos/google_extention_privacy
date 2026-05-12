@@ -19,7 +19,8 @@
     "https://securetoken.googleapis.com/*",
     "https://firestore.googleapis.com/*",
     "https://www.animefillerlist.com/*",
-    "https://api.jikan.moe/*"
+    "https://api.jikan.moe/*",
+    "https://api.aniskip.com/*"
   ],
   "action": {
     "default_popup": "popup.html",
