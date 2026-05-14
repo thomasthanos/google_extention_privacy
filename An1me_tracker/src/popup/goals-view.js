@@ -296,7 +296,7 @@
                 params.onGoalsChanged(effectiveGoalSettings);
             }
             chrome.storage.local.set({ goalSettings: effectiveGoalSettings }).catch((err) => {
-                console.warn('[GoalsView] Failed to save smart goals — reverting in-memory state:', err);
+                (window.PopupLogger?.warn || console.warn)('GoalsView', 'Failed to save smart goals — reverting in-memory state:', err);
                 params.goalSettings = previousGoalSettings;
                 if (typeof params.onGoalsChanged === 'function') {
                     params.onGoalsChanged(previousGoalSettings);
@@ -372,7 +372,7 @@
             try {
                 await chrome.storage.local.set({ goalSettings: nextSettings });
             } catch (err) {
-                console.warn('[GoalsView] Failed to save goal:', err);
+                (window.PopupLogger?.warn || console.warn)('GoalsView', 'Failed to save goal:', err);
             }
         };
 

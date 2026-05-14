@@ -30,9 +30,13 @@
             if (!url) return resolve(null);
             const img = new Image();
             img.crossOrigin = 'anonymous';
-            img.onload = () => resolve(img);
-            img.onerror = () => resolve(null);
-            setTimeout(() => resolve(null), 4000);
+            // Cancel the 4s safety timeout if the image resolves either way.
+            // Previously the timer fired in every case (no clearTimeout), which
+            // didn't break correctness — Promises ignore second resolve — but
+            // kept a microtask alive 4s longer than necessary per image.
+            const timer = setTimeout(() => resolve(null), 4000);
+            img.onload = () => { clearTimeout(timer); resolve(img); };
+            img.onerror = () => { clearTimeout(timer); resolve(null); };
             img.src = url;
         });
     }

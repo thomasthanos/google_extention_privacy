@@ -144,8 +144,9 @@ const ProgressManager = {
      * Remove duplicate episodes from anime data
      */
     removeDuplicateEpisodes(animeData) {
+        const log = (window.PopupLogger && window.PopupLogger.warn) || console.warn;
         if (!animeData || typeof animeData !== 'object') {
-            console.warn('[Cleanup] Invalid animeData provided');
+            log('Cleanup', 'Invalid animeData provided');
             return {};
         }
 
@@ -153,7 +154,7 @@ const ProgressManager = {
 
         for (const [slug, anime] of Object.entries(cleaned)) {
             if (!anime || typeof anime !== 'object') {
-                console.warn('[Cleanup] Invalid anime entry:', slug);
+                log('Cleanup', 'Invalid anime entry:', slug);
                 delete cleaned[slug];
                 continue;
             }
@@ -165,7 +166,7 @@ const ProgressManager = {
             }
 
             if (!Array.isArray(anime.episodes)) {
-                console.warn('[Cleanup] Episodes is not an array for:', slug);
+                log('Cleanup', 'Episodes is not an array for:', slug);
                 cleaned[slug].episodes = [];
                 cleaned[slug].totalWatchTime = 0;
                 continue;

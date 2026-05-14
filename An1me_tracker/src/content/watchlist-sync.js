@@ -113,6 +113,15 @@ const WatchlistSync = {
         const Logger = this._logger();
         if (!animeId || !animeSlug) return false;
 
+        // When the user updates / reloads the extension while a watch tab is
+        // open, the old content script keeps running but chrome.runtime is
+        // gone. Any storage call from now on rejects with "Extension context
+        // invalidated". There's nothing useful we can do — the new content
+        // script will mount on the next page load — so we silently no-op
+        // instead of emitting a noisy WARN.
+        const Storage = window.AnimeTrackerContent?.Storage;
+        if (Storage?.isContextValid && !Storage.isContextValid()) return false;
+
         try {
             const { animeData = {} } = await chrome.storage.local.get(['animeData']);
             const entry = animeData[animeSlug] || null;
@@ -123,6 +132,9 @@ const WatchlistSync = {
             }
             return await this.updateStatus(animeId, type, animeSlug, options);
         } catch (e) {
+            // Swallow extension-context errors quietly — same reason as above.
+            const msg = String(e?.message || '').toLowerCase();
+            if (msg.includes('extension context') || msg.includes('cannot access')) return false;
             Logger.warn(`WatchlistSync: syncFromStorage failed for ${animeSlug}: ${e.message}`);
             return false;
         }

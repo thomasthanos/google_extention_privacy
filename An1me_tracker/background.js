@@ -1,5 +1,21 @@
-const FIREBASE_API_KEY = "AIzaSyCDF9US2OwARlyZ0AH_zDpjzmOXRtrGKMg";
-const FIREBASE_PROJECT_ID = "anime-tracker-64d86";
+// Load Firebase config + Firestore codec + merge utils. Single source of
+// truth for API key/project lives in src/common/firebase-config.js (also
+// loaded by the popup and content scripts via their respective entry points).
+importScripts(
+    'src/common/firebase-config.js',
+    'src/background/aniskip.js',
+    'src/background/filler-discovery.js',
+    'src/background/an1me-scraper.js',
+    'src/background/smart-notifications.js',
+    'src/background/watchlist-sync.js',
+    'src/background/metadata-repair.js'
+);
+
+const FIREBASE_API_KEY = (self.firebaseConfig && self.firebaseConfig.apiKey) || '';
+const FIREBASE_PROJECT_ID = (self.firebaseConfig && self.firebaseConfig.projectId) || '';
+if (!FIREBASE_API_KEY || !FIREBASE_PROJECT_ID) {
+    console.error('[BG] Firebase config missing — Firestore I/O will fail');
+}
 const FIRESTORE_DATABASE = `projects/${FIREBASE_PROJECT_ID}/databases/(default)`;
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/${FIRESTORE_DATABASE}`;
 // Poll interval was 60s — too aggressive for an anime tracker. A user
@@ -13,7 +29,7 @@ const CLOUD_POLL_INTERVAL_MS = 180000;
 // 3 min regardless of how often consumers connect.
 const CLOUD_CONSUMER_POLL_MIN_GAP_MS = 3 * 60 * 1000;
 
-importScripts('src/common/merge-utils.js');
+importScripts('src/common/merge-utils.js', 'src/common/firestore-codec.js');
 
 const sharedMergeUtils = self.AnimeTrackerMergeUtils || {};
 const missingMergeUtil = (name) => () => {
@@ -52,7 +68,6 @@ const PROGRESS_TOMBSTONE_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 // SW wake-up sees the stamp and flushes a sync immediately so the user's
 // change isn't lost until they happen to reopen the popup.
 const PENDING_SYNC_KEY = 'pendingSyncFlush';
-const PENDING_SYNC_STALE_MS = 8000;
 
 function markSyncPending() {
     try { chrome.storage.local.set({ [PENDING_SYNC_KEY]: Date.now() }); } catch {}
@@ -184,218 +199,13 @@ function bgStorageRemove(keys) {
     });
 }
 
-const METADATA_REPAIR_STATE_KEY = 'metadataRepairState';
-const PENDING_METADATA_REPAIR_KEY = 'pendingBackgroundMetadataRepair';
-const METADATA_REPAIR_ALARM = 'metadataRepairTick';
 // 5-min progress-sync debounce. Uses chrome.alarms instead of setTimeout so
 // it survives MV3 service-worker kills (setTimeout >30s is unreliable in MV3).
+// Metadata-repair alarm/constants live in src/background/metadata-repair.js.
 const PROGRESS_SYNC_ALARM = 'progressSyncDebounce';
-const METADATA_REPAIR_INFO_TTL_MS = 24 * 60 * 60 * 1000;
-const METADATA_REPAIR_INFO_TTL_AIRING_MS = 60 * 60 * 1000;
-const METADATA_REPAIR_EPISODE_TYPES_TTL_MS = 24 * 60 * 60 * 1000;
-const METADATA_REPAIR_NOT_FOUND_TTL_MS = 3 * 24 * 60 * 60 * 1000;
-const METADATA_REPAIR_ITEMS_PER_TICK = 3;
-const METADATA_REPAIR_INTER_ITEM_DELAY_MS = 250;
-const METADATA_REPAIR_MAX_LOGS = 60;
-const METADATA_REPAIR_MAX_ATTEMPTS = 3;
-const METADATA_REPAIR_RETRY_BASE_DELAY_MS = 1500;
 
-function delay(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function isRetryableMetadataRepairError(error) {
-    const message = String(error?.message || '').toLowerCase();
-    if (!message) return true;
-
-    if (message.includes('http 404')) return false;
-    if (message.includes('http 400')) return false;
-    if (message.includes('http 401')) return false;
-    if (message.includes('http 403')) return false;
-
-    return true;
-}
-
-async function runMetadataRepairWithRetry(task, options = {}) {
-    const {
-        attempts = METADATA_REPAIR_MAX_ATTEMPTS,
-        baseDelayMs = METADATA_REPAIR_RETRY_BASE_DELAY_MS,
-        shouldRetry = isRetryableMetadataRepairError
-    } = options;
-
-    let lastError = null;
-
-    for (let attempt = 1; attempt <= attempts; attempt++) {
-        try {
-            return await task(attempt);
-        } catch (error) {
-            lastError = error;
-            if (attempt >= attempts || !shouldRetry(error)) {
-                throw error;
-            }
-
-            const delayMs = baseDelayMs * Math.pow(2, attempt - 1);
-            await delay(delayMs);
-        }
-    }
-
-    throw lastError || new Error('Metadata repair retry failed');
-}
-
-function scheduleMetadataRepairTick(delayMs = 0) {
-    const when = Date.now() + Math.max(50, delayMs);
-    chrome.alarms.create(METADATA_REPAIR_ALARM, { when });
-}
-
-async function getMetadataRepairState() {
-    const result = await bgStorageGet([METADATA_REPAIR_STATE_KEY]);
-    return result[METADATA_REPAIR_STATE_KEY] || null;
-}
-
-async function setMetadataRepairState(state) {
-    await bgStorageSet({ [METADATA_REPAIR_STATE_KEY]: state });
-}
-
-function appendMetadataRepairLog(logs, entry) {
-    const next = Array.isArray(logs) ? logs.slice(-(METADATA_REPAIR_MAX_LOGS - 1)) : [];
-    next.push(entry);
-    return next;
-}
-
-function isAnimeInfoCacheFresh(entry) {
-    if (!entry || typeof entry !== 'object') return false;
-    const age = entry.cachedAt ? Date.now() - entry.cachedAt : Infinity;
-    if (entry.notFound) return age < METADATA_REPAIR_NOT_FOUND_TTL_MS;
-    const ttl = entry.status === 'RELEASING'
-        ? METADATA_REPAIR_INFO_TTL_AIRING_MS
-        : METADATA_REPAIR_INFO_TTL_MS;
-    return age < ttl;
-}
-
-function isEpisodeTypesCacheFresh(entry) {
-    if (!entry || typeof entry !== 'object') return false;
-    const age = entry.cachedAt ? Date.now() - entry.cachedAt : Infinity;
-    if (entry.notFound) return age < METADATA_REPAIR_NOT_FOUND_TTL_MS;
-    return age < METADATA_REPAIR_EPISODE_TYPES_TTL_MS;
-}
-
-function formatMetadataRepairDetail(infoResult, fillerResult) {
-    const parts = [];
-
-    if (infoResult?.status === 'fetched') parts.push('info refreshed');
-    else if (infoResult?.status === 'cached') parts.push('info cached');
-    else if (infoResult?.status === 'unavailable') parts.push('info unavailable');
-    else if (infoResult?.status === 'failed') parts.push(`info failed: ${infoResult.error || 'error'}`);
-
-    if (fillerResult?.status === 'fetched') {
-        const fillers = fillerResult.fillerCount || 0;
-        const total = fillerResult.totalEpisodes || '?';
-        parts.push(`${fillers} fillers / ${total} eps`);
-    } else if (fillerResult?.status === 'cached') {
-        parts.push('filler cached');
-    } else if (fillerResult?.status === 'nofill') {
-        parts.push('not listed');
-    } else if (fillerResult?.status === 'movie') {
-        parts.push('movie/OVA');
-    } else if (fillerResult?.status === 'failed') {
-        parts.push(`filler failed: ${fillerResult.error || 'error'}`);
-    }
-
-    return parts.join(' • ');
-}
-
-function buildMetadataRepairLog(slug, title, infoResult, fillerResult) {
-    const displayTitle = title || slug;
-    const detail = formatMetadataRepairDetail(infoResult, fillerResult);
-
-    if (infoResult?.status === 'failed' || fillerResult?.status === 'failed') {
-        return { type: 'error', slug, name: displayTitle, detail, at: Date.now() };
-    }
-
-    if (fillerResult?.status === 'movie') {
-        return { type: 'movie', slug, name: displayTitle, detail, at: Date.now() };
-    }
-
-    if (fillerResult?.status === 'nofill') {
-        return { type: 'nofill', slug, name: displayTitle, detail, at: Date.now() };
-    }
-
-    if (infoResult?.status === 'fetched' || fillerResult?.status === 'fetched') {
-        return { type: 'fetch', slug, name: displayTitle, detail, at: Date.now() };
-    }
-
-    return { type: 'cached', slug, name: displayTitle, detail, at: Date.now() };
-}
-
-function countMetadataRepairOutcome(logEntry) {
-    const base = { fetched: 0, cached: 0, skipped: 0, failed: 0 };
-    if (!logEntry) return base;
-
-    if (logEntry.type === 'fetch') base.fetched = 1;
-    else if (logEntry.type === 'cached') base.cached = 1;
-    else if (logEntry.type === 'movie' || logEntry.type === 'nofill') base.skipped = 1;
-    else if (logEntry.type === 'error') base.failed = 1;
-
-    return base;
-}
-
-async function buildLibraryRepairPlan(animeData, options = {}) {
-    const forceInfoRefresh = options.forceInfoRefresh === true;
-    const forceFillerRefresh = options.forceFillerRefresh === true;
-    const entries = Object.entries(animeData || {});
-    const storageKeys = [];
-
-    entries.forEach(([slug]) => {
-        storageKeys.push(`animeinfo_${slug}`);
-        storageKeys.push(`episodeTypes_${slug}`);
-    });
-
-    const cachedEntries = storageKeys.length > 0 ? await bgStorageGet(storageKeys) : {};
-    const items = [];
-    let processed = 0;
-    let cached = 0;
-    let skipped = 0;
-
-    for (const [slug, anime] of entries) {
-        const infoEntry = cachedEntries[`animeinfo_${slug}`];
-        const fillerEntry = cachedEntries[`episodeTypes_${slug}`];
-        const movieLike = isLikelyMovieSlug(slug);
-
-        const hasFreshInfo = !forceInfoRefresh && isAnimeInfoCacheFresh(infoEntry);
-        const hasFreshFiller = movieLike
-            ? true
-            : (!forceFillerRefresh && isEpisodeTypesCacheFresh(fillerEntry));
-
-        const needsInfo = !hasFreshInfo;
-        const needsFiller = !movieLike && !hasFreshFiller;
-
-        if (!needsInfo && !needsFiller) {
-            processed++;
-            if (movieLike || fillerEntry?.notFound) {
-                skipped++;
-            } else {
-                cached++;
-            }
-            continue;
-        }
-
-        items.push({
-            slug,
-            title: anime?.title || slug
-        });
-    }
-
-    return {
-        total: entries.length,
-        processed,
-        cached,
-        skipped,
-        items,
-        queueIndex: 0,
-        forceInfoRefresh,
-        forceFillerRefresh
-    };
-}
+// Library metadata repair (state, plan, batch runner, retry helpers) lives
+// in src/background/metadata-repair.js. Loaded via importScripts above.
 
 let syncInProgress = false;
 let pendingSync = false;
@@ -419,6 +229,16 @@ let _cloudPollInFlight = null;
 // even though the cloud doc hasn't changed.
 const _LAST_POLL_KEY = '_bgLastCloudPollAt';
 const _LAST_PROGRESS_SYNC_KEY = '_bgLastProgressSyncAt';
+// Survives SW kill: own-write echo tracking + last-applied cloud timestamp.
+// Without persistence, after a SW restart a `lastUpdated` value we just wrote
+// to Firestore returns from a poll and is treated as a foreign update — we
+// re-merge, re-write, and pay the read+write cost for no reason.
+const _LAST_APPLIED_KEY = '_bgLastAppliedCloudUpdatedAt';
+const _RECENT_OWN_WRITES_KEY = '_bgRecentOwnWrites';
+// Keep persisted own-writes for 1 min — long enough to span an SW cold-start
+// followed by an immediate cloud poll, short enough that stale entries don't
+// accumulate after the user goes offline for a while.
+const _OWN_WRITE_PERSIST_TTL_MS = 60 * 1000;
 
 // Tracks whether hydration has completed. pollCloudData and other timestamp
 // readers await this so they don't make decisions based on the default 0
@@ -428,7 +248,10 @@ function hydrateBgPollState() {
     if (_bgHydrationPromise) return _bgHydrationPromise;
     _bgHydrationPromise = (async () => {
         try {
-            const stored = await bgStorageGet([_LAST_POLL_KEY, _LAST_PROGRESS_SYNC_KEY]);
+            const stored = await bgStorageGet([
+                _LAST_POLL_KEY, _LAST_PROGRESS_SYNC_KEY,
+                _LAST_APPLIED_KEY, _RECENT_OWN_WRITES_KEY
+            ]);
             const cloud = Number(stored[_LAST_POLL_KEY]) || 0;
             const progress = Number(stored[_LAST_PROGRESS_SYNC_KEY]) || 0;
             // Only hydrate values from the past — guards against future-dated
@@ -436,6 +259,28 @@ function hydrateBgPollState() {
             const now = Date.now();
             if (cloud > 0 && cloud <= now) _lastCloudPollAt = cloud;
             if (progress > 0 && progress <= now) _lastProgressSyncAt = progress;
+
+            const lastApplied = stored[_LAST_APPLIED_KEY];
+            if (typeof lastApplied === 'string' && lastApplied) {
+                _lastAppliedCloudUpdatedAt = lastApplied;
+            }
+
+            const persistedWrites = stored[_RECENT_OWN_WRITES_KEY];
+            if (Array.isArray(persistedWrites)) {
+                _bgRecentOwnWrites.length = 0;
+                let stalePruned = false;
+                for (const entry of persistedWrites) {
+                    const ts = typeof entry === 'string' ? entry : entry?.ts;
+                    const at = typeof entry === 'object' ? Number(entry?.at) || 0 : 0;
+                    if (!ts) continue;
+                    if (at && (now - at) > _OWN_WRITE_PERSIST_TTL_MS) {
+                        stalePruned = true;
+                        continue;
+                    }
+                    _bgRecentOwnWrites.push(ts);
+                }
+                if (stalePruned) persistOwnWrites();
+            }
         } catch {
             // Best-effort — fall back to zero (poll on next consumer connect).
         }
@@ -448,8 +293,17 @@ function persistBgPollState(updates) {
         const payload = {};
         if (typeof updates.cloudPollAt === 'number') payload[_LAST_POLL_KEY] = updates.cloudPollAt;
         if (typeof updates.progressSyncAt === 'number') payload[_LAST_PROGRESS_SYNC_KEY] = updates.progressSyncAt;
+        if (typeof updates.lastAppliedCloudUpdatedAt === 'string') payload[_LAST_APPLIED_KEY] = updates.lastAppliedCloudUpdatedAt;
         if (Object.keys(payload).length === 0) return;
         bgStorageSet(payload).catch(() => {});
+    } catch {}
+}
+
+function persistOwnWrites() {
+    try {
+        const now = Date.now();
+        const payload = _bgRecentOwnWrites.map((ts) => ({ ts, at: now }));
+        bgStorageSet({ [_RECENT_OWN_WRITES_KEY]: payload }).catch(() => {});
     } catch {}
 }
 
@@ -564,46 +418,14 @@ async function getFirebaseUser() {
     } catch { return null; }
 }
 
-function jsonToFirestoreFields(obj) {
-    const fields = {};
-    for (const [key, value] of Object.entries(obj)) fields[key] = jsonToFirestoreValue(value);
-    return fields;
-}
-
-function jsonToFirestoreValue(value) {
-    if (value === null || value === undefined) return { nullValue: null };
-    if (typeof value === 'string') return { stringValue: value };
-    if (typeof value === 'boolean') return { booleanValue: value };
-    if (typeof value === 'number') return Number.isInteger(value)
-        ? { integerValue: value.toString() }
-        : { doubleValue: value };
-    if (Array.isArray(value)) return { arrayValue: { values: value.map(jsonToFirestoreValue) } };
-    if (typeof value === 'object') return { mapValue: { fields: jsonToFirestoreFields(value) } };
-    return { nullValue: null };
-}
-
-function fromFSValue(v) {
-    if (!v) return null;
-    if ('nullValue' in v) return null;
-    if ('booleanValue' in v) return v.booleanValue;
-    if ('stringValue' in v) return v.stringValue;
-    if ('integerValue' in v) return parseInt(v.integerValue, 10);
-    if ('doubleValue' in v) return v.doubleValue;
-    if ('arrayValue' in v) return (v.arrayValue.values || []).map(fromFSValue);
-    if ('mapValue' in v) {
-        const obj = {};
-        for (const [k, val] of Object.entries(v.mapValue.fields || {})) obj[k] = fromFSValue(val);
-        return obj;
-    }
-    return null;
-}
-
-function fromFSDoc(doc) {
-    if (!doc?.fields) return null;
-    const out = {};
-    for (const [k, v] of Object.entries(doc.fields)) out[k] = fromFSValue(v);
-    return out;
-}
+// Firestore JSON codec moved to src/common/firestore-codec.js — single source
+// of truth shared with the content script and popup. Thin local aliases keep
+// the existing call sites in this file unchanged.
+const _fsCodec = self.AnimeTrackerFirestoreCodec || {};
+const jsonToFirestoreFields = _fsCodec.encodeFields || (() => { throw new Error('[BG] Firestore codec not loaded'); });
+const jsonToFirestoreValue = _fsCodec.encodeValue || (() => { throw new Error('[BG] Firestore codec not loaded'); });
+const fromFSValue = _fsCodec.decodeValue || (() => null);
+const fromFSDoc = _fsCodec.decodeDoc || (() => null);
 
 async function fetchCloudData(user, token) {
     try {
@@ -732,7 +554,10 @@ async function syncProgressOnly() {
             _lastAppliedCloudUpdatedAt = pushedAt;
             bgRememberOwnWrite(pushedAt);
             _lastProgressSyncAt = Date.now();
-            persistBgPollState({ progressSyncAt: _lastProgressSyncAt });
+            persistBgPollState({
+                progressSyncAt: _lastProgressSyncAt,
+                lastAppliedCloudUpdatedAt: pushedAt
+            });
         } else {
             console.warn('[BG] Progress sync failed:', response.status);
             if (response.status >= 500) invalidateBgCloudDocCache();
@@ -744,7 +569,10 @@ async function syncProgressOnly() {
         progressSyncInProgress = false;
         if (progressSyncPending) {
             progressSyncPending = false;
-            setTimeout(syncProgressOnly, 5000);
+            // chrome.alarms survives SW kill; setTimeout(5000) silently
+            // disappeared if the SW got recycled between the previous sync
+            // finishing and this re-queue firing, losing the pending change.
+            chrome.alarms.create(PROGRESS_SYNC_ALARM, { when: Date.now() + 5000 });
         }
     }
 }
@@ -845,6 +673,7 @@ async function syncToFirebase() {
             invalidateBgCloudDocCache();
             _lastAppliedCloudUpdatedAt = pushedAt;
             bgRememberOwnWrite(pushedAt);
+            persistBgPollState({ lastAppliedCloudUpdatedAt: pushedAt });
             clearSyncPending();
         } else {
             console.error('[BG] Sync failed:', response.status);
@@ -881,7 +710,16 @@ async function applyCloudUpdate(cloudDoc) {
     if (_applyCloudDebounce) clearTimeout(_applyCloudDebounce);
 
     if (_applyCloudUpdateWaiters.length >= _MAX_CLOUD_UPDATE_WAITERS) {
-        const stale = _applyCloudUpdateWaiters.splice(0, _applyCloudUpdateWaiters.length - _MAX_CLOUD_UPDATE_WAITERS + 1);
+        // Cap the queue so we don't hold an unbounded list of pending promises
+        // if upstream callers stop awaiting (rare, but a memory-leak guardrail).
+        // We resolve dropped waiters rather than reject because callers usually
+        // `.catch(() => null)` anyway and rejecting them produces noisy
+        // unhandledrejection logs without changing behavior. Log a warning so
+        // pile-ups don't go silently undetected — they almost always indicate
+        // a bug upstream (e.g. consumer loop without backoff).
+        const overflow = _applyCloudUpdateWaiters.length - _MAX_CLOUD_UPDATE_WAITERS + 1;
+        const stale = _applyCloudUpdateWaiters.splice(0, overflow);
+        console.warn(`[BG] applyCloudUpdate waiter overflow — dropped ${overflow} pending promises (queue cap ${_MAX_CLOUD_UPDATE_WAITERS})`);
         for (const w of stale) w.resolve();
     }
 
@@ -917,6 +755,7 @@ function bgRememberOwnWrite(ts) {
     if (!ts) return;
     _bgRecentOwnWrites.push(ts);
     if (_bgRecentOwnWrites.length > _BG_MAX_RECENT_OWN_WRITES) _bgRecentOwnWrites.shift();
+    persistOwnWrites();
 }
 function bgIsOwnEcho(ts) {
     return !!ts && _bgRecentOwnWrites.includes(ts);
@@ -971,7 +810,10 @@ async function _doApplyCloudUpdate(cloudDoc) {
             });
             dlog(`[BG-RT] ← Cloud update applied (eps: ${localEps}→${mergedEps})`);
         }
-        if (cloudUpdatedAt) _lastAppliedCloudUpdatedAt = cloudUpdatedAt;
+        if (cloudUpdatedAt) {
+            _lastAppliedCloudUpdatedAt = cloudUpdatedAt;
+            persistBgPollState({ lastAppliedCloudUpdatedAt: cloudUpdatedAt });
+        }
     } catch (e) {
         console.warn('[BG-RT] Apply update failed:', e.message);
     }
@@ -1081,1133 +923,28 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     }
 });
 
-const KNOWN_FILLER_SLUGS = {
-    'naruto': 'naruto',
-    'naruto-shippuuden': 'naruto-shippuden',
-    'one-piece': 'one-piece',
-    'bleach': 'bleach',
-    'bleach-sennen-kessen-hen': 'bleach',
-    'dragon-ball-z': 'dragon-ball-z',
-    'dragon-ball-super': 'dragon-ball-super',
-    'fairy-tail': 'fairy-tail',
-    'shingeki-no-kyojin': 'attack-on-titan',
-    'kimetsu-no-yaiba': 'demon-slayer-kimetsu-no-yaiba',
-    'boku-no-hero-academia': 'my-hero-academia',
-    'hunter-x-hunter-2011': 'hunter-x-hunter-2011',
-    'fullmetal-alchemist-brotherhood': 'fullmetal-alchemist-brotherhood',
-    'sword-art-online': 'sword-art-online',
-    'black-clover': 'black-clover',
-    'boruto-naruto-next-generations': 'boruto-naruto-next-generations',
-    'one-punch-man': 'one-punch-man',
-    'jujutsu-kaisen': 'jujutsu-kaisen',
-    'shingeki-no-kyojin-season-2': 'attack-on-titan',
-    'shingeki-no-kyojin-season-3': 'attack-on-titan',
-    'shingeki-no-kyojin-the-final-season': 'attack-on-titan',
-};
-
-// LRU-bounded filler-slug resolver cache. The previous unbounded `{}` could
-// grow indefinitely on long-lived service workers (e.g. mobile Orion), since
-// every distinct slug-candidate pair landed here forever. Cap to 500 entries
-// which covers a heavy library while keeping memory predictable.
-const FILLER_SLUG_CACHE_MAX = 500;
-const _fillerSlugLru = new Map();
-const fillerSlugCache = {
-    has(key) { return _fillerSlugLru.has(key); },
-    get(key) { return _fillerSlugLru.get(key); },
-    set(key, value) {
-        if (_fillerSlugLru.has(key)) _fillerSlugLru.delete(key);
-        else if (_fillerSlugLru.size >= FILLER_SLUG_CACHE_MAX) {
-            const oldest = _fillerSlugLru.keys().next().value;
-            if (oldest !== undefined) _fillerSlugLru.delete(oldest);
-        }
-        _fillerSlugLru.set(key, value);
-    },
-    delete(key) { _fillerSlugLru.delete(key); }
-};
-
-function generateFillerSlugCandidates(an1meSlug, animeTitle) {
-    const seen = new Set();
-    const candidates = [];
-
-    function add(s) {
-        if (!s || s.length < 2) return;
-        const clean = s.replace(/-+/g, '-').replace(/^-|-$/g, '').toLowerCase();
-        if (clean && !seen.has(clean)) { seen.add(clean); candidates.push(clean); }
-    }
-
-    function addWithStripping(s) {
-        add(s);
-        const stripped = s
-            .replace(/-the-final-season-kanketsu-hen$/i, '')
-            .replace(/-the-final-season-part-\d+$/i, '')
-            .replace(/-the-final-season$/i, '')
-            .replace(/-season-\d+-part-\d+$/i, '')
-            .replace(/-season-?\d+$/i, '')
-            .replace(/-s\d+$/i, '')
-            .replace(/-(2nd|3rd|4th|5th|6th|7th)-season$/i, '')
-            .replace(/-(part|cour)-?\d+$/i, '')
-            .replace(/-(final|last)-season$/i, '')
-            .replace(/-new-world$/i, '')
-            .replace(/-[a-z]+-hen$/i, '')
-            .replace(/-(ii|iii|iv|v|vi)$/i, '')
-            .replace(/-[2-9]$/i, '')
-            .replace(/-\d{4}$/i, '');
-        if (stripped && stripped !== s) add(stripped);
-    }
-
-    const slug = an1meSlug
-        .replace(/-episode.*$/i, '')
-        .replace(/-ep-?\d+$/i, '')
-        .toLowerCase();
-
-    addWithStripping(slug);
-
-    if (slug.includes('shippuuden')) {
-        addWithStripping(slug.replace(/shippuuden/g, 'shippuden'));
-    }
-
-    if (slug.includes('sennen-kessen-hen')) {
-        addWithStripping(slug.replace(/sennen-kessen-hen.*/i, 'thousand-year-blood-war'));
-    }
-
-    const JP_TO_EN = {
-        'shingeki-no-kyojin': 'attack-titan',
-        'kimetsu-no-yaiba': 'demon-slayer-kimetsu-no-yaiba',
-        'boku-no-hero-academia': 'my-hero-academia',
-        'hagane-no-renkinjutsushi': 'fullmetal-alchemist',
-        'ansatsu-kyoushitsu': 'assassination-classroom',
-        'nanatsu-no-taizai': 'seven-deadly-sins',
-        'yakusoku-no-neverland': 'promised-neverland',
-        'tensei-shitara-slime-datta-ken': 'that-time-i-got-reincarnated-slime',
-        'kenpuu-denki': 'berserk',
-        'naruto-shippuuden': 'naruto-shippuden',
-    };
-    for (const [jpBase, enBase] of Object.entries(JP_TO_EN)) {
-        if (slug.startsWith(jpBase)) {
-            add(enBase);
-            const suffix = slug.slice(jpBase.length);
-            if (suffix) addWithStripping(enBase + suffix);
-        }
-    }
-
-    if (animeTitle) {
-        const titleSlug = String(animeTitle)
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/-+/g, '-')
-            .replace(/^-|-$/g, '');
-        addWithStripping(titleSlug);
-    }
-
-    return candidates;
-}
-
-async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
-    const { forceRefresh = false } = options;
-    const cacheKey = an1meSlug.toLowerCase();
-
-    if (!forceRefresh && fillerSlugCache.has(cacheKey)) return fillerSlugCache.get(cacheKey);
-
-    if (cacheKey in KNOWN_FILLER_SLUGS) {
-        const known = KNOWN_FILLER_SLUGS[cacheKey];
-        fillerSlugCache.set(cacheKey, known);
-        return known;
-    }
-
-    const storageKey = `fillerslug_${cacheKey}`;
-    if (forceRefresh) {
-        fillerSlugCache.delete(cacheKey);
-        try {
-            await bgStorageRemove([storageKey]);
-        } catch (e) {
-            console.warn('[BG] Failed to clear filler slug cache before refresh:', e.message);
-        }
-    }
-
-    try {
-        const stored = await bgStorageGet([storageKey]);
-        const cached = stored[storageKey];
-        if (cached !== undefined) {
-            if (typeof cached === 'string') {
-                fillerSlugCache.set(cacheKey, cached);
-                return cached;
-            }
-            if (cached?.notFound) {
-                const age = cached.cachedAt ? Date.now() - cached.cachedAt : Infinity;
-                if (age < 3 * 24 * 60 * 60 * 1000) {
-                    fillerSlugCache.set(cacheKey, null);
-                    return null;
-                }
-                await bgStorageRemove([storageKey]);
-            }
-        }
-    } catch (e) {
-        console.warn('[BG] discoverFillerSlug storage read failed:', e.message);
-    }
-
-    const candidates = generateFillerSlugCandidates(an1meSlug, animeTitle).slice(0, 5);
-    // Race candidates: cancel siblings as soon as one HEAD returns 200.
-    // Previous version waited for ALL 5 (or all to time out), wasting
-    // ~2-4s on every miss path.
-    const groupCtrl = new AbortController();
-    const tryCandidate = async (candidate) => {
-        const perCtrl = new AbortController();
-        const onAbort = () => perCtrl.abort();
-        groupCtrl.signal.addEventListener('abort', onAbort, { once: true });
-        const timer = setTimeout(() => perCtrl.abort(), 10000);
-        try {
-            const resp = await fetch(
-                `https://www.animefillerlist.com/shows/${candidate}`,
-                { method: 'HEAD', signal: perCtrl.signal }
-            );
-            if (resp.ok) return candidate;
-            throw new Error(`HTTP ${resp.status}`);
-        } finally {
-            clearTimeout(timer);
-            groupCtrl.signal.removeEventListener('abort', onAbort);
-        }
-    };
-
-    let found = null;
-    try {
-        // Promise.any throws AggregateError only when EVERY promise rejects.
-        // We treat any single fulfilled promise as the answer, and abort the rest.
-        found = await Promise.any(candidates.map(tryCandidate));
-        groupCtrl.abort();
-    } catch {
-        found = null;
-    }
-
-    if (found) {
-        fillerSlugCache.set(cacheKey, found);
-        await bgStorageSet({ [storageKey]: found });
-        dlog(`[AnimeTracker] Filler slug discovered: ${an1meSlug} → ${found}`);
-        return found;
-    }
-
-    const notFoundEntry = { notFound: true, cachedAt: Date.now() };
-    fillerSlugCache.set(cacheKey, null);
-    try {
-        await bgStorageSet({ [storageKey]: notFoundEntry });
-    } catch (e) {
-        console.warn('[BG] Failed to cache notFound filler slug:', e.message);
-    }
-    dlog(`[AnimeTracker] No filler data for ${an1meSlug} (tried ${candidates.length} candidates)`);
-    return null;
-}
-
-function isSeasonLikeSlug(slug) {
-    return /-(?:season-?\d+|(?:\d+)(?:st|nd|rd|th)-season|s\d+|(?:part|cour)-?\d+|(?:ii|iii|iv|v|vi))(?=$|-)/i.test(String(slug || ''));
-}
-
-function toOrdinal(n) {
-    const num = Number(n);
-    if (!Number.isFinite(num)) return null;
-    if (num % 100 >= 11 && num % 100 <= 13) return `${num}th`;
-    if (num % 10 === 1) return `${num}st`;
-    if (num % 10 === 2) return `${num}nd`;
-    if (num % 10 === 3) return `${num}rd`;
-    return `${num}th`;
-}
-
-function buildAnimeInfoSlugCandidates(slug) {
-    const input = String(slug || '').toLowerCase();
-    if (!input) return [];
-
-    const out = [input];
-    const add = (value) => {
-        if (!value || out.includes(value)) return;
-        out.push(value);
-    };
-
-    add(input.replace(/-season-?(\d+)(?=$|-)/i, (_m, num) => {
-        const ord = toOrdinal(num);
-        return ord ? `-${ord}-season` : _m;
-    }));
-
-    add(input.replace(/-(\d+)(st|nd|rd|th)-season(?=$|-)/i, '-season-$1'));
-
-    add(input.replace(/-s(\d+)(?=$|-)/i, '-season-$1'));
-
-    if (!isSeasonLikeSlug(input)) {
-        const base = input.replace(
-            /-(?:season-?\d+|(?:\d+)(?:st|nd|rd|th)-season|s\d+|part-?\d+|cour-?\d+|(?:ii|iii|iv|v|vi))$/i,
-            ''
-        );
-        add(base);
-    }
-
-    return out;
-}
-
-async function fetchAnimePageInfo(slug) {
-    const candidates = buildAnimeInfoSlugCandidates(slug);
-    if (candidates.length === 0) {
-        throw new Error('Missing slug');
-    }
-
-    let resolvedSlug = candidates[0];
-    let url = `https://an1me.to/anime/${resolvedSlug}/`;
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 15000);
-    let response;
-    try {
-        response = await fetch(url, { signal: ctrl.signal });
-    } finally {
-        clearTimeout(timer);
-    }
-
-    if (!response.ok && response.status === 404 && candidates.length > 1) {
-        for (const candidateSlug of candidates.slice(1)) {
-            const ctrl2 = new AbortController();
-            const timer2 = setTimeout(() => ctrl2.abort(), 15000);
-            try {
-                const candidateResponse = await fetch(`https://an1me.to/anime/${candidateSlug}/`, { signal: ctrl2.signal });
-                if (candidateResponse.ok) {
-                    response = candidateResponse;
-                    resolvedSlug = candidateSlug;
-                    break;
-                }
-            } finally {
-                clearTimeout(timer2);
-            }
-        }
-    }
-
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const html = await response.text();
-
-    let totalEpisodes = null;
-    const epDdMatch = html.match(
-        /(?:Επεισόδια|Episodes?)<\/dt>\s*(<dd[^>]*>[\s\S]{0,300}?<\/dd>)/
-    );
-    if (epDdMatch) {
-        const text = epDdMatch[1].replace(/<[^>]+>/g, ' ');
-        const numMatch = text.match(/\b(\d{1,4})\b/);
-        if (numMatch) totalEpisodes = parseInt(numMatch[1], 10);
-    }
-
-    let latestEpisode = null;
-    {
-        let maxEp = 0;
-        for (const watchSlug of new Set([slug, resolvedSlug])) {
-            const epPattern = new RegExp(`/watch/${watchSlug}-episode-(\\d+)`, 'gi');
-            let m;
-            while ((m = epPattern.exec(html)) !== null) {
-                const n = parseInt(m[1], 10);
-                if (n > maxEp) maxEp = n;
-            }
-        }
-        if (maxEp > 0) latestEpisode = maxEp;
-    }
-
-    let status = null;
-    const dateMatch = html.match(
-        /(?:Προβλήθηκε|Aired?)<\/dt>[\s\S]{0,300}?<time[^>]*>([\s\S]*?)<\/time>/
-    );
-    if (dateMatch) {
-        const dateText = dateMatch[1].replace(/\s+/g, ' ').trim();
-        status = dateText.includes('?') ? 'RELEASING' : 'FINISHED';
-    }
-
-    if (!status) {
-        if (/Finished\s+Airing|Ολοκληρώθηκε/i.test(html)) status = 'FINISHED';
-        else if (/Currently\s+Airing|Προβάλλεται\s+τώρα/i.test(html)) status = 'RELEASING';
-    }
-
-    if (status === 'FINISHED' || !status) {
-        if (/>Airing<\//i.test(html)) status = 'RELEASING';
-    }
-
-    if (status === 'FINISHED' && totalEpisodes && latestEpisode && latestEpisode < totalEpisodes) {
-        status = 'RELEASING';
-    }
-
-    // For finished entries, the highest uploaded episode is a reasonable
-    // fallback total. For airing shows it is only the current availability.
-    if (!totalEpisodes && latestEpisode && status === 'FINISHED') {
-        totalEpisodes = latestEpisode;
-    }
-
-    let nextEpisodeAt = null;
-    let nextEpisodeTimezone = null;
-    const countdownMatch = html.match(
-        /<div[^>]+class=["'][^"']*next-scheduled-episode[^"']*["'][\s\S]*?<span[^>]+data-timezone=["']([^"']+)["'][^>]+data-countdown=["']([^"']+)["']/i
-    ) || html.match(
-        /<span[^>]+data-timezone=["']([^"']+)["'][^>]+data-countdown=["']([^"']+)["'][^>]*>/i
-    );
-    if (countdownMatch) {
-        nextEpisodeTimezone = countdownMatch[1] || null;
-        const rawCountdown = countdownMatch[2] || '';
-        const normalizedCountdown = rawCountdown.trim().replace(' ', 'T');
-        const parsedCountdown = new Date(normalizedCountdown);
-        if (Number.isFinite(parsedCountdown.getTime())) {
-            nextEpisodeAt = parsedCountdown.toISOString();
-        }
-    }
-
-    let coverImage = null;
-    const imgMatch = html.match(/<img[^>]+class=["'][^"']*anime-main-image[^"']*["'][^>]*src=["']([^"']+)["']/i)
-        || html.match(/<img[^>]+src=["']([^"']+)["'][^>]*class=["'][^"']*anime-main-image[^"']*["']/i);
-    if (imgMatch) {
-        coverImage = imgMatch[1];
-    }
-    if (!coverImage) {
-        const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
-            || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
-        if (ogMatch) coverImage = ogMatch[1];
-    }
-
-    let siteAnimeId = null;
-    const idMatch = html.match(/\bcurrent_post_data_id\s*=\s*(\d+)/)
-        || html.match(/\bcurrent_anime_id\s*=\s*(\d+)/)
-        || html.match(/showWatchlistModal\(['"]#watchlist-(\d+)['"]\)/);
-    if (idMatch) siteAnimeId = parseInt(idMatch[1], 10);
-
-    let durationSeconds = null;
-    const durDdMatch = html.match(
-        /(?:Διάρκεια|Duration)<\/dt>\s*(<dd[^>]*>[\s\S]{0,200}?<\/dd>)/i
-    );
-    if (durDdMatch) {
-        const text = durDdMatch[1].replace(/<[^>]+>/g, ' ').toLowerCase();
-        let totalMinutes = 0;
-        const hourMatches = text.matchAll(/(\d+)\s*(?:h\b|hr\b|hour|ώρ)/g);
-        for (const m of hourMatches) totalMinutes += parseInt(m[1], 10) * 60;
-        const minMatches = text.matchAll(/(\d+)\s*(?:m\b|min|λεπτ)/g);
-        for (const m of minMatches) totalMinutes += parseInt(m[1], 10);
-        if (totalMinutes === 0) {
-            const bareNum = text.match(/\b(\d{1,4})\b/);
-            if (bareNum) totalMinutes = parseInt(bareNum[1], 10);
-        }
-        if (totalMinutes > 0 && totalMinutes <= 24 * 60) {
-            durationSeconds = totalMinutes * 60;
-        }
-    }
-
-    return {
-        totalEpisodes,
-        status,
-        latestEpisode,
-        nextEpisodeAt,
-        nextEpisodeTimezone,
-        coverImage,
-        siteAnimeId,
-        resolvedSlug,
-        durationSeconds
-    };
-}
-
-async function batchFetchAnimeInfo(slugs) {
-    const BATCH_SIZE = 3;
-    const DELAY_MS = 1200;
-    let successCount = 0;
-
-    const backfills = new Map();
-
-    for (let i = 0; i < slugs.length; i += BATCH_SIZE) {
-        const batch = slugs.slice(i, i + BATCH_SIZE);
-
-        await Promise.all(batch.map(async (slug) => {
-            try {
-                const info = await fetchAnimePageInfo(slug);
-                if (info) {
-                    const entry = { ...info, cachedAt: Date.now() };
-                    await bgStorageSet({ [`animeinfo_${slug}`]: entry });
-                    successCount++;
-
-                    if (info.coverImage || info.siteAnimeId || info.durationSeconds) {
-                        backfills.set(slug, {
-                            coverImage: info.coverImage,
-                            siteAnimeId: info.siteAnimeId,
-                            durationSeconds: info.durationSeconds || null
-                        });
-                    }
-                } else {
-                    await bgStorageSet({ [`animeinfo_${slug}`]: { notFound: true, cachedAt: Date.now() } });
-                }
-            } catch (e) {
-                console.warn(`[BG] Fetch failed for ${slug}:`, e.message);
-            }
-        }));
-
-        if (i + BATCH_SIZE < slugs.length) {
-            await new Promise(r => setTimeout(r, DELAY_MS));
-        }
-    }
-
-    if (backfills.size > 0) {
-        const fresh = await bgStorageGet(['animeData']);
-        const animeData = fresh.animeData || {};
-        let changed = false;
-        for (const [slug, fill] of backfills) {
-            if (!animeData[slug]) continue;
-            if (fill.coverImage && !animeData[slug].coverImage) {
-                animeData[slug].coverImage = fill.coverImage;
-                changed = true;
-            }
-            if (fill.siteAnimeId && !animeData[slug].siteAnimeId) {
-                animeData[slug].siteAnimeId = fill.siteAnimeId;
-                changed = true;
-            }
-            if (fill.durationSeconds && Array.isArray(animeData[slug].episodes)) {
-                const dur = fill.durationSeconds;
-                let epsChanged = false;
-                animeData[slug].episodes = animeData[slug].episodes.map((ep) => {
-                    const current = Number(ep?.duration) || 0;
-                    if (isPlaceholderDuration(current)) {
-                        epsChanged = true;
-                        return { ...ep, duration: dur, durationSource: 'site-metadata' };
-                    }
-                    return ep;
-                });
-                if (epsChanged) {
-                    animeData[slug].totalWatchTime = animeData[slug].episodes.reduce(
-                        (sum, ep) => sum + (Number(ep?.duration) || 0), 0
-                    );
-                    changed = true;
-                }
-            }
-        }
-        if (changed) await bgStorageSet({ animeData });
-    }
-    dlog(`[BG] Batch fetch done — ${successCount}/${slugs.length}`);
-}
-
-async function fetchEpisodeTypesFromAnimeFillerList(animeSlug) {
-    try {
-        const url = `https://www.animefillerlist.com/shows/${animeSlug}`;
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 15000);
-        let response;
-        try {
-            response = await fetch(url, { signal: ctrl.signal });
-        } finally {
-            clearTimeout(timer);
-        }
-        if (!response.ok) {
-            if (response.status === 404) return null;
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const html = await response.text();
-        const episodeTypes = { canon: [], filler: [], mixed: [], anime_canon: [], totalEpisodes: null };
-
-        const trPattern = /<tr[^>]*\bclass=["']([^"']+)["'][^>]*>([\s\S]*?)<\/tr>/gi;
-        let trMatch;
-        while ((trMatch = trPattern.exec(html)) !== null) {
-            const classes = trMatch[1].toLowerCase();
-            const rowContent = trMatch[2];
-
-            let type = null;
-            if (/\bmanga_canon\b/.test(classes)) type = 'canon';
-            else if (/\bmixed_canon/.test(classes)) type = 'mixed';
-            else if (/\banime_canon\b/.test(classes)) type = 'anime_canon';
-            else if (/\bfiller\b/.test(classes)) type = 'filler';
-
-            if (!type) continue;
-
-            const numMatch = rowContent.match(/>(\d+)</);
-            if (!numMatch) continue;
-
-            const epNum = parseInt(numMatch[1], 10);
-            if (!Number.isFinite(epNum) || epNum <= 0) continue;
-
-            episodeTypes[type].push(epNum);
-        }
-
-        for (const key of ['canon', 'filler', 'mixed', 'anime_canon']) {
-            episodeTypes[key] = [...new Set(episodeTypes[key])].sort((a, b) => a - b);
-        }
-
-        const all = [
-            ...episodeTypes.canon,
-            ...episodeTypes.mixed,
-            ...episodeTypes.filler,
-            ...episodeTypes.anime_canon
-        ];
-        if (all.length > 0) episodeTypes.totalEpisodes = Math.max(...all);
-
-        if (all.length === 0) {
-            console.warn(`[Anime Tracker] ⚠ No episodes parsed for ${animeSlug} — site structure may have changed`);
-            return null;
-        }
-
-        dlog(`[Anime Tracker] ✓ Fetched episode types for ${animeSlug}:`, episodeTypes);
-        return episodeTypes;
-    } catch (error) {
-        console.error(`[Anime Tracker] ✗ Failed for ${animeSlug}: ${error?.message}`, error);
-        throw error;
-    }
-}
-
-async function fetchJikanEpisodes(title) {
-    try {
-        const searchCtrl = new AbortController();
-        const searchTimer = setTimeout(() => searchCtrl.abort(), 10000);
-        const searchRes = await fetch(
-            `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(title)}&limit=1`,
-            { signal: searchCtrl.signal }
-        );
-        clearTimeout(searchTimer);
-        if (!searchRes.ok) return null;
-        const searchData = await searchRes.json();
-        const anime = searchData?.data?.[0];
-        if (!anime?.mal_id) return null;
-
-        const malId = anime.mal_id;
-        const allEpisodes = [];
-        let page = 1;
-        let hasNext = true;
-
-        while (hasNext && page <= 10) {
-            const epCtrl = new AbortController();
-            const epTimer = setTimeout(() => epCtrl.abort(), 10000);
-            const epRes = await fetch(
-                `https://api.jikan.moe/v4/anime/${malId}/episodes?page=${page}`,
-                { signal: epCtrl.signal }
-            );
-            clearTimeout(epTimer);
-            if (!epRes.ok) break;
-            const epData = await epRes.json();
-            if (epData?.data) allEpisodes.push(...epData.data);
-            hasNext = epData?.pagination?.has_next_page === true;
-            page++;
-            if (hasNext) await new Promise(r => setTimeout(r, 400));
-        }
-
-        if (allEpisodes.length === 0) return null;
-
-        const episodeTypes = { canon: [], filler: [], mixed: [], anime_canon: [], totalEpisodes: allEpisodes.length };
-        for (const ep of allEpisodes) {
-            const num = ep.mal_id;
-            if (!num || num <= 0) continue;
-            if (ep.filler) {
-                episodeTypes.filler.push(num);
-            } else if (ep.recap) {
-                episodeTypes.mixed.push(num);
-            } else {
-                episodeTypes.canon.push(num);
-            }
-        }
-
-        return episodeTypes;
-    } catch {
-        return null;
-    }
-}
-
-// AniSkip: open community database of intro/outro timings, keyed by MAL ID.
-// Used to auto-detect when the actual story ends so the "episode complete"
-// fires at the start of the credits — far more accurate than a static 85%.
-// Cache hit serves indefinitely (timestamps don't change once submitted);
-// "not found" cached for 7 days so we retry occasionally for newly-added
-// timings.
-const ANISKIP_OUTRO_KEY_PREFIX = 'aniSkipOutro:';
-const ANISKIP_FOUND_TTL_MS = 90 * 24 * 60 * 60 * 1000;
-const ANISKIP_MISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const SLUG_TO_MAL_KEY_PREFIX = 'malIdForSlug:';
-const SLUG_TO_MAL_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-
-async function getMalIdForSlug(slug, title) {
-    if (!slug) return null;
-    const cacheKey = `${SLUG_TO_MAL_KEY_PREFIX}${slug}`;
-    try {
-        const cached = (await bgStorageGet([cacheKey]))[cacheKey];
-        if (cached && (Date.now() - (cached.cachedAt || 0)) < SLUG_TO_MAL_TTL_MS) {
-            return cached.malId || null;
-        }
-    } catch { /* fall through to fetch */ }
-    if (!title) return null;
-    try {
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 10000);
-        const res = await fetch(
-            `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(title)}&limit=1`,
-            { signal: ctrl.signal }
-        );
-        clearTimeout(timer);
-        if (!res.ok) return null;
-        const data = await res.json();
-        const malId = data?.data?.[0]?.mal_id || null;
-        await bgStorageSet({ [cacheKey]: { malId, cachedAt: Date.now() } });
-        return malId;
-    } catch { return null; }
-}
-
-async function fetchAniSkipOutroStart(slug, title, episodeNumber, episodeLength) {
-    if (!slug || !episodeNumber) return null;
-    const malId = await getMalIdForSlug(slug, title);
-    if (!malId) return null;
-
-    const cacheKey = `${ANISKIP_OUTRO_KEY_PREFIX}${malId}:${episodeNumber}`;
-    try {
-        const cached = (await bgStorageGet([cacheKey]))[cacheKey];
-        if (cached) {
-            const age = Date.now() - (cached.cachedAt || 0);
-            const ttl = cached.outroStart ? ANISKIP_FOUND_TTL_MS : ANISKIP_MISS_TTL_MS;
-            if (age < ttl) return cached.outroStart || null;
-        }
-    } catch { /* fall through to fetch */ }
-
-    try {
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 8000);
-        const lengthParam = Number.isFinite(episodeLength) && episodeLength > 0
-            ? `&episodeLength=${Math.round(episodeLength)}`
-            : '';
-        const res = await fetch(
-            `https://api.aniskip.com/v2/skip-times/${malId}/${episodeNumber}?types[]=ed${lengthParam}`,
-            { signal: ctrl.signal }
-        );
-        clearTimeout(timer);
-        if (!res.ok) {
-            await bgStorageSet({ [cacheKey]: { outroStart: null, cachedAt: Date.now() } });
-            return null;
-        }
-        const data = await res.json();
-        let outroStart = null;
-        if (data?.found && Array.isArray(data.results)) {
-            const ed = data.results.find(r => r?.skipType === 'ed' && r?.interval?.startTime > 0);
-            if (ed) outroStart = Math.round(Number(ed.interval.startTime));
-        }
-        await bgStorageSet({ [cacheKey]: { outroStart, cachedAt: Date.now() } });
-        return outroStart;
-    } catch {
-        return null;
-    }
-}
-
-const SMART_NOTIF_ALARM = 'smartNotifCheck';
-const SMART_NOTIF_INTERVAL_MINUTES = 60;
-// Cap how many anime we hit per tick to keep an1me.to load polite. The
-// previous cap of 5 meant a user with ~50 airing anime would take up to
-// 10 hours for a full pass. 10/tick × hourly = roughly a full sweep per
-// 5 hours for most users while still rate-limiting via inter-fetch delay.
-const SMART_NOTIF_MAX_PER_TICK = 10;
-
-async function checkNewEpisodes() {
-    try {
-        const settings = await bgStorageGet(['smartNotificationsEnabled', 'animeData', 'smartNotifLastCheck']);
-        if (settings.smartNotificationsEnabled !== true) return;
-
-        const animeData = settings.animeData || {};
-        const lastCheck = settings.smartNotifLastCheck || {};
-        const now = Date.now();
-        const updatedLastCheck = { ...lastCheck };
-        let checked = 0;
-
-        // Sort eligible anime by oldest lastCheck timestamp first so we
-        // rotate through the list across ticks instead of always hitting
-        // the same first N entries.
-        const eligible = Object.entries(animeData)
-            .filter(([slug, anime]) => !anime.droppedAt && !anime.completedAt && !anime.onHoldAt)
-            .map(([slug, anime]) => [slug, anime, lastCheck[slug] || 0])
-            .sort((a, b) => a[2] - b[2])
-            .map(([slug, anime]) => [slug, anime]);
-
-        for (const [slug, anime] of eligible) {
-            if (checked >= SMART_NOTIF_MAX_PER_TICK) break;
-
-            const cachedKey = `animeinfo_${slug}`;
-            const cached = (await bgStorageGet([cachedKey]))[cachedKey];
-
-            if (!cached || (cached.status !== 'RELEASING')) continue;
-
-            const lastCheckedTime = lastCheck[slug] || 0;
-            if (now - lastCheckedTime < 3600000) continue;
-
-            checked++;
-            try {
-                const info = await fetchAnimePageInfo(slug);
-                if (!info?.latestEpisode) continue;
-
-                const prevLatest = cached.latestEpisode || 0;
-                if (info.latestEpisode > prevLatest && prevLatest > 0) {
-                    const highestWatched = Math.max(0, ...(anime.episodes || []).map(ep => Number(ep.number) || 0));
-                    if (info.latestEpisode > highestWatched) {
-                        chrome.notifications.create(`new-ep-${slug}`, {
-                            type: 'basic',
-                            iconUrl: 'src/icons/icon128.png',
-                            title: `New Episode Available!`,
-                            message: `${anime.title} — Episode ${info.latestEpisode} is now available`,
-                            priority: 1
-                        });
-                    }
-                }
-
-                // Update cache whenever we have fresh info — even when prevLatest is 0
-                // (e.g. anime cached before first episode aired). Without this, the
-                // notification gate stays stuck because prevLatest never advances.
-                if (info.latestEpisode !== prevLatest || cached.status !== info.status) {
-                    await bgStorageSet({ [cachedKey]: { ...cached, ...info, cachedAt: now } });
-                }
-
-                updatedLastCheck[slug] = now;
-            } catch {
-            }
-
-            await new Promise(r => setTimeout(r, 1500));
-        }
-
-        await bgStorageSet({ smartNotifLastCheck: updatedLastCheck });
-    } catch (e) {
-        console.warn('[BG] Smart notification check failed:', e);
-    }
-}
-
-chrome.notifications.onClicked.addListener((notifId) => {
-    if (notifId.startsWith('new-ep-')) {
-        const slug = notifId.replace('new-ep-', '');
-        // Encode slug to avoid breaking the URL if it ever contains odd characters
-        // (slugs are normally URL-safe, but this is defense-in-depth).
-        const encoded = encodeURIComponent(slug);
-        chrome.tabs.create({ url: `https://an1me.to/anime/${encoded}/` });
-        chrome.notifications.clear(notifId);
-        return;
-    }
-    if (notifId.startsWith('badge-') || notifId === 'badges-batch') {
-        // openPopup() requires a user gesture in some browsers and a
-        // specific window context; if it's unavailable we fall back to
-        // opening the popup HTML in a regular tab so the user always
-        // lands somewhere when they click the notification.
-        const openPopupFallback = () => {
-            try {
-                chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
-            } catch { /* swallow — last-resort no-op */ }
-        };
-        try {
-            const result = chrome.action?.openPopup?.();
-            if (result && typeof result.then === 'function') {
-                result.catch(openPopupFallback);
-            } else if (result === undefined) {
-                // Older Chrome returns undefined synchronously when the
-                // popup can't be opened from a service worker.
-                openPopupFallback();
-            }
-        } catch {
-            openPopupFallback();
-        }
-        chrome.notifications.clear(notifId);
-    }
-});
-
-function showBadgeNotification(badge) {
-    try {
-        chrome.notifications.create(`badge-${badge.id}`, {
-            type: 'basic',
-            iconUrl: 'src/icons/icon128.png',
-            title: 'Badge unlocked!',
-            message: `${badge.icon || '🏅'} ${badge.title} — ${badge.desc || ''}`.trim(),
-            priority: 1
-        });
-    } catch (e) {
-        console.warn('[BG] Badge notification failed:', e);
-    }
-}
-
-function showBatchBadgeNotification(count) {
-    try {
-        chrome.notifications.create('badges-batch', {
-            type: 'basic',
-            iconUrl: 'src/icons/icon128.png',
-            title: 'Achievements unlocked!',
-            message: `You unlocked ${count} new badges. Tap to view.`,
-            priority: 1
-        });
-    } catch (e) {
-        console.warn('[BG] Batch badge notification failed:', e);
-    }
-}
-
-let metadataRepairInProgress = false;
-
-async function repairAnimeInfoCache(slug, forceRefresh = true) {
-    const key = `animeinfo_${slug}`;
-    const stored = await bgStorageGet([key]);
-    const cached = stored[key];
-
-    if (!forceRefresh && isAnimeInfoCacheFresh(cached)) {
-        return cached?.notFound
-            ? { status: 'unavailable', entry: cached }
-            : { status: 'cached', entry: cached };
-    }
-
-    try {
-        const info = await fetchAnimePageInfo(slug);
-        const entry = { ...info, cachedAt: Date.now() };
-        await bgStorageSet({ [key]: entry });
-        return { status: 'fetched', entry };
-    } catch (error) {
-        const message = String(error?.message || '').toLowerCase();
-        if (message.includes('http 404')) {
-            const notFoundEntry = { notFound: true, cachedAt: Date.now() };
-            await bgStorageSet({ [key]: notFoundEntry });
-            return { status: 'unavailable', entry: notFoundEntry };
-        }
-        throw error;
-    }
-}
-
-async function repairEpisodeTypesCache(slug, title, forceRefresh = true) {
-    if (isLikelyMovieSlug(slug)) {
-        return { status: 'movie' };
-    }
-
-    const key = `episodeTypes_${slug}`;
-    const stored = await bgStorageGet([key]);
-    const cached = stored[key];
-
-    if (!forceRefresh && isEpisodeTypesCacheFresh(cached)) {
-        return cached?.notFound
-            ? { status: 'nofill', entry: cached }
-            : {
-                status: 'cached',
-                entry: cached,
-                fillerCount: cached?.filler?.length || 0,
-                totalEpisodes: cached?.totalEpisodes || null
-            };
-    }
-
-    const fillerSlug = await discoverFillerSlug(slug, title || null, { forceRefresh });
-    if (!fillerSlug) {
-        const notFoundEntry = { notFound: true, cachedAt: Date.now() };
-        await bgStorageSet({ [key]: notFoundEntry });
-        return { status: 'nofill', entry: notFoundEntry };
-    }
-
-    const episodeTypes = await fetchEpisodeTypesFromAnimeFillerList(fillerSlug);
-    if (!episodeTypes) {
-        const notFoundEntry = { notFound: true, cachedAt: Date.now() };
-        await bgStorageSet({ [key]: notFoundEntry });
-        return { status: 'nofill', entry: notFoundEntry };
-    }
-
-    const entry = {
-        ...episodeTypes,
-        cachedAt: Date.now(),
-        _fillerSlug: fillerSlug || null
-    };
-    await bgStorageSet({ [key]: entry });
-    return {
-        status: 'fetched',
-        entry,
-        fillerCount: entry.filler?.length || 0,
-        totalEpisodes: entry.totalEpisodes || null
-    };
-}
-
-async function finalizeMetadataRepair(state, patch = {}) {
-    const finalState = {
-        ...state,
-        ...patch,
-        currentSlug: null,
-        currentTitle: null,
-        updatedAt: new Date().toISOString()
-    };
-    await setMetadataRepairState(finalState);
-    await chrome.alarms.clear(METADATA_REPAIR_ALARM);
-    return finalState;
-}
-
-async function runMetadataRepairBatch(options = {}) {
-    const { maxItems = METADATA_REPAIR_ITEMS_PER_TICK } = options;
-
-    if (metadataRepairInProgress) return false;
-    metadataRepairInProgress = true;
-
-    try {
-        let state = await getMetadataRepairState();
-        if (!state || state.status !== 'running') {
-            await chrome.alarms.clear(METADATA_REPAIR_ALARM);
-            return false;
-        }
-
-        for (let step = 0; step < maxItems; step++) {
-            state = await getMetadataRepairState();
-            if (!state || state.status !== 'running') {
-                await chrome.alarms.clear(METADATA_REPAIR_ALARM);
-                return false;
-            }
-
-            const items = Array.isArray(state.items) ? state.items : [];
-            const index = Number.isFinite(Number(state.queueIndex))
-                ? Number(state.queueIndex)
-                : Math.min(Number(state.processed) || 0, items.length);
-
-            if (index >= items.length) {
-                await finalizeMetadataRepair(state, {
-                    status: 'completed',
-                    completedAt: new Date().toISOString()
-                });
-                return true;
-            }
-
-            const item = items[index];
-            const startedAt = new Date().toISOString();
-            if (state.currentSlug !== item.slug || state.currentTitle !== item.title) {
-                state = {
-                    ...state,
-                    currentSlug: item.slug,
-                    currentTitle: item.title || item.slug,
-                    updatedAt: startedAt
-                };
-                await setMetadataRepairState(state);
-            }
-
-            let infoResult = { status: 'cached' };
-            let fillerResult = { status: 'cached' };
-            let logEntry;
-
-            try {
-                infoResult = await runMetadataRepairWithRetry(
-                    () => repairAnimeInfoCache(item.slug, state.options?.forceInfoRefresh !== false)
-                );
-            } catch (error) {
-                infoResult = { status: 'failed', error: error.message };
-            }
-
-            try {
-                fillerResult = await runMetadataRepairWithRetry(
-                    () => repairEpisodeTypesCache(
-                        item.slug,
-                        item.title || item.slug,
-                        state.options?.forceFillerRefresh !== false
-                    )
-                );
-            } catch (error) {
-                fillerResult = { status: 'failed', error: error.message };
-            }
-
-            logEntry = buildMetadataRepairLog(item.slug, item.title || item.slug, infoResult, fillerResult);
-            const counts = countMetadataRepairOutcome(logEntry);
-            const processed = (Number(state.processed) || 0) + 1;
-            const nextQueueIndex = index + 1;
-            const nextItem = items[nextQueueIndex] || null;
-            const updatedAt = new Date().toISOString();
-
-            state = {
-                ...state,
-                processed,
-                queueIndex: nextQueueIndex,
-                fetched: (state.fetched || 0) + counts.fetched,
-                cached: (state.cached || 0) + counts.cached,
-                skipped: (state.skipped || 0) + counts.skipped,
-                failed: (state.failed || 0) + counts.failed,
-                logs: appendMetadataRepairLog(state.logs, logEntry),
-                lastLog: logEntry,
-                currentSlug: nextItem?.slug || null,
-                currentTitle: nextItem?.title || null,
-                updatedAt
-            };
-
-            if (nextQueueIndex >= items.length) {
-                await finalizeMetadataRepair(state, {
-                    status: 'completed',
-                    completedAt: updatedAt
-                });
-                return true;
-            }
-
-            await setMetadataRepairState(state);
-            await delay(METADATA_REPAIR_INTER_ITEM_DELAY_MS);
-        }
-
-        scheduleMetadataRepairTick(500);
-        return true;
-    } catch (error) {
-        console.error('[BG] Library repair failed:', error);
-        const state = await getMetadataRepairState();
-        if (state?.status === 'running') {
-            await finalizeMetadataRepair(state, {
-                status: 'error',
-                errorMessage: error.message || 'Unknown repair error',
-                completedAt: new Date().toISOString()
-            });
-        }
-        return false;
-    } finally {
-        metadataRepairInProgress = false;
-    }
-}
-
-async function startLibraryRepair(options = {}) {
-    await bgStorageSet({ [PENDING_METADATA_REPAIR_KEY]: false });
-
-    const existing = await getMetadataRepairState();
-    if (existing?.status === 'running') {
-        scheduleMetadataRepairTick(0);
-        runMetadataRepairBatch({ maxItems: 1 }).catch((error) => {
-            console.error('[BG] Failed to resume running repair:', error);
-        });
-        return existing;
-    }
-
-    const stored = await bgStorageGet(['animeData']);
-    const animeData = stored.animeData || {};
-    const plan = await buildLibraryRepairPlan(animeData, options);
-    const now = new Date().toISOString();
-
-    let state = {
-        status: 'running',
-        startedAt: now,
-        updatedAt: now,
-        completedAt: null,
-        errorMessage: null,
-        total: plan.total,
-        processed: plan.processed,
-        queueIndex: plan.queueIndex,
-        fetched: 0,
-        cached: plan.cached,
-        skipped: plan.skipped,
-        failed: 0,
-        currentSlug: plan.items[0]?.slug || null,
-        currentTitle: plan.items[0]?.title || null,
-        items: plan.items,
-        logs: [],
-        options: {
-            forceInfoRefresh: plan.forceInfoRefresh,
-            forceFillerRefresh: plan.forceFillerRefresh
-        }
-    };
-
-    if (plan.total === 0 || plan.items.length === 0) {
-        state = {
-            ...state,
-            status: 'completed',
-            completedAt: now,
-            currentSlug: null,
-            currentTitle: null
-        };
-        await setMetadataRepairState(state);
-        await chrome.alarms.clear(METADATA_REPAIR_ALARM);
-        return state;
-    }
-
-    await setMetadataRepairState(state);
-    scheduleMetadataRepairTick(0);
-    runMetadataRepairBatch({ maxItems: 1 }).catch((error) => {
-        console.error('[BG] Failed to start library repair batch:', error);
-    });
-    return state;
-}
-
-async function maybeStartPendingMetadataRepair() {
-    const stored = await bgStorageGet([PENDING_METADATA_REPAIR_KEY]);
-    if (!stored[PENDING_METADATA_REPAIR_KEY]) return false;
-    await startLibraryRepair({
-        forceInfoRefresh: false,
-        forceFillerRefresh: false
-    });
-    return true;
-}
-
-async function resumeMetadataRepairIfNeeded() {
-    const state = await getMetadataRepairState();
-    if (state?.status !== 'running') return;
-    scheduleMetadataRepairTick(0);
-    runMetadataRepairBatch({ maxItems: 1 }).catch((error) => {
-        console.error('[BG] Failed to resume metadata repair on boot:', error);
-    });
-}
+// Filler discovery (KNOWN_FILLER_SLUGS, fillerSlugCache,
+// generateFillerSlugCandidates, discoverFillerSlug) moved to
+// src/background/filler-discovery.js. Loaded via importScripts at the top of this file.
+
+// an1me.to scraper (fetchAnimePageInfo, batchFetchAnimeInfo, slug-candidate
+// helpers) and Filler Discovery (fetchEpisodeTypesFromAnimeFillerList,
+// fetchJikanEpisodes, discoverFillerSlug) moved to src/background/an1me-scraper.js and
+// src/background/filler-discovery.js. Loaded via importScripts at the top of this file.
+
+// AniSkip + MAL-ID resolution + bundle migration now live in src/background/aniskip.js.
+// Loaded via importScripts at the top of this file. Functions remain at SW
+// global scope so existing call sites here continue to work unchanged.
+
+// Smart notifications (SMART_NOTIF_ALARM, checkNewEpisodes), badge
+// notifications (showBadgeNotification, showBatchBadgeNotification) and the
+// chrome.notifications.onClicked listener live in src/background/smart-notifications.js.
+// Loaded via importScripts above.
+
+// Library metadata repair runners (runMetadataRepairBatch, startLibraryRepair,
+// repairAnimeInfoCache, repairEpisodeTypesCache, finalizeMetadataRepair,
+// maybeStartPendingMetadataRepair, resumeMetadataRepairIfNeeded) live in
+// src/background/metadata-repair.js.
 
 async function migrateFromSyncToLocal() {
     try {
@@ -2341,72 +1078,8 @@ async function persistBeforeUnloadTrack(animeInfo, duration) {
     }
 }
 
-async function syncWatchlistToSite(animeId, type) {
-    dlog(`%c WatchlistSync %c ${type} %c anime #${animeId}`, 'background:#6366f1;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'background:#818cf8;color:#fff;padding:2px 6px', 'color:#a5b4fc');
-
-    try {
-        const tabs = await chrome.tabs.query({ url: 'https://an1me.to/*' });
-        // Pick the first tab that's actually loaded and not discarded.
-        // chrome.tabs.query can return discarded tabs (memory-saver mode in
-        // recent Chrome versions) which CAN'T receive runtime messages —
-        // sendMessage would fire "Receiving end does not exist" and we'd fall
-        // through to direct fetch anyway, but with a noisy console error.
-        const liveTab = (tabs || []).find(t =>
-            t && t.id != null && t.discarded !== true && t.status !== 'unloaded'
-        );
-        if (liveTab) {
-            chrome.tabs.sendMessage(liveTab.id, {
-                type: 'WATCHLIST_SYNC_EXECUTE',
-                animeId,
-                watchlistType: type
-            }, (response) => {
-                if (chrome.runtime.lastError) {
-                    console.warn(`%c WatchlistSync %c tab forward failed`, 'background:#ef4444;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fca5a5', chrome.runtime.lastError.message);
-                    directWatchlistFetch(animeId, type).catch(e => console.warn('[BG] WatchlistSync direct fallback failed:', e.message));
-                } else {
-                    dlog(`%c WatchlistSync %c ✓ forwarded to tab`, 'background:#22c55e;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#86efac');
-                }
-            });
-        } else {
-            dlog(`%c WatchlistSync %c no live tab open, direct fetch`, 'background:#f59e0b;color:#000;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fcd34d');
-            await directWatchlistFetch(animeId, type);
-        }
-    } catch (e) {
-        console.warn(`%c WatchlistSync %c ✗ ${e.message}`, 'background:#ef4444;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fca5a5');
-    }
-}
-
-async function directWatchlistFetch(animeId, type) {
-    const AJAX_URL = 'https://an1me.to/wp-admin/admin-ajax.php';
-    const action = type === 'remove' ? 'remove_from_watchlist' : 'add_to_watchlist';
-    try {
-        const formData = new URLSearchParams();
-        formData.append('action', action);
-        formData.append('anime_id', animeId.toString());
-        formData.append('type', type);
-
-        const res = await fetchWithTimeout(AJAX_URL, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: formData.toString()
-        });
-
-        const text = await res.text();
-        try {
-            const data = JSON.parse(text);
-            if (data?.success) {
-                dlog(`%c WatchlistSync %c ✓ ${data.data?.message || 'OK'}`, 'background:#22c55e;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#86efac');
-            } else {
-                console.warn(`%c WatchlistSync %c ✗ ${data.data?.message || text.substring(0, 100)}`, 'background:#ef4444;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fca5a5');
-            }
-        } catch {
-            dlog(`%c WatchlistSync %c HTTP ${res.status} ${text.substring(0, 100)}`, 'background:#6366f1;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#a5b4fc');
-        }
-    } catch (e) {
-        console.warn(`%c WatchlistSync %c ✗ ${e.message}`, 'background:#ef4444;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fca5a5');
-    }
-}
+// Watchlist sync (syncWatchlistToSite, directWatchlistFetch) lives in
+// src/background/watchlist-sync.js. Loaded via importScripts above.
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === 'SYNC_TO_FIREBASE') {
@@ -2732,17 +1405,24 @@ resumeMetadataRepairIfNeeded().catch((error) => {
     console.error('[BG] Failed to resume metadata repair on boot:', error);
 });
 hydrateBgPollState();
+// Best-effort migration of legacy per-key caches into bundled maps. Idempotent
+// (guarded by a flag in storage). Runs in background — no awaiting needed.
+migratePerKeyCachesOnce();
 
 // Recover from SW kills: if a previous incarnation scheduled a sync via
 // setTimeout but was terminated before it fired, the PENDING_SYNC_KEY stamp
-// is still in storage. Run the sync now so the user's last change isn't
-// stranded until they reopen the popup.
+// is still in storage. We always recover when the stamp exists — the previous
+// SW is dead (we're in a fresh boot), so its setTimeout can never fire.
+// syncToFirebase is self-serializing via syncInProgress + pendingSync so a
+// double-call is harmless even in the corner case of a near-instant restart.
+// Earlier version gated on `Date.now() - ts < PENDING_SYNC_STALE_MS` which
+// silently dropped any change whose marker was set within ~8s before the
+// SW died — a real and reproducible data-loss path.
 (async () => {
     try {
         const stored = await bgStorageGet([PENDING_SYNC_KEY]);
         const ts = Number(stored?.[PENDING_SYNC_KEY]) || 0;
         if (!ts) return;
-        if (Date.now() - ts < PENDING_SYNC_STALE_MS) return;
         dlog('[BG] Recovering stranded sync from previous SW incarnation');
         syncToFirebase();
     } catch (e) {

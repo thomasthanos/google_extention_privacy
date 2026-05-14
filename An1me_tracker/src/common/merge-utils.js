@@ -173,6 +173,20 @@
         return true;
     }
 
+    // Fields compared explicitly above. Anything outside this set is caught
+    // by the stableStringify safety net below — guards against silent drift
+    // when new fields (like `favorite`, `nextEpisodeAt`, etc.) are added
+    // without being threaded through this equality check.
+    const COMPARED_ANIME_KEYS = new Set([
+        'title', 'titleUpdatedAt', 'coverImage', 'lastWatched',
+        'completedAt', 'droppedAt', 'onHoldAt',
+        'listState', 'listStateUpdatedAt',
+        'totalEpisodes', 'totalWatchTime', 'episodes',
+        'favorite', 'favoritedAt', 'favoriteUpdatedAt',
+        'siteAnimeId', 'slug',
+        'nextEpisodeAt', 'nextEpisodeTimezone'
+    ]);
+
     function areAnimeEntriesEqual(aAnime, bAnime) {
         const a = aAnime || {};
         const b = bAnime || {};
@@ -188,7 +202,28 @@
         if (getSafeString(a.listStateUpdatedAt) !== getSafeString(b.listStateUpdatedAt)) return false;
         if (getSafeNumber(Number(a.totalEpisodes)) !== getSafeNumber(Number(b.totalEpisodes))) return false;
         if (getSafeNumber(Number(a.totalWatchTime)) !== getSafeNumber(Number(b.totalWatchTime))) return false;
+        if (!!a.favorite !== !!b.favorite) return false;
+        if (getSafeString(a.favoritedAt) !== getSafeString(b.favoritedAt)) return false;
+        if (getSafeString(a.favoriteUpdatedAt) !== getSafeString(b.favoriteUpdatedAt)) return false;
+        if (getSafeNumber(Number(a.siteAnimeId)) !== getSafeNumber(Number(b.siteAnimeId))) return false;
+        if (getSafeString(a.slug) !== getSafeString(b.slug)) return false;
+        if (getSafeString(a.nextEpisodeAt) !== getSafeString(b.nextEpisodeAt)) return false;
+        if (getSafeString(a.nextEpisodeTimezone) !== getSafeString(b.nextEpisodeTimezone)) return false;
         if (!areEpisodesEqual(a.episodes, b.episodes)) return false;
+
+        // Safety net: any field not listed above must still match. Without
+        // this, adding a new synced field (we just hit this with `favorite`)
+        // returns "equal" for diverging entries and the change never reaches
+        // the cloud. stableStringify only runs on unrecognized keys so the
+        // common path stays O(N) on episodes, not O(N) on the whole entry.
+        for (const key of Object.keys(a)) {
+            if (COMPARED_ANIME_KEYS.has(key)) continue;
+            if (stableStringify(a[key] ?? null) !== stableStringify(b[key] ?? null)) return false;
+        }
+        for (const key of Object.keys(b)) {
+            if (COMPARED_ANIME_KEYS.has(key)) continue;
+            if (!Object.prototype.hasOwnProperty.call(a, key)) return false;
+        }
 
         return true;
     }

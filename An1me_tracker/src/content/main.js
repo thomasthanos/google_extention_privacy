@@ -354,7 +354,12 @@
             await tryRefreshTrackedDuration(videoElement, 'timeupdate');
         }
 
-        if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
+        // Pass cachedOutroStartSec so the captured outro timing is honored
+        // here too, not just inside trackImmediately. Previously this site
+        // (and the two below in the debounced handler) called shouldMarkComplete
+        // with only two args, which silently disabled the outroStart-based
+        // completion path and forced everyone back to the 85% threshold.
+        if (ProgressTracker.shouldMarkComplete(currentTime, duration, cachedOutroStartSec)) {
             if (shouldBlockCompletion(currentTime, duration)) {
                 const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
                 Logger.debug(`Threshold reached but only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), waiting...`);
@@ -397,11 +402,11 @@
 
         if (!duration || duration === 0 || isNaN(duration)) return;
 
-        if (currentTime > CONFIG.MIN_PROGRESS_TO_SAVE && !ProgressTracker.shouldMarkComplete(currentTime, duration)) {
+        if (currentTime > CONFIG.MIN_PROGRESS_TO_SAVE && !ProgressTracker.shouldMarkComplete(currentTime, duration, cachedOutroStartSec)) {
             ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration);
         }
 
-        if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
+        if (ProgressTracker.shouldMarkComplete(currentTime, duration, cachedOutroStartSec)) {
             if (trackingState !== TrackingState.IDLE) return;
 
             if (shouldBlockCompletion(currentTime, duration)) {
@@ -519,7 +524,7 @@
             const duration = videoElement.duration;
             const currentTime = videoElement.currentTime;
 
-            if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
+            if (ProgressTracker.shouldMarkComplete(currentTime, duration, cachedOutroStartSec)) {
                 if (shouldBlockCompletion(currentTime, duration)) {
                     const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
                     Logger.debug(`Visibility change: only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), saving progress instead`);
@@ -560,7 +565,7 @@
         const duration = videoElement.duration;
         const currentTime = videoElement.currentTime;
 
-        if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
+        if (ProgressTracker.shouldMarkComplete(currentTime, duration, cachedOutroStartSec)) {
             if (trackingState === TrackingState.COMPLETED) return;
 
             if (shouldBlockCompletion(currentTime, duration)) {
@@ -1055,7 +1060,7 @@
             if (videoElement && videoElement.duration > 0) {
                 const currentTime = videoElement.currentTime;
                 const duration = videoElement.duration;
-                if (ProgressTracker.shouldMarkComplete(currentTime, duration)) {
+                if (ProgressTracker.shouldMarkComplete(currentTime, duration, cachedOutroStartSec)) {
                     const minWatch = AT.CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
                     if (accumulatedPlaybackSeconds >= minWatch) {
                         Logger.info('Periodic check: threshold reached, tracking');

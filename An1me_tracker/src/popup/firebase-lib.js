@@ -380,55 +380,21 @@ const FirebaseLib = (function () {
         return true;
     }
 
-    function firestoreDocToJson(doc) {
-        if (!doc.fields) return {};
-        const result = {};
-        for (const [key, value] of Object.entries(doc.fields)) {
-            result[key] = firestoreValueToJson(value);
-        }
-        return result;
+    // Firestore JSON codec lives in src/common/firestore-codec.js — single
+    // source of truth shared with background.js and the content script.
+    // Loaded before this file via popup.html. Thin local aliases keep the
+    // existing call sites in this module unchanged.
+    const _fsCodec = (typeof window !== 'undefined' && window.AnimeTrackerFirestoreCodec) || null;
+    if (!_fsCodec) {
+        console.error('[FirebaseLib] Firestore codec not loaded — sync disabled');
     }
-
-    function firestoreValueToJson(value) {
-        if (value.stringValue !== undefined) return value.stringValue;
-        if (value.integerValue !== undefined) return parseInt(value.integerValue);
-        if (value.doubleValue !== undefined) return value.doubleValue;
-        if (value.booleanValue !== undefined) return value.booleanValue;
-        if (value.nullValue !== undefined) return null;
-        if (value.timestampValue !== undefined) return value.timestampValue;
-        if (value.arrayValue !== undefined) {
-            return (value.arrayValue.values || []).map(firestoreValueToJson);
-        }
-        if (value.mapValue !== undefined) {
-            return firestoreDocToJson(value.mapValue);
-        }
-        return null;
-    }
-
-    function jsonToFirestoreFields(obj) {
-        const fields = {};
-        for (const [key, value] of Object.entries(obj)) {
-            fields[key] = jsonToFirestoreValue(value);
-        }
-        return fields;
-    }
-
-    function jsonToFirestoreValue(value) {
-        if (value === null || value === undefined) return { nullValue: null };
-        if (typeof value === 'string') return { stringValue: value };
-        if (typeof value === 'number') {
-            if (Number.isInteger(value)) return { integerValue: value.toString() };
-            return { doubleValue: value };
-        }
-        if (typeof value === 'boolean') return { booleanValue: value };
-        if (Array.isArray(value)) {
-            return { arrayValue: { values: value.map(jsonToFirestoreValue) } };
-        }
-        if (typeof value === 'object') {
-            return { mapValue: { fields: jsonToFirestoreFields(value) } };
-        }
-        return { nullValue: null };
-    }
+    const firestoreDocToJson = (doc) => {
+        if (!_fsCodec || !doc?.fields) return {};
+        return _fsCodec.decodeFields(doc.fields);
+    };
+    const firestoreValueToJson = (value) => _fsCodec ? _fsCodec.decodeValue(value) : null;
+    const jsonToFirestoreFields = (obj) => _fsCodec ? _fsCodec.encodeFields(obj) : {};
+    const jsonToFirestoreValue = (value) => _fsCodec ? _fsCodec.encodeValue(value) : { nullValue: null };
 
     async function signInWithExportedToken(tokenData) {
         if (!tokenData || !tokenData.user || !tokenData.tokens) throw new Error('Invalid token data');

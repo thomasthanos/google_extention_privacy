@@ -1,8 +1,17 @@
 (function () {
     'use strict';
 
-    const FIREBASE_API_KEY = 'AIzaSyCDF9US2OwARlyZ0AH_zDpjzmOXRtrGKMg';
-    const FIREBASE_PROJECT_ID = 'anime-tracker-64d86';
+    // Shared config — populated by firebase-config.js (loaded earlier in the
+    // content_scripts list). If absent we log loudly and disable sync rather
+    // than silently 401-ing every request.
+    const _firebaseConfig = (typeof globalThis !== 'undefined' && globalThis.firebaseConfig)
+        || (typeof window !== 'undefined' && window.firebaseConfig)
+        || null;
+    if (!_firebaseConfig) {
+        console.error('[CS-CloudSync] Firebase config not loaded — sync disabled');
+    }
+    const FIREBASE_API_KEY = _firebaseConfig?.apiKey || '';
+    const FIREBASE_PROJECT_ID = _firebaseConfig?.projectId || '';
     const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)`;
     // Orion / Safari fallback polling — kept in sync with the BG service
     // worker constant (background.js: CLOUD_POLL_INTERVAL_MS). 3 min keeps
@@ -41,50 +50,19 @@
         }
     }
 
-    function toFSValue(v) {
-        if (v === null || v === undefined) return { nullValue: null };
-        if (typeof v === 'boolean') return { booleanValue: v };
-        if (typeof v === 'string') return { stringValue: v };
-        if (typeof v === 'number') return Number.isInteger(v)
-            ? { integerValue: String(v) }
-            : { doubleValue: v };
-        if (Array.isArray(v)) return { arrayValue: { values: v.map(toFSValue) } };
-        if (typeof v === 'object') {
-            const fields = {};
-            for (const [k, val] of Object.entries(v)) fields[k] = toFSValue(val);
-            return { mapValue: { fields } };
-        }
-        return { nullValue: null };
+    // Firestore JSON codec lives in src/common/firestore-codec.js (loaded
+    // before this file via the watch-page content_scripts list). Thin local
+    // aliases keep the existing call sites unchanged. If the shared module
+    // ever fails to load we surface it loudly instead of silently producing
+    // null payloads.
+    const _fsCodec = globalThis.AnimeTrackerFirestoreCodec;
+    if (!_fsCodec) {
+        console.error('[CS-CloudSync] Firestore codec not loaded — sync disabled');
     }
-
-    function toFSFields(obj) {
-        const f = {};
-        for (const [k, v] of Object.entries(obj)) f[k] = toFSValue(v);
-        return f;
-    }
-
-    function fromFSValue(v) {
-        if (!v) return null;
-        if ('nullValue' in v) return null;
-        if ('booleanValue' in v) return v.booleanValue;
-        if ('stringValue' in v) return v.stringValue;
-        if ('integerValue' in v) return parseInt(v.integerValue, 10);
-        if ('doubleValue' in v) return v.doubleValue;
-        if ('arrayValue' in v) return (v.arrayValue.values || []).map(fromFSValue);
-        if ('mapValue' in v) {
-            const obj = {};
-            for (const [k, val] of Object.entries(v.mapValue.fields || {})) obj[k] = fromFSValue(val);
-            return obj;
-        }
-        return null;
-    }
-
-    function fromFSDoc(doc) {
-        if (!doc?.fields) return null;
-        const out = {};
-        for (const [k, v] of Object.entries(doc.fields)) out[k] = fromFSValue(v);
-        return out;
-    }
+    const toFSValue = _fsCodec ? _fsCodec.encodeValue : (() => ({ nullValue: null }));
+    const toFSFields = _fsCodec ? _fsCodec.encodeFields : (() => ({}));
+    const fromFSValue = _fsCodec ? _fsCodec.decodeValue : (() => null);
+    const fromFSDoc = _fsCodec ? _fsCodec.decodeDoc : (() => null);
 
     async function signOutDueToTokenFailure() {
         Logger?.warn('Token refresh failed — signing out to force re-auth');
@@ -177,15 +155,84 @@
     let _lastAppliedCloudUpdatedAt = null;
     const _CLOUD_DOC_TTL = 120000;
 
+    // Persistence keys — without them, an a1nime.to tab reload (which respawns
+    // the content script) loses own-write echo tracking. A cloud poll right
+    // after reload then treats the timestamp we just pushed as a foreign
+    // update and merges/writes again for no reason.
+    const _CS_LAST_APPLIED_KEY = '_csLastAppliedCloudUpdatedAt';
+    const _CS_RECENT_OWN_WRITES_KEY = '_csRecentOwnWrites';
+    const _CS_OWN_WRITE_PERSIST_TTL_MS = 60 * 1000;
+
     const _recentOwnWrites = [];
     const _MAX_RECENT_OWN_WRITES = 20;
     function rememberOwnWrite(ts) {
         if (!ts) return;
         _recentOwnWrites.push(ts);
         if (_recentOwnWrites.length > _MAX_RECENT_OWN_WRITES) _recentOwnWrites.shift();
+        persistOwnWrites();
     }
     function isOwnEcho(ts) {
         return !!ts && _recentOwnWrites.includes(ts);
+    }
+
+    function persistOwnWrites() {
+        try {
+            const now = Date.now();
+            const payload = _recentOwnWrites.map((ts) => ({ ts, at: now }));
+            chrome.storage.local.set({ [_CS_RECENT_OWN_WRITES_KEY]: payload }, () => {
+                void chrome.runtime.lastError;
+            });
+        } catch { /* best-effort */ }
+    }
+
+    function persistLastApplied(ts) {
+        if (!ts) return;
+        try {
+            chrome.storage.local.set({ [_CS_LAST_APPLIED_KEY]: ts }, () => {
+                void chrome.runtime.lastError;
+            });
+        } catch { /* best-effort */ }
+    }
+
+    let _csHydrationPromise = null;
+    function hydrateCsEchoState() {
+        if (_csHydrationPromise) return _csHydrationPromise;
+        _csHydrationPromise = new Promise((resolve) => {
+            try {
+                chrome.storage.local.get(
+                    [_CS_LAST_APPLIED_KEY, _CS_RECENT_OWN_WRITES_KEY],
+                    (stored) => {
+                        try {
+                            if (chrome.runtime.lastError) { resolve(); return; }
+                            const lastApplied = stored?.[_CS_LAST_APPLIED_KEY];
+                            if (typeof lastApplied === 'string' && lastApplied) {
+                                _lastAppliedCloudUpdatedAt = lastApplied;
+                            }
+                            const persisted = stored?.[_CS_RECENT_OWN_WRITES_KEY];
+                            if (Array.isArray(persisted)) {
+                                const now = Date.now();
+                                let stalePruned = false;
+                                _recentOwnWrites.length = 0;
+                                for (const entry of persisted) {
+                                    const ts = typeof entry === 'string' ? entry : entry?.ts;
+                                    const at = typeof entry === 'object' ? Number(entry?.at) || 0 : 0;
+                                    if (!ts) continue;
+                                    if (at && (now - at) > _CS_OWN_WRITE_PERSIST_TTL_MS) {
+                                        stalePruned = true;
+                                        continue;
+                                    }
+                                    _recentOwnWrites.push(ts);
+                                }
+                                if (stalePruned) persistOwnWrites();
+                            }
+                        } finally {
+                            resolve();
+                        }
+                    }
+                );
+            } catch { resolve(); }
+        });
+        return _csHydrationPromise;
     }
 
     function invalidateCloudDocCache() {
@@ -326,6 +373,19 @@
         }
     }
 
+    // Holds a deep-cloned snapshot of the last successfully pushed videoProgress
+    // map so we can compare via `areProgressMapsEqual` instead of stringifying
+    // every push. For a heavy library (5000+ progress entries) the old
+    // `JSON.stringify(...) === lastPushedProgress` pattern cost ~10–30ms of
+    // serialization per call; the structural equality check costs ~5ms.
+    // `lastPushedProgress` is declared at module scope above (let).
+    function snapshotForCompare(value) {
+        try {
+            if (typeof structuredClone === 'function') return structuredClone(value);
+        } catch { /* fall through to JSON clone */ }
+        try { return JSON.parse(JSON.stringify(value)); } catch { return null; }
+    }
+
     async function pushProgressDirect(options = {}) {
         const { keepalive = false } = options;
         if (isPushingProgressDirect && !keepalive) {
@@ -347,8 +407,9 @@
                 localAnimeData,
                 localSnapshot.deletedAnime || {}
             );
-            const snapshot = JSON.stringify(filteredLocalVP);
-            if (snapshot === lastPushedProgress) return;
+            if (lastPushedProgress && areProgressMapsEqual(filteredLocalVP, lastPushedProgress)) {
+                return;
+            }
 
             let cloudVP = {};
             if (!keepalive) {
@@ -360,7 +421,9 @@
                 ? (localSnapshot.videoProgress || {})
                 : ((await chrome.storage.local.get(['videoProgress'])).videoProgress || {});
             const latestLocal = filterTrackedFromProgress(latestLocalFull, localAnimeData);
-            if (!keepalive && JSON.stringify(latestLocal) !== snapshot) {
+            // The user kept writing while we were preparing the payload —
+            // schedule a follow-up push so we don't drop the late writes.
+            if (!keepalive && !areProgressMapsEqual(latestLocal, filteredLocalVP)) {
                 progressPushPending = true;
             }
 
@@ -380,8 +443,7 @@
                 }
             }
 
-            const mergedSnap = JSON.stringify(mergedVP);
-            if (mergedSnap === lastPushedProgress) {
+            if (lastPushedProgress && areProgressMapsEqual(mergedVP, lastPushedProgress)) {
                 Logger?.debug('Progress push skipped (merged matches last pushed)');
                 return;
             }
@@ -403,12 +465,16 @@
             });
 
             if (res.ok) {
-                lastPushedProgress = mergedSnap;
+                // Keep the snapshot we just pushed for the next equality check.
+                // structuredClone instead of holding the live ref so subsequent
+                // mutations don't corrupt our "what did we last send?" record.
+                lastPushedProgress = snapshotForCompare(mergedVP);
                 lastPushAt = Date.now();
                 invalidateCloudDocCache();
                 notifyBgInvalidateCloudDoc();
                 _lastAppliedCloudUpdatedAt = pushedAt;
                 rememberOwnWrite(pushedAt);
+                persistLastApplied(pushedAt);
                 Logger?.info('videoProgress pushed (merged)');
             } else {
                 Logger?.warn(`Direct progress push failed: ${res.status}`);
@@ -432,7 +498,18 @@
 
     let fullPushInProgress = false;
     let fullPushPending = false;
-    let lastPushedFullSnap = null;
+    // Structural snapshot of what we last successfully pushed. Was a single
+    // stringified JSON blob (lazy equality); now four refs against which the
+    // next push compares with the merge-utils equality fns. Cheaper and
+    // doesn't hold a large string in memory for the whole session.
+    let lastPushedFull = null; // { animeData, videoProgress, deletedAnime, groupCoverImages } | null
+
+    function _localPayloadsEqual(a, b) {
+        return areAnimeDataMapsEqual(a.animeData || {}, b.animeData || {})
+            && areProgressMapsEqual(a.videoProgress || {}, b.videoProgress || {})
+            && shallowEqualDeletedAnime(a.deletedAnime || {}, b.deletedAnime || {})
+            && shallowEqualObjectMap(a.groupCoverImages || {}, b.groupCoverImages || {});
+    }
 
     async function pushFullDirect(options = {}) {
         const { keepalive = false } = options;
@@ -456,7 +533,12 @@
             const local = keepalive
                 ? localSnapshot
                 : await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
-            if (!keepalive && JSON.stringify(local) !== JSON.stringify(localSnapshot)) {
+            // Drift detection between the two reads above — if storage changed
+            // mid-flight, schedule a follow-up push. Was `JSON.stringify(local)
+            // !== JSON.stringify(localSnapshot)` which paid 2× serialization
+            // for the entire local library every push. Per-field structural
+            // equality is dramatically cheaper for big libraries.
+            if (!keepalive && !_localPayloadsEqual(local, localSnapshot)) {
                 fullPushPending = true;
             }
 
@@ -495,8 +577,13 @@
                 }
             }
 
-            const uploadSnap = JSON.stringify({ mergedAnime, mergedProgress, mergedDeleted, mergedGroupCovers });
-            if (uploadSnap === lastPushedFullSnap) {
+            const mergedBundle = {
+                animeData: mergedAnime,
+                videoProgress: mergedProgress,
+                deletedAnime: mergedDeleted,
+                groupCoverImages: mergedGroupCovers
+            };
+            if (lastPushedFull && _localPayloadsEqual(mergedBundle, lastPushedFull)) {
                 Logger?.debug('Full push skipped (no changes since last push)');
                 return;
             }
@@ -529,12 +616,15 @@
             });
 
             if (res.ok) {
-                lastPushedFullSnap = uploadSnap;
+                // Clone the merged bundle so subsequent mutations don't poison
+                // our "what did we last push?" record.
+                lastPushedFull = snapshotForCompare(mergedBundle);
                 lastPushAt = Date.now();
                 invalidateCloudDocCache();
                 notifyBgInvalidateCloudDoc();
                 _lastAppliedCloudUpdatedAt = pushedAt;
                 rememberOwnWrite(pushedAt);
+                persistLastApplied(pushedAt);
                 Logger?.info('Full push to Firestore complete');
             } else {
                 Logger?.warn(`Full push failed: ${res.status}`);
@@ -633,6 +723,10 @@
     const PERIODIC_PUSH_INTERVAL = 300000;
     let periodicPushTimer = null;
     let lastPushAt = 0;
+    // Last snapshot used by the idle-skip check. Was a JSON.stringify string
+    // (held in memory for the whole session — hundreds of KB for big libs);
+    // now a structured snapshot compared via the merge-utils equality fns,
+    // which is both faster per tick and avoids the long-lived string buffer.
     let _lastIdleSnapshot = null;
 
     async function _currentLocalProgressSnapshot(isOrionMode) {
@@ -641,8 +735,18 @@
                 ? ['videoProgress', 'animeData', 'deletedAnime', 'groupCoverImages']
                 : ['videoProgress'];
             const r = await chrome.storage.local.get(keys);
-            return JSON.stringify(r);
+            return r || null;
         } catch { return null; }
+    }
+
+    function _idleSnapshotsEqual(a, b) {
+        if (!a || !b) return false;
+        // Orion mode reads all 4 keys; SW mode reads only videoProgress.
+        if (!areProgressMapsEqual(a.videoProgress || {}, b.videoProgress || {})) return false;
+        if (!areAnimeDataMapsEqual(a.animeData || {}, b.animeData || {})) return false;
+        if (!shallowEqualDeletedAnime(a.deletedAnime || {}, b.deletedAnime || {})) return false;
+        if (!shallowEqualObjectMap(a.groupCoverImages || {}, b.groupCoverImages || {})) return false;
+        return true;
     }
 
     function startPeriodicPush(isOrionMode) {
@@ -652,11 +756,11 @@
             if (Date.now() - lastPushAt < PERIODIC_PUSH_INTERVAL * 0.8) return;
 
             const snap = await _currentLocalProgressSnapshot(isOrionMode);
-            if (snap && snap === _lastIdleSnapshot) {
+            if (snap && _idleSnapshotsEqual(snap, _lastIdleSnapshot)) {
                 Logger?.debug('Periodic push skipped (idle — no local changes)');
                 return;
             }
-            _lastIdleSnapshot = snap;
+            _lastIdleSnapshot = snap ? snapshotForCompare(snap) : null;
 
             if (isOrionMode) {
                 pushFullDirect()
@@ -752,7 +856,10 @@
                 });
                 Logger?.info(`Cloud update applied (eps: ${localEps}→${mergedEps})`);
             }
-            if (cloudUpdatedAt) _lastAppliedCloudUpdatedAt = cloudUpdatedAt;
+            if (cloudUpdatedAt) {
+                _lastAppliedCloudUpdatedAt = cloudUpdatedAt;
+                persistLastApplied(cloudUpdatedAt);
+            }
         } catch (e) {
             Logger?.warn(`Apply cloud update failed: ${e.message}`);
         }
@@ -894,6 +1001,11 @@
 
     async function init() {
         if (initialized) return;
+
+        // Restore echo-tracking state from storage before any sync work —
+        // otherwise a freshly-mounted content script (page reload) loses
+        // `_recentOwnWrites` and treats our just-pushed timestamp as foreign.
+        await hydrateCsEchoState();
 
         currentUser = await getUser();
         if (!currentUser) {

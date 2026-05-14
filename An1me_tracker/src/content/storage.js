@@ -3,6 +3,16 @@
  * Chrome storage wrapper with sync fallback
  */
 
+// Match popup/storage.js — `some(key !== undefined)` triggered the migration
+// short-circuit as soon as ONE key existed locally, so a partially-migrated
+// state (e.g. videoProgress present locally but animeData still in sync)
+// silently skipped the remaining sync→local migration on this side.
+function hasStoredValue(value) {
+    if (value === undefined || value === null) return false;
+    if (typeof value !== 'object') return true;
+    return Object.keys(value).length > 0;
+}
+
 const ContentStorage = {
     LEGACY_SYNC_KEYS: new Set(['animeData', 'trackedEpisodes', 'videoProgress']),
 
@@ -22,7 +32,7 @@ const ContentStorage = {
      */
     async get(keys) {
         const { Logger } = window.AnimeTrackerContent;
-        
+
         return new Promise((resolve) => {
             const requestedKeys = Array.isArray(keys) ? keys : [keys];
             const legacySyncKeys = requestedKeys.filter((key) => this.LEGACY_SYNC_KEYS.has(key));
@@ -54,24 +64,33 @@ const ContentStorage = {
                     return;
                 }
 
-                const hasLocalData = requestedKeys.some(key => localResult[key] !== undefined);
+                // Only skip the sync fallback when ALL requested keys are
+                // present locally — matches popup/storage.js semantics.
+                const hasLocalData = requestedKeys.every((key) => hasStoredValue(localResult[key]));
 
                 if (hasLocalData || legacySyncKeys.length === 0) {
                     clearTimeout(timeoutId);
                     resolve(localResult);
                 } else {
-                    chrome.storage.sync.get(legacySyncKeys, (syncResult) => {
+                    const missingLegacyKeys = legacySyncKeys.filter((key) => !hasStoredValue(localResult[key]));
+                    if (missingLegacyKeys.length === 0) {
+                        clearTimeout(timeoutId);
+                        resolve(localResult);
+                        return;
+                    }
+
+                    chrome.storage.sync.get(missingLegacyKeys, (syncResult) => {
                         clearTimeout(timeoutId);
                         if (chrome.runtime.lastError) {
                             resolve(localResult);
                             return;
                         }
 
-                        const hasSyncData = legacySyncKeys.some(key => syncResult[key] !== undefined);
+                        const hasSyncData = missingLegacyKeys.some((key) => hasStoredValue(syncResult[key]));
                         if (hasSyncData) {
                             Logger.info('Migrating data from sync to local storage');
                             chrome.storage.local.set(syncResult, () => {
-                                chrome.storage.sync.remove(legacySyncKeys);
+                                chrome.storage.sync.remove(missingLegacyKeys);
                             });
                         }
 
