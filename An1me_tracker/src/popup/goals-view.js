@@ -301,6 +301,7 @@
                 if (typeof params.onGoalsChanged === 'function') {
                     params.onGoalsChanged(previousGoalSettings);
                 }
+                try { render(container, { ...params, goalSettings: previousGoalSettings }); } catch {}
             });
         }
 
@@ -426,16 +427,9 @@
         return _lastBadgeEvaluation;
     }
 
-    function maybeDetectUnlocks(prevBadges, nextBadges) {
-        const AchievementsEngine = window.AnimeTracker?.AchievementsEngine;
-        if (!AchievementsEngine) return [];
-        return AchievementsEngine.diffUnlocks(prevBadges, nextBadges);
-    }
-
     window.AnimeTracker = window.AnimeTracker || {};
     window.AnimeTracker.GoalsView = {
         render,
-        getLastBadgeEvaluation,
-        maybeDetectUnlocks
+        getLastBadgeEvaluation
     };
 })();

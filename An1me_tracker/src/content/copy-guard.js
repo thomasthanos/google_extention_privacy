@@ -118,9 +118,9 @@
     let _lastEnsureStyleAt = 0;
     function scheduleEnsureStyle() {
         if (document.getElementById(STYLE_ID)) return;
+        if (_ensureStylePending) return;
         const now = Date.now();
         if (now - _lastEnsureStyleAt < 2000) {
-            if (_ensureStylePending) return;
             _ensureStylePending = true;
             setTimeout(() => {
                 _ensureStylePending = false;

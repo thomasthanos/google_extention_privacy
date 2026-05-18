@@ -34,10 +34,8 @@ async function checkNewEpisodes() {
         // rotate through the list across ticks instead of always hitting
         // the same first N entries.
         const eligible = Object.entries(animeData)
-            .filter(([slug, anime]) => !anime.droppedAt && !anime.completedAt && !anime.onHoldAt)
-            .map(([slug, anime]) => [slug, anime, lastCheck[slug] || 0])
-            .sort((a, b) => a[2] - b[2])
-            .map(([slug, anime]) => [slug, anime]);
+            .filter(([, anime]) => !anime.droppedAt && !anime.completedAt && !anime.onHoldAt)
+            .sort(([a], [b]) => (lastCheck[a] || 0) - (lastCheck[b] || 0));
 
         for (const [slug, anime] of eligible) {
             if (checked >= SMART_NOTIF_MAX_PER_TICK) break;
@@ -76,11 +74,7 @@ async function checkNewEpisodes() {
                     await bgStorageSet({ [cachedKey]: { ...cached, ...info, cachedAt: now } });
                 }
 
-                // Persist per-slug progress after every tick so an SW kill
-                // mid-loop doesn't reset the rotation. Trade: extra writes
-                // (small, single-field) for resilience.
                 updatedLastCheck[slug] = now;
-                try { await bgStorageSet({ smartNotifLastCheck: updatedLastCheck }); } catch { /* best-effort */ }
             } catch {
             }
 

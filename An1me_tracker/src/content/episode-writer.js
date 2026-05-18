@@ -71,12 +71,11 @@ const EpisodeWriter = {
      */
     writeEpisode(info, duration, animeData, options = {}) {
         if (!info || !info.animeSlug || !info.episodeNumber) {
-            return { changed: false, changeType: 'none', createdAnime: false };
+            return { changed: false, changeType: 'none' };
         }
 
         const logPrefix = options.logPrefix || 'EpisodeWriter';
         const slug = info.animeSlug;
-        let createdAnime = false;
 
         if (!animeData[slug]) {
             animeData[slug] = {
@@ -89,7 +88,6 @@ const EpisodeWriter = {
                 coverImage: info.coverImage || null,
                 siteAnimeId: info.siteAnimeId || null
             };
-            createdAnime = true;
         } else if (info.siteAnimeId && !animeData[slug].siteAnimeId) {
             animeData[slug].siteAnimeId = info.siteAnimeId;
         }
@@ -130,9 +128,9 @@ const EpisodeWriter = {
         }
 
         const validDuration = this._normalizeDuration(duration, logPrefix);
-        const targetEpisode = Number(info.episodeNumber) || info.episodeNumber;
+        const targetEpisode = Number(info.episodeNumber);
         const existingIndex = animeData[slug].episodes
-            .findIndex(ep => Number(ep?.number) === Number(targetEpisode));
+            .findIndex(ep => Number(ep?.number) === targetEpisode);
 
         if (existingIndex !== -1) {
             const existingEpisode = animeData[slug].episodes[existingIndex] || {};
@@ -146,9 +144,9 @@ const EpisodeWriter = {
                 animeData[slug].totalWatchTime = animeData[slug].episodes
                     .reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
                 animeData[slug].lastWatched = this._compactNow();
-                return { changed: true, changeType: 'updated-placeholder', createdAnime };
+                return { changed: true, changeType: 'updated-placeholder' };
             }
-            return { changed: false, changeType: 'none', createdAnime };
+            return { changed: false, changeType: 'none' };
         }
 
         const watchedAt = this._compactNow();
@@ -188,7 +186,7 @@ const EpisodeWriter = {
             this._setListState(animeData[slug], 'active', nowIso);
         }
 
-        return { changed: true, changeType: 'added-episode', createdAnime };
+        return { changed: true, changeType: 'added-episode' };
     }
 };
 

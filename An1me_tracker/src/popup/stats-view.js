@@ -29,13 +29,7 @@
         return node;
     }
 
-    function fmtH(sec) {
-        const h = sec / 3600;
-        if (h === 0) return '0h';
-        if (h >= 100) return Math.round(h) + 'h';
-        if (h >= 10) return h.toFixed(1) + 'h';
-        return h.toFixed(1) + 'h';
-    }
+    const fmtH = (sec) => window.AnimeTracker.UIHelpers.fmtHours(sec);
 
     function fmtDayKey(dk) {
         const [y, m, d] = dk.split('-').map(Number);
@@ -330,60 +324,6 @@
         return el('div', { class: 'bars-wrap' }, [root]);
     }
 
-    /* ══════════════════════════════════════════════════════════
-       5. LIBRARY TABLE — watching/completed/on-hold/dropped
-    ══════════════════════════════════════════════════════════ */
-    function renderLibrary(categories) {
-        const sections = [
-            { key: 'watching',   label: 'Watching',   color: '#4fb3e0' },
-            { key: 'completed',  label: 'Completed',  color: '#5cd197' },
-            { key: 'onHold',     label: 'On hold',    color: '#f0c040' },
-            { key: 'dropped',    label: 'Dropped',    color: '#6b7694' }
-        ];
-
-        const wrap = el('div', { class: 'library-wrap' });
-        let any = false;
-
-        for (const s of sections) {
-            const rows = categories[s.key] || [];
-            if (!rows.length) continue;
-            any = true;
-
-            const section = el('div', { class: 'lib-section' });
-            section.appendChild(
-                el('div', { class: 'lib-heading' }, [
-                    el('span', { class: 'lib-dot', style: `background:${s.color}` }),
-                    el('span', { class: 'lib-heading-label', text: s.label }),
-                    el('span', { class: 'lib-count', text: String(rows.length) })
-                ])
-            );
-
-            const list = el('div', { class: 'lib-list' });
-            rows.slice(0, 50).forEach(r => {
-                const pct = r.total > 0 ? Math.min(100, Math.round((r.watched / r.total) * 100)) : 0;
-                const row = el('div', { class: 'lib-row', title: r.title || r.slug });
-                row.appendChild(el('span', { class: 'lib-title', text: r.title || r.slug }));
-                row.appendChild(el('span', { class: 'lib-prog', text: r.total ? `${r.watched}/${r.total}` : `${r.watched}` }));
-                const track = el('span', { class: 'lib-bar' });
-                const fill  = el('span', { class: 'lib-bar-fill', style: `width:${pct}%;background:${s.color}` });
-                track.appendChild(fill);
-                row.appendChild(track);
-                list.appendChild(row);
-            });
-
-            section.appendChild(list);
-            wrap.appendChild(section);
-        }
-
-        if (!any) {
-            wrap.appendChild(el('div', { class: 'stats-empty', text: 'Start watching anime on an1me.to to see your library.' }));
-        }
-        return wrap;
-    }
-
-    /* ══════════════════════════════════════════════════════════
-       MAIN RENDER
-    ══════════════════════════════════════════════════════════ */
     function render(container, animeData) {
         if (!container) return;
         container.innerHTML = '';
@@ -392,7 +332,6 @@
         const index    = StatsEngine.buildWatchIndex(animeData);
         const streak   = StatsEngine.computeStreak(index);
         const weekly   = StatsEngine.windowStats(index, 7);
-        const cats     = StatsEngine.categorizeAnime(animeData);
 
         // Share button
         const shareBtn = el('button', {

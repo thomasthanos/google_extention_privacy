@@ -118,7 +118,7 @@ const ContentStorage = {
             chrome.storage.local.set(data, () => {
                 clearTimeout(timeoutId);
                 if (chrome.runtime.lastError) {
-                    const errorMsg = chrome.runtime.lastError.message;
+                    const errorMsg = (chrome.runtime.lastError && chrome.runtime.lastError.message) || '';
 
                     if (errorMsg.includes('Extension context invalidated') ||
                         errorMsg.includes('Cannot access') ||
@@ -134,6 +134,25 @@ const ContentStorage = {
             });
         });
     },
+
+    _mutateQueue: Promise.resolve(),
+    async mutate(keys, mutator) {
+        const requested = Array.isArray(keys) ? keys : [keys];
+        const run = async () => {
+            const data = await this.get(requested);
+            const result = mutator(data);
+            if (result && typeof result.then === 'function') await result;
+            const payload = {};
+            for (const k of requested) {
+                if (Object.prototype.hasOwnProperty.call(data, k)) payload[k] = data[k];
+            }
+            await this.set(payload);
+            return data;
+        };
+        const next = this._mutateQueue.then(run, run);
+        this._mutateQueue = next.catch(() => {});
+        return next;
+    }
 
 };
 

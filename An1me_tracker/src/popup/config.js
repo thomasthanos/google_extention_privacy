@@ -37,9 +37,9 @@ const ANIME_PARTS_CONFIG = {
     ],
 };
 
-// Single source of truth lives in src/common/multipart-mappings.js.
-const CANONICAL_EPISODE_OFFSET_MAPPING =
-    (typeof window !== 'undefined' && window.AnimeTrackerMultipartMappings?.EPISODE_OFFSET_MAPPING) || {};
+function CANONICAL_EPISODE_OFFSET_MAPPING() {
+    return (typeof window !== 'undefined' && window.AnimeTrackerMultipartMappings?.EPISODE_OFFSET_MAPPING) || {};
+}
 
 const SERIES_MOVIE_MERGE_SLUGS = new Set([
     'trinity-seven',
@@ -601,7 +601,10 @@ const SeasonGrouping = {
 
                     longerEntries.forEach(entry => {
                         if (entry.seasonNum === 1 && longerEntries.length === 1) {
-                            const maxSeason = Math.max(...shorterEntries.map(e => e.seasonNum));
+                            const seasonNums = shorterEntries
+                                .map(e => e.seasonNum)
+                                .filter(Number.isFinite);
+                            const maxSeason = seasonNums.length > 0 ? Math.max(...seasonNums) : 0;
                             entry.seasonNum = maxSeason + 1;
                         }
                         shorterEntries.push(entry);
@@ -627,6 +630,10 @@ window.AnimeTracker = window.AnimeTracker || {};
 window.AnimeTracker.CONFIG = CONFIG;
 window.AnimeTracker.DONATE_LINKS = DONATE_LINKS;
 window.AnimeTracker.ANIME_PARTS_CONFIG = ANIME_PARTS_CONFIG;
-window.AnimeTracker.CANONICAL_EPISODE_OFFSET_MAPPING = CANONICAL_EPISODE_OFFSET_MAPPING;
+Object.defineProperty(window.AnimeTracker, 'CANONICAL_EPISODE_OFFSET_MAPPING', {
+    get: CANONICAL_EPISODE_OFFSET_MAPPING,
+    enumerable: true,
+    configurable: true
+});
 window.AnimeTracker.SERIES_MOVIE_MERGE_SLUGS = SERIES_MOVIE_MERGE_SLUGS;
 window.AnimeTracker.SeasonGrouping = SeasonGrouping;

@@ -152,6 +152,7 @@ const FillerService = {
                 );
             });
 
+            if (!response) throw new Error('No response from background');
             if (response.success) {
                 const cachedData = {
                     ...response.episodeTypes,
@@ -296,15 +297,17 @@ const FillerService = {
                     batch.map(async (slug) => {
                         try {
                             const animeTitle = animeData[slug]?.title || null;
+                            const episodeTypes = await this.fetchEpisodeTypes(slug, animeTitle);
                             processed++;
                             if (onProgress) onProgress(processed, total, animeTitle || slug);
-                            const episodeTypes = await this.fetchEpisodeTypes(slug, animeTitle);
                             if (episodeTypes) {
                                 this.updateFromEpisodeTypes(slug, episodeTypes);
                                 return { slug, success: true };
                             }
                             return { slug, success: false };
                         } catch (error) {
+                            processed++;
+                            if (onProgress) onProgress(processed, total, animeData[slug]?.title || slug);
                             return { slug, success: false, error };
                         }
                     })
@@ -469,11 +472,7 @@ const FillerService = {
         return totalEpisodes - totalFillers;
     },
 
-    /**
-     * Get total episodes for anime.
-     * Priority: AnilistService → stored anime.totalEpisodes → null.
-     */
-    getTotalEpisodes(slug, watchedCount, anime = null) {
+    getTotalEpisodes(slug, anime = null) {
         const normalizedSlug = slug.toLowerCase();
 
         const anilistTotal = window.AnimeTracker?.AnilistService?.getTotalEpisodes(normalizedSlug);
@@ -486,76 +485,32 @@ const FillerService = {
         return null;
     },
 
-    /**
-     * Calculate progress percentage.
-     * Returns { progress, total, isGuessed }.
-     * total=null means the episode count is unknown (airing / N/A on site).
-     */
     calculateProgress(episodeCount, slug, anime = null) {
-        const totalEpisodes = this.getTotalEpisodes(slug, episodeCount, anime);
+        const totalEpisodes = this.getTotalEpisodes(slug, anime);
 
         if (!totalEpisodes) {
-            return { progress: null, total: null, isGuessed: false };
+            return { progress: null, total: null };
         }
 
         if (anime && anime.episodes) {
             const canonWatched = this.getCanonEpisodeCount(slug, anime.episodes);
             const totalCanon = this.getTotalCanonEpisodes(slug, totalEpisodes);
             if (canonWatched >= totalCanon && totalCanon > 0) {
-                return { progress: 100, total: totalEpisodes, isGuessed: false };
+                return { progress: 100, total: totalEpisodes };
             }
         }
 
         if (episodeCount >= totalEpisodes) {
-            return { progress: 100, total: totalEpisodes, isGuessed: false };
+            return { progress: 100, total: totalEpisodes };
         }
 
         const progress = (episodeCount / totalEpisodes) * 100;
-        const hasKnownTotal = window.AnimeTracker?.AnilistService?.getTotalEpisodes(slug.toLowerCase()) != null
-            || (anime && Number.isFinite(anime.totalEpisodes) && anime.totalEpisodes > 0);
-
         return {
             progress: Math.min(progress, 100),
-            total: totalEpisodes,
-            isGuessed: !hasKnownTotal
+            total: totalEpisodes
         };
     },
 
-    /**
-     * Clear cached filler data for a specific slug (in-memory + storage).
-     * Useful when a show gets a filler list added to animefillerlist.com and
-     * the notFound entry would otherwise block re-fetching for 7 days.
-     *
-     * @param {string} animeSlug  - the an1me.to slug
-     * @param {boolean} [persist=true] - also remove from chrome.storage.local
-     * @returns {Promise<void>}
-     */
-    async clearCache(animeSlug, persist = true) {
-        const { Storage } = window.AnimeTracker;
-        const { Logger } = window.AnimeTracker;
-
-        delete this.episodeTypesCache[animeSlug];
-
-        if (persist) {
-            try {
-                await Storage.remove([`episodeTypes_${animeSlug}`]);
-                await new Promise((resolve) => {
-                    const timer = setTimeout(resolve, 5000);
-                    chrome.runtime.sendMessage(
-                        { type: 'CLEAR_FILLER_CACHE', animeSlug },
-                        () => { clearTimeout(timer); chrome.runtime.lastError; resolve(); }
-                    );
-                });
-                Logger.success(`Cleared filler cache for ${animeSlug}`);
-            } catch (e) {
-                Logger.warn(`Failed to clear filler storage for ${animeSlug}:`, e);
-            }
-        }
-    },
-
-    /**
-     * Check if anime has filler data
-     */
     hasFillerData(slug) {
         const normalizedSlug = this.getNormalizedFillerSlug(slug);
         return this.KNOWN_FILLERS[normalizedSlug] && this.KNOWN_FILLERS[normalizedSlug].length > 0;

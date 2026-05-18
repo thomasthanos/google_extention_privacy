@@ -4,16 +4,11 @@
     let _hourCache = null;
 
     function dayKey(date) {
-        const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, '0');
-        const d = String(date.getDate()).padStart(2, '0');
-        return `${y}-${m}-${d}`;
+        return window.AnimeTracker.StatsEngine.dayKey(date);
     }
 
     function monthKey(date) {
-        const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, '0');
-        return `${y}-${m}`;
+        return window.AnimeTracker.StatsEngine.monthKey(date);
     }
 
     function isoWeekKey(date) {
@@ -62,7 +57,9 @@
         return _hourCache;
     }
 
+    const _hcCountMovies = { animeData: null, value: 0 };
     function countMovies(animeData) {
+        if (_hcCountMovies.animeData === animeData) return _hcCountMovies.value;
         const Utils = window.AnimeTrackerMergeUtils;
         let count = 0;
         for (const slug in animeData || {}) {
@@ -71,24 +68,34 @@
             if (!a || !Array.isArray(a.episodes) || a.episodes.length === 0) continue;
             if (Utils?.isLikelyMovieSlug?.(slug)) count++;
         }
+        _hcCountMovies.animeData = animeData;
+        _hcCountMovies.value = count;
         return count;
     }
 
+    const _hcCountDropped = { animeData: null, value: 0 };
     function countDropped(animeData) {
+        if (_hcCountDropped.animeData === animeData) return _hcCountDropped.value;
         let count = 0;
         for (const slug in animeData || {}) {
             if (!Object.prototype.hasOwnProperty.call(animeData, slug)) continue;
             if (animeData[slug]?.droppedAt || animeData[slug]?.listState === 'dropped') count++;
         }
+        _hcCountDropped.animeData = animeData;
+        _hcCountDropped.value = count;
         return count;
     }
 
+    const _hcCountOnHold = { animeData: null, value: 0 };
     function countOnHold(animeData) {
+        if (_hcCountOnHold.animeData === animeData) return _hcCountOnHold.value;
         let count = 0;
         for (const slug in animeData || {}) {
             if (!Object.prototype.hasOwnProperty.call(animeData, slug)) continue;
             if (animeData[slug]?.onHoldAt || animeData[slug]?.listState === 'on_hold') count++;
         }
+        _hcCountOnHold.animeData = animeData;
+        _hcCountOnHold.value = count;
         return count;
     }
 
@@ -101,8 +108,16 @@
         return best;
     }
 
+    const _hcLongestEps = new Map();
+    let _hcLongestEpsRef = null;
     function longestEpisodesInOneSeries(animeData, options) {
         const onlyCompleted = options?.onlyCompleted === true;
+        if (_hcLongestEpsRef !== animeData) {
+            _hcLongestEpsRef = animeData;
+            _hcLongestEps.clear();
+        }
+        const key = onlyCompleted ? 'completed' : 'any';
+        if (_hcLongestEps.has(key)) return _hcLongestEps.get(key);
         let best = 0;
         for (const slug in animeData || {}) {
             if (!Object.prototype.hasOwnProperty.call(animeData, slug)) continue;
@@ -116,10 +131,13 @@
             }
             if (a.episodes.length > best) best = a.episodes.length;
         }
+        _hcLongestEps.set(key, best);
         return best;
     }
 
+    const _hcWeekendEps = { animeData: null, value: 0 };
     function weekendEpisodes(animeData) {
+        if (_hcWeekendEps.animeData === animeData) return _hcWeekendEps.value;
         let count = 0;
         for (const slug in animeData || {}) {
             if (!Object.prototype.hasOwnProperty.call(animeData, slug)) continue;
@@ -133,11 +151,22 @@
                 if (day === 0 || day === 6) count++;
             }
         }
+        _hcWeekendEps.animeData = animeData;
+        _hcWeekendEps.value = count;
         return count;
     }
 
+    const _hcComebackGap = new Map();
+    let _hcComebackGapRef = null;
     function hasComebackGap(animeData, gapDays) {
+        if (_hcComebackGapRef !== animeData) {
+            _hcComebackGapRef = animeData;
+            _hcComebackGap.clear();
+        }
+        if (_hcComebackGap.has(gapDays)) return _hcComebackGap.get(gapDays);
         const gapMs = gapDays * 86400000;
+        let found = false;
+        outer:
         for (const slug in animeData || {}) {
             if (!Object.prototype.hasOwnProperty.call(animeData, slug)) continue;
             const a = animeData[slug];
@@ -151,10 +180,11 @@
             if (times.length < 2) continue;
             times.sort((x, y) => x - y);
             for (let i = 1; i < times.length; i++) {
-                if (times[i] - times[i - 1] >= gapMs) return true;
+                if (times[i] - times[i - 1] >= gapMs) { found = true; break outer; }
             }
         }
-        return false;
+        _hcComebackGap.set(gapDays, found);
+        return found;
     }
 
     function bestDailyEpisodeCount(index) {

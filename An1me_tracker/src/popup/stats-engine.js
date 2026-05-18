@@ -157,8 +157,12 @@
     }
 
     function buildWatchIndex(animeData) {
+        if (_cache && _cache.ref === animeData) return _cache.index;
         const sig = signatureOf(animeData);
-        if (_cache && _cache.sig === sig) return _cache.index;
+        if (_cache && _cache.sig === sig) {
+            _cache.ref = animeData;
+            return _cache.index;
+        }
 
         const byDay = new Map();
         const byMonth = new Map();
@@ -273,14 +277,14 @@
             sig
         };
 
-        _cache = { sig, index };
+        _cache = { ref: animeData, sig, index };
         return index;
     }
 
     function computeStreak(byDayOrIndex) {
         const byDay = byDayOrIndex?.byDay || byDayOrIndex;
         if (!byDay || byDay.size === 0) {
-            return { currentStreak: 0, longestStreak: 0, lastWatchDay: null, brokenOn: null };
+            return { currentStreak: 0, longestStreak: 0 };
         }
 
         const todayKey = dayKey(new Date());
@@ -306,7 +310,6 @@
         }
 
         let current = 0;
-        let brokenOn = null;
         if (lastKey === todayKey || lastKey === yesterdayKey) {
             current = 1;
             for (let i = keys.length - 2; i >= 0; i--) {
@@ -314,18 +317,11 @@
                 if (gap === 1) current++;
                 else break;
             }
-        } else {
-            const [ly, lm, ld] = lastKey.split('-').map(Number);
-            const d = new Date(ly, lm - 1, ld);
-            d.setDate(d.getDate() + 1);
-            brokenOn = dayKey(d);
         }
 
         return {
             currentStreak: current,
-            longestStreak: Math.max(longest, current),
-            lastWatchDay: lastKey,
-            brokenOn
+            longestStreak: Math.max(longest, current)
         };
     }
 
@@ -493,17 +489,9 @@
             earliestDays,
             latestDays,
             confidence,
-            confidenceScore,
             model: remaining <= 0 && allowSingleEpisodeForecast
                 ? 'next-drop-pace'
-                : (releaseFloorDays > 0 ? 'release-aware' : (configuredTarget ? 'catch-up-aware' : 'pace-aware')),
-            releaseFloorDays,
-            recent7Rate,
-            recent14Rate,
-            recent30Rate,
-            spanRate,
-            userBaseRate,
-            animeSignalWeight
+                : (releaseFloorDays > 0 ? 'release-aware' : (configuredTarget ? 'catch-up-aware' : 'pace-aware'))
         };
     }
 
@@ -543,28 +531,20 @@
     }
 
     function topAnimeInWindow(animeData, days = 7, limit = 5) {
-        const now = new Date();
-        const cutoff = new Date();
-        cutoff.setDate(now.getDate() - (days - 1));
-        cutoff.setHours(0, 0, 0, 0);
-
+        const idx = buildWatchIndex(animeData);
+        const win = windowStats(idx, days);
         const rows = [];
-        for (const slug in animeData || {}) {
-            if (!Object.prototype.hasOwnProperty.call(animeData, slug)) continue;
-            const anime = animeData[slug];
-            if (!anime?.episodes?.length) continue;
-            let eps = 0;
-            let seconds = 0;
-            for (const ep of anime.episodes) {
-                const d = parseDate(ep?.watchedAt);
-                if (!d || d < cutoff) continue;
-                eps++;
-                seconds += Number(ep?.duration) || 0;
-            }
-            if (eps > 0) {
-                rows.push({ slug, title: anime.title, coverImage: anime.coverImage, episodes: eps, seconds });
-            }
-        }
+        win.perAnime.forEach((stat, slug) => {
+            if (!stat || stat.episodes === 0) return;
+            const a = animeData?.[slug] || {};
+            rows.push({
+                slug,
+                title: a.title || slug,
+                coverImage: a.coverImage || null,
+                episodes: stat.episodes,
+                seconds: stat.seconds || 0
+            });
+        });
         rows.sort((a, b) => b.seconds - a.seconds || b.episodes - a.episodes);
         return rows.slice(0, limit);
     }

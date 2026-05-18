@@ -226,72 +226,6 @@ const ProgressManager = {
     },
 
     /**
-     * Fill small tracking gaps (up to 2 consecutive missing episodes).
-     * Skips filler episodes so intentionally-skipped fillers are not auto-added.
-     */
-    repairLikelyMissedEpisodes(animeData) {
-        const { FillerService } = window.AnimeTracker;
-        const repairedData = { ...animeData };
-        let repairedCount = 0;
-        const nowIso = new Date().toISOString();
-
-        for (const [slug, anime] of Object.entries(repairedData)) {
-            if (!anime || !Array.isArray(anime.episodes) || anime.episodes.length < 3) continue;
-
-            const episodeMap = new Map();
-            for (const ep of anime.episodes) {
-                const num = Number(ep?.number) || 0;
-                if (num > 0 && !episodeMap.has(num)) {
-                    episodeMap.set(num, ep);
-                }
-            }
-
-            const sortedNumbers = Array.from(episodeMap.keys()).sort((a, b) => a - b);
-            if (sortedNumbers.length < 3) continue;
-
-            const durations = Array.from(episodeMap.values())
-                .map(ep => Number(ep.duration) || 0)
-                .filter(d => d > 0);
-            const fallbackDuration = durations.length > 0
-                ? Math.round(durations.reduce((sum, d) => sum + d, 0) / durations.length)
-                : 1440;
-
-            let changed = false;
-            for (let i = 0; i < sortedNumbers.length - 1; i++) {
-                const left = sortedNumbers[i];
-                const right = sortedNumbers[i + 1];
-                const gap = right - left - 1;
-                if (gap <= 0 || gap > 2) continue;
-
-                for (let missing = left + 1; missing < right; missing++) {
-                    if (episodeMap.has(missing)) continue;
-
-                    // Without filler data we can't tell intentional skips from accidents — skip repair
-                    if (!FillerService?.hasFillerData?.(slug)) continue;
-                    if (FillerService.isFillerEpisode(slug, missing)) continue;
-
-                    const rightEp = episodeMap.get(right);
-                    episodeMap.set(missing, {
-                        number: missing,
-                        watchedAt: rightEp?.watchedAt || anime.lastWatched || nowIso,
-                        duration: fallbackDuration,
-                        autoRepaired: true
-                    });
-                    repairedCount++;
-                    changed = true;
-                }
-            }
-
-            if (changed) {
-                anime.episodes = Array.from(episodeMap.values()).sort((a, b) => a.number - b.number);
-                anime.totalWatchTime = anime.episodes.reduce((sum, ep) => sum + (ep.duration || 0), 0);
-            }
-        }
-
-        return { repairedData, repairedCount };
-    },
-
-    /**
      * Clean progress for tracked/completed episodes
      */
     cleanTrackedProgress(animeData, videoProgress, deletedAnime = {}) {
@@ -354,6 +288,7 @@ const ProgressManager = {
     getInProgressAnime(animeData, videoProgress) {
         const inProgressMap = new Map();
         const completedPercentage = window.AnimeTracker?.CONFIG?.COMPLETED_PERCENTAGE || 85;
+        const trackedEpsBySlug = new Map();
 
         for (const [id, progress] of Object.entries(videoProgress)) {
             const slugMatch = id.match(/^(.+)__episode-(\d+)$/);
@@ -368,11 +303,15 @@ const ProgressManager = {
 
             const trackedAnime = animeData?.[animeSlug];
             if (trackedAnime?.completedAt || trackedAnime?.droppedAt || trackedAnime?.onHoldAt) continue;
-            const trackedEpisodeNumbers = new Set(
-                Array.isArray(trackedAnime?.episodes)
-                    ? trackedAnime.episodes.map(ep => Number(ep?.number)).filter(n => Number.isFinite(n) && n > 0)
-                    : []
-            );
+            let trackedEpisodeNumbers = trackedEpsBySlug.get(animeSlug);
+            if (!trackedEpisodeNumbers) {
+                trackedEpisodeNumbers = new Set(
+                    Array.isArray(trackedAnime?.episodes)
+                        ? trackedAnime.episodes.map(ep => Number(ep?.number)).filter(n => Number.isFinite(n) && n > 0)
+                        : []
+                );
+                trackedEpsBySlug.set(animeSlug, trackedEpisodeNumbers);
+            }
             // If the episode is already in the tracked/watch list, this resume entry
             // is stale and should not appear in the top continue-watching section.
             if (trackedEpisodeNumbers.has(episodeNum)) continue;

@@ -185,7 +185,9 @@ async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
                 { method: 'HEAD', signal: perCtrl.signal }
             );
             if (resp.ok) return candidate;
-            throw new Error(`HTTP ${resp.status}`);
+            const err = new Error(`HTTP ${resp.status}`);
+            err.httpStatus = resp.status;
+            throw err;
         } finally {
             clearTimeout(timer);
             groupCtrl.signal.removeEventListener('abort', onAbort);
@@ -193,13 +195,16 @@ async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
     };
 
     let found = null;
+    let allWere404 = false;
     try {
         // Promise.any throws AggregateError only when EVERY promise rejects.
         // We treat any single fulfilled promise as the answer, and abort the rest.
         found = await Promise.any(candidates.map(tryCandidate));
         groupCtrl.abort();
-    } catch {
+    } catch (aggErr) {
         found = null;
+        const errors = Array.isArray(aggErr?.errors) ? aggErr.errors : [];
+        allWere404 = errors.length > 0 && errors.every(e => e?.httpStatus === 404);
     }
 
     if (found) {
@@ -209,6 +214,10 @@ async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
             `[AnimeTracker] Filler slug discovered: ${an1meSlug} → ${found}`
         );
         return found;
+    }
+
+    if (!allWere404) {
+        return null;
     }
 
     const notFoundEntry = { notFound: true, cachedAt: Date.now() };

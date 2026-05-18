@@ -25,7 +25,7 @@
         if (!root) return [];
         return Array.from(root.querySelectorAll(
             'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        )).filter(el => !el.hasAttribute('hidden') && el.offsetParent !== null);
+        )).filter(el => !el.hasAttribute('hidden') && el.getClientRects().length > 0);
     }
 
     function open(overlay, opts = {}) {
@@ -105,7 +105,8 @@
                 document.removeEventListener('keydown', onKey, true);
                 resolve(value);
             };
-            const timeoutId = setTimeout(() => finish(false), 8000);
+            const autoDismissMs = danger ? 60000 : 8000;
+            const timeoutId = setTimeout(() => finish(false), autoDismissMs);
 
             el.querySelector('.at-confirm-ok').addEventListener('click', () => finish(true));
             el.querySelector('.at-confirm-cancel').addEventListener('click', () => finish(false));
@@ -123,5 +124,5 @@
     }
 
     window.AnimeTracker = window.AnimeTracker || {};
-    window.AnimeTracker.Dialogs = { open, close, focusableIn, inlineConfirm };
+    window.AnimeTracker.Dialogs = { open, close, inlineConfirm };
 })();

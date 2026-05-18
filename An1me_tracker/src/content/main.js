@@ -241,20 +241,23 @@
         trackingState = TrackingState.TRACKING;
 
         try {
-            const result = await Storage.get(['animeData', 'deletedAnime']);
-            if (result?.__timedOut) {
+            let written = false;
+            let animeData = null;
+            const mutateResult = await Storage.mutate(['animeData', 'deletedAnime'], (data) => {
+                const ad = data.animeData = data.animeData || {};
+                const del = data.deletedAnime = data.deletedAnime || {};
+                written = writeSyncEpisode(animeInfo, duration, ad, 'Immediate');
+                if (written) delete del[animeInfo.animeSlug];
+                animeData = ad;
+            });
+            if (mutateResult?.__timedOut) {
                 Logger.warn('Immediate track skipped: storage read timed out');
                 trackingState = TrackingState.IDLE;
                 earlyTrackDone = false;
                 return;
             }
-            const animeData = result.animeData || {};
-            const deletedAnime = { ...(result.deletedAnime || {}) };
-            const written = writeSyncEpisode(animeInfo, duration, animeData, 'Immediate');
 
             if (written) {
-                delete deletedAnime[animeInfo.animeSlug];
-                await Storage.set({ animeData, deletedAnime });
                 await clearStayedFillerEpisode(animeInfo.animeSlug, animeInfo.episodeNumber);
                 trackingState = TrackingState.COMPLETED;
                 Logger.success('✓ Immediate track successful');

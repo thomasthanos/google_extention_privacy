@@ -670,8 +670,17 @@
         return true;
     }
 
+    let _metadataHookedVideo = null;
+    let _metadataHookedHandler = null;
     function attachVideoMetadataHooks() {
         if (!video) return;
+        if (_metadataHookedVideo === video) return;
+        if (_metadataHookedVideo && _metadataHookedHandler) {
+            try {
+                _metadataHookedVideo.removeEventListener('durationchange', _metadataHookedHandler);
+                _metadataHookedVideo.removeEventListener('loadedmetadata', _metadataHookedHandler);
+            } catch {}
+        }
         const primeOutroEnd = async () => {
             const cache = await loadCache();
             if (cache.outroEnd) { await refreshPanelState(); return; }
@@ -685,6 +694,8 @@
         if (video.readyState >= 1) primeOutroEnd();
         video.addEventListener('loadedmetadata', primeOutroEnd, { once: true });
         video.addEventListener('durationchange', primeOutroEnd);
+        _metadataHookedVideo = video;
+        _metadataHookedHandler = primeOutroEnd;
     }
 
     function getControlsHost() {
@@ -762,12 +773,13 @@
         if (episodeWatchTimer || !helperEnabled) return;
         episodeWatchTimer = setInterval(() => {
             if (!helperEnabled) return;
+            if (typeof document !== 'undefined' && document.visibilityState && document.visibilityState !== 'visible') return;
             const nextEpisodeIdentity = getEpisodeIdentity();
             if (!nextEpisodeIdentity || nextEpisodeIdentity === lastEpisodeIdentity) return;
             handleEpisodeIdentityChange(nextEpisodeIdentity).catch((e) => {
                 Logger.debug('Skiptime: episode watcher refresh failed', e);
             });
-        }, 1000);
+        }, 2500);
     }
 
     function injectStyles(targetDoc = document) {
@@ -1343,8 +1355,7 @@
                 scheduleMount();
             }, 250);
         } catch (err) {
-            Logger.error('Skiptime: mountPanel crashed', err && err.message ? err.message : String(err));
-            console.error('[Skiptime] full error:', err);
+            Logger.error('Skiptime: mountPanel crashed', err);
         } finally {
             mountInProgress = false;
         }
@@ -1381,6 +1392,14 @@
         if (episodeWatchTimer) {
             clearInterval(episodeWatchTimer);
             episodeWatchTimer = null;
+        }
+        if (_metadataHookedVideo && _metadataHookedHandler) {
+            try {
+                _metadataHookedVideo.removeEventListener('durationchange', _metadataHookedHandler);
+                _metadataHookedVideo.removeEventListener('loadedmetadata', _metadataHookedHandler);
+            } catch {}
+            _metadataHookedVideo = null;
+            _metadataHookedHandler = null;
         }
         if (panelEl) { try { panelEl.remove(); } catch {} panelEl = null; }
         panelDoc = null;

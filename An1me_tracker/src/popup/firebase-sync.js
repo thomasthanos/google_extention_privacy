@@ -228,18 +228,36 @@ const FirebaseSync = {
             this.saveToCloudTimeout = null;
         }
 
+        this._pendingDebouncedResolvers = this._pendingDebouncedResolvers || [];
+        this._pendingDebouncedRejecters = this._pendingDebouncedRejecters || [];
+
+        const resolveAll = (value) => {
+            const resolvers = this._pendingDebouncedResolvers.splice(0);
+            this._pendingDebouncedRejecters.length = 0;
+            for (const fn of resolvers) { try { fn(value); } catch {} }
+        };
+        const rejectAll = (error) => {
+            const rejecters = this._pendingDebouncedRejecters.splice(0);
+            this._pendingDebouncedResolvers.length = 0;
+            for (const fn of rejecters) { try { fn(error); } catch {} }
+        };
+
         if (immediate) {
-            return this.performCloudSave();
+            const result = this.performCloudSave();
+            Promise.resolve(result).then(resolveAll, rejectAll);
+            return result;
         }
 
         return new Promise((resolve, reject) => {
+            this._pendingDebouncedResolvers.push(resolve);
+            this._pendingDebouncedRejecters.push(reject);
             this.saveToCloudTimeout = setTimeout(async () => {
                 try {
                     await this.performCloudSave();
-                    resolve();
+                    resolveAll();
                 } catch (error) {
                     PopupLogger.error('Firebase', 'Debounced save failed:', error);
-                    reject(error);
+                    rejectAll(error);
                 }
             }, CONFIG.CLOUD_SAVE_DEBOUNCE_MS);
         });
@@ -280,6 +298,10 @@ const FirebaseSync = {
                     throw new Error('Invalid videoProgress for cloud save');
                 }
 
+                const { data: cachedDoc } = this.getCachedUserDocument(this.currentUser.uid);
+                const shouldWriteEmail = !cachedDoc
+                    || cachedDoc.email !== this.currentUser.email;
+
                 const savedDoc = {
                     animeData: dataToSave.animeData || {},
                     videoProgress: dataToSave.videoProgress || {},
@@ -291,8 +313,11 @@ const FirebaseSync = {
                     email: this.currentUser.email
                 };
 
+                const fieldList = ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'goalSettings', 'badgeUnlocks', 'lastUpdated'];
+                if (shouldWriteEmail) fieldList.push('email');
+
                 await FirebaseLib.setDocument('users', this.currentUser.uid, savedDoc, {
-                    fields: ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'goalSettings', 'badgeUnlocks', 'lastUpdated', 'email']
+                    fields: fieldList
                 });
                 this.setCachedUserDocument(this.currentUser.uid, savedDoc);
                 try {
@@ -330,8 +355,7 @@ const FirebaseSync = {
                 const retryDelay = Math.min(2000 * Math.pow(2, this.cloudSaveRetryCount - 1), CONFIG.MAX_RETRY_DELAY_MS);
                 PopupLogger.log('Firebase', `Will retry in ${retryDelay}ms`);
 
-                // Schedule retry without recursion — reuse the same data
-                this.pendingSave = dataToSave;
+                if (!this.pendingSave) this.pendingSave = dataToSave;
                 setTimeout(() => {
                     if (this.currentUser && this.pendingSave) {
                         this.performCloudSave(elements);
@@ -506,8 +530,7 @@ const FirebaseSync = {
                 mergedDeletedAnime = AnimeTracker.MergeUtils.pruneStaleDeletedAnime(finalData.animeData, mergedDeletedAnime);
                 AnimeTracker.MergeUtils.applyDeletedAnime(finalData.animeData, mergedDeletedAnime);
 
-                // Prune deletedAnime entries older than 30 days
-                const DELETED_MAX_AGE = 10 * 24 * 60 * 60 * 1000;
+                const DELETED_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
                 const pruneCutoff = Date.now() - DELETED_MAX_AGE;
                 for (const slug of Object.keys(mergedDeletedAnime)) {
                     const info = mergedDeletedAnime[slug];

@@ -89,14 +89,29 @@
 
     const POPUP_COMPACT = { compact: true };
 
+    const POPUP_LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
+    function popupLevel() {
+        try {
+            return (typeof window !== 'undefined' && window.POPUP_LOG_LEVEL)
+                || (typeof window !== 'undefined' && window.AnimeTrackerContent?.CONFIG?.LOG_LEVEL)
+                || 'INFO';
+        } catch {
+            return 'INFO';
+        }
+    }
+    function shouldPopupLog(level) {
+        const lvl = POPUP_LEVELS[level];
+        const cur = POPUP_LEVELS[popupLevel()] ?? POPUP_LEVELS.INFO;
+        return lvl >= cur;
+    }
+
     const PopupLogger = {
         // log → compact (drops extras; inline data into the message string).
-        log(tag, ...args)   { popupStyled(rawLog, tag, args, POPUP_COMPACT); },
-        once(tag, key, ...args) { popupOnce(tag, key, rawLog, args, POPUP_COMPACT); },
-        throttled(tag, key, intervalMs, ...args) { popupThrottled(tag, key, intervalMs, rawLog, args, POPUP_COMPACT); },
-        // debug/warn/error → full objects (devs poke at debug; warn/error need detail).
-        debug(tag, ...args) { popupStyled(rawDebug, tag, args); },
-        warn(tag, ...args)  { popupStyled(rawWarn, tag, args); },
+        log(tag, ...args)   { if (!shouldPopupLog('INFO')) return; popupStyled(rawLog, tag, args, POPUP_COMPACT); },
+        once(tag, key, ...args) { if (!shouldPopupLog('INFO')) return; popupOnce(tag, key, rawLog, args, POPUP_COMPACT); },
+        throttled(tag, key, intervalMs, ...args) { if (!shouldPopupLog('INFO')) return; popupThrottled(tag, key, intervalMs, rawLog, args, POPUP_COMPACT); },
+        debug(tag, ...args) { if (!shouldPopupLog('DEBUG')) return; popupStyled(rawDebug, tag, args); },
+        warn(tag, ...args)  { if (!shouldPopupLog('WARN')) return; popupStyled(rawWarn, tag, args); },
         error(tag, ...args) { popupStyled(rawError, tag, args); }
     };
 

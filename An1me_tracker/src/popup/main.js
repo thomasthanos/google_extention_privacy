@@ -438,15 +438,10 @@
         return allowed.has(value) ? value : 'airing';
     }
 
-    // Status resolution + small list-state mutations live in
-    // src/popup/anime-status.js. Local aliases keep existing call sites
-    // working unchanged.
     const {
         AnimeStatus,
         getStatus: getAnimeStatus,
         isCompleted: isAnimeCompleted,
-        getCalendarDayDiff,
-        getKnownTotalEpisodesForRepair,
         repairAiringCompleted: repairAiringCompletedEntries
     } = AT.StatusService;
 
@@ -572,10 +567,10 @@
         for (const [baseSlug, groupedEntries] of groupsArray) {
             if (SeasonGrouping.isMovieGroup(groupedEntries)) {
                 if (groupedEntries.length > 1) {
-                    html += AnimeCardRenderer.createMovieGroup(baseSlug, groupedEntries, visibleProgress);
+                    html += AnimeCardRenderer.createMovieGroup(baseSlug, groupedEntries);
                 } else {
                     const { slug, anime } = groupedEntries[0];
-                    html += AnimeCardRenderer.createSingleMovieCard(slug, anime, visibleProgress);
+                    html += AnimeCardRenderer.createSingleMovieCard(slug, anime);
                 }
             } else if (SeasonGrouping.hasMultipleSeasons(groupedEntries)) {
                 html += AnimeCardRenderer.createSeasonGroup(baseSlug, groupedEntries, visibleProgress);
@@ -2032,13 +2027,7 @@
 
             if (user) {
                 try {
-                    const fresh = await Storage.get(['videoProgress', 'deletedAnime', 'groupCoverImages']);
-                    await FirebaseSync.saveToCloud({
-                        animeData,
-                        videoProgress: fresh.videoProgress || {},
-                        deletedAnime: fresh.deletedAnime || {},
-                        groupCoverImages: fresh.groupCoverImages || {}
-                    }, true);
+                    await FirebaseSync.saveToCloud({ animeData }, true);
                 } catch (syncErr) {
                     PopupLogger.error('Favorite', 'Cloud sync failed:', syncErr);
                 }
@@ -2127,11 +2116,9 @@
         hideDialog();
     }
 
-    // Dialog focus-trap helpers live in src/popup/dialogs-a11y.js.
     const {
         open: openDialogA11y,
         close: closeDialogA11y,
-        focusableIn: _focusableIn,
         inlineConfirm: showInlineConfirm
     } = AT.Dialogs;
 
@@ -2159,10 +2146,8 @@
         closeDialogA11y(elements.addAnimeDialog);
     }
 
-    // Episode-range parsing + slug helpers live in src/popup/episode-parse.js.
     const {
         parseRanges: parseEpisodeRanges,
-        buildRangeString,
         splitCanonAndFillers,
         extractSlugFromInput,
         generateTitleFromSlug,
@@ -2183,10 +2168,10 @@
                     { type: 'WATCHLIST_SYNC', animeId: siteId, watchlistType },
                     () => { if (chrome.runtime.lastError) { /* ignore */ } }
                 );
-                PopupLogger.log('WatchlistSync', `sent ${watchlistType} for #${siteId}`);
+                PopupLogger.debug('WatchlistSync', `sent ${watchlistType} for #${siteId}`);
             } else {
                 // No siteAnimeId yet — fetch it from the anime page, then sync
-                PopupLogger.log('WatchlistSync', `fetching siteAnimeId for ${slug}...`);
+                PopupLogger.debug('WatchlistSync', `fetching siteAnimeId for ${slug}...`);
                 chrome.runtime.sendMessage(
                     { type: 'FETCH_ANIME_INFO', slug },
                     (response) => {
@@ -2200,11 +2185,11 @@
                                 { type: 'WATCHLIST_SYNC', animeId: fetchedId, watchlistType },
                                 () => { if (chrome.runtime.lastError) { /* ignore */ } }
                             );
-                            PopupLogger.log('WatchlistSync', `fetched #${fetchedId}, sent ${watchlistType}`);
+                            PopupLogger.debug('WatchlistSync', `fetched #${fetchedId}, sent ${watchlistType}`);
                             // Persist the siteAnimeId
                             AT.Storage.set({ animeData }).catch(() => {});
                         } else {
-                            PopupLogger.log('WatchlistSync', `could not find siteAnimeId for ${slug}`);
+                            PopupLogger.debug('WatchlistSync', `could not find siteAnimeId for ${slug}`);
                         }
                     }
                 );
@@ -2244,7 +2229,7 @@
 
         const allParsedEpisodes = parseEpisodeRanges(episodesRawInput);
         const includeFillers = document.getElementById('includeFillers')?.checked || false;
-        const { canon, fillers: excludedFillers } = splitCanonAndFillers(slug, allParsedEpisodes);
+        const { canon } = splitCanonAndFillers(slug, allParsedEpisodes);
         const episodeNumbers = includeFillers ? allParsedEpisodes : canon;
 
         if (episodeNumbers.length === 0) {
@@ -2402,46 +2387,6 @@
             PopupLogger.error('FetchFiller', 'Error:', error);
         } finally {
             if (btn) { btn.disabled = false; btn.textContent = '🎭'; }
-        }
-    }
-
-    async function refreshAllAnimeInfo(options = {}) {
-        const { force = true } = options;
-        const { Storage, AnilistService } = AT;
-        const slugs = Object.keys(animeData || {});
-
-        if (slugs.length === 0) return;
-
-        if (force) {
-            const infoKeys = slugs.map((slug) => `animeinfo_${slug}`);
-            // Chunk the remove() so we don't hit MAX_WRITE_OPERATIONS_PER_MINUTE
-            // on libraries with hundreds of anime. 100 keys/call is well under
-            // any chrome.storage limit and avoids one giant transaction.
-            const REMOVE_CHUNK = 100;
-            for (let i = 0; i < infoKeys.length; i += REMOVE_CHUNK) {
-                const chunk = infoKeys.slice(i, i + REMOVE_CHUNK);
-                try {
-                    await Storage.remove(chunk);
-                } catch (error) {
-                    PopupLogger.warn('RefreshAll', `chunk remove failed at ${i}:`, error?.message || error);
-                    // Don't break — continue with remaining chunks so we
-                    // still clear most of the cache and proceed to refetch.
-                }
-            }
-            for (const slug of slugs) {
-                delete AnilistService.cache[slug];
-            }
-        }
-
-        startAutoSync();
-        try {
-            await AnilistService.autoFetchMissing(animeData, () => {
-                scheduleDeferredListRefresh({ delayMs: 0 });
-            }, (done, total, title) => {
-                setMetadataRepairStatus(`${done}/${total} — ${_truncTitle(title, 18)}`);
-            });
-        } finally {
-            endAutoSync();
         }
     }
 
@@ -3286,6 +3231,8 @@
         }
 
         let storageUpdateTimeout = null;
+        let pendingStatsRender = false;
+        let pendingGoalsRender = false;
         chrome.storage.onChanged.addListener((changes, namespace) => {
             if (namespace !== 'local') return;
             const isOwn = isOwnStorageChange(changes);
@@ -3299,31 +3246,18 @@
                 animeData = changes.animeData.newValue || {};
                 needsFullRender = true;
                 if (!isOwn) isExternalUpdate = true;
-                // Invalidate stats + achievements caches so views reflect new data
                 try { window.AnimeTracker?.StatsEngine?.invalidate(); } catch {}
                 try { window.AnimeTracker?.AchievementsEngine?.invalidate(); } catch {}
-                const statsView = document.getElementById('statsView');
-                const appRoot = document.querySelector('.app');
-                if (statsView && appRoot && appRoot.classList.contains('stats-mode')) {
-                    try { window.AnimeTracker.StatsView.render(statsView, animeData); } catch {}
-                }
-                if (appRoot && appRoot.classList.contains('goals-mode')) {
-                    try { renderGoalsView(); } catch {}
-                }
+                pendingStatsRender = true;
+                pendingGoalsRender = true;
             }
             if (changes[GOAL_SETTINGS_KEY]) {
                 goalSettings = changes[GOAL_SETTINGS_KEY].newValue || null;
-                const appRoot = document.querySelector('.app');
-                if (appRoot && appRoot.classList.contains('goals-mode')) {
-                    try { renderGoalsView(); } catch {}
-                }
+                pendingGoalsRender = true;
             }
             if (changes[BADGE_STATE_KEY]) {
                 badgeState = changes[BADGE_STATE_KEY].newValue || {};
-                const appRoot = document.querySelector('.app');
-                if (appRoot && appRoot.classList.contains('goals-mode')) {
-                    try { renderGoalsView(); } catch {}
-                }
+                pendingGoalsRender = true;
             }
             if (changes.groupCoverImages) {
                 window.AnimeTracker.groupCoverImages = changes.groupCoverImages.newValue || {};
@@ -3394,11 +3328,29 @@
                 try { FirebaseSync.clearCachedUserDocument(); } catch {}
             }
 
-            if (needsFullRender) {
+            const hasDeferredRender = needsFullRender || pendingStatsRender || pendingGoalsRender;
+            if (hasDeferredRender) {
                 if (storageUpdateTimeout) clearTimeout(storageUpdateTimeout);
                 storageUpdateTimeout = setTimeout(async () => {
-                    scheduleDeferredListRefresh({ delayMs: 0 });
-                    if (isExternalUpdate && !handledRepairStateChange && !handledMetadataCacheChange && elements.syncStatus && elements.syncText) {
+                    storageUpdateTimeout = null;
+                    if (needsFullRender) {
+                        scheduleDeferredListRefresh({ delayMs: 0 });
+                    }
+                    const appRoot = document.querySelector('.app');
+                    if (pendingStatsRender) {
+                        pendingStatsRender = false;
+                        const statsView = document.getElementById('statsView');
+                        if (statsView && appRoot && appRoot.classList.contains('stats-mode')) {
+                            try { window.AnimeTracker.StatsView.render(statsView, animeData); } catch {}
+                        }
+                    }
+                    if (pendingGoalsRender) {
+                        pendingGoalsRender = false;
+                        if (appRoot && appRoot.classList.contains('goals-mode')) {
+                            try { renderGoalsView(); } catch {}
+                        }
+                    }
+                    if (needsFullRender && isExternalUpdate && !handledRepairStateChange && !handledMetadataCacheChange && elements.syncStatus && elements.syncText) {
                         elements.syncStatus.classList.add('synced');
                         elements.syncText.textContent = 'Synced ✓';
                         setTimeout(() => { elements.syncText.textContent = 'Cloud Synced'; }, 2500);
@@ -3508,21 +3460,6 @@
         }
     }
 
-    function checkBackgroundAlive(timeoutMs = 400) {
-        return new Promise((resolve) => {
-            const timer = setTimeout(() => resolve(false), timeoutMs);
-            try {
-                chrome.runtime.sendMessage({ type: 'GET_VERSION' }, (resp) => {
-                    clearTimeout(timer);
-                    resolve(!chrome.runtime.lastError && !!resp);
-                });
-            } catch {
-                clearTimeout(timer);
-                resolve(false);
-            }
-        });
-    }
-
     async function init() {
         const { FirebaseSync, Storage, FillerFetchUI } = AT;
 
@@ -3570,7 +3507,7 @@
             const { lastCleanupDate } = await Storage.get(['lastCleanupDate']);
             const today = new Date().toISOString().slice(0, 10);
             if (lastCleanupDate === today) {
-                PopupLogger.log('Cleanup', 'Already ran today, skipping');
+                PopupLogger.debug('Cleanup', 'Already ran today, skipping');
             } else {
                 const raw = await Storage.get(['animeData', 'videoProgress', 'deletedAnime']);
                 let dirty = false;
@@ -3585,9 +3522,8 @@
                     }
                 }
 
-                // Prune deletedAnime older than 10 days
                 if (raw.deletedAnime) {
-                    const cutoff = Date.now() - 10 * 24 * 60 * 60 * 1000;
+                    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
                     for (const slug of Object.keys(raw.deletedAnime)) {
                         const info = raw.deletedAnime[slug];
                         const delAt = +(new Date(info?.deletedAt || info || 0));
@@ -3668,7 +3604,7 @@
             const fill = card.querySelector('.ip-fill');
             if (fill && fill.style.width !== pct + '%') {
                 fill.style.width = pct + '%';
-                PopupLogger.log('IP-Refresh', `${slug}: ${pct}% (${timeStr}/${durStr})`);
+                PopupLogger.debug('IP-Refresh', `${slug}: ${pct}% (${timeStr}/${durStr})`);
             }
 
             const badge = card.querySelector('.ip-pct-badge');

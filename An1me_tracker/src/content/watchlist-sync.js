@@ -153,6 +153,19 @@ const WatchlistSync = {
     async _persistSyncedType(animeSlug, type) {
         if (!animeSlug) return;
         try {
+            const { Storage } = window.AnimeTrackerContent || {};
+            if (Storage && typeof Storage.mutate === 'function') {
+                await Storage.mutate(['animeData'], (data) => {
+                    const animeData = data.animeData = data.animeData || {};
+                    if (!animeData[animeSlug]) return;
+                    if (type === 'remove') {
+                        delete animeData[animeSlug].watchlistSyncedType;
+                    } else {
+                        animeData[animeSlug].watchlistSyncedType = type;
+                    }
+                });
+                return;
+            }
             const { animeData = {} } = await chrome.storage.local.get(['animeData']);
             if (!animeData[animeSlug]) return;
             if (type === 'remove') {
@@ -382,15 +395,6 @@ const WatchlistSync = {
             }
         } catch { }
         return false;
-    },
-
-    getWatchlistType(anime, isFirstEpisode) {
-        if (!anime) return null;
-        if (anime.droppedAt) return 'dropped';
-        if (anime.onHoldAt) return 'on_hold';
-        if (anime.completedAt) return 'completed';
-        if (isFirstEpisode) return 'watching';
-        return null;
     }
 };
 
@@ -437,18 +441,37 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     formData.append('anime_id', animeId.toString());
     formData.append('type', watchlistType);
 
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
     fetch('https://an1me.to/wp-admin/admin-ajax.php', {
         method: 'POST',
         credentials: 'include',
-        body: formData
+        body: formData,
+        signal: ctrl.signal
     })
-        .then(res => res.text())
-        .then(text => {
-            console.log(`[WatchlistSync] via tab: ${action} type="${watchlistType}" #${animeId}`);
-            sendResponse({ success: true });
+        .then(res => {
+            return res.text().then(text => {
+                clearTimeout(timer);
+                const trimmed = (text || '').trim();
+                if (trimmed === '0' || trimmed === '-1') {
+                    const reason = trimmed === '0' ? 'auth_failed' : 'bad_request';
+                    (window.AnimeTrackerContent?.Logger || console).warn?.(
+                        `[WatchlistSync] via tab returned ${trimmed} (${reason}) for #${animeId}`
+                    );
+                    sendResponse({ success: false, error: reason });
+                    return;
+                }
+                (window.AnimeTrackerContent?.Logger || console).debug?.(
+                    `[WatchlistSync] via tab: ${action} type="${watchlistType}" #${animeId}`
+                );
+                sendResponse({ success: true });
+            });
         })
         .catch(e => {
-            console.warn(`[WatchlistSync] via tab error: ${e.message}`);
+            clearTimeout(timer);
+            (window.AnimeTrackerContent?.Logger || console).warn?.(
+                `[WatchlistSync] via tab error: ${e.message}`
+            );
             sendResponse({ success: false, error: e.message });
         });
     return true;

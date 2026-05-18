@@ -173,7 +173,7 @@ const VideoMonitor = {
             const promptKey = animeInfo.uniqueId;
 
             let resumePromptShown = false;
-            const showPromptOnce = (savedProgress, source) => {
+            const showPromptOnce = (savedProgress) => {
                 if (resumePromptShown) return;
                 if (window.__atResumeShownFor.has(promptKey)) { resumePromptShown = true; return; }
                 if (!savedProgress || !(savedProgress.currentTime > CONFIG.MIN_PROGRESS_TO_SAVE)) return;
@@ -220,7 +220,7 @@ const VideoMonitor = {
 
             const initialProgress = await ProgressTracker.getSavedProgress(animeInfo.uniqueId);
             if (initialProgress && initialProgress.currentTime > CONFIG.MIN_PROGRESS_TO_SAVE) {
-                showPromptOnce(initialProgress, 'initial');
+                showPromptOnce(initialProgress);
             } else {
                 // Cross-device case: progress was saved on another device but
                 // hasn't synced down to this tab yet. Watch chrome.storage for
@@ -261,7 +261,7 @@ const VideoMonitor = {
 
                     chrome.storage.onChanged.removeListener(onProgressArrive);
                     if (resumeWaitTimer) { clearTimeout(resumeWaitTimer); resumeWaitTimer = null; }
-                    showPromptOnce(entry, 'cloud');
+                    showPromptOnce(entry);
                 };
                 chrome.storage.onChanged.addListener(onProgressArrive);
 
@@ -279,14 +279,15 @@ const VideoMonitor = {
 
         let _lastSavedTime = -1;
         const tickSave = () => {
-            if (this.videoElement && animeInfo && !video.paused) {
-                const currentTime = this.videoElement.currentTime;
-                const duration = this.videoElement.duration;
-                if (currentTime > 0 && duration > 0 && Math.floor(currentTime) !== _lastSavedTime) {
-                    _lastSavedTime = Math.floor(currentTime);
-                    ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration);
-                }
-            }
+            const v = this.videoElement;
+            if (!v || !animeInfo || v.paused) return;
+            const currentTime = v.currentTime;
+            const duration = v.duration;
+            if (!(currentTime > 0) || !(duration > 0)) return;
+            const floored = Math.floor(currentTime);
+            if (floored === _lastSavedTime) return;
+            _lastSavedTime = floored;
+            ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration);
         };
 
         const startSaveInterval = () => {

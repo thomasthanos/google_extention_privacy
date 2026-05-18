@@ -364,7 +364,9 @@ const FillerFetchUI = {
         document.getElementById(this.IDS.cancelBtn)
             .addEventListener('click', () => this.cancel());
 
-        // Store reference for potential cleanup
+        if (this._escHandler) {
+            try { document.removeEventListener('keydown', this._escHandler); } catch {}
+        }
         this._escHandler = (e) => {
             if (e.key === 'Escape' && this.state.isOpen) this.close();
         };
@@ -608,6 +610,7 @@ const FillerFetchUI = {
             // ── Fetch from AnimeFillerList via background ────────────────────
             try {
                 const episodeTypes = await FillerService.fetchEpisodeTypes(slug, anime.title || null);
+                if (this.state.isCancelled) break;
 
                 if (episodeTypes && !episodeTypes.notFound) {
                     FillerService.updateFromEpisodeTypes(slug, episodeTypes);
@@ -626,11 +629,13 @@ const FillerFetchUI = {
                     this._setStat('skipped', this.state.skipped);
                 }
             } catch (err) {
+                if (this.state.isCancelled) break;
                 this._log('error', title, err.message?.slice(0, 30) || 'error');
                 this.state.failed++;
                 this._setStat('failed', this.state.failed);
             }
 
+            if (this.state.isCancelled) break;
             // Small delay so we don't hammer animefillerlist.com
             await new Promise(r => setTimeout(r, 150));
         }
@@ -651,8 +656,14 @@ const FillerFetchUI = {
             log.scrollTop = log.scrollHeight;
         }
 
-        this._setProgress(this.state.isCancelled ? this.state.total > 0 ? (((this.state.fetched + this.state.cached + this.state.skipped) / this.state.total) * 100) : 0 : 100,
-            this.state.isCancelled ? 'Cancelled — see log above' : '✓ Complete — see log above');
+        const completedSoFar = this.state.fetched + this.state.cached + this.state.skipped;
+        const progressPct = !this.state.isCancelled
+            ? 100
+            : (this.state.total > 0 ? (completedSoFar / this.state.total) * 100 : 0);
+        const progressLabel = this.state.isCancelled
+            ? 'Cancelled — see log above'
+            : '✓ Complete — see log above';
+        this._setProgress(progressPct, progressLabel);
 
         document.getElementById(this.IDS.cancelBtn).style.display = 'none';
         document.getElementById(this.IDS.closeBtn).style.display  = '';

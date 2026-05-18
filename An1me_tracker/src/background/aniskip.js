@@ -23,6 +23,7 @@ const ANISKIP_FOUND_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const ANISKIP_MISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SLUG_TO_MAL_KEY_PREFIX = 'malIdForSlug:';
 const SLUG_TO_MAL_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const SLUG_TO_MAL_HTTP_MISS_TTL_MS = 60 * 60 * 1000;
 
 const ANISKIP_BUNDLE_KEY = 'aniSkipOutroBundle';
 const SLUG_TO_MAL_BUNDLE_KEY = 'malIdForSlugBundle';
@@ -96,8 +97,10 @@ async function getMalIdForSlug(slug, title) {
     if (!slug) return null;
     const bundle = await loadSlugMalBundle();
     const cached = bundle[slug];
-    if (cached && (Date.now() - (Number(cached.cachedAt) || 0)) < SLUG_TO_MAL_TTL_MS) {
-        return cached.malId || null;
+    if (cached) {
+        const age = Date.now() - (Number(cached.cachedAt) || 0);
+        const ttl = cached.httpMiss ? SLUG_TO_MAL_HTTP_MISS_TTL_MS : SLUG_TO_MAL_TTL_MS;
+        if (age < ttl) return cached.malId || null;
     }
     if (!title) return null;
     try {
@@ -108,13 +111,21 @@ async function getMalIdForSlug(slug, title) {
             { signal: ctrl.signal }
         );
         clearTimeout(timer);
-        if (!res.ok) return null;
+        if (!res.ok) {
+            bundle[slug] = { malId: null, cachedAt: Date.now(), httpMiss: true };
+            scheduleSlugMalBundleFlush();
+            return null;
+        }
         const data = await res.json();
         const malId = data?.data?.[0]?.mal_id || null;
         bundle[slug] = { malId, cachedAt: Date.now() };
         scheduleSlugMalBundleFlush();
         return malId;
-    } catch { return null; }
+    } catch {
+        bundle[slug] = { malId: null, cachedAt: Date.now(), httpMiss: true };
+        scheduleSlugMalBundleFlush();
+        return null;
+    }
 }
 
 async function fetchAniSkipOutroStart(slug, title, episodeNumber, episodeLength) {
@@ -157,6 +168,8 @@ async function fetchAniSkipOutroStart(slug, title, episodeNumber, episodeLength)
         scheduleAniSkipBundleFlush();
         return outroStart;
     } catch {
+        bundle[cacheKey] = { outroStart: null, cachedAt: Date.now() };
+        scheduleAniSkipBundleFlush();
         return null;
     }
 }

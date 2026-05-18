@@ -92,6 +92,13 @@ const UIHelpers = {
         return 'size-small';
     },
 
+    fmtHours(seconds) {
+        const h = (Number(seconds) || 0) / 3600;
+        if (h === 0) return '0h';
+        if (h >= 100) return Math.round(h) + 'h';
+        return h.toFixed(1) + 'h';
+    },
+
     _ESCAPE_MAP: { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;', '`': '&#x60;', '/': '&#x2F;' },
     _ESCAPE_RE: /[&<>"'`/]/g,
 
@@ -190,7 +197,13 @@ const UIHelpers = {
     showToast(message, options = {}) {
         const { type = 'info', duration = 2000 } = options;
         try {
-            document.querySelectorAll('.at-toast').forEach(n => n.remove());
+            document.querySelectorAll('.at-toast').forEach(n => {
+                const t1 = n.__atToastLeaveTimer;
+                const t2 = n.__atToastRemoveTimer;
+                if (t1) clearTimeout(t1);
+                if (t2) clearTimeout(t2);
+                n.remove();
+            });
 
             const el = document.createElement('div');
             el.className = `at-toast at-toast--${type}`;
@@ -201,9 +214,9 @@ const UIHelpers = {
             document.body.appendChild(el);
             requestAnimationFrame(() => el.classList.add('at-toast--visible'));
 
-            setTimeout(() => {
+            el.__atToastLeaveTimer = setTimeout(() => {
                 el.classList.add('at-toast--leaving');
-                setTimeout(() => { try { el.remove(); } catch {} }, 220);
+                el.__atToastRemoveTimer = setTimeout(() => { try { el.remove(); } catch {} }, 220);
             }, Math.max(500, duration));
         } catch {
             // last-resort no-op so a missing document doesn't break callers
@@ -214,13 +227,6 @@ const UIHelpers = {
 window.AnimeTracker = window.AnimeTracker || {};
 window.AnimeTracker.UIHelpers = UIHelpers;
 
-// Compatibility shim for filler-service.js (and any future consumers) that
-// destructure `Logger` from `window.AnimeTracker`. The original Logger
-// gated info/success/warn behind a DEBUG flag that was always false (so
-// they were silent in production), and only `error` actually logged.
-// We preserve that behavior but route through PopupLogger so the styling
-// is consistent with the rest of the popup, and warn/error keep full
-// objects (PopupLogger.warn/error don't drop extras).
 window.AnimeTracker.Logger = {
     info:    () => {},
     success: () => {},

@@ -360,8 +360,8 @@ async function runMetadataRepairBatch(options = {}) {
                 await setMetadataRepairState(state);
             }
 
-            let infoResult = { status: 'cached' };
-            let fillerResult = { status: 'cached' };
+            let infoResult;
+            let fillerResult;
             let logEntry;
 
             try {

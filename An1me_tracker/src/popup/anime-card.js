@@ -68,13 +68,6 @@ const AnimeCardRenderer = {
             ? `<span class="skipped-fillers-badge" title="Skipped filler episodes: ${skippedFillersText}"><span class="icon-inline">${UIHelpers.createIcon('skip')}</span> ${skippedFillers.length} filler skipped</span>`
             : '';
 
-        const progressTags = episodesWithProgress.map(ep =>
-            `<span class="episode-tag in-progress" data-episode="${ep.number}" title="Saved: ${ep.percentage}%">
-                Ep ${ep.number} (${ep.timeStr})
-                <button class="progress-delete-btn" data-slug="${slug}" data-episode="${ep.number}" title="Delete progress">×</button>
-            </span>`
-        ).join('');
-
         const sortedEpisodes = [...(anime.episodes || [])].sort((a, b) =>
             b.number - a.number
         );
@@ -112,19 +105,6 @@ const AnimeCardRenderer = {
             : '';
 
         const fillerInfo = FillerService.getFillerInfo(slug, anime.episodes);
-
-        const progressSection = progressTags ? `
-            <div class="anime-in-progress collapsible collapsed">
-                <div class="in-progress-header">
-                    <span class="in-progress-title">In Progress (${episodesWithProgress.length})</span>
-                    <svg class="collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="6 9 12 15 18 9"/>
-                    </svg>
-                </div>
-                <div class="in-progress-content">
-                    <div class="episode-list">${progressTags}</div>
-                </div>
-            </div>` : '';
 
         const currentEpText = currentEpisode > 0 ? `Ep ${currentEpisode}` : '';
         const unknownTotal = progressData.total == null;
@@ -308,6 +288,7 @@ const AnimeCardRenderer = {
                 }
             }
         } catch (e) {
+            try { window.PopupLogger?.debug?.('AnimeCard', 'ETA inference failed:', e?.message || e); } catch {}
         }
 
         const headerActionsHtml = `
@@ -464,13 +445,7 @@ const AnimeCardRenderer = {
         `;
     },
 
-    createInProgressItem(anime) {
-        // Body moved — see anime-card-inprogress.js. The augment file
-        // overrides this stub with the real implementation at load time;
-        // it stays defined here as a safety net in case the sibling file
-        // fails to load (returning an empty card is preferable to a TypeError).
-        return '';
-    },
+    createInProgressItem(anime) { return ''; },
 
     createInProgressGroup() { return ''; },
     createSeasonGroup() { return ''; },

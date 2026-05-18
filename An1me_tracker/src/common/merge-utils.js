@@ -332,23 +332,22 @@
         return true;
     }
 
+    const MOVIE_PATTERNS = [
+        /-movie(-|$)/i,
+        /-film(-|$)/i,
+        /-gekijouban/i,
+        /-the-movie/i,
+        /^.*-movie-\d+/i,
+        /-3d-/i,
+        /-ova(-|$)/i,
+        /-special(-|$)/i,
+        /-recap(-|$)/i
+    ];
+
     function isLikelyMovieSlug(slug) {
         const value = getSafeString(slug);
         if (!value) return false;
-
-        const moviePatterns = [
-            /-movie(-|$)/i,
-            /-film(-|$)/i,
-            /-gekijouban/i,
-            /-the-movie/i,
-            /^.*-movie-\d+/i,
-            /-3d-/i,
-            /-ova(-|$)/i,
-            /-special(-|$)/i,
-            /-recap(-|$)/i
-        ];
-
-        return moviePatterns.some((pattern) => pattern.test(value));
+        return MOVIE_PATTERNS.some((pattern) => pattern.test(value));
     }
 
     const TOMBSTONE_GRACE_MS = 5000;

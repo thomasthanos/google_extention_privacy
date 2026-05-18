@@ -16,9 +16,11 @@
 
     function encodeValue(value) {
         if (value === null || value === undefined) return { nullValue: null };
+        if (value instanceof Date) return { timestampValue: value.toISOString() };
         if (typeof value === 'string') return { stringValue: value };
         if (typeof value === 'boolean') return { booleanValue: value };
         if (typeof value === 'number') {
+            if (!Number.isFinite(value)) return { nullValue: null };
             return Number.isInteger(value)
                 ? { integerValue: String(value) }
                 : { doubleValue: value };

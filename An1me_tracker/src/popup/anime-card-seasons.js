@@ -204,7 +204,7 @@
                         } else {
                             isComplete = progressPercent >= 100 && !_sPartial;
                             if (!isComplete && !_sPartial && anime.episodes?.length > 0) {
-                                const totalEps = FillerService.getTotalEpisodes(slug, episodeCount, anime);
+                                const totalEps = FillerService.getTotalEpisodes(slug, anime);
                                 if (totalEps && currentEp >= totalEps) isComplete = true;
                             }
                             hasProgress = progressPercent > 0 || episodeCount > 0;

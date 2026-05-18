@@ -430,11 +430,9 @@ const ProgressTracker = {
         const now = Date.now();
         const regularThrottleMs = Math.max(5000, Number(CONFIG.PROGRESS_WRITE_THROTTLE_MS) || 45000);
         const pauseThrottleMs = Math.max(1000, Number(CONFIG.PAUSE_WRITE_THROTTLE_MS) || 15000);
-        const urgentThrottleMs = Math.max(500, Number(CONFIG.FORCED_PROGRESS_WRITE_THROTTLE_MS) || 3000);
-        const throttleMs = !force ? regularThrottleMs : (urgent ? urgentThrottleMs : pauseThrottleMs);
+        const throttleMs = !force ? regularThrottleMs : pauseThrottleMs;
 
-        if (urgent) {
-        } else if ((now - this.lastSaveTime) < throttleMs) {
+        if (!urgent && (now - this.lastSaveTime) < throttleMs) {
             this.pendingSeekSave = { uniqueId, currentTime, duration, urgent };
 
             if (this.seekSaveTimeout) {
@@ -528,16 +526,15 @@ const ProgressTracker = {
                 return false;
             }
 
-            const result = await Storage.get(['animeData', 'deletedAnime']);
+            const result = await Storage.get(['animeData']);
             const animeData = result.animeData || {};
-            const deletedAnime = { ...(result.deletedAnime || {}) };
             const anime = animeData[animeSlug];
 
             if (!anime || !anime.episodes || !Array.isArray(anime.episodes)) {
                 return false;
             }
 
-            return anime.episodes.some(ep => ep.number === episodeNumber);
+            return anime.episodes.some(ep => Number(ep?.number) === episodeNumber);
         } catch (e) {
             Logger.error('Exception checking tracked episodes:', e);
             return false;
@@ -553,13 +550,12 @@ const ProgressTracker = {
             const validDuration = this.normalizeDuration(videoDuration);
             if (!validDuration) return false;
 
-            const result = await Storage.get(['animeData', 'deletedAnime']);
+            const result = await Storage.get(['animeData']);
             if (result.__timedOut) {
                 Logger.warn('Skip refreshTrackedEpisodeDuration: storage read timed out');
                 return false;
             }
             const animeData = result.animeData || {};
-            const deletedAnime = { ...(result.deletedAnime || {}) };
             const animeKey = info.animeSlug;
             const anime = animeData[animeKey];
             if (!anime || !Array.isArray(anime.episodes)) return false;
@@ -635,49 +631,57 @@ const ProgressTracker = {
                 throw new Error('Invalid video duration');
             }
 
-            const result = await Storage.get(['animeData', 'deletedAnime', 'videoProgress']);
-            if (result.__timedOut) {
-                Logger.error('Skip saveWatchedEpisode: storage read timed out (would clobber animeData)');
-                throw new Error('Storage read timeout');
-            }
-            const animeData = result.animeData || {};
-            const deletedAnime = { ...(result.deletedAnime || {}) };
-            const videoProgress = { ...(result.videoProgress || {}) };
-
             const validDuration = this.normalizeDuration(videoDuration);
             if (!validDuration) {
                 Logger.error('Invalid normalized video duration:', videoDuration);
                 throw new Error('Invalid normalized video duration');
             }
 
-            const writeResult = EpisodeWriter.writeEpisode(info, validDuration, animeData, {
-                logPrefix: 'saveWatchedEpisode'
-            });
-            if (!writeResult.changed) {
+            let writeResult = null;
+            let progressTouched = false;
+            let animeDataAfter = null;
+            let videoProgressAfter = null;
+            const data = await Storage.mutate(
+                ['animeData', 'deletedAnime', 'videoProgress'],
+                (data) => {
+                    const animeData = data.animeData = data.animeData || {};
+                    const deletedAnime = data.deletedAnime = data.deletedAnime || {};
+                    const videoProgress = data.videoProgress = data.videoProgress || {};
+
+                    writeResult = EpisodeWriter.writeEpisode(info, validDuration, animeData, {
+                        logPrefix: 'saveWatchedEpisode'
+                    });
+                    if (!writeResult.changed) return;
+
+                    delete deletedAnime[info.animeSlug];
+
+                    const tossIds = [info.uniqueId];
+                    if (info.isDoubleEpisode && info.secondEpisodeNumber) {
+                        const base = info.uniqueId.replace(/__episode-\d+$/, '');
+                        tossIds.push(`${base}__episode-${info.secondEpisodeNumber}`);
+                    }
+                    for (const id of tossIds) {
+                        if (videoProgress[id]) { delete videoProgress[id]; progressTouched = true; }
+                    }
+                    animeDataAfter = animeData;
+                    videoProgressAfter = videoProgress;
+                }
+            );
+            if (data?.__timedOut) {
+                Logger.error('Skip saveWatchedEpisode: storage read timed out (would clobber animeData)');
+                throw new Error('Storage read timeout');
+            }
+            if (!writeResult || !writeResult.changed) {
                 Logger.debug('Episode already tracked:', info.uniqueId);
                 return false;
             }
-
-            delete deletedAnime[info.animeSlug];
-
-            const tossIds = [info.uniqueId];
-            if (info.isDoubleEpisode && info.secondEpisodeNumber) {
-                const base = info.uniqueId.replace(/__episode-\d+$/, '');
-                tossIds.push(`${base}__episode-${info.secondEpisodeNumber}`);
-            }
-            let progressTouched = false;
-            for (const id of tossIds) {
-                if (videoProgress[id]) { delete videoProgress[id]; progressTouched = true; }
-            }
-            const payload = { animeData, deletedAnime };
-            if (progressTouched) payload.videoProgress = videoProgress;
-            await Storage.set(payload);
-            this._adCache = animeData;
+            this._adCache = animeDataAfter;
             this._adCacheTime = Date.now();
             if (progressTouched) {
-                this._vpCache = videoProgress;
+                this._vpCache = videoProgressAfter;
                 this._vpCacheTime = Date.now();
             }
+            const animeData = animeDataAfter;
 
             if (writeResult.changeType === 'updated-placeholder') {
                 Logger.debug(`Updated placeholder duration for tracked episode: ${info.uniqueId}`);

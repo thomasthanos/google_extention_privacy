@@ -59,9 +59,7 @@
     if (!_fsCodec) {
         console.error('[CS-CloudSync] Firestore codec not loaded — sync disabled');
     }
-    const toFSValue = _fsCodec ? _fsCodec.encodeValue : (() => ({ nullValue: null }));
     const toFSFields = _fsCodec ? _fsCodec.encodeFields : (() => ({}));
-    const fromFSValue = _fsCodec ? _fsCodec.decodeValue : (() => null);
     const fromFSDoc = _fsCodec ? _fsCodec.decodeDoc : (() => null);
 
     async function signOutDueToTokenFailure() {
@@ -152,14 +150,8 @@
 
     let _cloudDocCache = null;
     let _cloudDocCacheTime = 0;
-    let _lastAppliedCloudUpdatedAt = null;
     const _CLOUD_DOC_TTL = 120000;
 
-    // Persistence keys — without them, an a1nime.to tab reload (which respawns
-    // the content script) loses own-write echo tracking. A cloud poll right
-    // after reload then treats the timestamp we just pushed as a foreign
-    // update and merges/writes again for no reason.
-    const _CS_LAST_APPLIED_KEY = '_csLastAppliedCloudUpdatedAt';
     const _CS_RECENT_OWN_WRITES_KEY = '_csRecentOwnWrites';
     const _CS_OWN_WRITE_PERSIST_TTL_MS = 60 * 1000;
 
@@ -185,29 +177,16 @@
         } catch { /* best-effort */ }
     }
 
-    function persistLastApplied(ts) {
-        if (!ts) return;
-        try {
-            chrome.storage.local.set({ [_CS_LAST_APPLIED_KEY]: ts }, () => {
-                void chrome.runtime.lastError;
-            });
-        } catch { /* best-effort */ }
-    }
-
     let _csHydrationPromise = null;
     function hydrateCsEchoState() {
         if (_csHydrationPromise) return _csHydrationPromise;
         _csHydrationPromise = new Promise((resolve) => {
             try {
                 chrome.storage.local.get(
-                    [_CS_LAST_APPLIED_KEY, _CS_RECENT_OWN_WRITES_KEY],
+                    [_CS_RECENT_OWN_WRITES_KEY],
                     (stored) => {
                         try {
                             if (chrome.runtime.lastError) { resolve(); return; }
-                            const lastApplied = stored?.[_CS_LAST_APPLIED_KEY];
-                            if (typeof lastApplied === 'string' && lastApplied) {
-                                _lastAppliedCloudUpdatedAt = lastApplied;
-                            }
                             const persisted = stored?.[_CS_RECENT_OWN_WRITES_KEY];
                             if (Array.isArray(persisted)) {
                                 const now = Date.now();
@@ -435,7 +414,8 @@
                 if (mergedCount > localCount) {
                     csPauseSync();
                     try {
-                        await chrome.storage.local.set({ videoProgress: mergedVP });
+                        const fullLocal = (await chrome.storage.local.get(['videoProgress'])).videoProgress || {};
+                        await chrome.storage.local.set({ videoProgress: { ...fullLocal, ...mergedVP } });
                         Logger?.info(`Pulled ${mergedCount - localCount} new progress entries from cloud`);
                     } catch (e) {
                         Logger?.warn(`Failed to merge pulled progress locally: ${e.message}`);
@@ -472,9 +452,7 @@
                 lastPushAt = Date.now();
                 invalidateCloudDocCache();
                 notifyBgInvalidateCloudDoc();
-                _lastAppliedCloudUpdatedAt = pushedAt;
                 rememberOwnWrite(pushedAt);
-                persistLastApplied(pushedAt);
                 Logger?.info('videoProgress pushed (merged)');
             } else {
                 Logger?.warn(`Direct progress push failed: ${res.status}`);
@@ -622,9 +600,7 @@
                 lastPushAt = Date.now();
                 invalidateCloudDocCache();
                 notifyBgInvalidateCloudDoc();
-                _lastAppliedCloudUpdatedAt = pushedAt;
                 rememberOwnWrite(pushedAt);
-                persistLastApplied(pushedAt);
                 Logger?.info('Full push to Firestore complete');
             } else {
                 Logger?.warn(`Full push failed: ${res.status}`);
@@ -667,34 +643,6 @@
                 resolve(false);
             }
         });
-    }
-
-    let progressDebounce = null;
-    let progressMaxWaitTimer = null;
-    const PROGRESS_MAX_WAIT_MS = 90000;
-
-    async function flushProgressPush() {
-        if (progressDebounce) { clearTimeout(progressDebounce); progressDebounce = null; }
-        if (progressMaxWaitTimer) { clearTimeout(progressMaxWaitTimer); progressMaxWaitTimer = null; }
-        const swAlive = await wakeBackgroundSW('SYNC_PROGRESS_ONLY');
-        if (!swAlive) {
-            Logger?.debug('SW unreachable, pushing progress directly');
-            await pushProgressDirect();
-        }
-    }
-
-    function scheduleProgressPush(delay = 60000) {
-        if (progressDebounce) clearTimeout(progressDebounce);
-        progressDebounce = setTimeout(() => {
-            progressDebounce = null;
-            flushProgressPush();
-        }, delay);
-        if (!progressMaxWaitTimer) {
-            progressMaxWaitTimer = setTimeout(() => {
-                progressMaxWaitTimer = null;
-                flushProgressPush();
-            }, PROGRESS_MAX_WAIT_MS);
-        }
     }
 
     let fullPushDebounce = null;
@@ -794,9 +742,6 @@
             return;
         }
 
-        if (progressDebounce) { clearTimeout(progressDebounce); progressDebounce = null; }
-        if (progressMaxWaitTimer) { clearTimeout(progressMaxWaitTimer); progressMaxWaitTimer = null; }
-
         // Direct keepalive fetch from the content script — survives page unload.
         // Intentionally no wakeBackgroundSW here: that would trigger a duplicate write
         // via SW's SYNC_PROGRESS_ONLY handler. The direct keepalive fetch is enough.
@@ -855,10 +800,6 @@
                     groupCoverImages: mergedGroupCovers
                 });
                 Logger?.info(`Cloud update applied (eps: ${localEps}→${mergedEps})`);
-            }
-            if (cloudUpdatedAt) {
-                _lastAppliedCloudUpdatedAt = cloudUpdatedAt;
-                persistLastApplied(cloudUpdatedAt);
             }
         } catch (e) {
             Logger?.warn(`Apply cloud update failed: ${e.message}`);
@@ -950,7 +891,6 @@
             }
 
             if (shouldSyncFull) {
-                if (progressDebounce) clearTimeout(progressDebounce);
                 if (isOrionMode) {
                     scheduleFullPush(1500);
                 } else {
@@ -1054,11 +994,16 @@
             }
         }, 50 * 60 * 1000);
 
-        window.addEventListener('beforeunload', () => {
+        let orionTeardownRan = false;
+        const orionTeardown = () => {
+            if (orionTeardownRan) return;
+            orionTeardownRan = true;
             clearInterval(orionTokenRefreshTimer);
             stopCloudPolling();
             pushOnTeardown(true);
-        });
+        };
+        window.addEventListener('beforeunload', orionTeardown);
+        window.addEventListener('pagehide', orionTeardown, { passive: true });
     }
 
     setTimeout(init, 2000);

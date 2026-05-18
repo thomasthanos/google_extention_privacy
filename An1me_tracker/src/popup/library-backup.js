@@ -108,7 +108,6 @@
 
     window.AnimeTracker = window.AnimeTracker || {};
     window.AnimeTracker.LibraryBackup = {
-        BACKUP_FORMAT_VERSION,
         buildPayload,
         triggerDownload,
         parseAndValidate,

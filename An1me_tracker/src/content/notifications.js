@@ -609,13 +609,15 @@ const Notifications = {
 window.AnimeTrackerContent = window.AnimeTrackerContent || {};
 window.AnimeTrackerContent.Notifications = Notifications;
 
-document.addEventListener('__at_test_complete', (e) => {
-    Notifications.showCompletion(e.detail);
-});
-document.addEventListener('__at_test_resume', (e) => {
-    Notifications.showResumePrompt(
-        e.detail,
-        () => { },
-        () => { }
-    );
-});
+if (typeof window !== 'undefined' && window.__AT_TEST === true) {
+    document.addEventListener('__at_test_complete', (e) => {
+        Notifications.showCompletion(e.detail);
+    });
+    document.addEventListener('__at_test_resume', (e) => {
+        Notifications.showResumePrompt(
+            e.detail,
+            () => { },
+            () => { }
+        );
+    });
+}

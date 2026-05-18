@@ -18,15 +18,6 @@ if (!FIREBASE_API_KEY || !FIREBASE_PROJECT_ID) {
 }
 const FIRESTORE_DATABASE = `projects/${FIREBASE_PROJECT_ID}/databases/(default)`;
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/${FIRESTORE_DATABASE}`;
-// Poll interval was 60s — too aggressive for an anime tracker. A user
-// watching a 24-min episode would pay 24 Firestore reads just to detect
-// cross-device writes that almost never happen mid-episode. 3 min keeps
-// cross-device sync responsive while dropping read cost by 3×.
-const CLOUD_POLL_INTERVAL_MS = 180000;
-// Stricter minimum gap between "consumer-connected" polls. Without this,
-// a user clicking the popup repeatedly or rapidly opening watch tabs would
-// each trigger a fresh read. Caps these "convenience" reads to once per
-// 3 min regardless of how often consumers connect.
 const CLOUD_CONSUMER_POLL_MIN_GAP_MS = 3 * 60 * 1000;
 
 importScripts('src/common/merge-utils.js', 'src/common/firestore-codec.js');
@@ -55,7 +46,7 @@ const dlog = (...a) => { if (BG_DEBUG) console.log(...a); };
 const ddebug = (...a) => { if (BG_DEBUG) console.debug(...a); };
 
 const COMPLETED_PERCENTAGE = 85;
-const DELETED_ANIME_MAX_AGE_MS = 10 * 24 * 60 * 60 * 1000;
+const DELETED_ANIME_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_PROGRESS_ENTRIES = 200;
 // Keep videoProgress tombstones (`deleted:true`) for this long so cross-device
 // deletions propagate even if the receiving device only syncs days later.
@@ -108,7 +99,6 @@ function cleanTrackedProgressBg(animeData, videoProgress, deletedAnime = {}) {
         if (id === '__slugIndex') continue;
         const isTracked = trackedIds.has(id);
         const isCompleted = (progress.percentage || 0) >= COMPLETED_PERCENTAGE;
-        const savedAge = progress.savedAt ? now - new Date(progress.savedAt).getTime() : Infinity;
 
         if (isTracked) continue;
         if (isCompleted) continue;
@@ -229,20 +219,9 @@ let _cloudPollInFlight = null;
 // even though the cloud doc hasn't changed.
 const _LAST_POLL_KEY = '_bgLastCloudPollAt';
 const _LAST_PROGRESS_SYNC_KEY = '_bgLastProgressSyncAt';
-// Survives SW kill: own-write echo tracking + last-applied cloud timestamp.
-// Without persistence, after a SW restart a `lastUpdated` value we just wrote
-// to Firestore returns from a poll and is treated as a foreign update — we
-// re-merge, re-write, and pay the read+write cost for no reason.
-const _LAST_APPLIED_KEY = '_bgLastAppliedCloudUpdatedAt';
 const _RECENT_OWN_WRITES_KEY = '_bgRecentOwnWrites';
-// Keep persisted own-writes for 1 min — long enough to span an SW cold-start
-// followed by an immediate cloud poll, short enough that stale entries don't
-// accumulate after the user goes offline for a while.
 const _OWN_WRITE_PERSIST_TTL_MS = 60 * 1000;
 
-// Tracks whether hydration has completed. pollCloudData and other timestamp
-// readers await this so they don't make decisions based on the default 0
-// values (which would force a Firestore read on every SW cold start).
 let _bgHydrationPromise = null;
 function hydrateBgPollState() {
     if (_bgHydrationPromise) return _bgHydrationPromise;
@@ -250,7 +229,7 @@ function hydrateBgPollState() {
         try {
             const stored = await bgStorageGet([
                 _LAST_POLL_KEY, _LAST_PROGRESS_SYNC_KEY,
-                _LAST_APPLIED_KEY, _RECENT_OWN_WRITES_KEY
+                _RECENT_OWN_WRITES_KEY
             ]);
             const cloud = Number(stored[_LAST_POLL_KEY]) || 0;
             const progress = Number(stored[_LAST_PROGRESS_SYNC_KEY]) || 0;
@@ -259,11 +238,6 @@ function hydrateBgPollState() {
             const now = Date.now();
             if (cloud > 0 && cloud <= now) _lastCloudPollAt = cloud;
             if (progress > 0 && progress <= now) _lastProgressSyncAt = progress;
-
-            const lastApplied = stored[_LAST_APPLIED_KEY];
-            if (typeof lastApplied === 'string' && lastApplied) {
-                _lastAppliedCloudUpdatedAt = lastApplied;
-            }
 
             const persistedWrites = stored[_RECENT_OWN_WRITES_KEY];
             if (Array.isArray(persistedWrites)) {
@@ -293,7 +267,6 @@ function persistBgPollState(updates) {
         const payload = {};
         if (typeof updates.cloudPollAt === 'number') payload[_LAST_POLL_KEY] = updates.cloudPollAt;
         if (typeof updates.progressSyncAt === 'number') payload[_LAST_PROGRESS_SYNC_KEY] = updates.progressSyncAt;
-        if (typeof updates.lastAppliedCloudUpdatedAt === 'string') payload[_LAST_APPLIED_KEY] = updates.lastAppliedCloudUpdatedAt;
         if (Object.keys(payload).length === 0) return;
         bgStorageSet(payload).catch(() => {});
     } catch {}
@@ -310,10 +283,6 @@ function persistOwnWrites() {
 const activeStreamConsumers = new Set();
 const IDLE_TEARDOWN_GRACE_MS = 10000;
 let _idleTeardownTimer = null;
-
-function hasStreamConsumers() {
-    return activeStreamConsumers.size > 0;
-}
 
 function addStreamConsumer(id) {
     const wasEmpty = activeStreamConsumers.size === 0;
@@ -418,13 +387,8 @@ async function getFirebaseUser() {
     } catch { return null; }
 }
 
-// Firestore JSON codec moved to src/common/firestore-codec.js — single source
-// of truth shared with the content script and popup. Thin local aliases keep
-// the existing call sites in this file unchanged.
 const _fsCodec = self.AnimeTrackerFirestoreCodec || {};
 const jsonToFirestoreFields = _fsCodec.encodeFields || (() => { throw new Error('[BG] Firestore codec not loaded'); });
-const jsonToFirestoreValue = _fsCodec.encodeValue || (() => { throw new Error('[BG] Firestore codec not loaded'); });
-const fromFSValue = _fsCodec.decodeValue || (() => null);
 const fromFSDoc = _fsCodec.decodeDoc || (() => null);
 
 async function fetchCloudData(user, token) {
@@ -439,23 +403,13 @@ async function fetchCloudData(user, token) {
     }
 }
 
-async function pollCloudData(reason = 'poll') {
+async function pollCloudData(reason = 'consumer-connected') {
     if (_cloudPollInFlight) return _cloudPollInFlight;
 
     _cloudPollInFlight = (async () => {
         try {
-            // Wait for hydrated timestamps before deciding to skip — otherwise
-            // a freshly-woken SW reads _lastCloudPollAt = 0 and pays a wasted
-            // Firestore read even when a previous incarnation polled seconds ago.
             await hydrateBgPollState();
-
-            // "Convenience" polls (consumer-connected, content-page-open) get
-            // a stricter gate so rapid popup opens / page navigations don't
-            // burn reads. Only the explicit periodic 'poll' reason uses the
-            // base interval.
-            const isConvenience = reason === 'consumer-connected' || reason === 'content-page-open';
-            const gate = isConvenience ? CLOUD_CONSUMER_POLL_MIN_GAP_MS : CLOUD_POLL_INTERVAL_MS;
-            if ((Date.now() - _lastCloudPollAt) < gate) return null;
+            if ((Date.now() - _lastCloudPollAt) < CLOUD_CONSUMER_POLL_MIN_GAP_MS) return null;
 
             const user = await getFirebaseUser();
             const token = await getFirebaseToken();
@@ -551,13 +505,9 @@ async function syncProgressOnly() {
         if (response.ok) {
             lastPushedProgressBG = structuredClone(localVP);
             invalidateBgCloudDocCache();
-            _lastAppliedCloudUpdatedAt = pushedAt;
             bgRememberOwnWrite(pushedAt);
             _lastProgressSyncAt = Date.now();
-            persistBgPollState({
-                progressSyncAt: _lastProgressSyncAt,
-                lastAppliedCloudUpdatedAt: pushedAt
-            });
+            persistBgPollState({ progressSyncAt: _lastProgressSyncAt });
         } else {
             console.warn('[BG] Progress sync failed:', response.status);
             if (response.status >= 500) invalidateBgCloudDocCache();
@@ -649,31 +599,33 @@ async function syncToFirebase() {
         }
 
         const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
-        const fieldMask = [
-            'animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'lastUpdated', 'email'
-        ].map(f => `updateMask.fieldPaths=${f}`).join('&');
+        const shouldWriteEmail = !cloudDoc || cloudDoc.email !== user.email;
+
+        const fieldList = ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'lastUpdated'];
+        if (shouldWriteEmail) fieldList.push('email');
+        const fieldMask = fieldList.map(f => `updateMask.fieldPaths=${f}`).join('&');
 
         const pushedAt = new Date().toISOString();
+        const payloadFields = {
+            animeData: mergedAnime,
+            videoProgress: mergedProgress,
+            deletedAnime: mergedDeleted,
+            groupCoverImages: mergedGroup,
+            lastUpdated: pushedAt
+        };
+        if (shouldWriteEmail) payloadFields.email = user.email;
+
         const response = await fetchWithTimeout(`${url}?${fieldMask}`, {
             method: 'PATCH',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                fields: jsonToFirestoreFields({
-                    animeData: mergedAnime,
-                    videoProgress: mergedProgress,
-                    deletedAnime: mergedDeleted,
-                    groupCoverImages: mergedGroup,
-                    lastUpdated: pushedAt,
-                    email: user.email
-                })
+                fields: jsonToFirestoreFields(payloadFields)
             })
         });
 
         if (response.ok) {
             invalidateBgCloudDocCache();
-            _lastAppliedCloudUpdatedAt = pushedAt;
             bgRememberOwnWrite(pushedAt);
-            persistBgPollState({ lastAppliedCloudUpdatedAt: pushedAt });
             clearSyncPending();
         } else {
             console.error('[BG] Sync failed:', response.status);
@@ -696,7 +648,6 @@ let _applyCloudUpdateDoc = null;
 let _applyCloudDebounce = null;
 let _applyCloudUpdateQueue = Promise.resolve();
 let _applyCloudUpdateWaiters = [];
-let _lastAppliedCloudUpdatedAt = null;
 
 const _MAX_CLOUD_UPDATE_WAITERS = 100;
 
@@ -792,8 +743,6 @@ async function _doApplyCloudUpdate(cloudDoc) {
         const cloudGroup = cloudDoc.groupCoverImages || {};
         const mergedGroup = mergeGroupCoverImages(localGroup, cloudGroup);
 
-        const localEps = Object.values(local.animeData || {}).reduce((s, a) => s + (a.episodes?.length || 0), 0);
-        const mergedEps = Object.values(mergedAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
         const animeChanged = !areAnimeDataMapsEqual(local.animeData || {}, mergedAnime);
 
         const progressChanged = !areProgressMapsEqual(local.videoProgress || {}, mergedProgress);
@@ -801,18 +750,14 @@ async function _doApplyCloudUpdate(cloudDoc) {
         const groupChanged = !shallowEqualObjectMap(localGroup, mergedGroup);
 
         if (animeChanged || progressChanged || deletedChanged || groupChanged) {
-            pauseSync(5000);
+            pauseSync();
             await bgStorageSet({
                 animeData: mergedAnime,
                 videoProgress: mergedProgress,
                 deletedAnime: mergedDeleted,
                 groupCoverImages: mergedGroup
             });
-            dlog(`[BG-RT] ← Cloud update applied (eps: ${localEps}→${mergedEps})`);
-        }
-        if (cloudUpdatedAt) {
-            _lastAppliedCloudUpdatedAt = cloudUpdatedAt;
-            persistBgPollState({ lastAppliedCloudUpdatedAt: cloudUpdatedAt });
+            dlog('[BG-RT] ← Cloud update applied');
         }
     } catch (e) {
         console.warn('[BG-RT] Apply update failed:', e.message);
@@ -1201,20 +1146,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             syncWatchlistToSite(animeId, watchlistType).catch(e =>
                 console.warn('[BG] Watchlist sync error:', e)
             );
-        }
-        return true;
-    }
-
-    if (message.type === 'CLEAR_FILLER_CACHE') {
-        const slug = (message.animeSlug || '').toLowerCase();
-        if (slug) {
-            fillerSlugCache.delete(slug);
-            const storageKey = `fillerslug_${slug}`;
-            bgStorageRemove([storageKey])
-                .then(() => sendResponse({ success: true }))
-                .catch((e) => sendResponse({ success: false, error: e.message }));
-        } else {
-            sendResponse({ success: false, error: 'Missing animeSlug' });
         }
         return true;
     }

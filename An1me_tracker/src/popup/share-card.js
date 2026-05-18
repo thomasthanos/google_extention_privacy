@@ -17,13 +17,7 @@
     // Scale factor για conversion συντεταγμένων
     const SCALE = 2;
 
-    /* ── helpers (ίδια, αλλά με scaling) ── */
-    function fmtH(s) {
-        const h = s / 3600;
-        if (h === 0) return '0h';
-        if (h >= 100) return Math.round(h) + 'h';
-        return h.toFixed(1) + 'h';
-    }
+    const fmtH = (s) => window.AnimeTracker.UIHelpers.fmtHours(s);
 
     function loadImg(url) {
         return new Promise(resolve => {
@@ -526,11 +520,18 @@
             const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
             if (!blob) { _toast('Could not generate share card.', 'error'); return; }
             const url = URL.createObjectURL(blob);
+            let clipboardCopied = false;
             try {
                 if (navigator.clipboard?.write && window.ClipboardItem) {
                     await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                    clipboardCopied = true;
                 }
-            } catch { }
+            } catch (e) {
+                try { window.PopupLogger?.debug?.('ShareCard', 'Clipboard copy unavailable:', e?.message || e); } catch {}
+            }
+            if (clipboardCopied) {
+                try { _toast('Card image copied to clipboard', 'success', 1500); } catch {}
+            }
             try {
                 chrome?.tabs?.create ? chrome.tabs.create({ url }) : window.open(url, '_blank');
             } catch {

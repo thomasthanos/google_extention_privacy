@@ -206,6 +206,7 @@
     }
 
     function renderAboutCard(version) {
+        const safeVersion = escapeHtml(version || '-');
         return `
             <section class="settings-card settings-card--compact settings-card--support">
                 <div class="settings-about-row">
@@ -213,6 +214,7 @@
                         <span class="settings-about-badge">${svg('heart')}<span>Support</span></span>
                         <span class="settings-about-title">Keep Anime Tracker evolving</span>
                         <span class="settings-about-note">If the extension helps your daily watching flow, you can support future updates here.</span>
+                        <span class="settings-about-version">Anime Tracker v${safeVersion}</span>
                     </div>
                     <button class="settings-about-donate" id="settingsDonate" type="button">
                         ${svg('heart')}<span>Donate</span>

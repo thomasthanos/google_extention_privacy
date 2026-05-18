@@ -1,20 +1,4 @@
 const AnimeParser = {
-    escapeHtml(str) {
-        if (typeof str !== 'string') {
-            if (str === null || str === undefined) return '';
-            str = String(str);
-        }
-
-        return str
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;')
-            .replace(/`/g, '&#x60;')
-            .replace(/\//g, '&#x2F;');
-    },
-
     extractAnimeInfo(options = {}) {
         const { Logger } = window.AnimeTrackerContent;
 
@@ -190,8 +174,6 @@ const AnimeParser = {
     },
 
     findEpisodeFromDOM() {
-        const { Logger } = window.AnimeTrackerContent;
-
         const activeEpisodeSelectors = [
             '.episode-list .active',
             '.episodes .current',
@@ -337,7 +319,10 @@ const AnimeParser = {
             const sourceNumbers = navEpisodeNumbers.size >= 3 ? navEpisodeNumbers : episodeNumbers;
             if (sourceNumbers.size === 0) return null;
 
-            const maxEpisode = Math.max(...sourceNumbers);
+            let maxEpisode = 0;
+            for (const n of sourceNumbers) {
+                if (Number.isFinite(n) && n > maxEpisode) maxEpisode = n;
+            }
             if (!Number.isFinite(maxEpisode) || maxEpisode <= 0 || maxEpisode > 9999) return null;
             // On airing pages the episode nav only tells us what is currently
             // available, not the final episode count, so don't persist it as

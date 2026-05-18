@@ -186,59 +186,71 @@ const FirebaseLib = (function () {
         });
     }
 
+    let _popupRefreshInflight = null;
+
     async function refreshToken(refreshTokenValue) {
-        try {
-            if (!refreshTokenValue || typeof refreshTokenValue !== 'string') {
-                throw new Error('Invalid refresh token');
-            }
+        if (_popupRefreshInflight) return _popupRefreshInflight;
 
-            const response = await fetchWithTimeout(
-                `https://securetoken.googleapis.com/v1/token?key=${API_KEY}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        grant_type: 'refresh_token',
-                        refresh_token: refreshTokenValue
-                    })
+        const inflight = (async () => {
+            try {
+                if (!refreshTokenValue || typeof refreshTokenValue !== 'string') {
+                    throw new Error('Invalid refresh token');
                 }
-            );
 
-            if (!response.ok) {
-                await response.text();
-                PopupLogger.error('Firebase', 'Token refresh HTTP error:', response.status);
-                throw new Error(`HTTP error: ${response.status}`);
+                const response = await fetchWithTimeout(
+                    `https://securetoken.googleapis.com/v1/token?key=${API_KEY}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            grant_type: 'refresh_token',
+                            refresh_token: refreshTokenValue
+                        })
+                    }
+                );
+
+                if (!response.ok) {
+                    await response.text();
+                    PopupLogger.error('Firebase', 'Token refresh HTTP error:', response.status);
+                    throw new Error(`HTTP error: ${response.status}`);
+                }
+
+                const data = await response.json().catch(() => null);
+
+                if (!data) {
+                    throw new Error('Empty/invalid token refresh response');
+                }
+
+                if (data.error) {
+                    throw new Error(data.error?.message || 'Token refresh failed');
+                }
+
+                if (!data.id_token || !data.refresh_token || !data.expires_in) {
+                    const missing = ['id_token', 'refresh_token', 'expires_in'].filter(k => !data[k]);
+                    PopupLogger.error('Firebase', 'Invalid token refresh response, missing fields:', missing);
+                    throw new Error('Invalid token refresh response');
+                }
+
+                const tokens = {
+                    idToken: data.id_token,
+                    refreshToken: data.refresh_token,
+                    expiresAt: Date.now() + (parseInt(data.expires_in) * 1000)
+                };
+
+                await chrome.storage.local.set({ [STORAGE_KEYS.TOKENS]: tokens });
+                PopupLogger.log('Firebase', `Token refreshed, expires at ${new Date(tokens.expiresAt).toLocaleTimeString()}`);
+                return tokens;
+            } catch (error) {
+                PopupLogger.error('Firebase', 'Token refresh error:', error);
+                throw error;
             }
+        })();
 
-            const data = await response.json().catch(() => null);
-
-            if (!data) {
-                throw new Error('Empty/invalid token refresh response');
-            }
-
-            if (data.error) {
-                throw new Error(data.error?.message || 'Token refresh failed');
-            }
-
-            if (!data.id_token || !data.refresh_token || !data.expires_in) {
-                const missing = ['id_token', 'refresh_token', 'expires_in'].filter(k => !data[k]);
-                PopupLogger.error('Firebase', 'Invalid token refresh response, missing fields:', missing);
-                throw new Error('Invalid token refresh response');
-            }
-
-            const tokens = {
-                idToken: data.id_token,
-                refreshToken: data.refresh_token,
-                expiresAt: Date.now() + (parseInt(data.expires_in) * 1000)
-            };
-
-            await chrome.storage.local.set({ [STORAGE_KEYS.TOKENS]: tokens });
-            PopupLogger.log('Firebase', `Token refreshed, expires at ${new Date(tokens.expiresAt).toLocaleTimeString()}`);
-            return tokens;
-        } catch (error) {
-            PopupLogger.error('Firebase', 'Token refresh error:', error);
-            throw error;
-        }
+        _popupRefreshInflight = inflight;
+        inflight.finally(() => {
+            if (_popupRefreshInflight === inflight) _popupRefreshInflight = null;
+        });
+        return inflight;
     }
 
     async function getIdToken() {
@@ -392,9 +404,7 @@ const FirebaseLib = (function () {
         if (!_fsCodec || !doc?.fields) return {};
         return _fsCodec.decodeFields(doc.fields);
     };
-    const firestoreValueToJson = (value) => _fsCodec ? _fsCodec.decodeValue(value) : null;
     const jsonToFirestoreFields = (obj) => _fsCodec ? _fsCodec.encodeFields(obj) : {};
-    const jsonToFirestoreValue = (value) => _fsCodec ? _fsCodec.encodeValue(value) : { nullValue: null };
 
     async function signInWithExportedToken(tokenData) {
         if (!tokenData || !tokenData.user || !tokenData.tokens) throw new Error('Invalid token data');

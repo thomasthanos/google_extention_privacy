@@ -96,7 +96,7 @@
                                 <div class="ip-bar"><div class="ip-fill" style="width:${pct}%"></div></div>
                                 <span class="ip-remaining">${remainingStr}</span>
                             </div>
-                            <a class="ip-continue-btn" href="${continueUrl}" target="_blank" title="Continue watching Ep ${latestEp.number}">
+                            <a class="ip-continue-btn" href="${continueUrl}" target="_blank" rel="noopener noreferrer" title="Continue watching Ep ${latestEp.number}">
                                 <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                                 Continue Ep ${latestEp.number}
                             </a>
