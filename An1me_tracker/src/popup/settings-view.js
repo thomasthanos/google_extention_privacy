@@ -9,7 +9,7 @@
  *   #settingsAvatar, #settingsUserName, #settingsUserEmail, #settingsSignOut,
  *   #settingsCopyGuard (+ subtitle), #settingsSmartNotif (+ subtitle),
  *   #settingsAutoSkipFiller (+ subtitle), #settingsSkiptime (+ subtitle), [NEW]
- *   #settingsRefresh, #settingsRefreshInfo, #settingsExportData,
+ *   #settingsRefresh, #settingsExportData,
  *   #settingsImportData, #settingsImportFile, #settingsFetchFillers,
  *   #settingsClear, #settingsExportToken, #settingsDonate.
  *
@@ -146,13 +146,6 @@
                             <span class="settings-action-subtitle">Sync with cloud</span>
                         </span>
                     </button>
-                    <button class="settings-action" id="settingsRefreshInfo" type="button">
-                        ${svg('info')}
-                        <span class="settings-action-text">
-                            <span class="settings-action-title">Refresh Anime Info</span>
-                            <span class="settings-action-subtitle">Re-fetch episode counts &amp; status</span>
-                        </span>
-                    </button>
                     <button class="settings-action" id="settingsFetchFillers" type="button">
                         ${svg('sparkles')}
                         <span class="settings-action-text">
@@ -205,8 +198,7 @@
         `;
     }
 
-    function renderAboutCard(version) {
-        const safeVersion = escapeHtml(version || '-');
+    function renderAboutCard() {
         return `
             <section class="settings-card settings-card--compact settings-card--support">
                 <div class="settings-about-row">
@@ -214,7 +206,6 @@
                         <span class="settings-about-badge">${svg('heart')}<span>Support</span></span>
                         <span class="settings-about-title">Keep Anime Tracker evolving</span>
                         <span class="settings-about-note">If the extension helps your daily watching flow, you can support future updates here.</span>
-                        <span class="settings-about-version">Anime Tracker v${safeVersion}</span>
                     </div>
                     <button class="settings-about-donate" id="settingsDonate" type="button">
                         ${svg('heart')}<span>Donate</span>
@@ -232,7 +223,6 @@
 
         const {
             user = null,
-            version = null,
             settings = {}
         } = params;
 
@@ -254,7 +244,7 @@
                     ${renderPlaybackCard(state)}
                     ${renderLibraryCard()}
                     ${renderDangerCard()}
-                    ${renderAboutCard(version)}
+                    ${renderAboutCard()}
                 </div>
             `;
             return;
@@ -292,10 +282,6 @@
             state.autoSkipFiller ? 'Filler episodes will be auto-skipped' : 'Skip filler, jump to next canon ep');
         updateToggle('settingsSkiptime', state.skiptimeHelper,
             state.skiptimeHelper ? 'Capture intro/outro on an1me.to/watch' : 'Floating panel for intro/outro contributions');
-
-        // Update version label without touching donate button (still bound).
-        const versionLabel = container.querySelector('.settings-about-version');
-        if (versionLabel) versionLabel.textContent = `Anime Tracker v${escapeHtml(version || '-')}`;
     }
 
     // Lazy-create a hidden aria-live region so screen readers announce toggle
@@ -358,7 +344,7 @@
     // later with the actual user/settings to refresh the visible content.
     const initialContainer = document.getElementById('settingsView');
     if (initialContainer) {
-        render(initialContainer, { user: null, version: null, settings: {} });
+        render(initialContainer, { user: null, settings: {} });
         // Keep it hidden until view-mode='settings' switches to it. The CSS
         // rule `.app.settings-mode #settingsView` handles the show.
         initialContainer.setAttribute('hidden', '');

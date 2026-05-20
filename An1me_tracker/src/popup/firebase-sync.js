@@ -9,6 +9,36 @@ const {
     shallowEqualObjectMap
 } = window.AnimeTracker.MergeUtils;
 
+// Playback & Tracking toggles synced to Firestore under a single
+// `playbackSettings` field. Each entry maps the cloud field name to the
+// chrome.storage.local key + how to interpret raw stored values as a bool.
+// `updatedAt` is a sibling ISO string used for last-write-wins between
+// devices — keeps writes to a single field-masked PATCH and reads piggyback
+// on the existing user-doc fetch (no extra Firestore round trips).
+const PLAYBACK_SETTINGS_KEY = 'playbackSettings';
+const PLAYBACK_SETTINGS_UPDATED_AT_KEY = 'playbackSettingsUpdatedAt';
+const PLAYBACK_SETTINGS_DEBOUNCE_MS = 1500;
+const PLAYBACK_SETTINGS_MAP = {
+    copyGuard: { storage: 'copyGuardEnabled', interpret: (v) => v !== false, defaultsTo: true },
+    smartNotif: { storage: 'smartNotificationsEnabled', interpret: (v) => v === true, defaultsTo: false },
+    autoSkipFiller: { storage: 'autoSkipFillers', interpret: (v) => v === true, defaultsTo: false },
+    skiptimeHelper: { storage: 'skiptimeHelperEnabled', interpret: (v) => v === true, defaultsTo: false }
+};
+
+function readPlaybackSettings(stored) {
+    const settings = {};
+    for (const [field, cfg] of Object.entries(PLAYBACK_SETTINGS_MAP)) {
+        const raw = stored?.[cfg.storage];
+        settings[field] = (typeof raw === 'undefined') ? cfg.defaultsTo : cfg.interpret(raw);
+    }
+    return settings;
+}
+
+function playbackSettingsEqual(a, b) {
+    if (!a || !b) return false;
+    return Object.keys(PLAYBACK_SETTINGS_MAP).every((k) => !!a[k] === !!b[k]);
+}
+
 const FirebaseSync = {
     // State
     currentUser: null,
@@ -19,6 +49,12 @@ const FirebaseSync = {
     cloudSaveRetryCount: 0,
     userDocumentCache: null,
     USER_DOCUMENT_CACHE_TTL_MS: 5 * 60 * 1000,
+
+    // Playback-settings save state (separate from main library save so a
+    // toggle flip doesn't piggyback a full animeData write).
+    playbackSaveTimeout: null,
+    pendingPlaybackSave: null,
+    isSavingPlayback: false,
 
     cloneAny(data) {
         if (data === null || typeof data === 'undefined') return null;
@@ -90,6 +126,155 @@ const FirebaseSync = {
             cachedAt: Date.now(),
             data: this.cloneAny(data)
         };
+    },
+
+    /**
+     * Read current playback toggle state from chrome.storage.local and
+     * return the cloud-shaped object. Used when queueing a save.
+     */
+    async readPlaybackSettingsFromStorage() {
+        const keys = Object.values(PLAYBACK_SETTINGS_MAP).map((c) => c.storage);
+        keys.push(PLAYBACK_SETTINGS_UPDATED_AT_KEY);
+        const stored = await window.AnimeTracker.Storage.get(keys);
+        return {
+            settings: readPlaybackSettings(stored),
+            updatedAt: stored[PLAYBACK_SETTINGS_UPDATED_AT_KEY] || null
+        };
+    },
+
+    /**
+     * Queue a debounced playback-settings cloud write. Reads current toggle
+     * state from storage, stamps `updatedAt`, persists it locally, then
+     * PATCHes ONLY the `playbackSettings` field. Coalesces rapid toggling
+     * into a single write.
+     *
+     * Idempotent against the cached cloud doc — skips the network call when
+     * the desired payload already matches what's in the cache.
+     */
+    async queuePlaybackSettingsSave({ immediate = false } = {}) {
+        const { settings } = await this.readPlaybackSettingsFromStorage();
+        const updatedAt = new Date().toISOString();
+        // Stamp the local copy unconditionally. When the user is signed out
+        // this still records "the user changed something at time X", so a
+        // later sign-in's loadAndSyncData picks the right side in the
+        // last-write-wins compare instead of clobbering offline edits.
+        try {
+            await window.AnimeTracker.Storage.set({ [PLAYBACK_SETTINGS_UPDATED_AT_KEY]: updatedAt });
+        } catch (e) {
+            PopupLogger.warn('Firebase', `Failed to stamp local playbackSettingsUpdatedAt: ${e?.message}`);
+        }
+
+        if (!this.currentUser) return;
+
+        this.pendingPlaybackSave = { ...settings, updatedAt };
+
+        if (this.playbackSaveTimeout) {
+            clearTimeout(this.playbackSaveTimeout);
+            this.playbackSaveTimeout = null;
+        }
+
+        if (immediate) {
+            return this.flushPlaybackSettingsSave();
+        }
+
+        return new Promise((resolve) => {
+            this.playbackSaveTimeout = setTimeout(async () => {
+                this.playbackSaveTimeout = null;
+                try {
+                    await this.flushPlaybackSettingsSave();
+                } catch (e) {
+                    PopupLogger.warn('Firebase', `Playback settings save failed: ${e?.message}`);
+                }
+                resolve();
+            }, PLAYBACK_SETTINGS_DEBOUNCE_MS);
+        });
+    },
+
+    async flushPlaybackSettingsSave() {
+        if (!this.currentUser || !this.pendingPlaybackSave) return;
+        if (this.isSavingPlayback) return;
+
+        const payload = this.pendingPlaybackSave;
+        this.pendingPlaybackSave = null;
+        this.isSavingPlayback = true;
+
+        try {
+            const { data: cached } = this.getCachedUserDocument(this.currentUser.uid);
+            const cachedPlayback = cached?.playbackSettings || null;
+            if (cachedPlayback
+                && cachedPlayback.updatedAt === payload.updatedAt
+                && playbackSettingsEqual(cachedPlayback, payload)) {
+                // Cache already reflects this exact payload — skip the PATCH.
+                return;
+            }
+
+            await FirebaseLib.setDocument('users', this.currentUser.uid, {
+                playbackSettings: payload
+            }, { fields: ['playbackSettings'] });
+
+            // Seed the local cache and the SW's so a follow-up sync doesn't
+            // pay a Firestore read just to learn what we just wrote.
+            if (cached) {
+                const updated = { ...cached, playbackSettings: payload };
+                this.setCachedUserDocument(this.currentUser.uid, updated);
+            }
+            try {
+                chrome.runtime.sendMessage(
+                    { type: 'UPDATE_BG_PLAYBACK_SETTINGS', playbackSettings: payload },
+                    () => { void chrome.runtime.lastError; }
+                );
+            } catch { /* best effort */ }
+
+            PopupLogger.log('Firebase', `Playback settings synced · cg=${payload.copyGuard?'1':'0'} sn=${payload.smartNotif?'1':'0'} af=${payload.autoSkipFiller?'1':'0'} sh=${payload.skiptimeHelper?'1':'0'}`);
+        } catch (error) {
+            // Re-queue so the next flush retries — but don't infinite-loop:
+            // only restore if nothing newer landed in the meantime.
+            if (!this.pendingPlaybackSave) this.pendingPlaybackSave = payload;
+            throw error;
+        } finally {
+            this.isSavingPlayback = false;
+        }
+    },
+
+    /**
+     * Apply cloud playback settings to local storage if the cloud copy is
+     * newer than what we have locally. Returns true if local was updated.
+     */
+    async applyCloudPlaybackSettings(cloudPlayback) {
+        if (!cloudPlayback || typeof cloudPlayback !== 'object') return false;
+        const cloudUpdatedAt = cloudPlayback.updatedAt || null;
+        if (!cloudUpdatedAt) return false;
+
+        const keys = Object.values(PLAYBACK_SETTINGS_MAP).map((c) => c.storage);
+        keys.push(PLAYBACK_SETTINGS_UPDATED_AT_KEY);
+        const stored = await window.AnimeTracker.Storage.get(keys);
+        const localUpdatedAt = stored[PLAYBACK_SETTINGS_UPDATED_AT_KEY] || null;
+
+        // Cloud wins only when strictly newer — ties favor local so we don't
+        // clobber an in-flight user toggle with the value we just pushed.
+        if (localUpdatedAt && Date.parse(localUpdatedAt) >= Date.parse(cloudUpdatedAt)) {
+            return false;
+        }
+
+        const writes = { [PLAYBACK_SETTINGS_UPDATED_AT_KEY]: cloudUpdatedAt };
+        let changed = false;
+        for (const [field, cfg] of Object.entries(PLAYBACK_SETTINGS_MAP)) {
+            const next = !!cloudPlayback[field];
+            const current = (typeof stored[cfg.storage] === 'undefined') ? cfg.defaultsTo : cfg.interpret(stored[cfg.storage]);
+            if (current !== next) {
+                writes[cfg.storage] = next;
+                changed = true;
+            }
+        }
+
+        if (!changed) {
+            // Just bump the updatedAt so we don't keep re-comparing.
+            await window.AnimeTracker.Storage.set(writes);
+            return false;
+        }
+
+        await window.AnimeTracker.Storage.set(writes);
+        return true;
     },
 
     async hydrateSyncData(data) {
@@ -669,6 +854,37 @@ const FirebaseSync = {
 
             await FillerService.loadCachedEpisodeTypes(finalData.animeData);
 
+            // ── Playback settings reconciliation ─────────────────────────
+            // Cloud wins when its `updatedAt` is strictly newer than the
+            // local stamp. Otherwise local is newer (or cloud has none yet)
+            // and we push our local view up so cross-device sync converges.
+            // Single-field PATCH, debounced — cheap.
+            try {
+                const cloudPlayback = cloudData?.playbackSettings || null;
+                const applied = await this.applyCloudPlaybackSettings(cloudPlayback);
+                if (!applied) {
+                    const { settings: localPlayback, updatedAt: localPlaybackStamp } =
+                        await this.readPlaybackSettingsFromStorage();
+                    const cloudNewerOrEqual = cloudPlayback?.updatedAt
+                        && localPlaybackStamp
+                        && Date.parse(cloudPlayback.updatedAt) >= Date.parse(localPlaybackStamp);
+                    const cloudMatches = cloudPlayback
+                        && playbackSettingsEqual(cloudPlayback, localPlayback);
+                    if (!cloudNewerOrEqual || !cloudMatches) {
+                        // Ensure local has a stamp before pushing — first-ever push
+                        // for a user who never toggled anything still seeds the cloud
+                        // doc so future devices have a baseline.
+                        if (!localPlaybackStamp) {
+                            const seedStamp = new Date().toISOString();
+                            await Storage.set({ [PLAYBACK_SETTINGS_UPDATED_AT_KEY]: seedStamp });
+                        }
+                        await this.queuePlaybackSettingsSave({ immediate: false });
+                    }
+                }
+            } catch (e) {
+                PopupLogger.warn('Sync', 'Playback settings reconcile skipped:', e?.message || e);
+            }
+
             if (elements?.syncStatus) {
                 elements.syncStatus.classList.remove('syncing');
                 elements.syncStatus.classList.add('synced');
@@ -696,6 +912,25 @@ const FirebaseSync = {
         if (this.saveToCloudTimeout) {
             clearTimeout(this.saveToCloudTimeout);
             this.saveToCloudTimeout = null;
+        }
+
+        // Flush a queued playback-settings PATCH with keepalive so a toggle
+        // flip seconds before popup close still lands on the server.
+        if (this.playbackSaveTimeout) {
+            clearTimeout(this.playbackSaveTimeout);
+            this.playbackSaveTimeout = null;
+        }
+        if (this.pendingPlaybackSave && this.currentUser) {
+            const playbackToSave = this.pendingPlaybackSave;
+            this.pendingPlaybackSave = null;
+            FirebaseLib.setDocument('users', this.currentUser.uid, {
+                playbackSettings: playbackToSave
+            }, {
+                keepalive: true,
+                fields: ['playbackSettings']
+            }).catch((err) => {
+                PopupLogger.error('Sync', 'Playback save on unload failed:', err);
+            });
         }
 
         if (this.pendingSave && this.currentUser) {

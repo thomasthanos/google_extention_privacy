@@ -22,6 +22,7 @@ const FillerFetchUI = {
         isRunning:   false,
         isCancelled: false,
         fetchDone:   false,
+        autoMode:    false,
         primaryAction: 'start',
         total:   0,
         fetched: 0,
@@ -349,7 +350,11 @@ const FillerFetchUI = {
 
         document.getElementById(this.IDS.overlay)
             .addEventListener('click', (e) => {
-                if (e.target.id === this.IDS.overlay) this.close();
+                // Click-outside dismisses, but in autoMode the import IS the boss —
+                // the user can't dismiss it until done (matches the hidden X / Hide
+                // buttons). Otherwise an accidental click-outside aborts the post-
+                // sign-in / post-update fetch that we *want* to complete.
+                if (e.target.id === this.IDS.overlay && !this.state.autoMode) this.close();
             });
 
         document.getElementById(this.IDS.startBtn)
@@ -368,38 +373,67 @@ const FillerFetchUI = {
             try { document.removeEventListener('keydown', this._escHandler); } catch {}
         }
         this._escHandler = (e) => {
-            if (e.key === 'Escape' && this.state.isOpen) this.close();
+            if (e.key === 'Escape' && this.state.isOpen && !this.state.autoMode) this.close();
         };
         document.addEventListener('keydown', this._escHandler);
     },
 
     // ─── Open / Close ────────────────────────────────────────────────────────
 
-    async open() {
+    async open(options = {}) {
+        const autoMode = options.autoMode === true;
         this.state.isOpen = true;
-        this.resetUI();
+        this.state.autoMode = autoMode;
+        this.resetUI({ autoMode });
 
         const data = await window.AnimeTracker.Storage.get(['animeData']);
         this.state.total = Object.keys(data.animeData || {}).length;
 
         document.getElementById(this.IDS.overlay).style.display = 'flex';
+        this._applyAutoModeChrome();
     },
 
     close() {
-        // Block close while fetch is running — user must cancel first
+        // Block close while fetch is running — user must cancel first.
+        // Auto-mode also blocks close at all times (it self-dismisses).
         if (this.state.isRunning) return;
+        if (this.state.autoMode && !this.state.fetchDone) return;
         this.state.isOpen = false;
+        this.state.autoMode = false;
         document.getElementById(this.IDS.overlay).style.display = 'none';
+    },
+
+    /**
+     * Apply autoMode visibility to the close × and the primary Start/Hide
+     * button. In autoMode the dialog is the boss — neither button is shown
+     * while the import is in flight; only after `fetchDone` do we expose a
+     * single Close affordance.
+     */
+    _applyAutoModeChrome() {
+        const closeBtn = document.getElementById(this.IDS.closeBtn);
+        const startBtn = document.getElementById(this.IDS.startBtn);
+        const cancelBtn = document.getElementById(this.IDS.cancelBtn);
+        if (!closeBtn || !startBtn || !cancelBtn) return;
+
+        if (!this.state.autoMode) return;
+
+        closeBtn.style.display = 'none';
+        cancelBtn.style.display = 'none';
+        if (!this.state.fetchDone) {
+            startBtn.style.display = 'none';
+        }
     },
 
     // ─── UI helpers ─────────────────────────────────────────────────────────
 
-    resetUI() {
+    resetUI(options = {}) {
+        const keepAutoMode = options.autoMode === true;
         Object.assign(this.state, {
             isRunning: false, isCancelled: false, fetchDone: false,
             primaryAction: 'start',
             fetched: 0, cached: 0, skipped: 0, failed: 0,
         });
+        if (!keepAutoMode) this.state.autoMode = false;
 
         this._setProgress(0, 'Ready to fetch and import your data…');
         ['fetched','cached','skipped','failed'].forEach(k => this._setStat(k, 0));
@@ -408,10 +442,12 @@ const FillerFetchUI = {
         log.innerHTML = '';
         log.style.display = 'none';
 
+        const closeBtn = document.getElementById(this.IDS.closeBtn);
         const startBtn = document.getElementById(this.IDS.startBtn);
         startBtn.textContent = 'Start Import';
         startBtn.style.display = '';
         startBtn.disabled = false;
+        if (closeBtn) closeBtn.style.display = '';
         document.getElementById(this.IDS.cancelBtn).style.display = 'none';
     },
 
@@ -450,8 +486,9 @@ const FillerFetchUI = {
         document.getElementById(this.IDS.cancelBtn).style.display = 'none';
         const startBtn = document.getElementById(this.IDS.startBtn);
         startBtn.textContent = 'Hide';
-        startBtn.style.display = '';
+        startBtn.style.display = this.state.autoMode ? 'none' : '';
         startBtn.disabled = false;
+        this._applyAutoModeChrome();
     },
 
     applyBackgroundState(state) {
@@ -504,6 +541,15 @@ const FillerFetchUI = {
         startBtn.style.display = '';
         startBtn.disabled = false;
         startBtn.textContent = state.status === 'running' ? 'Hide' : 'Close';
+        // autoMode hides Hide-while-running and the × at all times; the
+        // single Close affordance only re-emerges once `fetchDone` flips.
+        if (this.state.autoMode) {
+            const closeBtn = document.getElementById(this.IDS.closeBtn);
+            if (closeBtn) closeBtn.style.display = 'none';
+            if (state.status === 'running') {
+                startBtn.style.display = 'none';
+            }
+        }
     },
 
     /**
@@ -552,7 +598,9 @@ const FillerFetchUI = {
         this.state.isCancelled = false;
 
         document.getElementById(this.IDS.startBtn).style.display  = 'none';
-        document.getElementById(this.IDS.cancelBtn).style.display = '';
+        // Cancel is only an option for user-initiated fetches. autoMode is
+        // the boss — no Cancel, no Hide, no × until the run completes.
+        document.getElementById(this.IDS.cancelBtn).style.display = this.state.autoMode ? 'none' : '';
         document.getElementById(this.IDS.closeBtn).style.display  = 'none';
 
         const { FillerService, Storage, CONFIG } = window.AnimeTracker;
@@ -666,7 +714,9 @@ const FillerFetchUI = {
         this._setProgress(progressPct, progressLabel);
 
         document.getElementById(this.IDS.cancelBtn).style.display = 'none';
-        document.getElementById(this.IDS.closeBtn).style.display  = '';
+        // autoMode hides the × at all times; user dismisses via the single
+        // "Close" button below once fetchDone flips.
+        document.getElementById(this.IDS.closeBtn).style.display  = this.state.autoMode ? 'none' : '';
         const startBtn = document.getElementById(this.IDS.startBtn);
         startBtn.textContent = this.state.isCancelled ? 'Closed' : '✓ Done';
         startBtn.style.display = '';

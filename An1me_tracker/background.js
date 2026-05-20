@@ -759,8 +759,77 @@ async function _doApplyCloudUpdate(cloudDoc) {
             });
             dlog('[BG-RT] ← Cloud update applied');
         }
+
+        if (cloudDoc.playbackSettings) {
+            await applyCloudPlaybackSettings(cloudDoc.playbackSettings);
+        }
     } catch (e) {
         console.warn('[BG-RT] Apply update failed:', e.message);
+    }
+}
+
+// Playback toggles synced via cloudDoc.playbackSettings. Mirrored from
+// FirebaseSync.applyCloudPlaybackSettings (popup) so the SW can propagate
+// changes seen via pollCloudData → chrome.storage.local without going
+// through the popup. Last-write-wins via `updatedAt` ISO timestamp.
+const BG_PLAYBACK_FIELD_MAP = {
+    copyGuard: 'copyGuardEnabled',
+    smartNotif: 'smartNotificationsEnabled',
+    autoSkipFiller: 'autoSkipFillers',
+    skiptimeHelper: 'skiptimeHelperEnabled'
+};
+const BG_PLAYBACK_UPDATED_AT_KEY = 'playbackSettingsUpdatedAt';
+
+async function applyCloudPlaybackSettings(cloudPlayback) {
+    if (!cloudPlayback || typeof cloudPlayback !== 'object') return false;
+    const cloudUpdatedAt = cloudPlayback.updatedAt || null;
+    if (!cloudUpdatedAt) return false;
+
+    try {
+        const localKeys = Object.values(BG_PLAYBACK_FIELD_MAP).concat([BG_PLAYBACK_UPDATED_AT_KEY]);
+        const stored = await bgStorageGet(localKeys);
+        const localUpdatedAt = stored[BG_PLAYBACK_UPDATED_AT_KEY] || null;
+        if (localUpdatedAt && Date.parse(localUpdatedAt) >= Date.parse(cloudUpdatedAt)) {
+            return false;
+        }
+
+        const writes = { [BG_PLAYBACK_UPDATED_AT_KEY]: cloudUpdatedAt };
+        let changed = false;
+        for (const [field, storageKey] of Object.entries(BG_PLAYBACK_FIELD_MAP)) {
+            const next = !!cloudPlayback[field];
+            const current = stored[storageKey];
+            // copyGuard treats undefined-or-true as ON; others treat undefined as OFF.
+            const currentBool = storageKey === 'copyGuardEnabled'
+                ? (current !== false)
+                : (current === true);
+            if (currentBool !== next) {
+                writes[storageKey] = next;
+                changed = true;
+            }
+        }
+
+        if (!changed) {
+            await bgStorageSet(writes);
+            return false;
+        }
+
+        await bgStorageSet(writes);
+
+        // Smart notifs has alarm side-effects — schedule/cancel here so a
+        // cloud-driven enable on another device still starts the alarm.
+        if (Object.prototype.hasOwnProperty.call(writes, 'smartNotificationsEnabled')) {
+            if (writes.smartNotificationsEnabled) {
+                chrome.alarms.create(SMART_NOTIF_ALARM, { periodInMinutes: SMART_NOTIF_INTERVAL_MINUTES });
+            } else {
+                chrome.alarms.clear(SMART_NOTIF_ALARM).catch(() => {});
+            }
+        }
+
+        dlog('[BG-RT] ← Cloud playback settings applied');
+        return true;
+    } catch (e) {
+        console.warn('[BG-RT] Apply playback settings failed:', e.message);
+        return false;
     }
 }
 
@@ -864,6 +933,17 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     if (changes.animeData) {
         maybeStartPendingMetadataRepair().catch((error) => {
             console.error('[BG] Failed to honor pending repair request:', error);
+        });
+    }
+
+    // The popup sets `pendingBackgroundMetadataRepair: true` on sign-in. If
+    // animeData happens to be identical between local and cloud (e.g. signing
+    // back in on the same device), the `changes.animeData` path above never
+    // fires and the flag would sit unread until the next SW boot. Honor the
+    // flag-flip directly so the silent repair starts within seconds of sign-in.
+    if (changes.pendingBackgroundMetadataRepair?.newValue === true) {
+        maybeStartPendingMetadataRepair().catch((error) => {
+            console.error('[BG] Failed to start pending repair on flag flip:', error);
         });
     }
 });
@@ -1121,6 +1201,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return true;
     }
 
+    if (message.type === 'UPDATE_BG_PLAYBACK_SETTINGS') {
+        // Popup just pushed playbackSettings to Firestore — patch the SW
+        // cache so a follow-up poll doesn't re-fetch the same value we
+        // already know about.
+        if (message.playbackSettings && typeof message.playbackSettings === 'object') {
+            if (_bgCloudDocCache && typeof _bgCloudDocCache === 'object') {
+                _bgCloudDocCache = { ..._bgCloudDocCache, playbackSettings: message.playbackSettings };
+                _bgCloudDocCacheTime = Date.now();
+            }
+        }
+        sendResponse({ ok: true });
+        return true;
+    }
+
     if (message.type === 'FETCH_ANIME_INFO') {
         if (!message.slug) { sendResponse({ error: 'Missing slug' }); return true; }
         fetchAnimePageInfo(message.slug)
@@ -1274,8 +1368,72 @@ chrome.runtime.onInstalled.addListener((details) => {
         ].join(';');
         dlog(`%c🎬 Anime Tracker v${chrome.runtime.getManifest().version}`, style);
         migrateFromSyncToLocal();
+
+        // Post-update fetch: stamp a flag so (a) the SW kicks off the
+        // metadata-repair pass on boot via maybeStartPendingMetadataRepair(),
+        // and (b) the next popup open surfaces the auto-fetch UI + toast.
+        // Skip if a previous post-update flag is still unconsumed (user
+        // hasn't opened the popup yet) — don't double-stamp.
+        const fromVersion = details.previousVersion || null;
+        const toVersion = chrome.runtime.getManifest().version || null;
+
+        // Wipe metadata caches (animeinfo_*, episodeTypes_*) so the post-
+        // update repair has real work to do instead of returning "all cached"
+        // immediately. Without this, every update produced an empty no-op
+        // pass and the user saw "Import complete · 0 fetched" — confusing
+        // and useless. We rebuild from scratch with the new version's logic.
+        clearMetadataCachesOnce().catch((e) =>
+            console.warn('[BG] Metadata cache wipe on update failed:', e)
+        ).finally(() => {
+            bgStorageGet(['postUpdateFetchTriggeredAt']).then((existing) => {
+                const payload = {
+                    pendingBackgroundMetadataRepair: true
+                };
+                if (!existing.postUpdateFetchTriggeredAt) {
+                    payload.postUpdateFetchTriggeredAt = Date.now();
+                    payload.postUpdateFetchFromVersion = fromVersion;
+                    payload.postUpdateFetchToVersion = toVersion;
+                }
+                return bgStorageSet(payload);
+            }).then(() => {
+                // Kick off the repair immediately so background warming happens
+                // even if the user never opens the popup. Re-entrant-safe.
+                maybeStartPendingMetadataRepair().catch((error) => {
+                    console.warn('[BG] Post-update repair start failed:', error);
+                });
+            }).catch((e) => console.warn('[BG] Post-update flag write failed:', e));
+        });
     }
 });
+
+/**
+ * Wipe every `animeinfo_*` and `episodeTypes_*` key from chrome.storage.local.
+ * Called from the onInstalled.update handler so the metadata-repair pass that
+ * follows actually re-scrapes (instead of seeing fresh-cached entries and
+ * skipping every item). Uses get(null) to enumerate then a single remove() —
+ * avoids paying a per-key remove round-trip on libraries with hundreds of
+ * tracked anime.
+ */
+async function clearMetadataCachesOnce() {
+    try {
+        const all = await new Promise((resolve, reject) => {
+            chrome.storage.local.get(null, (result) => {
+                if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+                else resolve(result || {});
+            });
+        });
+        const keysToClear = Object.keys(all).filter((k) =>
+            k.startsWith('animeinfo_') || k.startsWith('episodeTypes_')
+        );
+        if (keysToClear.length === 0) return;
+        await bgStorageRemove(keysToClear);
+        invalidateBgCloudDocCache();
+        dlog(`[BG] Wiped ${keysToClear.length} metadata cache entries for post-update refresh`);
+    } catch (e) {
+        console.warn('[BG] clearMetadataCachesOnce failed:', e);
+        throw e;
+    }
+}
 
 chrome.runtime.onStartup.addListener(() => {
     dlog('[Anime Tracker] Extension started');

@@ -37,7 +37,6 @@
         settingsUserEmail: document.getElementById('settingsUserEmail'),
         settingsDonate: document.getElementById('settingsDonate'),
         settingsRefresh: document.getElementById('settingsRefresh'),
-        settingsRefreshInfo: document.getElementById('settingsRefreshInfo'),
         settingsCopyGuard: document.getElementById('settingsCopyGuard'),
         settingsCopyGuardSubtitle: document.getElementById('settingsCopyGuardSubtitle'),
         settingsDataTools: document.getElementById('settingsDataTools'),
@@ -97,7 +96,6 @@
     // State for edit title
     let editingSlug = null;
     let loadAndSyncInProgress = false;
-    let pendingAutoRepairAfterSignIn = false;
     let metadataRepairPromise = null;
     let lastMetadataRepairState = null;
     let metadataRepairStatusResetTimer = null;
@@ -1335,7 +1333,6 @@
         }
 
         const user = AT?.FirebaseSync?.getUser?.() || null;
-        const version = chrome.runtime?.getManifest?.()?.version || null;
 
         // Read all toggle states from storage so the UI matches reality. We
         // can avoid this if main.js already has them in memory — but reading
@@ -1361,7 +1358,6 @@
 
         SettingsView.render(container, {
             user,
-            version,
             settings: storedSettings
         });
 
@@ -1628,13 +1624,16 @@
         const slugsList = Object.keys(animeData);
         const { allFillersCached, allAnilistCached } = checkAllCached(slugsList);
 
-        const repairState = await syncMetadataRepairStateFromStorage({ autoOpenRunning: true });
+        // Skip the popup-side auto-fetch entirely when the SW is already
+        // running a metadata repair — otherwise both would race to fetch
+        // the same items.
+        const repairState = await syncMetadataRepairStateFromStorage();
         const repairRunning = repairState?.status === 'running';
 
-        if (!pendingAutoRepairAfterSignIn && !repairRunning && !allFillersCached) {
+        if (!repairRunning && !allFillersCached) {
             runAutoFetch(FillerService, animeData, () => scheduleDeferredListRefresh());
         }
-        if (!pendingAutoRepairAfterSignIn && !repairRunning && !allAnilistCached) {
+        if (!repairRunning && !allAnilistCached) {
             runAutoFetch(AT.AnilistService, animeData, () => scheduleDeferredListRefresh());
         }
     }
@@ -2527,16 +2526,68 @@
         return applyMetadataRepairState(result.metadataRepairState || null, options);
     }
 
+    /**
+     * If the background service worker stamped `postUpdateFetchTriggeredAt`
+     * after an extension update, surface a toast and open the auto-fetch UI
+     * so the freshly-installed version warms its anime metadata caches.
+     *
+     * Always clears the flag — even when there's nothing to fetch — so we
+     * don't re-trigger every popup open. The BG side already kicked off
+     * `pendingBackgroundMetadataRepair`; here we just expose it to the user.
+     */
+    /**
+     * The SW kicks off the post-update metadata repair on `onInstalled.update`
+     * before the popup ever opens, so we DON'T pop a toast or auto-open the
+     * fetch dialog when the user happens to open the popup later — that was
+     * the green "πρασινακι" that interrupted the user. Instead we silently
+     * consume the post-update flag and let the footer sync-status badge
+     * surface any in-flight progress (driven by the storage.onChanged
+     * listener that calls applyMetadataRepairState on every state tick).
+     *
+     * The user can still open the import dialog any time via
+     * Settings → Fetch & Import All.
+     */
+    async function maybePromptPostUpdateFetch() {
+        const { Storage } = AT;
+        try {
+            const stored = await Storage.get([
+                'postUpdateFetchTriggeredAt',
+                'postUpdateFetchToVersion',
+                'metadataRepairState'
+            ]);
+
+            if (stored.postUpdateFetchTriggeredAt) {
+                // Single-shot — clear so we don't keep checking forever.
+                await Storage.remove([
+                    'postUpdateFetchTriggeredAt',
+                    'postUpdateFetchFromVersion',
+                    'postUpdateFetchToVersion'
+                ]);
+            }
+
+            // If a repair is already running in the background, reflect it
+            // in the footer immediately (storage.onChanged would also do
+            // this on the next state tick, but this avoids the gap on
+            // popup-open before the first tick).
+            if (stored.metadataRepairState?.status === 'running') {
+                applyMetadataRepairState(stored.metadataRepairState);
+            }
+        } catch (e) {
+            PopupLogger.warn('Init', 'Post-update silent sync failed:', e);
+        }
+    }
+
     async function fetchAllFillers(options = {}) {
         const {
             autoStart = true,
             forceInfoRefresh = false,
-            forceFillerRefresh = false
+            forceFillerRefresh = false,
+            autoMode = false
         } = options;
 
         const { FillerFetchUI } = AT;
 
-        await FillerFetchUI.open();
+        await FillerFetchUI.open({ autoMode });
 
         if (!autoStart) {
             return syncMetadataRepairStateFromStorage({ ensureOpen: true });
@@ -2589,7 +2640,8 @@
     async function signInWithGoogle() {
         const { FirebaseSync } = AT;
         try {
-            pendingAutoRepairAfterSignIn = true;
+            // Set the flag; SW honors it via storage.onChanged and runs the
+            // metadata repair silently. No popup-side modal/toast.
             await chrome.storage.local.set({ pendingBackgroundMetadataRepair: true });
             elements.googleSignIn.disabled = true;
             elements.googleSignIn.innerHTML = `
@@ -2610,7 +2662,6 @@
                 PopupLogger.error('Firebase', 'Sign in error:', error);
                 showAuthToast('Sign in failed. Please try again.', 'error');
             }
-            pendingAutoRepairAfterSignIn = false;
             await chrome.storage.local.set({ pendingBackgroundMetadataRepair: false });
         } finally {
             elements.googleSignIn.disabled = false;
@@ -2732,12 +2783,12 @@
                 tokenSignInBtn.textContent = 'Importing...';
                 if (errorEl) errorEl.style.display = 'none';
                 try {
-                    pendingAutoRepairAfterSignIn = true;
+                    // Set the flag; SW honors it via storage.onChanged and
+                    // runs the metadata repair silently. No popup-side modal.
                     await chrome.storage.local.set({ pendingBackgroundMetadataRepair: true });
                     const tokenData = JSON.parse(tokenInput);
                     await FirebaseLib.signInWithExportedToken(tokenData);
                 } catch (err) {
-                    pendingAutoRepairAfterSignIn = false;
                     await chrome.storage.local.set({ pendingBackgroundMetadataRepair: false });
                     const msg = (err instanceof SyntaxError || (err.message && err.message.includes('JSON')))
                         ? 'Invalid token format. Please copy it again from Chrome.'
@@ -2851,6 +2902,14 @@
             try {
                 await chrome.storage.local.set({ [key.storageKey]: nextEnabled });
                 if (onAfterSave) onAfterSave(nextEnabled);
+                // Mirror the change up to Firestore so other devices pick it
+                // up. Debounced — flipping multiple toggles in a row produces
+                // a single field-masked PATCH.
+                try {
+                    await FirebaseSync.queuePlaybackSettingsSave();
+                } catch (syncError) {
+                    PopupLogger.warn('Settings', `Cloud sync queue failed for ${key.btnId}: ${syncError?.message}`);
+                }
             } catch (error) {
                 PopupLogger.error('Settings', `Failed to update ${key.btnId}:`, error);
                 renderFn(currentlyEnabled);
@@ -2941,41 +3000,6 @@
                 return;
             }
 
-            const refreshInfoBtn = e.target.closest('#settingsRefreshInfo');
-            if (refreshInfoBtn) {
-                const { Storage, AnilistService } = AT;
-                refreshInfoBtn.classList.add('loading');
-                setSettingsDataToolsExpanded(false);
-                setSettingsPreferencesExpanded(false);
-                try {
-                    const allKeys = await new Promise((resolve) => chrome.storage.local.get(null, (r) => {
-                        // Surface storage failures instead of silently treating them as empty.
-                        if (chrome.runtime.lastError) {
-                            PopupLogger.warn('Storage', 'get(null) error:', chrome.runtime.lastError.message);
-                            resolve({});
-                            return;
-                        }
-                        resolve(r || {});
-                    }));
-                    const infoKeys = Object.keys(allKeys).filter(k => k.startsWith('animeinfo_'));
-                    if (infoKeys.length > 0) await Storage.remove(infoKeys);
-                    AnilistService.cache = {};
-                    startAutoSync();
-                    await AnilistService.autoFetchMissing(animeData, () => {
-                        scheduleDeferredListRefresh();
-                    }, (done, total, title) => {
-                        setMetadataRepairStatus(`${done}/${total} — ${_truncTitle(title, 18)}`);
-                    });
-                    endAutoSync();
-                } catch (err) {
-                    PopupLogger.error('RefreshInfo', 'Error:', err);
-                    endAutoSync();
-                } finally {
-                    refreshInfoBtn.classList.remove('loading');
-                }
-                return;
-            }
-
             if (e.target.closest('#settingsClear')) {
                 setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
@@ -3011,7 +3035,15 @@
             if (e.target.closest('#settingsFetchFillers')) {
                 setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
-                await fetchAllFillers({ autoStart: true });
+                // Force a real re-scan — without this, the SW finds every
+                // cache entry still fresh and returns "Import complete" in
+                // milliseconds, which makes the button look broken. Users
+                // press this when they want fresh data, period.
+                await fetchAllFillers({
+                    autoStart: true,
+                    forceInfoRefresh: true,
+                    forceFillerRefresh: true
+                });
                 return;
             }
         });
@@ -3277,6 +3309,15 @@
             }
             if (changes[COPY_GUARD_STORAGE_KEY]) {
                 renderCopyGuardSetting(changes[COPY_GUARD_STORAGE_KEY].newValue !== false);
+            }
+            if (changes[SMART_NOTIF_STORAGE_KEY]) {
+                renderSmartNotifSetting(changes[SMART_NOTIF_STORAGE_KEY].newValue === true);
+            }
+            if (changes[AUTO_SKIP_FILLER_STORAGE_KEY]) {
+                renderAutoSkipFillerSetting(changes[AUTO_SKIP_FILLER_STORAGE_KEY].newValue === true);
+            }
+            if (changes[SKIPTIME_HELPER_KEY]) {
+                renderSkiptimeHelperSetting(changes[SKIPTIME_HELPER_KEY].newValue === true);
             }
             if (changes.videoProgress) {
                 videoProgress = changes.videoProgress.newValue || {};
@@ -3554,16 +3595,24 @@
                 try { chrome.runtime.sendMessage({ type: 'GET_VERSION' }); } catch {}
                 await refreshPopupCloudData(true);
                 startPopupCloudRefresh();
-                if (pendingAutoRepairAfterSignIn) {
-                    pendingAutoRepairAfterSignIn = false;
-                    await fetchAllFillers({ autoStart: true });
-                }
+                // Sign-in is always silent — the SW picks up the
+                // `pendingBackgroundMetadataRepair` flag we wrote in
+                // signInWithGoogle / tokenSignInBtn and runs the repair in
+                // background. Progress is surfaced via the footer
+                // sync-status badge (storage.onChanged → applyMetadataRepairState).
+                await maybePromptPostUpdateFetch();
             },
             onUserSignedOut: () => {
                 stopPopupCloudRefresh();
                 showAuthScreen();
             },
-            onError: () => { showMainApp(null); loadData(); }
+            onError: () => {
+                showMainApp(null);
+                loadData();
+                // Show the post-update prompt even when auth errored — the
+                // local library still benefits from a metadata refresh.
+                maybePromptPostUpdateFetch().catch(() => {});
+            }
         });
     }
 
