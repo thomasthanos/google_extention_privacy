@@ -140,6 +140,11 @@ const ContentStorage = {
         const requested = Array.isArray(keys) ? keys : [keys];
         const run = async () => {
             const data = await this.get(requested);
+            // Storage read timed out — bail before the mutator runs. Otherwise
+            // the mutator's `data.x = data.x || {}` seeds empty maps and the
+            // set() below clobbers real storage with them. Callers detect this
+            // via the returned `__timedOut` flag.
+            if (data && data.__timedOut) return data;
             const result = mutator(data);
             if (result && typeof result.then === 'function') await result;
             const payload = {};

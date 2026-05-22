@@ -91,6 +91,17 @@
       ],
       "run_at": "document_idle",
       "all_frames": false
+    },
+    {
+      "matches": [
+        "https://an1me.to/",
+        "https://*.an1me.to/"
+      ],
+      "js": [
+        "src/content/continue-watching.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ],
   "background": {

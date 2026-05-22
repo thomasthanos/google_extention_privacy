@@ -116,6 +116,7 @@ const UIHelpers = {
         'myanimelist.net',
         'media.kitsu.app',
         'img1.ak.crunchyroll.com',
+        'image.tmdb.org',
         'an1me.to',
     ],
 

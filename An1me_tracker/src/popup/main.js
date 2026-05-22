@@ -121,6 +121,7 @@
     }
     let deferredListRefresh = null;
     let realignCategoryTabs = () => {};
+    let categorySwitchTimer = null;
     // 5min interval — reuses the FirebaseSync user-document cache (TTL also
     // 5min) and the SW's `_BG_CLOUD_TTL`, so each tick costs at most 1 read
     // and only when the cache window has rolled over. Was 60s+forceFresh,
@@ -431,6 +432,29 @@
         return allowed.has(value) ? value : 'all';
     }
 
+    function renderCategorySwitch(filter = '') {
+        if (!elements.animeList) {
+            renderAnimeList(filter);
+            return;
+        }
+
+        if (categorySwitchTimer) {
+            clearTimeout(categorySwitchTimer);
+            categorySwitchTimer = null;
+        }
+
+        elements.animeList.classList.add('category-switching');
+        categorySwitchTimer = setTimeout(() => {
+            categorySwitchTimer = null;
+            renderAnimeList(filter);
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    elements.animeList?.classList.remove('category-switching');
+                });
+            });
+        }, 90);
+    }
+
     function normalizeCompactStatus(value) {
         const allowed = new Set(['airing', 'on_hold', 'completed', 'dropped']);
         return allowed.has(value) ? value : 'airing';
@@ -440,7 +464,8 @@
         AnimeStatus,
         getStatus: getAnimeStatus,
         isCompleted: isAnimeCompleted,
-        repairAiringCompleted: repairAiringCompletedEntries
+        repairAiringCompleted: repairAiringCompletedEntries,
+        persistDetectedCompletions
     } = AT.StatusService;
 
     // normalizeMovieDurations + cleanupPhantomMovies live in
@@ -1009,10 +1034,12 @@
             // ── Status chips (Airing / Hold / Completed / Dropped tabs)
             const chip = target.closest('[data-compact-status]');
             if (chip && list.contains(chip)) {
-                e.stopPropagation();
+                e.preventDefault();
+                e.stopImmediatePropagation();
                 const nextStatus = normalizeCompactStatus(chip.dataset.compactStatus || '');
                 if (nextStatus !== currentCompactStatus) {
                     currentCompactStatus = nextStatus;
+                    _lastRenderedListMarkup = null;
                     renderAnimeList(getActiveFilter());
                 }
                 return;
@@ -1612,7 +1639,13 @@
         await FillerService.loadStayedFillers();
         await AT.AnilistService.loadCachedData(animeData);
 
-        if (repairAiringCompletedEntries(animeData)) {
+        let changed = repairAiringCompletedEntries(animeData);
+        // Persist `completed` for anime that getStatus() classifies as finished
+        // but carry no completedAt/listState — otherwise the an1me.to watchlist
+        // sync can't see them and they stay stuck under "Watching".
+        if (persistDetectedCompletions(animeData)) changed = true;
+
+        if (changed) {
             const payload = { animeData };
             markInternalSave(payload);
             await AT.Storage.set(payload);
@@ -1638,8 +1671,9 @@
         }
     }
 
-    async function loadData() {
+    async function loadData(options = {}) {
         const { Storage } = AT;
+        const { skipAutoFetch = false } = options;
 
         try {
             if (shouldRunMaintenance('migrateMultiPartAnime')) {
@@ -1666,7 +1700,9 @@
             await updateStats();
             await loadGoalAndBadgeState();
 
-            await runAutoFetchIfNeeded();
+            if (!skipAutoFetch) {
+                await runAutoFetchIfNeeded();
+            }
         } catch (e) {
             PopupLogger.error('Storage', 'Load error:', e);
             animeData = {};
@@ -1679,11 +1715,12 @@
     /**
      * Load and sync with cloud
      */
-    async function loadAndSyncData() {
+    async function loadAndSyncData(options = {}) {
         if (loadAndSyncInProgress) return;
         loadAndSyncInProgress = true;
 
         const { FirebaseSync } = AT;
+        const { skipAutoFetch = false } = options;
 
         try {
             const prefs = await chrome.storage.local.get(['userPreferences']);
@@ -1704,7 +1741,7 @@
             // Fast path: render from local storage immediately so the popup
             // doesn't show a blank list while waiting for Firebase round-trips.
             // Especially important on slow mobile networks.
-            await loadData();
+            await loadData({ skipAutoFetch });
 
             const data = await FirebaseSync.loadAndSyncData(elements);
             if (data) {
@@ -1727,18 +1764,20 @@
                 await updateStats();
                 await loadGoalAndBadgeState();
 
-                await runAutoFetchIfNeeded();
+                if (!skipAutoFetch) {
+                    await runAutoFetchIfNeeded();
+                }
             }
         } catch (error) {
             PopupLogger.error('Sync', 'Error:', error);
             if (isQuotaExceededError(error)) {
                 const recovered = await recoverFromQuotaPressure('loadAndSyncData');
                 if (recovered) {
-                    await loadData();
+                    await loadData({ skipAutoFetch });
                     return;
                 }
             }
-            await loadData();
+            await loadData({ skipAutoFetch });
         } finally {
             loadAndSyncInProgress = false;
         }
@@ -2570,7 +2609,7 @@
             // this on the next state tick, but this avoids the gap on
             // popup-open before the first tick).
             if (stored.metadataRepairState?.status === 'running') {
-                applyMetadataRepairState(stored.metadataRepairState);
+                await applyMetadataRepairState(stored.metadataRepairState, { autoOpenRunning: true });
             }
         } catch (e) {
             PopupLogger.warn('Init', 'Post-update silent sync failed:', e);
@@ -2867,11 +2906,16 @@
 
         document.addEventListener('click', (e) => {
             const donateTrigger = e.target.closest('#settingsDonate');
-            if (donateTrigger) {
-                e.stopPropagation();                setSettingsDataToolsExpanded(false);
-                setSettingsPreferencesExpanded(false);
-                setTimeout(openDonateDropdown, 80);
+            if (!donateTrigger) return;
+            e.stopPropagation();
+            // Toggle: a second click on the button closes the open dropdown.
+            if (elements.donateDropdown?.classList.contains('visible')) {
+                closeDonateDropdown();
+                return;
             }
+            setSettingsDataToolsExpanded(false);
+            setSettingsPreferencesExpanded(false);
+            setTimeout(openDonateDropdown, 80);
         });
 
         const settingsViewEl = document.getElementById('settingsView');
@@ -2988,9 +3032,9 @@
                 setSettingsPreferencesExpanded(false);
                 try {
                     if (FirebaseSync.getUser()) {
-                        await loadAndSyncData();
+                        await loadAndSyncData({ skipAutoFetch: true });
                     } else {
-                        await loadData();
+                        await loadData({ skipAutoFetch: true });
                     }
                 } catch (error) {
                     PopupLogger.error('RefreshData', 'Error:', error);
@@ -3035,14 +3079,13 @@
             if (e.target.closest('#settingsFetchFillers')) {
                 setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
-                // Force a real re-scan — without this, the SW finds every
-                // cache entry still fresh and returns "Import complete" in
-                // milliseconds, which makes the button look broken. Users
-                // press this when they want fresh data, period.
+                // Cache-first import: the SW reads chrome.storage.local first,
+                // counts fresh entries as cached/skipped, and fetches only
+                // missing or stale metadata/filler data.
                 await fetchAllFillers({
                     autoStart: true,
-                    forceInfoRefresh: true,
-                    forceFillerRefresh: true
+                    forceInfoRefresh: false,
+                    forceFillerRefresh: false
                 });
                 return;
             }
@@ -3220,21 +3263,31 @@
             requestAnimationFrame(() => moveSlider(initialActive, true));
 
             elements.categoryTabs.querySelectorAll('.category-tab').forEach(tab => {
-                tab.addEventListener('click', async () => {
+                tab.addEventListener('click', () => {
                     const rawCat = tab.dataset.category;
+                    const nextCategory = normalizeCategory(rawCat);
+                    const categoryChanged = nextCategory !== currentCategory;
+
                     elements.categoryTabs.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
                     tab.classList.add('active');
-
-                    const appRoot = document.querySelector('.app');
 
                     // Switching a category exits any view mode (stats/goals)
                     setViewMode(null);
 
                     requestAnimationFrame(() => moveSlider(tab, false));
 
-                    currentCategory = normalizeCategory(rawCat);
-                    if (elements.searchInput) renderAnimeList(elements.searchInput.value);
-                    await chrome.storage.local.set({ userPreferences: { sort: currentSort, category: currentCategory } });
+                    if (categoryChanged) {
+                        currentCategory = nextCategory;
+                        _lastRenderedListMarkup = null;
+                        renderCategorySwitch(elements.searchInput?.value || '');
+                    }
+
+                    try {
+                        const savePref = chrome.storage.local.set({
+                            userPreferences: { sort: currentSort, category: currentCategory }
+                        });
+                        if (savePref && typeof savePref.catch === 'function') savePref.catch(() => {});
+                    } catch {}
                 });
             });
         }
@@ -3352,7 +3405,7 @@
 
             if (changes.metadataRepairState) {
                 handledRepairStateChange = true;
-                void applyMetadataRepairState(changes.metadataRepairState.newValue || null);
+                void applyMetadataRepairState(changes.metadataRepairState.newValue || null, { autoOpenRunning: true });
             }
 
             // Cache invalidation: when an external writer (SSE → SW → storage,
@@ -3411,6 +3464,19 @@
             elements.animeList.addEventListener('mouseleave', flushDeferredListRefresh);
             elements.animeList.addEventListener('click', async (e) => {
                 const target = e.target;
+
+                const statusChip = target.closest('[data-compact-status]');
+                if (statusChip && elements.animeList.contains(statusChip)) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    const nextStatus = normalizeCompactStatus(statusChip.dataset.compactStatus || '');
+                    if (nextStatus !== currentCompactStatus) {
+                        currentCompactStatus = nextStatus;
+                        _lastRenderedListMarkup = null;
+                        renderAnimeList(getActiveFilter());
+                    }
+                    return;
+                }
 
                 if (target.classList.contains('progress-delete-btn') || target.closest('.progress-delete-btn')) {
                     const btn = target.classList.contains('progress-delete-btn') ? target : target.closest('.progress-delete-btn');

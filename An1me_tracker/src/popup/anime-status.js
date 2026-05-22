@@ -230,6 +230,45 @@
         return changed;
     }
 
+    /**
+     * Persist `listState:'completed'` for anime that getStatus() classifies as
+     * finished but that carry no explicit completion marker. The an1me.to
+     * watchlist sync only reads completedAt / listState / totalEpisodes, so
+     * AniList-metadata-detected completions are invisible to it — without this
+     * they never leave the site's "Watching" list. Currently-releasing anime
+     * are skipped so this never fights repairAiringCompleted.
+     */
+    function persistDetectedCompletions(data, options = {}) {
+        const AT = window.AnimeTracker;
+        const targetData = data || {};
+        const requestedSlugs = Array.isArray(options.slugs) ? options.slugs : null;
+        const slugs = requestedSlugs && requestedSlugs.length
+            ? requestedSlugs
+            : Object.keys(targetData);
+        let changed = false;
+
+        for (const slug of slugs) {
+            const anime = targetData[slug];
+            if (!anime) continue;
+            if (anime.droppedAt || anime.onHoldAt) continue;
+
+            const listState = String(anime.listState || '').toLowerCase();
+            if (anime.completedAt || listState === 'completed') continue;   // already marked
+            if (listState === 'dropped' || listState === 'on_hold') continue;
+
+            // Releasing anime drift in and out of "caught up" — leave those to
+            // repairAiringCompleted so the two passes never fight.
+            if (AT.AnilistService?.getStatus(String(slug).toLowerCase()) === 'RELEASING') continue;
+
+            if (getStatus(slug, anime) !== AnimeStatus.COMPLETED) continue;
+
+            setManualListState(anime, 'completed');
+            changed = true;
+        }
+
+        return changed;
+    }
+
     window.AnimeTracker = window.AnimeTracker || {};
     window.AnimeTracker.StatusService = {
         AnimeStatus,
@@ -238,6 +277,7 @@
         getCalendarDayDiff,
         getKnownTotalEpisodesForRepair,
         repairAiringCompleted,
+        persistDetectedCompletions,
         setManualListState,
         markTitleEdited,
         clearDeletedAnimeSlug

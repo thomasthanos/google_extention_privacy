@@ -12,9 +12,6 @@ const FillerFetchUI = {
         progressFill: 'filler-fetch-ui-progress-fill',
         progressText: 'filler-fetch-ui-progress-text',
         logFeed:      'filler-fetch-ui-log',
-        closeBtn:     'filler-fetch-ui-close-btn',
-        startBtn:     'filler-fetch-ui-start-btn',
-        cancelBtn:    'filler-fetch-ui-cancel-btn',
     },
 
     state: {
@@ -23,7 +20,6 @@ const FillerFetchUI = {
         isCancelled: false,
         fetchDone:   false,
         autoMode:    false,
-        primaryAction: 'start',
         total:   0,
         fetched: 0,
         cached:  0,
@@ -33,7 +29,7 @@ const FillerFetchUI = {
 
     onComplete: null,
 
-    // ─── Init ───────────────────────────────────────────────────────────────
+    // --- Init ---------------------------------------------------------------
 
     init() {
         this.injectStyles();
@@ -41,11 +37,10 @@ const FillerFetchUI = {
         this.attachEventListeners();
     },
 
-    // ─── Modal HTML ─────────────────────────────────────────────────────────
+    // --- Modal HTML ---------------------------------------------------------
 
     createModal() {
-        const { overlay, container, progressFill, progressText,
-                logFeed, closeBtn, startBtn, cancelBtn } = this.IDS;
+        const { overlay, container, progressFill, progressText, logFeed } = this.IDS;
 
         const html = `
         <div id="${overlay}" class="ffui-overlay" style="display:none">
@@ -53,7 +48,6 @@ const FillerFetchUI = {
 
             <div class="ffui-header">
               <span class="ffui-title"><span class="ffui-title-dot"></span>Fetch & Import</span>
-              <button id="${closeBtn}" class="ffui-close" aria-label="Close">×</button>
             </div>
 
             <div class="ffui-body">
@@ -91,25 +85,19 @@ const FillerFetchUI = {
               <div id="${logFeed}" class="ffui-log" style="display:none"></div>
 
             </div>
-
-            <div class="ffui-footer">
-              <button id="${cancelBtn}" class="ffui-btn ffui-btn-sec" style="display:none">Cancel</button>
-              <button id="${startBtn}"  class="ffui-btn ffui-btn-pri">Start Import</button>
-            </div>
-
           </div>
         </div>`;
 
         document.body.insertAdjacentHTML('beforeend', html);
     },
 
-    // ─── CSS ────────────────────────────────────────────────────────────────
+    // --- CSS ----------------------------------------------------------------
 
     injectStyles() {
         if (document.getElementById('ffui-styles')) return;
         const css = `
         <style id="ffui-styles">
-        /* ── Overlay ─────────────────────────────────── */
+        /* -- Overlay ----------------------------------- */
         .ffui-overlay {
             position:fixed; inset:0;
             background:rgba(7,9,14,.92);
@@ -121,7 +109,7 @@ const FillerFetchUI = {
         }
         @keyframes ffui-fade { from{opacity:0} to{opacity:1} }
 
-        /* ── Box ─────────────────────────────────────── */
+        /* -- Box --------------------------------------- */
         .ffui-box {
             background: #111520;
             background-image: radial-gradient(ellipse at 50% 0%, rgba(79,195,247,0.06) 0%, transparent 65%);
@@ -143,7 +131,7 @@ const FillerFetchUI = {
             to  {transform:translateY(0);  opacity:1}
         }
 
-        /* ── Header ──────────────────────────────────── */
+        /* -- Header ------------------------------------ */
         .ffui-header {
             padding: 16px 18px 15px;
             background: linear-gradient(180deg, rgba(79,195,247,0.07) 0%, transparent 100%);
@@ -162,21 +150,11 @@ const FillerFetchUI = {
             box-shadow: 0 0 8px rgba(79,195,247,0.7);
             flex-shrink:0;
         }
-        .ffui-close {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.07);
-            border-radius: 7px;
-            width:28px; height:28px; cursor:pointer;
-            color:#6b7694; font-size:20px; line-height:1;
-            display:flex; align-items:center; justify-content:center;
-            transition: all .15s;
-        }
-        .ffui-close:hover { background:rgba(255,255,255,.1); color:#e8edf8; border-color:rgba(255,255,255,.12); }
 
-        /* ── Body ────────────────────────────────────── */
+        /* -- Body -------------------------------------- */
         .ffui-body { padding:16px 18px; display:flex; flex-direction:column; gap:14px; }
 
-        /* ── Progress ────────────────────────────────── */
+        /* -- Progress ---------------------------------- */
         .ffui-progress-info {
             display:flex; justify-content:space-between; align-items:center;
             margin-bottom:7px;
@@ -202,7 +180,7 @@ const FillerFetchUI = {
             box-shadow: 0 0 8px rgba(79,195,247,0.4);
         }
 
-        /* ── Stats grid ──────────────────────────────── */
+        /* -- Stats grid -------------------------------- */
         .ffui-stats {
             display:grid; grid-template-columns:repeat(4,1fr); gap:7px;
         }
@@ -229,7 +207,7 @@ const FillerFetchUI = {
             text-transform:uppercase; letter-spacing:.6px; font-weight:600;
         }
 
-        /* ── Live log ────────────────────────────────── */
+        /* -- Live log ---------------------------------- */
         .ffui-log {
             background: rgba(0,0,0,0.3);
             border: 1px solid rgba(255,255,255,0.05);
@@ -274,111 +252,26 @@ const FillerFetchUI = {
             font-weight:700; color:#e8edf8;
         }
         .ffui-log-row.is-summary .ffui-log-name { color:#e8edf8; }
-
-        /* ── Footer ──────────────────────────────────── */
-        .ffui-footer {
-            padding: 13px 18px;
-            background: rgba(0,0,0,0.2);
-            border-top: 1px solid rgba(255,255,255,0.05);
-            display:flex; gap:9px; justify-content:flex-end;
-        }
-
-        /* Cancel — ghost */
-        .ffui-btn-sec {
-            padding: 0 18px; height:36px;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 999px;
-            font-size:12px; font-weight:600; cursor:pointer;
-            color:#6b7694;
-            transition: all .15s;
-            font-family: inherit;
-        }
-        .ffui-btn-sec:hover:not(:disabled) { background:rgba(255,255,255,.09); color:#e8edf8; }
-
-        /* Start / Close — 3-D cyan (mirrors .btn-google-primary style) */
-        .ffui-btn-pri {
-            padding: 0 22px; height:36px;
-            background: linear-gradient(160deg, #3db8e8 0%, #1a96c8 45%, #0e79a8 100%);
-            border: none;
-            border-radius: 999px;
-            font-size:12px; font-weight:700; cursor:pointer;
-            color:#fff;
-            position:relative;
-            transition: all .15s;
-            font-family: inherit;
-            box-shadow:
-                0 1px 0 rgba(255,255,255,0.25) inset,
-                0 -2px 0 rgba(0,0,0,0.35) inset,
-                0 3px 10px rgba(14,121,168,0.55),
-                0 1px 3px rgba(0,0,0,0.5);
-        }
-        .ffui-btn-pri::before {
-            content:'';
-            position:absolute; inset:0;
-            border-radius:inherit;
-            background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 55%);
-            pointer-events:none;
-        }
-        .ffui-btn-pri:hover:not(:disabled) {
-            transform:translateY(-1px);
-            box-shadow:
-                0 1px 0 rgba(255,255,255,0.25) inset,
-                0 -2px 0 rgba(0,0,0,0.35) inset,
-                0 5px 16px rgba(14,121,168,0.65),
-                0 2px 5px rgba(0,0,0,0.5);
-        }
-        .ffui-btn-pri:active:not(:disabled) {
-            transform:translateY(1px);
-            box-shadow:
-                0 1px 0 rgba(255,255,255,0.15) inset,
-                0 -1px 0 rgba(0,0,0,0.3) inset,
-                0 2px 6px rgba(14,121,168,0.4);
-        }
-        .ffui-btn-pri:disabled, .ffui-btn-sec:disabled {
-            opacity:.4; cursor:not-allowed; transform:none!important;
-        }
         </style>`;
         document.head.insertAdjacentHTML('beforeend', css);
     },
 
-    // ─── Events ─────────────────────────────────────────────────────────────
-
+    // --- Events -------------------------------------------------------------
     attachEventListeners() {
-        document.getElementById(this.IDS.closeBtn)
-            .addEventListener('click', () => this.close());
-
         document.getElementById(this.IDS.overlay)
             .addEventListener('click', (e) => {
-                // Click-outside dismisses, but in autoMode the import IS the boss —
-                // the user can't dismiss it until done (matches the hidden X / Hide
-                // buttons). Otherwise an accidental click-outside aborts the post-
-                // sign-in / post-update fetch that we *want* to complete.
-                if (e.target.id === this.IDS.overlay && !this.state.autoMode) this.close();
+                if (e.target.id === this.IDS.overlay && !this.state.isRunning) this.close();
             });
-
-        document.getElementById(this.IDS.startBtn)
-            .addEventListener('click', () => {
-                if (this.state.primaryAction === 'close' || this.state.fetchDone) {
-                    this.close();
-                    return;
-                }
-                this.startFetch();
-            });
-
-        document.getElementById(this.IDS.cancelBtn)
-            .addEventListener('click', () => this.cancel());
 
         if (this._escHandler) {
             try { document.removeEventListener('keydown', this._escHandler); } catch {}
         }
         this._escHandler = (e) => {
-            if (e.key === 'Escape' && this.state.isOpen && !this.state.autoMode) this.close();
+            if (e.key === 'Escape' && this.state.isOpen && !this.state.isRunning) this.close();
         };
         document.addEventListener('keydown', this._escHandler);
     },
-
-    // ─── Open / Close ────────────────────────────────────────────────────────
+    // --- Open / Close --------------------------------------------------------
 
     async open(options = {}) {
         const autoMode = options.autoMode === true;
@@ -390,47 +283,21 @@ const FillerFetchUI = {
         this.state.total = Object.keys(data.animeData || {}).length;
 
         document.getElementById(this.IDS.overlay).style.display = 'flex';
-        this._applyAutoModeChrome();
     },
 
     close() {
-        // Block close while fetch is running — user must cancel first.
-        // Auto-mode also blocks close at all times (it self-dismisses).
         if (this.state.isRunning) return;
-        if (this.state.autoMode && !this.state.fetchDone) return;
         this.state.isOpen = false;
         this.state.autoMode = false;
         document.getElementById(this.IDS.overlay).style.display = 'none';
     },
 
-    /**
-     * Apply autoMode visibility to the close × and the primary Start/Hide
-     * button. In autoMode the dialog is the boss — neither button is shown
-     * while the import is in flight; only after `fetchDone` do we expose a
-     * single Close affordance.
-     */
-    _applyAutoModeChrome() {
-        const closeBtn = document.getElementById(this.IDS.closeBtn);
-        const startBtn = document.getElementById(this.IDS.startBtn);
-        const cancelBtn = document.getElementById(this.IDS.cancelBtn);
-        if (!closeBtn || !startBtn || !cancelBtn) return;
-
-        if (!this.state.autoMode) return;
-
-        closeBtn.style.display = 'none';
-        cancelBtn.style.display = 'none';
-        if (!this.state.fetchDone) {
-            startBtn.style.display = 'none';
-        }
-    },
-
-    // ─── UI helpers ─────────────────────────────────────────────────────────
+    // --- UI helpers ---------------------------------------------------------
 
     resetUI(options = {}) {
         const keepAutoMode = options.autoMode === true;
         Object.assign(this.state, {
             isRunning: false, isCancelled: false, fetchDone: false,
-            primaryAction: 'start',
             fetched: 0, cached: 0, skipped: 0, failed: 0,
         });
         if (!keepAutoMode) this.state.autoMode = false;
@@ -441,14 +308,6 @@ const FillerFetchUI = {
         const log = document.getElementById(this.IDS.logFeed);
         log.innerHTML = '';
         log.style.display = 'none';
-
-        const closeBtn = document.getElementById(this.IDS.closeBtn);
-        const startBtn = document.getElementById(this.IDS.startBtn);
-        startBtn.textContent = 'Start Import';
-        startBtn.style.display = '';
-        startBtn.disabled = false;
-        if (closeBtn) closeBtn.style.display = '';
-        document.getElementById(this.IDS.cancelBtn).style.display = 'none';
     },
 
     _setProgress(pct, label) {
@@ -481,14 +340,7 @@ const FillerFetchUI = {
     showPendingStart(label = 'Starting import…') {
         this.state.isRunning = true;
         this.state.fetchDone = false;
-        this.state.primaryAction = 'close';
         this._setProgress(0, label);
-        document.getElementById(this.IDS.cancelBtn).style.display = 'none';
-        const startBtn = document.getElementById(this.IDS.startBtn);
-        startBtn.textContent = 'Hide';
-        startBtn.style.display = this.state.autoMode ? 'none' : '';
-        startBtn.disabled = false;
-        this._applyAutoModeChrome();
     },
 
     applyBackgroundState(state) {
@@ -504,7 +356,6 @@ const FillerFetchUI = {
         this.state.failed = Number(state.failed) || 0;
         this.state.isRunning = state.status === 'running';
         this.state.fetchDone = state.status === 'completed' || state.status === 'error';
-        this.state.primaryAction = 'close';
 
         this._setStat('fetched', this.state.fetched);
         this._setStat('cached', this.state.cached);
@@ -536,20 +387,17 @@ const FillerFetchUI = {
 
         this._setProgress(pct, label);
 
-        document.getElementById(this.IDS.cancelBtn).style.display = 'none';
-        const startBtn = document.getElementById(this.IDS.startBtn);
-        startBtn.style.display = '';
-        startBtn.disabled = false;
-        startBtn.textContent = state.status === 'running' ? 'Hide' : 'Close';
-        // autoMode hides Hide-while-running and the × at all times; the
-        // single Close affordance only re-emerges once `fetchDone` flips.
-        if (this.state.autoMode) {
-            const closeBtn = document.getElementById(this.IDS.closeBtn);
-            if (closeBtn) closeBtn.style.display = 'none';
-            if (state.status === 'running') {
-                startBtn.style.display = 'none';
-            }
+        if (state.status === 'completed') {
+            this._scheduleAutoClose();
         }
+    },
+
+    _scheduleAutoClose() {
+        if (this._autoCloseTimer) clearTimeout(this._autoCloseTimer);
+        this._autoCloseTimer = setTimeout(() => {
+            this._autoCloseTimer = null;
+            this.close();
+        }, 900);
     },
 
     /**
@@ -562,7 +410,7 @@ const FillerFetchUI = {
         const log = document.getElementById(this.IDS.logFeed);
         if (log.style.display === 'none') log.style.display = 'flex';
 
-        const icons   = { fetch: '●', cached: '◌', skip: '□', nofill: '□', error: '×', movie: '▷' };
+        const icons   = { fetch: '*', cached: 'o', skip: '-', nofill: '-', error: 'x', movie: '>' };
         const classes = { fetch: 'is-fetch', cached: 'is-cached', skip: 'is-nofill', nofill: 'is-nofill', error: 'is-error', movie: 'is-movie' };
 
         const row = document.createElement('div');
@@ -570,7 +418,7 @@ const FillerFetchUI = {
 
         const iconSpan = document.createElement('span');
         iconSpan.className = 'ffui-log-icon';
-        iconSpan.textContent = icons[type] || '□';
+        iconSpan.textContent = icons[type] || '-';
         row.appendChild(iconSpan);
 
         const nameSpan = document.createElement('span');
@@ -589,154 +437,9 @@ const FillerFetchUI = {
         log.appendChild(row);
         log.scrollTop = log.scrollHeight;
     },
-
-    // ─── Core fetch logic ────────────────────────────────────────────────────
-
-    async startFetch() {
-        if (this.state.isRunning) return;
-        this.state.isRunning  = true;
-        this.state.isCancelled = false;
-
-        document.getElementById(this.IDS.startBtn).style.display  = 'none';
-        // Cancel is only an option for user-initiated fetches. autoMode is
-        // the boss — no Cancel, no Hide, no × until the run completes.
-        document.getElementById(this.IDS.cancelBtn).style.display = this.state.autoMode ? 'none' : '';
-        document.getElementById(this.IDS.closeBtn).style.display  = 'none';
-
-        const { FillerService, Storage, CONFIG } = window.AnimeTracker;
-
-        const data     = await Storage.get(['animeData']);
-        const animeData = data.animeData || {};
-        const entries  = Object.entries(animeData);
-        this.state.total = entries.length;
-
-        for (let i = 0; i < entries.length; i++) {
-            if (this.state.isCancelled) break;
-
-            const [slug, anime] = entries[i];
-            const title = anime.title || slug;
-            const pct   = ((i + 1) / entries.length) * 100;
-
-            this._setProgress(pct, `${i + 1} / ${entries.length} — ${title}`);
-
-            // ── Skip movies / OVAs / specials ────────────────────────────────
-            if (FillerService.isLikelyMovie(slug)) {
-                this._log('movie', title, 'movie/OVA');
-                this.state.skipped++;
-                this._setStat('skipped', this.state.skipped);
-                continue;
-            }
-
-            // ── Check in-memory cache ────────────────────────────────────────
-            const cached = FillerService.episodeTypesCache[slug];
-            if (cached) {
-                const age = cached.cachedAt ? Date.now() - cached.cachedAt : Infinity;
-
-                // notFound entry within TTL → skip (do NOT count as cached)
-                if (cached.notFound) {
-                    const ttl = CONFIG.FILLER_NOT_FOUND_CACHE_TTL;
-                    if (age < ttl) {
-                        this._log('nofill', title, 'not listed');
-                        this.state.skipped++;
-                        this._setStat('skipped', this.state.skipped);
-                        continue;
-                    }
-                    // Expired notFound — clear it so fetchEpisodeTypes retries
-                    delete FillerService.episodeTypesCache[slug];
-                } else if (age < (CONFIG.EPISODE_TYPES_CACHE_TTL ?? Infinity)) {
-                    // Fresh valid cache
-                    const fillers = cached.filler?.length ?? 0;
-                    const detail  = fillers > 0 ? `${fillers} fillers` : 'no fillers';
-                    this._log('cached', title, detail);
-                    this.state.cached++;
-                    this._setStat('cached', this.state.cached);
-                    continue;
-                }
-                // else: expired valid cache → fall through to fetch
-            }
-
-            // ── Fetch from AnimeFillerList via background ────────────────────
-            try {
-                const episodeTypes = await FillerService.fetchEpisodeTypes(slug, anime.title || null);
-                if (this.state.isCancelled) break;
-
-                if (episodeTypes && !episodeTypes.notFound) {
-                    FillerService.updateFromEpisodeTypes(slug, episodeTypes);
-
-                    const fillers = episodeTypes.filler?.length ?? 0;
-                    const total   = episodeTypes.totalEpisodes ?? '?';
-                    const pctFill = total > 0 ? ` (${Math.round(fillers / total * 100)}%)` : '';
-                    this._log('fetch', title, `${fillers} fillers / ${total} eps${pctFill}`);
-
-                    this.state.fetched++;
-                    this._setStat('fetched', this.state.fetched);
-                } else {
-                    // null → notFound cached by fetchEpisodeTypes
-                    this._log('nofill', title, 'not listed');
-                    this.state.skipped++;
-                    this._setStat('skipped', this.state.skipped);
-                }
-            } catch (err) {
-                if (this.state.isCancelled) break;
-                this._log('error', title, err.message?.slice(0, 30) || 'error');
-                this.state.failed++;
-                this._setStat('failed', this.state.failed);
-            }
-
-            if (this.state.isCancelled) break;
-            // Small delay so we don't hammer animefillerlist.com
-            await new Promise(r => setTimeout(r, 150));
-        }
-
-        // ── Done ─────────────────────────────────────────────────────────────
-        this.state.isRunning = false;
-
-        // Summary row in log
-        const log = document.getElementById(this.IDS.logFeed);
-        if (log) {
-            log.style.display = 'flex';
-            const summary = document.createElement('div');
-            summary.className = 'ffui-log-row is-summary';
-            summary.innerHTML = this.state.isCancelled
-                ? `<span class="ffui-log-icon">□</span><span class="ffui-log-name">Cancelled — ${this.state.fetched} fetched, ${this.state.cached} cached, ${this.state.skipped} no-filler</span>`
-                : `<span class="ffui-log-icon">●</span><span class="ffui-log-name">Done — ${this.state.fetched} fetched, ${this.state.cached} cached, ${this.state.skipped} no-filler${this.state.failed > 0 ? `, ${this.state.failed} failed` : ''}</span>`;
-            log.appendChild(summary);
-            log.scrollTop = log.scrollHeight;
-        }
-
-        const completedSoFar = this.state.fetched + this.state.cached + this.state.skipped;
-        const progressPct = !this.state.isCancelled
-            ? 100
-            : (this.state.total > 0 ? (completedSoFar / this.state.total) * 100 : 0);
-        const progressLabel = this.state.isCancelled
-            ? 'Cancelled — see log above'
-            : '✓ Complete — see log above';
-        this._setProgress(progressPct, progressLabel);
-
-        document.getElementById(this.IDS.cancelBtn).style.display = 'none';
-        // autoMode hides the × at all times; user dismisses via the single
-        // "Close" button below once fetchDone flips.
-        document.getElementById(this.IDS.closeBtn).style.display  = this.state.autoMode ? 'none' : '';
-        const startBtn = document.getElementById(this.IDS.startBtn);
-        startBtn.textContent = this.state.isCancelled ? 'Closed' : '✓ Done';
-        startBtn.style.display = '';
-        startBtn.disabled = true;
-
-        if (!this.state.isCancelled && this.onComplete) {
-            this.onComplete();
-            this.onComplete = null;
-        }
-
-        // Signal fetch is done so the button's delegated handler calls close()
-        startBtn.disabled = false;
-        startBtn.textContent = 'Close';
-        this.state.fetchDone = true;
-    },
-
-    cancel() {
-        this.state.isCancelled = true;
-    },
 };
 
 window.AnimeTracker = window.AnimeTracker || {};
 window.AnimeTracker.FillerFetchUI = FillerFetchUI;
+
+

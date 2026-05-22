@@ -22,6 +22,11 @@ const CLOUD_CONSUMER_POLL_MIN_GAP_MS = 3 * 60 * 1000;
 
 importScripts('src/common/merge-utils.js', 'src/common/firestore-codec.js');
 
+// AniList background sync — core engine (shared with the popup) + the SW-side
+// driver that pushes progress without the popup being open. anilist-sync.js
+// depends on AniListCore, so the order here matters.
+importScripts('src/common/anilist-core.js', 'src/background/anilist-sync.js');
+
 const sharedMergeUtils = self.AnimeTrackerMergeUtils || {};
 const missingMergeUtil = (name) => () => {
     throw new Error(`[BG] Missing shared merge util: ${name}`);
@@ -53,6 +58,47 @@ const MAX_PROGRESS_ENTRIES = 200;
 // Without the grace period, the SW's syncProgressOnly path stripped tombstones
 // ~5 minutes after deletion, leaving the deletion to silently disappear.
 const PROGRESS_TOMBSTONE_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
+
+function stripFirebaseSilentAnimeMetadata(anime) {
+    if (!anime || typeof anime !== 'object') return anime;
+    const copy = { ...anime };
+    delete copy.coverImage;
+    delete copy.siteAnimeId;
+    delete copy.totalEpisodes;
+    delete copy.latestEpisode;
+    delete copy.nextEpisodeAt;
+    delete copy.nextEpisodeTimezone;
+    delete copy.durationSeconds;
+    delete copy.totalWatchTime;
+
+    if (Array.isArray(copy.episodes)) {
+        copy.episodes = copy.episodes.map((episode) => {
+            if (!episode || typeof episode !== 'object') return episode;
+            const epCopy = { ...episode };
+            delete epCopy.duration;
+            delete epCopy.durationSource;
+            return epCopy;
+        });
+    }
+
+    return copy;
+}
+
+function areAnimeDataEqualIgnoringFetchMetadata(oldAnime = {}, newAnime = {}) {
+    const oldKeys = Object.keys(oldAnime || {}).sort();
+    const newKeys = Object.keys(newAnime || {}).sort();
+    if (oldKeys.length !== newKeys.length) return false;
+    for (let i = 0; i < oldKeys.length; i++) {
+        if (oldKeys[i] !== newKeys[i]) return false;
+        const key = oldKeys[i];
+        const oldComparable = stripFirebaseSilentAnimeMetadata(oldAnime[key]);
+        const newComparable = stripFirebaseSilentAnimeMetadata(newAnime[key]);
+        if (JSON.stringify(oldComparable) !== JSON.stringify(newComparable)) {
+            return false;
+        }
+    }
+    return true;
+}
 
 // Survives SW kills: when a setTimeout(syncToFirebase, ...) is scheduled we
 // stamp this key. If the SW is terminated before the timer fires, the next
@@ -869,26 +915,9 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         const oldCount = Object.values(oldAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
         const newCount = Object.values(newAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
 
-        let metadataChanged = false;
-        if (newCount === oldCount) {
-            for (const slug of Object.keys(newAnime)) {
-                const oldEntry = oldAnime[slug];
-                const newEntry = newAnime[slug];
-                if ((oldEntry?.coverImage || null) !== (newEntry?.coverImage || null) ||
-                    (oldEntry?.droppedAt || null) !== (newEntry?.droppedAt || null) ||
-                    (oldEntry?.completedAt || null) !== (newEntry?.completedAt || null) ||
-                    (oldEntry?.totalEpisodes || null) !== (newEntry?.totalEpisodes || null) ||
-                    (oldEntry?.title || '') !== (newEntry?.title || '')) {
-                    metadataChanged = true;
-                    break;
-                }
-            }
-            if (!metadataChanged && Object.keys(oldAnime).length !== Object.keys(newAnime).length) {
-                metadataChanged = true;
-            }
-        }
+        const libraryChanged = !areAnimeDataEqualIgnoringFetchMetadata(oldAnime, newAnime);
 
-        if (newCount > oldCount || metadataChanged) {
+        if (newCount > oldCount || libraryChanged) {
             if (newCount > oldCount) {
                 dlog(
                     `%cAnime Tracker %c➕ New episode! (${oldCount}→${newCount})`,
@@ -1377,32 +1406,27 @@ chrome.runtime.onInstalled.addListener((details) => {
         const fromVersion = details.previousVersion || null;
         const toVersion = chrome.runtime.getManifest().version || null;
 
-        // Wipe metadata caches (animeinfo_*, episodeTypes_*) so the post-
-        // update repair has real work to do instead of returning "all cached"
-        // immediately. Without this, every update produced an empty no-op
-        // pass and the user saw "Import complete · 0 fetched" — confusing
-        // and useless. We rebuild from scratch with the new version's logic.
-        clearMetadataCachesOnce().catch((e) =>
-            console.warn('[BG] Metadata cache wipe on update failed:', e)
-        ).finally(() => {
-            bgStorageGet(['postUpdateFetchTriggeredAt']).then((existing) => {
-                const payload = {
-                    pendingBackgroundMetadataRepair: true
-                };
-                if (!existing.postUpdateFetchTriggeredAt) {
-                    payload.postUpdateFetchTriggeredAt = Date.now();
-                    payload.postUpdateFetchFromVersion = fromVersion;
-                    payload.postUpdateFetchToVersion = toVersion;
-                }
-                return bgStorageSet(payload);
-            }).then(() => {
-                // Kick off the repair immediately so background warming happens
-                // even if the user never opens the popup. Re-entrant-safe.
-                maybeStartPendingMetadataRepair().catch((error) => {
-                    console.warn('[BG] Post-update repair start failed:', error);
-                });
-            }).catch((e) => console.warn('[BG] Post-update flag write failed:', e));
-        });
+        // Keep metadata caches across extension reload/update. The repair pass
+        // is cache-first and fetches only missing/stale entries, so wiping
+        // animeinfo_* / episodeTypes_* here would waste network and Firebase
+        // churn after every manual extension refresh.
+        bgStorageGet(['postUpdateFetchTriggeredAt']).then((existing) => {
+            const payload = {
+                pendingBackgroundMetadataRepair: true
+            };
+            if (!existing.postUpdateFetchTriggeredAt) {
+                payload.postUpdateFetchTriggeredAt = Date.now();
+                payload.postUpdateFetchFromVersion = fromVersion;
+                payload.postUpdateFetchToVersion = toVersion;
+            }
+            return bgStorageSet(payload);
+        }).then(() => {
+            // Kick off the repair immediately so background warming happens
+            // even if the user never opens the popup. Re-entrant-safe.
+            maybeStartPendingMetadataRepair().catch((error) => {
+                console.warn('[BG] Post-update repair start failed:', error);
+            });
+        }).catch((e) => console.warn('[BG] Post-update flag write failed:', e));
     }
 });
 

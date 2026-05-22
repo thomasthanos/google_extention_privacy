@@ -1,7 +1,6 @@
 const WatchlistSync = {
     _AJAX_URL: 'https://an1me.to/wp-admin/admin-ajax.php',
     _STANDALONE_COMPLETE_RE: /(?:^|[-_])(movie|film|ova|ona|special|fan-letter)(?:[-_]|$)/i,
-    _REPAIR_VERSION: 2,
 
     _logger() {
         return window.AnimeTrackerContent?.Logger || {
@@ -304,68 +303,60 @@ const WatchlistSync = {
         return success;
     },
 
-    async repairPendingStatusesOnce() {
+    /**
+     * Self-healing reconcile: pushes any anime whose resolved completed /
+     * dropped / on-hold state differs from what was last synced to an1me.to.
+     * Runs on every page load (cheap — no network when nothing is stale) so a
+     * completion detected later (e.g. by the popup persisting `listState`)
+     * still reaches the site. updateStatus() does the proper remove-then-add,
+     * so a "Watching" entry actually moves to "Completed".
+     */
+    async reconcileWatchlistStatuses() {
         const Logger = this._logger();
         const LOCK_KEY = 'watchlistRepairLock';
         const LOCK_TTL_MS = 5 * 60 * 1000;
 
         if (!this._isLoggedIn()) {
-            Logger.debug('WatchlistSync: repair skipped, site user not logged in');
+            Logger.debug('WatchlistSync: reconcile skipped, site user not logged in');
             return false;
         }
 
         let lockHeld = false;
         try {
-            const {
-                animeData = {},
-                watchlistRepairVersion = 0,
-                [LOCK_KEY]: lockTs = 0
-            } = await chrome.storage.local.get(['animeData', 'watchlistRepairVersion', LOCK_KEY]);
+            const { animeData = {}, [LOCK_KEY]: lockTs = 0 } =
+                await chrome.storage.local.get(['animeData', LOCK_KEY]);
 
-            if ((Number(watchlistRepairVersion) || 0) >= this._REPAIR_VERSION) {
-                Logger.debug('WatchlistSync: repair already completed for current version');
-                return true;
+            // Only entries whose an1me.to status is genuinely stale.
+            const stale = [];
+            for (const [slug, entry] of Object.entries(animeData)) {
+                if (!entry?.siteAnimeId) continue;
+                const want = this.resolveRepairStatus(entry, slug);
+                if (!want) continue;
+                if (entry.watchlistSyncedType === want) continue;
+                stale.push([slug, entry, want]);
             }
+            if (stale.length === 0) return true;
 
             if (Number(lockTs) && Date.now() - Number(lockTs) < LOCK_TTL_MS) {
-                Logger.debug('WatchlistSync: repair lock held by another tab, skipping');
+                Logger.debug('WatchlistSync: reconcile lock held by another tab, skipping');
                 return false;
             }
-
             await chrome.storage.local.set({ [LOCK_KEY]: Date.now() });
             lockHeld = true;
 
-            const entries = Object.entries(animeData).filter(([slug, entry]) =>
-                !!entry?.siteAnimeId && !!this.resolveRepairStatus(entry, slug)
-            );
-
-            if (entries.length === 0) {
-                await chrome.storage.local.set({ watchlistRepairVersion: this._REPAIR_VERSION });
-                return true;
-            }
-
-            let hadFailure = false;
-
-            for (const [slug, entry] of entries) {
-                const type = this.resolveRepairStatus(entry, slug);
-                if (!type) continue;
-
-                const ok = await this.updateStatus(entry.siteAnimeId, type, slug, { force: true });
-                if (!ok) hadFailure = true;
-
+            let synced = 0;
+            for (const [slug, entry, want] of stale) {
+                const ok = await this.updateStatus(entry.siteAnimeId, want, slug);
+                if (ok) synced++;
                 await new Promise(resolve => setTimeout(resolve, 250));
             }
 
-            if (!hadFailure) {
-                await chrome.storage.local.set({ watchlistRepairVersion: this._REPAIR_VERSION });
-                Logger.info(`Watchlist: ✓ resynced ${entries.length} existing entries with an1me.to`);
-            } else {
-                Logger.warn('Watchlist: some entries failed to resync — will retry on a later page load');
+            if (synced > 0) {
+                Logger.info(`Watchlist: ✓ reconciled ${synced} status change(s) with an1me.to`);
             }
-
-            return !hadFailure;
+            return true;
         } catch (e) {
-            Logger.warn(`WatchlistSync: repair failed: ${e.message}`);
+            Logger.warn(`WatchlistSync: reconcile failed: ${e.message}`);
             return false;
         } finally {
             if (lockHeld) {
@@ -402,7 +393,7 @@ window.AnimeTrackerContent = window.AnimeTrackerContent || {};
 window.AnimeTrackerContent.WatchlistSync = WatchlistSync;
 
 setTimeout(() => {
-    WatchlistSync.repairPendingStatusesOnce().catch(() => {});
+    WatchlistSync.reconcileWatchlistStatuses().catch(() => {});
 }, 2500);
 
 // Wake the background SW and trigger one cloud poll — but only on /watch/

@@ -287,23 +287,6 @@
         return true;
     }
 
-    function shallowEqualStringMap(aMap, bMap) {
-        if (aMap === bMap) return true;
-        const a = aMap || {};
-        const b = bMap || {};
-        const aKeys = Object.keys(a);
-        const bKeys = Object.keys(b);
-
-        if (aKeys.length !== bKeys.length) return false;
-
-        for (const key of aKeys) {
-            if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
-            if (getSafeString(a[key]) !== getSafeString(b[key])) return false;
-        }
-
-        return true;
-    }
-
     // Order-stable JSON.stringify — sorts object keys recursively so two
     // objects with the same data but different insertion order produce the
     // same string. Without this, shallowEqualObjectMap reports "different"
@@ -546,12 +529,6 @@
         return animeData;
     }
 
-    function getCoverUrl(entry) {
-        if (!entry) return null;
-        if (typeof entry === 'string') return entry;
-        return entry.url || null;
-    }
-
     function getCoverSetAt(entry) {
         if (!entry) return 0;
         if (typeof entry === 'string') return 0;
@@ -630,12 +607,9 @@
         mergeGroupCoverImages,
         mergeGoalSettings,
         mergeBadgeUnlocks,
-        getCoverUrl,
-        getCoverSetAt,
         areAnimeDataMapsEqual,
         areProgressMapsEqual,
         shallowEqualDeletedAnime,
-        shallowEqualStringMap,
         shallowEqualObjectMap,
         isLikelyMovieSlug,
         isPlaceholderDuration,

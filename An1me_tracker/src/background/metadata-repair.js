@@ -180,6 +180,7 @@ async function buildLibraryRepairPlan(animeData, options = {}) {
 
     const cachedEntries = storageKeys.length > 0 ? await bgStorageGet(storageKeys) : {};
     const items = [];
+    let logs = [];
     let processed = 0;
     let cached = 0;
     let skipped = 0;
@@ -198,12 +199,30 @@ async function buildLibraryRepairPlan(animeData, options = {}) {
         const needsFiller = !movieLike && !hasFreshFiller;
 
         if (!needsInfo && !needsFiller) {
+            const infoResult = infoEntry?.notFound
+                ? { status: 'unavailable', entry: infoEntry }
+                : { status: 'cached', entry: infoEntry };
+            const fillerResult = movieLike
+                ? { status: 'movie' }
+                : fillerEntry?.notFound
+                    ? { status: 'nofill', entry: fillerEntry }
+                    : {
+                        status: 'cached',
+                        entry: fillerEntry,
+                        fillerCount: fillerEntry?.filler?.length || 0,
+                        totalEpisodes: fillerEntry?.totalEpisodes || null
+                    };
+
             processed++;
             if (movieLike || fillerEntry?.notFound) {
                 skipped++;
             } else {
                 cached++;
             }
+            logs = appendMetadataRepairLog(
+                logs,
+                buildMetadataRepairLog(slug, anime?.title || slug, infoResult, fillerResult)
+            );
             continue;
         }
 
@@ -218,6 +237,7 @@ async function buildLibraryRepairPlan(animeData, options = {}) {
         processed,
         cached,
         skipped,
+        logs,
         items,
         queueIndex: 0,
         forceInfoRefresh,
@@ -469,7 +489,7 @@ async function startLibraryRepair(options = {}) {
         currentSlug: plan.items[0]?.slug || null,
         currentTitle: plan.items[0]?.title || null,
         items: plan.items,
-        logs: [],
+        logs: plan.logs || [],
         options: {
             forceInfoRefresh: plan.forceInfoRefresh,
             forceFillerRefresh: plan.forceFillerRefresh

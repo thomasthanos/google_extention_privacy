@@ -39,6 +39,46 @@
         return Date.now() < csSyncPausedUntil;
     }
 
+    function stripFirebaseSilentAnimeMetadata(anime) {
+        if (!anime || typeof anime !== 'object') return anime;
+        const copy = { ...anime };
+        delete copy.coverImage;
+        delete copy.siteAnimeId;
+        delete copy.totalEpisodes;
+        delete copy.latestEpisode;
+        delete copy.nextEpisodeAt;
+        delete copy.nextEpisodeTimezone;
+        delete copy.durationSeconds;
+        delete copy.totalWatchTime;
+
+        if (Array.isArray(copy.episodes)) {
+            copy.episodes = copy.episodes.map((episode) => {
+                if (!episode || typeof episode !== 'object') return episode;
+                const epCopy = { ...episode };
+                delete epCopy.duration;
+                delete epCopy.durationSource;
+                return epCopy;
+            });
+        }
+
+        return copy;
+    }
+
+    function areAnimeDataEqualIgnoringFetchMetadata(oldAnime = {}, newAnime = {}) {
+        const oldKeys = Object.keys(oldAnime || {}).sort();
+        const newKeys = Object.keys(newAnime || {}).sort();
+        if (oldKeys.length !== newKeys.length) return false;
+        for (let i = 0; i < oldKeys.length; i++) {
+            if (oldKeys[i] !== newKeys[i]) return false;
+            const key = oldKeys[i];
+            if (JSON.stringify(stripFirebaseSilentAnimeMetadata(oldAnime[key])) !==
+                JSON.stringify(stripFirebaseSilentAnimeMetadata(newAnime[key]))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     async function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
         if (options?.keepalive) return fetch(url, options);
         const ctrl = new AbortController();
@@ -857,17 +897,9 @@
                 const newAnime = changes.animeData.newValue || {};
                 const oldCount = Object.values(oldAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
                 const newCount = Object.values(newAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
+                const libraryChanged = !areAnimeDataEqualIgnoringFetchMetadata(oldAnime, newAnime);
 
-                let coverChanged = false;
-                if (newCount === oldCount) {
-                    for (const slug of Object.keys(newAnime)) {
-                        const oldCover = oldAnime[slug]?.coverImage || null;
-                        const newCover = newAnime[slug]?.coverImage || null;
-                        if (oldCover !== newCover) { coverChanged = true; break; }
-                    }
-                }
-
-                if (newCount > oldCount || coverChanged) {
+                if (newCount > oldCount || libraryChanged) {
                     shouldSyncFull = true;
                 }
             }

@@ -997,11 +997,34 @@ body {
 .anime-list {
   display: flex;
   flex-direction: column;
-  gap: 8px
+  gap: 8px;
+  opacity: 1;
+  transform: translateY(0);
+  filter: none;
+  transition: opacity 0.16s ease, transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), filter 0.16s ease
 }
 
 .anime-list.no-transition * {
   transition: none !important
+}
+
+.anime-list.category-switching {
+  opacity: 0.42;
+  transform: translateY(4px) scale(0.997);
+  filter: blur(0.35px);
+  pointer-events: none
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anime-list {
+    transition: none
+  }
+
+  .anime-list.category-switching {
+    opacity: 1;
+    transform: none;
+    filter: none
+  }
 }
 
 .status-chip-row {
@@ -1211,14 +1234,39 @@ body {
 
 .completed-list-cards .anime-card,
 .completed-list-cards .anime-season-group,
+.completed-list-cards .anime-movie-group,
 .dropped-list-cards .anime-card,
 .dropped-list-cards .anime-season-group,
+.dropped-list-cards .anime-movie-group,
 .onhold-list-cards .anime-card,
 .onhold-list-cards .anime-season-group,
+.onhold-list-cards .anime-movie-group,
 .airing-list-cards .anime-card,
-.airing-list-cards .anime-season-group {
+.airing-list-cards .anime-season-group,
+.airing-list-cards .anime-movie-group {
   width: 100%;
-  box-sizing: border-box
+  box-sizing: border-box;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E"), linear-gradient(180deg, rgba(28, 34, 54, 0.6) 0%, rgba(20, 25, 38, 0.8) 100%), var(--bg-card);
+  border: 1px solid var(--b1);
+  border-top-color: var(--b2);
+  box-shadow: var(--s2)
+}
+
+.completed-list-cards .anime-card:hover,
+.completed-list-cards .anime-season-group:hover,
+.completed-list-cards .anime-movie-group:hover,
+.dropped-list-cards .anime-card:hover,
+.dropped-list-cards .anime-season-group:hover,
+.dropped-list-cards .anime-movie-group:hover,
+.onhold-list-cards .anime-card:hover,
+.onhold-list-cards .anime-season-group:hover,
+.onhold-list-cards .anime-movie-group:hover,
+.airing-list-cards .anime-card:hover,
+.airing-list-cards .anime-season-group:hover,
+.airing-list-cards .anime-movie-group:hover {
+  border-color: rgba(79, 195, 247, 0.22);
+  border-top-color: rgba(79, 195, 247, 0.32);
+  box-shadow: var(--s3)
 }
 
 .dropped-list-section {
@@ -1422,9 +1470,30 @@ body {
 
 .anime-card-header {
   display: flex;
+  justify-content: flex-start;
   align-items: center;
   cursor: pointer;
-  gap: 10px
+  gap: 10px;
+  position: relative;
+  min-height: 58px;
+  padding-right: 32px
+}
+
+.anime-header-main {
+  justify-content: center;
+  min-height: 58px;
+  margin-left: 0 !important;
+  padding-right: 0;
+  gap: 3px;
+  box-sizing: border-box
+}
+
+.anime-card.expanded .anime-header-main {
+  padding-right: 56px
+}
+
+.anime-title-row {
+  min-height: 19px
 }
 
 .anime-cover-container,
@@ -1499,10 +1568,10 @@ body {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  max-width: 200px;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.3px
+  max-width: none;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0
 }
 
 .anime-expand-icon {
@@ -1582,9 +1651,10 @@ body {
   display: none;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 10px 0 2px;
-  margin-top: 8px;
+  flex-wrap: nowrap;
+  gap: 5px;
+  padding: 8px 0 1px;
+  margin-top: 7px;
   border-top: 1px solid var(--b0)
 }
 
@@ -1595,74 +1665,121 @@ body {
 .anime-card-actions button {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
+  justify-content: center;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 128px;
+  gap: 4px;
+  padding: 4px 8px;
   border-radius: 9999px;
-  background: var(--bg-3);
-  border: 1px solid var(--b1);
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--t2);
   cursor: pointer;
-  font-size: 11px;
-  font-weight: 500;
-  transition: all 0.15s ease;
-  white-space: nowrap
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1;
+  min-height: 26px;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden
 }
 
 .anime-card-actions button svg {
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
   flex-shrink: 0
 }
 
+.anime-card-actions button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis
+}
+
 .anime-card-actions button:hover {
-  background: var(--bg-4);
+  background: rgba(255, 255, 255, 0.055);
   color: var(--t1);
-  border-color: var(--b2, var(--b1))
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px)
+}
+
+.anime-card-actions button:active {
+  transform: translateY(0);
+  filter: brightness(0.94)
+}
+
+.anime-card-actions .anime-favorite-toggle {
+  color: #f7b955;
+  border-color: rgba(247, 185, 85, 0.24);
+  background: rgba(247, 185, 85, 0.06)
+}
+
+.anime-card-actions .anime-favorite-toggle:hover {
+  color: #ffd88a;
+  border-color: rgba(247, 185, 85, 0.46);
+  background: rgba(247, 185, 85, 0.14);
+  box-shadow: 0 0 0 1px rgba(247, 185, 85, 0.07), 0 7px 18px rgba(247, 185, 85, 0.09)
 }
 
 .anime-card-actions .anime-onhold-toggle {
-  color: var(--amber);
-  border-color: rgba(255, 183, 77, 0.2);
-  background: rgba(255, 183, 77, 0.06)
+  color: #74a7ff;
+  border-color: rgba(116, 167, 255, 0.24);
+  background: rgba(116, 167, 255, 0.055)
 }
 
 .anime-card-actions .anime-onhold-toggle:hover {
-  background: rgba(255, 183, 77, 0.14)
+  color: #a6c7ff;
+  border-color: rgba(116, 167, 255, 0.48);
+  background: rgba(116, 167, 255, 0.13);
+  box-shadow: 0 0 0 1px rgba(116, 167, 255, 0.07), 0 7px 18px rgba(116, 167, 255, 0.1)
 }
 
 .anime-card-actions .anime-onhold-toggle[data-onhold="true"] {
-  background: rgba(255, 183, 77, 0.15);
-  border-color: rgba(255, 183, 77, 0.35)
+  color: #d6e5ff;
+  background: linear-gradient(180deg, rgba(116, 167, 255, 0.26), rgba(116, 167, 255, 0.13));
+  border-color: rgba(116, 167, 255, 0.58);
+  box-shadow: inset 0 0 0 1px rgba(214, 229, 255, 0.09)
 }
 
 .anime-card-actions .anime-complete-toggle {
-  color: #4caf50;
-  border-color: rgba(76, 175, 80, 0.2);
-  background: rgba(76, 175, 80, 0.06)
+  color: #4edb82;
+  border-color: rgba(78, 219, 130, 0.22);
+  background: rgba(78, 219, 130, 0.055)
 }
 
 .anime-card-actions .anime-complete-toggle:hover {
-  background: rgba(76, 175, 80, 0.14)
+  color: #79f0a1;
+  border-color: rgba(78, 219, 130, 0.42);
+  background: rgba(78, 219, 130, 0.13);
+  box-shadow: 0 0 0 1px rgba(78, 219, 130, 0.06), 0 7px 18px rgba(78, 219, 130, 0.08)
 }
 
 .anime-card-actions .anime-complete-toggle[data-completed="true"] {
-  background: rgba(76, 175, 80, 0.15);
-  border-color: rgba(76, 175, 80, 0.35)
+  color: #b6ffd0;
+  background: linear-gradient(180deg, rgba(78, 219, 130, 0.24), rgba(78, 219, 130, 0.13));
+  border-color: rgba(78, 219, 130, 0.54);
+  box-shadow: inset 0 0 0 1px rgba(182, 255, 208, 0.08)
 }
 
 .anime-card-actions .anime-drop-toggle {
-  color: #e57373;
-  border-color: rgba(229, 115, 115, 0.2);
-  background: rgba(229, 115, 115, 0.06)
+  color: #ff777d;
+  border-color: rgba(255, 119, 125, 0.22);
+  background: rgba(255, 119, 125, 0.055)
 }
 
 .anime-card-actions .anime-drop-toggle:hover {
-  background: rgba(229, 115, 115, 0.14)
+  color: #ffa0a4;
+  border-color: rgba(255, 119, 125, 0.42);
+  background: rgba(255, 119, 125, 0.13);
+  box-shadow: 0 0 0 1px rgba(255, 119, 125, 0.06), 0 7px 18px rgba(255, 119, 125, 0.08)
 }
 
 .anime-card-actions .anime-drop-toggle[data-dropped="true"] {
-  background: rgba(229, 115, 115, 0.15);
-  border-color: rgba(229, 115, 115, 0.35)
+  color: #ffd0d2;
+  background: linear-gradient(180deg, rgba(255, 119, 125, 0.24), rgba(255, 119, 125, 0.13));
+  border-color: rgba(255, 119, 125, 0.54);
+  box-shadow: inset 0 0 0 1px rgba(255, 208, 210, 0.08)
 }
 
 .anime-card-actions .anime-edit-title {
@@ -3388,51 +3505,56 @@ body {
 }
 
 .anime-season-group {
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E"), linear-gradient(180deg, rgba(22, 28, 44, 0.45) 0%, rgba(16, 20, 32, 0.55) 100%), rgba(18, 23, 38, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: #161922;
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-top-color: rgba(255, 255, 255, 0.09);
   border-radius: var(--r-lg);
   padding: 10px 12px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
   /* See .anime-card — native virtualization for offscreen items. */
   content-visibility: auto;
-  contain-intrinsic-size: auto 88px;
+  contain-intrinsic-size: auto 78px;
   position: relative;
   overflow: hidden;
-  box-shadow: var(--s2)
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2)
 }
 
 .anime-season-group::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 12%;
-  bottom: 12%;
-  width: 2px;
-  background: var(--cyan);
-  border-radius: 0 2px 2px 0;
-  opacity: 0;
-  transition: opacity var(--tn)
+  display: none
 }
 
 .anime-season-group:hover {
-  border-color: rgba(0, 191, 255, 0.55);
-  border-top-color: rgba(0, 191, 255, 0.7);
-  box-shadow: var(--s3), 0 0 0 1px rgba(0, 191, 255, 0.18), 0 0 14px rgba(0, 191, 255, 0.08)
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.06)
 }
 
 .anime-season-group:hover::before {
-  opacity: 0.7
+  opacity: 0
 }
 
 .season-group-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   cursor: pointer;
-  gap: 10px
+  gap: 10px;
+  position: relative;
+  min-height: 58px;
+  padding-right: 32px
+}
+
+.season-header-main,
+.movie-header-main {
+  justify-content: center;
+  min-height: 58px;
+  margin-left: 0 !important;
+  padding-right: 0;
+  gap: 3px;
+  box-sizing: border-box
+}
+
+.season-title-row,
+.movie-title-row {
+  min-height: 19px
 }
 
 .season-group-name {
@@ -3441,19 +3563,26 @@ body {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap
+  white-space: nowrap;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0
 }
 
 .season-group-actions {
   display: flex;
   align-items: center;
   gap: 3px;
-  align-self: center
+  align-self: center;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%)
 }
 
 .season-group-expand-icon {
-  width: 14px;
-  height: 14px;
+  width: 24px;
+  height: 24px;
   color: var(--t3);
   transition: all var(--tf);
   display: flex;
@@ -3462,8 +3591,8 @@ body {
 }
 
 .season-group-expand-icon svg {
-  width: 14px;
-  height: 14px
+  width: 15px;
+  height: 15px
 }
 
 .anime-season-group:hover .season-group-expand-icon {
@@ -3788,6 +3917,93 @@ body {
 }
 
 .anime-movie-group {
+  background: #161922;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--r-lg);
+  padding: 10px 12px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  /* See .anime-card — native virtualization for offscreen items. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 78px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2)
+}
+
+.anime-movie-group::before {
+  display: none
+}
+
+.anime-movie-group:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.06)
+}
+
+.anime-movie-group:hover::before {
+  opacity: 0
+}
+
+.movie-group-header {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  cursor: pointer;
+  gap: 10px;
+  position: relative;
+  min-height: 58px;
+  padding-right: 32px
+}
+
+.movie-group-name {
+  font-family: 'PROXON', 'ComicSans', sans-serif;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0
+}
+
+.movie-group-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  align-self: center;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%)
+}
+
+.movie-group-expand-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--t3);
+  transition: all var(--tf);
+  display: flex;
+  align-items: center;
+  justify-content: center
+}
+
+.movie-group-expand-icon svg {
+  width: 15px;
+  height: 15px
+}
+
+.anime-movie-group:hover .movie-group-expand-icon {
+  color: var(--t2)
+}
+
+.anime-movie-group.expanded .movie-group-expand-icon {
+  transform: rotate(90deg);
+  color: var(--cyan)
+}
+
+.anime-card,
+.anime-season-group,
+.anime-movie-group {
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E"), linear-gradient(180deg, rgba(28, 34, 54, 0.6) 0%, rgba(20, 25, 38, 0.8) 100%), var(--bg-card);
   border: 1px solid var(--b1);
   border-top-color: var(--b2);
@@ -3796,14 +4012,24 @@ body {
   transition: border-color var(--tn), box-shadow var(--tn);
   position: relative;
   overflow: hidden;
-  /* See .anime-card — native virtualization for offscreen items. */
   content-visibility: auto;
-  contain-intrinsic-size: auto 88px;
+  contain-intrinsic-size: auto 78px;
   box-shadow: var(--s2)
 }
 
+.anime-card:hover,
+.anime-season-group:hover,
+.anime-movie-group:hover {
+  border-color: rgba(79, 195, 247, 0.22);
+  border-top-color: rgba(79, 195, 247, 0.32);
+  box-shadow: var(--s3)
+}
+
+.anime-card::before,
+.anime-season-group::before,
 .anime-movie-group::before {
   content: '';
+  display: block;
   position: absolute;
   left: 0;
   top: 12%;
@@ -3815,62 +4041,54 @@ body {
   transition: opacity var(--tn)
 }
 
-.anime-movie-group:hover {
-  border-color: rgba(79, 195, 247, 0.22);
-  border-top-color: rgba(79, 195, 247, 0.32);
-  box-shadow: var(--s3)
-}
-
+.anime-card:hover::before,
+.anime-season-group:hover::before,
 .anime-movie-group:hover::before {
   opacity: 0.6
 }
 
+.anime-card-header,
+.season-group-header,
 .movie-group-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   cursor: pointer;
-  gap: 10px
+  gap: 10px;
+  position: relative;
+  min-height: 58px;
+  padding-right: 32px
 }
 
+.anime-header-main,
+.season-header-main,
+.movie-header-main {
+  justify-content: center;
+  min-height: 58px;
+  margin-left: 0 !important;
+  padding-right: 0;
+  gap: 3px;
+  box-sizing: border-box
+}
+
+.anime-title-text,
+.season-group-name,
 .movie-group-name {
-  font-family: 'PROXON', 'ComicSans', sans-serif;
+  font-family: 'PROXON', 'ComicSans', 'Inter', 'Segoe UI', system-ui, sans-serif;
   flex: 1;
   min-width: 0;
+  max-width: none;
   overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
-  white-space: nowrap
+  color: var(--t1);
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0
 }
 
-.movie-group-actions {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  align-self: center
-}
-
-.movie-group-expand-icon {
-  width: 14px;
-  height: 14px;
-  color: var(--t3);
-  transition: all var(--tf);
-  display: flex;
-  align-items: center;
-  justify-content: center
-}
-
-.movie-group-expand-icon svg {
-  width: 14px;
-  height: 14px
-}
-
-.anime-movie-group:hover .movie-group-expand-icon {
-  color: var(--cyan)
-}
-
-.anime-movie-group.expanded .movie-group-expand-icon {
-  transform: rotate(90deg);
-  color: var(--cyan)
+.anime-card.expanded .anime-header-main {
+  padding-right: 56px
 }
 
 .movie-group-content {
@@ -4033,7 +4251,7 @@ body {
   display: flex;
   font-size: 10px;
   color: var(--t2);
-  margin-top: 3px;
+  margin-top: 1px;
   gap: 4px;
   line-height: 1.3;
   flex-wrap: wrap;
@@ -4044,7 +4262,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 3px;
+  margin-top: 1px;
   min-width: 0
 }
 
@@ -4058,7 +4276,11 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  flex-shrink: 0
+  flex-shrink: 0;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%)
 }
 
 .anime-meta-row-wrap .anime-header-actions {
@@ -4133,7 +4355,7 @@ body {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  margin-top: 2px;
+  margin-top: 1px;
   min-width: 0
 }
 
@@ -5943,9 +6165,17 @@ body {
 }
 
 .anime-favorite-toggle.is-favorite {
-  color: #ffd166;
-  border-color: rgba(255, 209, 102, 0.45) !important;
-  background: rgba(255, 209, 102, 0.08) !important
+  color: #ffe1a8;
+  border-color: rgba(247, 185, 85, 0.58) !important;
+  background: linear-gradient(180deg, rgba(247, 185, 85, 0.28), rgba(247, 185, 85, 0.14)) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 225, 168, 0.09)
+}
+
+.anime-card-actions .anime-favorite-toggle.is-favorite:hover {
+  color: #fff0cd;
+  border-color: rgba(247, 185, 85, 0.72) !important;
+  background: linear-gradient(180deg, rgba(247, 185, 85, 0.34), rgba(247, 185, 85, 0.18)) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 240, 205, 0.1), 0 7px 18px rgba(247, 185, 85, 0.11)
 }
 
 .anime-favorite-toggle.is-favorite svg {

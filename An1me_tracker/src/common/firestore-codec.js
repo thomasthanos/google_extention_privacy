@@ -79,7 +79,7 @@
         return decodeFields(doc.fields);
     }
 
-    const api = { encodeValue, encodeFields, decodeValue, decodeFields, decodeDoc };
+    const api = { encodeFields, decodeFields, decodeDoc };
 
     const root = typeof globalThis !== 'undefined' ? globalThis : self;
     root.AnimeTrackerFirestoreCodec = api;
