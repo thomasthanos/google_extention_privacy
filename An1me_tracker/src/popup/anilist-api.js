@@ -231,74 +231,120 @@
         const style = document.createElement('style');
         style.id = STYLE_ID;
         style.textContent = `
-            #${CARD_ID} .anilist-account { display:flex; align-items:center; gap:11px; margin-bottom:14px; }
+            #${CARD_ID} {
+                --anilist-accent:#2fb7ff;
+                --anilist-accent-strong:#10a8f7;
+                --anilist-surface:rgba(255,255,255,0.045);
+                --anilist-surface-strong:rgba(255,255,255,0.075);
+                --anilist-border:rgba(255,255,255,0.1);
+                font-family:'Inter','Segoe UI',system-ui,sans-serif;
+            }
+            #${CARD_ID} .anilist-account {
+                display:grid; grid-template-columns:auto minmax(0,1fr) auto;
+                align-items:center; gap:12px; margin-bottom:12px;
+            }
             #${CARD_ID} .anilist-avatar {
-                position:relative; width:38px; height:38px; flex-shrink:0;
-                border-radius:50%; overflow:hidden;
+                position:relative; width:44px; height:44px; flex-shrink:0;
+                border-radius:14px; overflow:hidden;
                 display:flex; align-items:center; justify-content:center;
-                background:linear-gradient(135deg,#02a9ff,#0265a8);
+                background:linear-gradient(135deg,rgba(47,183,255,0.95),rgba(44,103,255,0.88));
                 color:#fff; font-size:16px; font-weight:800;
+                box-shadow:0 8px 22px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.18);
             }
             #${CARD_ID} .anilist-avatar img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
-            #${CARD_ID} .anilist-account-text { display:flex; flex-direction:column; gap:1px; min-width:0; }
+            #${CARD_ID} .anilist-account-text { display:flex; flex-direction:column; gap:2px; min-width:0; }
             #${CARD_ID} .anilist-account-name {
-                font-size:14px; font-weight:800; color:#e8edf8;
+                font-size:15px; font-weight:800; color:#f4f7ff;
                 white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
             }
-            #${CARD_ID} .anilist-account-sub { font-size:11px; color:#8899b0; }
-            #${CARD_ID} .anilist-dot {
-                width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-left:auto;
-                background:#4caf82; box-shadow:0 0 0 3px rgba(76,175,130,0.18);
+            #${CARD_ID} .anilist-account-sub { font-size:11px; color:#9aa8bf; line-height:1.35; }
+            #${CARD_ID} .anilist-pill {
+                display:inline-flex; align-items:center; gap:6px; justify-self:end;
+                min-height:26px; padding:0 10px; border-radius:999px;
+                border:1px solid rgba(76,175,130,0.28);
+                background:rgba(76,175,130,0.1); color:#7be0ac;
+                font-size:11px; font-weight:750; white-space:nowrap;
             }
-            #${CARD_ID} .anilist-intro { margin-bottom:13px; }
-            #${CARD_ID} .anilist-intro-title { font-size:14px; font-weight:800; color:#e8edf8; margin-bottom:3px; }
-            #${CARD_ID} .anilist-intro-text { font-size:12px; color:#8899b0; line-height:1.5; }
+            #${CARD_ID} .anilist-pill::before {
+                content:''; width:6px; height:6px; border-radius:50%; background:currentColor;
+                box-shadow:0 0 0 3px rgba(123,224,172,0.12);
+            }
+            #${CARD_ID} .anilist-intro { margin-bottom:14px; }
+            #${CARD_ID} .anilist-intro-title { font-size:16px; font-weight:800; color:#f4f7ff; margin-bottom:4px; }
+            #${CARD_ID} .anilist-intro-text { font-size:12px; color:#9aa8bf; line-height:1.45; max-width:34ch; }
             #${CARD_ID} .anilist-progress {
-                height:6px; border-radius:999px; background:rgba(255,255,255,0.08);
-                overflow:hidden; margin-bottom:7px;
+                height:5px; border-radius:999px; background:rgba(255,255,255,0.08);
+                overflow:hidden; margin:2px 0 8px;
             }
             #${CARD_ID} .anilist-progress-fill {
                 height:100%; width:0%; border-radius:999px;
-                background:linear-gradient(90deg,#02a9ff,#4fc3f7); transition:width .3s ease;
+                background:linear-gradient(90deg,var(--anilist-accent-strong),#71d7ff); transition:width .3s ease;
             }
-            #${CARD_ID} .anilist-status { font-size:12px; color:#8899b0; min-height:16px; margin-bottom:12px; }
-            #${CARD_ID} .anilist-status[data-kind="ok"] { color:#4caf82; }
-            #${CARD_ID} .anilist-status[data-kind="err"] { color:#ff6b6b; }
+            #${CARD_ID} .anilist-status {
+                display:flex; align-items:center; min-height:0; margin-bottom:12px;
+                padding:8px 10px; border-radius:10px;
+                border:1px solid var(--anilist-border); background:var(--anilist-surface);
+                color:#9aa8bf; font-size:11.5px; line-height:1.35;
+                overflow-wrap:anywhere;
+            }
+            #${CARD_ID} .anilist-status:empty { display:none; }
+            #${CARD_ID} .anilist-status[data-kind="ok"] {
+                border-color:rgba(76,175,130,0.22); background:rgba(76,175,130,0.08); color:#7be0ac;
+            }
+            #${CARD_ID} .anilist-status[data-kind="err"] {
+                border-color:rgba(255,107,107,0.26); background:rgba(255,107,107,0.08); color:#ff8f8f;
+            }
             #${CARD_ID} .anilist-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+            #${CARD_ID} .anilist-actions { margin-bottom:2px; }
             #${CARD_ID} .anilist-btn {
                 display:inline-flex; align-items:center; justify-content:center; gap:7px;
-                padding:10px 15px; border-radius:11px; border:1px solid rgba(255,255,255,0.12);
-                background:rgba(255,255,255,0.06); color:#e8edf8;
-                font:inherit; font-size:12.5px; font-weight:700; cursor:pointer;
-                transition:background .15s ease, opacity .15s ease, transform .1s ease;
+                min-height:36px; padding:8px 13px; border-radius:10px;
+                border:1px solid var(--anilist-border);
+                background:var(--anilist-surface); color:#eef4ff;
+                font:inherit; font-size:12px; font-weight:750; cursor:pointer;
+                transition:background .15s ease, border-color .15s ease, opacity .15s ease, transform .1s ease;
             }
-            #${CARD_ID} .anilist-btn:hover:not(:disabled) { background:rgba(255,255,255,0.12); }
-            #${CARD_ID} .anilist-btn:active:not(:disabled) { transform:scale(0.97); }
+            #${CARD_ID} .anilist-btn:hover:not(:disabled) { background:var(--anilist-surface-strong); border-color:rgba(255,255,255,0.16); }
+            #${CARD_ID} .anilist-btn:active:not(:disabled) { transform:translateY(1px); }
             #${CARD_ID} .anilist-btn:disabled { opacity:.5; cursor:default; }
+            #${CARD_ID} .anilist-btn:focus-visible,
+            #${CARD_ID} .anilist-input:focus-visible {
+                outline:none; box-shadow:0 0 0 3px rgba(47,183,255,0.16);
+            }
             #${CARD_ID} .anilist-btn svg {
                 width:14px; height:14px; fill:none; stroke:currentColor;
                 stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round;
             }
-            #${CARD_ID} .anilist-btn--primary { background:#02a9ff; border-color:#02a9ff; color:#04121f; }
-            #${CARD_ID} .anilist-btn--primary:hover:not(:disabled) { background:#3cbcff; }
-            #${CARD_ID} .anilist-btn--ghost { background:transparent; }
+            #${CARD_ID} .anilist-btn--primary {
+                background:var(--anilist-accent-strong); border-color:rgba(16,168,247,0.9);
+                color:#02131f; box-shadow:0 8px 20px rgba(16,168,247,0.18);
+            }
+            #${CARD_ID} .anilist-btn--primary:hover:not(:disabled) { background:#35bdff; border-color:#35bdff; }
+            #${CARD_ID} .anilist-btn--ghost { background:transparent; color:#b5c1d5; }
             #${CARD_ID} .anilist-btn--block { flex:1; }
             #${CARD_ID}.anilist-syncing .anilist-btn--primary svg { animation:anilist-spin 1s linear infinite; }
             @keyframes anilist-spin { to { transform:rotate(360deg); } }
-            #${CARD_ID} .anilist-divider { height:1px; background:rgba(255,255,255,0.07); margin:16px 0 13px; }
+            #${CARD_ID} .anilist-divider { height:1px; background:rgba(255,255,255,0.07); margin:15px 0 12px; }
             #${CARD_ID} .anilist-sub {
-                font-size:11px; font-weight:800; color:#8899b0;
-                text-transform:uppercase; letter-spacing:.07em; margin-bottom:9px;
+                font-size:11px; font-weight:800; color:#9aa8bf;
+                text-transform:uppercase; margin-bottom:8px;
             }
+            #${CARD_ID} .anilist-import-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; }
             #${CARD_ID} .anilist-input {
-                flex:1; min-width:150px; padding:10px 12px; border-radius:11px;
-                border:1px solid rgba(255,255,255,0.14); background:rgba(0,0,0,0.28);
-                color:#e8edf8; font:inherit; font-size:12.5px;
+                width:100%; min-width:0; height:36px; padding:0 12px; border-radius:10px;
+                border:1px solid var(--anilist-border); background:rgba(0,0,0,0.18);
+                color:#eef4ff; font:inherit; font-size:12px;
             }
-            #${CARD_ID} .anilist-input:focus { outline:none; border-color:#02a9ff; }
-            #${CARD_ID} .anilist-input::placeholder { color:#5a6888; }
-            #${CARD_ID} .anilist-hint { font-size:11px; color:#5a6888; line-height:1.55; margin-top:9px; word-break:break-word; }
+            #${CARD_ID} .anilist-input:focus { outline:none; border-color:rgba(47,183,255,0.75); }
+            #${CARD_ID} .anilist-input::placeholder { color:#66738b; }
+            #${CARD_ID} .anilist-hint { font-size:11px; color:#7f8da6; line-height:1.45; margin-top:8px; word-break:break-word; }
             #${CARD_ID} .anilist-hint code { color:#8eb5ff; word-break:break-all; }
+            @media (max-width:380px) {
+                #${CARD_ID} .anilist-account { grid-template-columns:auto minmax(0,1fr); }
+                #${CARD_ID} .anilist-pill { grid-column:1 / -1; justify-self:start; }
+                #${CARD_ID} .anilist-import-row { grid-template-columns:1fr; }
+                #${CARD_ID} .anilist-import-row .anilist-btn { width:100%; }
+            }
             @media (prefers-reduced-motion:reduce) {
                 #${CARD_ID}.anilist-syncing .anilist-btn--primary svg { animation:none; }
                 #${CARD_ID} .anilist-progress-fill { transition:none; }
@@ -322,13 +368,13 @@
         const importSection = `
             <div class="anilist-divider"></div>
             <div class="anilist-sub">Import from AniList</div>
-            <div class="anilist-row">
+            <div class="anilist-import-row">
                 <input class="anilist-input" id="anilistUsername" type="text"
-                       placeholder="AniList username" value="${importName}"
+                       placeholder="Username" value="${importName}"
                        autocomplete="off" spellcheck="false">
                 <button class="anilist-btn" id="anilistImportBtn" type="button">Import</button>
             </div>
-            <div class="anilist-hint">Pulls anime from any public AniList list into your library. Existing entries are never changed.</div>
+            <div class="anilist-hint">Adds public AniList entries to your library. Existing entries stay untouched.</div>
         `;
 
         if (connected) {
@@ -343,10 +389,10 @@
                         <span class="anilist-account-name">${name}</span>
                         <span class="anilist-account-sub">Progress syncs automatically in the background</span>
                     </div>
-                    <span class="anilist-dot" title="Connected"></span>
+                    <span class="anilist-pill" title="Connected">Connected</span>
                 </div>
                 ${statusArea}
-                <div class="anilist-row">
+                <div class="anilist-row anilist-actions">
                     <button class="anilist-btn anilist-btn--primary" id="anilistSyncBtn" type="button">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                         <span>Sync now</span>
