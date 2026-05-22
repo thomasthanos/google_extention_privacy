@@ -11,7 +11,7 @@
  *   #settingsAutoSkipFiller (+ subtitle), #settingsSkiptime (+ subtitle), [NEW]
  *   #settingsRefresh, #settingsExportData,
  *   #settingsImportData, #settingsImportFile, #settingsFetchFillers,
- *   #settingsClear, #settingsExportToken, #settingsDonate.
+ *   #settingsClear, #settingsSetPassword, #settingsDonate.
  *
  * Render is idempotent β€” safe to call repeatedly when storage settings change.
  */
@@ -36,7 +36,8 @@
         download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
         upload:   '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
         trash:    '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
-        key:      '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
+        key:      '<circle cx="7.5" cy="14.5" r="4.5"/><path d="M11 11l9-9"/><path d="M16 7l2 2"/><path d="M14 9l2 2"/>',
+        check:    '<path d="M20 6L9 17l-5-5"/>',
         copy:     '<rect x="9" y="11" width="10" height="10" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
         bell:     '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
         skipFwd:  '<polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/>',
@@ -174,7 +175,29 @@
         `;
     }
 
-    function renderDangerCard() {
+    function mobilePasswordCopy(hasMobilePassword, accountEmail = '') {
+        if (hasMobilePassword) {
+            const emailHint = accountEmail ? accountEmail : 'your email';
+            return {
+                title: 'Mobile password active',
+                subtitle: `On mobile: sign in with ${emailHint} + your password`,
+                icon: 'check',
+                linked: true
+            };
+        }
+        return {
+            title: 'Set password for mobile',
+            subtitle: 'Link a password so you can sign in with email on mobile',
+            icon: 'key',
+            linked: false
+        };
+    }
+
+    function renderDangerCard({ hasMobilePassword = false, accountEmail = '' } = {}) {
+        const mobile = mobilePasswordCopy(hasMobilePassword, accountEmail);
+        const mobileBtnClass = mobile.linked
+            ? 'settings-action settings-action--linked'
+            : 'settings-action';
         return `
             <section class="settings-card settings-card--danger">
                 <h2 class="settings-card-title">Danger zone</h2>
@@ -186,11 +209,13 @@
                             <span class="settings-action-subtitle">Delete all tracking data on this device</span>
                         </span>
                     </button>
-                    <button class="settings-action" id="settingsExportToken" type="button">
-                        ${svg('key')}
+                    <button class="${mobileBtnClass}" id="settingsSetPassword" type="button"
+                            data-password-linked="${mobile.linked ? 'true' : 'false'}"
+                            aria-label="${escapeHtml(mobile.title)}">
+                        ${svg(mobile.icon)}
                         <span class="settings-action-text">
-                            <span class="settings-action-title">Export Auth Token</span>
-                            <span class="settings-action-subtitle">Transfer to Orion / Safari</span>
+                            <span class="settings-action-title" id="settingsSetPasswordTitle">${escapeHtml(mobile.title)}</span>
+                            <span class="settings-action-subtitle" id="settingsSetPasswordSubtitle">${escapeHtml(mobile.subtitle)}</span>
                         </span>
                     </button>
                 </div>
@@ -223,8 +248,10 @@
 
         const {
             user = null,
-            settings = {}
+            settings = {},
+            hasMobilePassword = false
         } = params;
+        const accountEmail = user?.email || '';
 
         const state = {
             copyGuard: settings.copyGuard !== false,           // default ON
@@ -243,7 +270,7 @@
                     ${renderAccountCard(user)}
                     ${renderPlaybackCard(state)}
                     ${renderLibraryCard()}
-                    ${renderDangerCard()}
+                    ${renderDangerCard({ hasMobilePassword, accountEmail })}
                     ${renderAboutCard()}
                 </div>
             `;
@@ -282,6 +309,26 @@
             state.autoSkipFiller ? 'Filler episodes will be auto-skipped' : 'Skip filler, jump to next canon ep');
         updateToggle('settingsSkiptime', state.skiptimeHelper,
             state.skiptimeHelper ? 'Capture intro/outro on an1me.to/watch' : 'Floating panel for intro/outro contributions');
+        updateMobilePasswordRow(hasMobilePassword, accountEmail);
+    }
+
+    function updateMobilePasswordRow(hasMobilePassword, accountEmail = '') {
+        const btn = document.getElementById('settingsSetPassword');
+        if (!btn) return;
+        const mobile = mobilePasswordCopy(!!hasMobilePassword, accountEmail);
+        const titleEl = document.getElementById('settingsSetPasswordTitle');
+        const subtitleEl = document.getElementById('settingsSetPasswordSubtitle');
+        const iconEl = btn.querySelector('.settings-icon');
+
+        btn.dataset.passwordLinked = mobile.linked ? 'true' : 'false';
+        btn.classList.toggle('settings-action--linked', mobile.linked);
+        btn.setAttribute('aria-label', mobile.title);
+        if (titleEl) titleEl.textContent = mobile.title;
+        if (subtitleEl) subtitleEl.textContent = mobile.subtitle;
+        if (iconEl) {
+            const paths = ICONS[mobile.icon];
+            if (paths) iconEl.innerHTML = paths;
+        }
     }
 
     // Lazy-create a hidden aria-live region so screen readers announce toggle
@@ -335,7 +382,7 @@
     }
 
     window.AnimeTracker = window.AnimeTracker || {};
-    window.AnimeTracker.SettingsView = { render, updateToggle };
+    window.AnimeTracker.SettingsView = { render, updateToggle, updateMobilePasswordRow };
 
     // β”€β”€β”€ Initial render at script-parse time β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€
     // Rendered NOW (not on view-mode click) so all IDs (#settingsCopyGuard,

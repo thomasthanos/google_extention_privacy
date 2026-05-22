@@ -81,7 +81,8 @@ const FirebaseLib = (function () {
         return null;
     }
 
-    async function signInWithGoogle() {
+    async function signInWithGoogle(options = {}) {
+        const { prompt = 'select_account' } = options;
         return new Promise((resolve, reject) => {
             const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
             const REDIRECT_URL = getRedirectUrl();
@@ -95,7 +96,7 @@ const FirebaseLib = (function () {
             authUrl.searchParams.set('redirect_uri', REDIRECT_URL);
             authUrl.searchParams.set('response_type', 'token');
             authUrl.searchParams.set('scope', SCOPES);
-            authUrl.searchParams.set('prompt', 'select_account');
+            authUrl.searchParams.set('prompt', prompt);
 
             PopupLogger.log('Firebase', 'Starting OAuth flow...');
 
@@ -157,26 +158,20 @@ const FirebaseLib = (function () {
                             return;
                         }
 
-                        currentUser = {
-                            uid: data.localId,
-                            email: data.email,
-                            displayName: data.displayName || (data.email || '').split('@')[0],
-                            photoURL: data.photoUrl || null
-                        };
-
-                        const tokens = {
-                            idToken: data.idToken,
-                            refreshToken: data.refreshToken,
-                            expiresAt: Date.now() + (parseInt(data.expiresIn) * 1000)
-                        };
+                        const session = sessionFromAuthResponse(data, ['google.com'], currentUser);
+                        currentUser = session.user;
 
                         await chrome.storage.local.set({
                             [STORAGE_KEYS.USER]: currentUser,
-                            [STORAGE_KEYS.TOKENS]: tokens
+                            [STORAGE_KEYS.TOKENS]: {
+                                idToken: session.idToken,
+                                refreshToken: session.refreshToken,
+                                expiresAt: session.expiresAt
+                            }
                         });
 
                         notifyAuthStateListeners(currentUser);
-                        resolve(currentUser);
+                        resolve(session);
                     } catch (error) {
                         PopupLogger.error('Firebase', 'Token exchange error:', error);
                         reject(error);
@@ -253,7 +248,8 @@ const FirebaseLib = (function () {
         return inflight;
     }
 
-    async function getIdToken() {
+    async function getIdToken(options = {}) {
+        const { forceRefresh = false } = options;
         const stored = await chrome.storage.local.get([STORAGE_KEYS.TOKENS]);
         const tokens = stored[STORAGE_KEYS.TOKENS];
 
@@ -273,13 +269,15 @@ const FirebaseLib = (function () {
         const isExpired = tokens.expiresAt < now;
         const isExpiringSoon = tokens.expiresAt < now + 300000;
 
-        if (isExpired) {
+        if (forceRefresh) {
+            PopupLogger.log('Firebase', 'Forcing token refresh...');
+        } else if (isExpired) {
             PopupLogger.log('Firebase', 'Token has expired, attempting refresh...');
         } else if (isExpiringSoon) {
             PopupLogger.log('Firebase', 'Token expiring soon, refreshing...');
         }
 
-        if (isExpiringSoon) {
+        if (forceRefresh || isExpiringSoon) {
             try {
                 const newTokens = await refreshToken(tokens.refreshToken);
                 return newTokens.idToken;
@@ -295,6 +293,54 @@ const FirebaseLib = (function () {
         }
 
         return tokens.idToken;
+    }
+
+    function authErrorNeedsRecentLogin(code) {
+        return code === 'CREDENTIAL_TOO_OLD_LOGIN_AGAIN'
+            || code === 'TOKEN_EXPIRED'
+            || code === 'INVALID_ID_TOKEN';
+    }
+
+    function providerIdsFromAuthResponse(data) {
+        if (!Array.isArray(data?.providerUserInfo)) return [];
+        return data.providerUserInfo
+            .map((entry) => entry?.providerId)
+            .filter(Boolean);
+    }
+
+    function userNeedsGoogleReauthForPasswordLink(user) {
+        const providers = Array.isArray(user?.providers) ? user.providers : [];
+        if (providers.length === 0) return true;
+        return providers.includes('google.com') && !providers.includes('password');
+    }
+
+    function userHasMobilePassword(user) {
+        if (!user) return false;
+        if (user.passwordLinkedAt) return true;
+        const providers = Array.isArray(user.providers) ? user.providers : [];
+        return providers.includes('password');
+    }
+
+    function sessionFromAuthResponse(data, defaultProviders = [], previousUser = null) {
+        const providers = providerIdsFromAuthResponse(data);
+        const mergedProviders = providers.length > 0 ? providers : defaultProviders;
+        const hasPasswordProvider = mergedProviders.includes('password');
+        const user = {
+            uid: data.localId,
+            email: data.email,
+            displayName: data.displayName || (data.email || '').split('@')[0],
+            photoURL: data.photoUrl || data.profilePicture || null,
+            providers: mergedProviders,
+            passwordLinkedAt: hasPasswordProvider
+                ? (previousUser?.passwordLinkedAt || new Date().toISOString())
+                : (previousUser?.passwordLinkedAt || null)
+        };
+        const tokens = {
+            idToken: data.idToken,
+            refreshToken: data.refreshToken,
+            expiresAt: Date.now() + (parseInt(data.expiresIn, 10) * 1000)
+        };
+        return { user, ...tokens };
     }
 
     async function signOut() {
@@ -406,76 +452,293 @@ const FirebaseLib = (function () {
     };
     const jsonToFirestoreFields = (obj) => _fsCodec ? _fsCodec.encodeFields(obj) : {};
 
-    async function signInWithExportedToken(tokenData) {
-        if (!tokenData || !tokenData.user || !tokenData.tokens) throw new Error('Invalid token data');
-        if (!tokenData.tokens.refreshToken || typeof tokenData.tokens.refreshToken !== 'string') {
-            throw new Error('Invalid or missing refresh token in exported data.');
+    // Turn a raw Firebase Identity Toolkit error code into a message safe to
+    // show the user. Unknown codes fall through to the raw string.
+    function mapAuthError(code) {
+        switch (code) {
+            case 'EMAIL_EXISTS': return 'An account with this email already exists.';
+            case 'EMAIL_NOT_FOUND': return 'No account found with this email.';
+            case 'INVALID_PASSWORD': return 'Incorrect password.';
+            case 'INVALID_LOGIN_CREDENTIALS': return 'Incorrect email or password.';
+            case 'INVALID_EMAIL': return 'Invalid email address.';
+            case 'MISSING_PASSWORD': return 'Please enter your password.';
+            case 'USER_DISABLED': return 'This account has been disabled.';
+            case 'OPERATION_NOT_ALLOWED': return 'Email/password sign-in is not enabled.';
+            case 'TOO_MANY_ATTEMPTS_TRY_LATER': return 'Too many attempts — please try again later.';
+            case 'CREDENTIAL_TOO_OLD_LOGIN_AGAIN':
+                return 'Could not verify your session. Try again and complete the Google sign-in window.';
+            case 'FEDERATED_USER_CANNOT_USE_PASSWORD':
+                return 'This account signs in with Google. Use Google on mobile, or create a separate email/password account.';
+            default:
+                if (typeof code === 'string' && code.startsWith('WEAK_PASSWORD')) {
+                    return 'Password must be at least 6 characters.';
+                }
+                return code || 'Authentication failed.';
         }
-        if (tokenData.expiresAt && Date.now() > tokenData.expiresAt) {
-            throw new Error('Token has expired (valid for 20 minutes). Please export a new token from Chrome.');
-        }
+    }
+
+    // Persist a fresh session from an Identity Toolkit auth response and
+    // notify listeners. Shared by sign-in and sign-up.
+    async function persistSession(data) {
+        const session = sessionFromAuthResponse(data, ['password'], currentUser);
+        currentUser = session.user;
+        await chrome.storage.local.set({
+            [STORAGE_KEYS.USER]: currentUser,
+            [STORAGE_KEYS.TOKENS]: {
+                idToken: session.idToken,
+                refreshToken: session.refreshToken,
+                expiresAt: session.expiresAt
+            }
+        });
+        notifyAuthStateListeners(currentUser);
+        return session;
+    }
+
+    // action: 'signInWithPassword' (existing user) | 'signUp' (new account).
+    async function emailPasswordAuth(action, email, password) {
+        const em = String(email || '').trim();
+        const pw = String(password || '');
+        if (!em) throw new Error('Please enter your email.');
+        if (!pw) throw new Error('Please enter your password.');
 
         let response, data;
         try {
-            response = await fetchWithTimeout(`https://securetoken.googleapis.com/v1/token?key=${API_KEY}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    grant_type: 'refresh_token',
-                    refresh_token: tokenData.tokens.refreshToken
-                })
-            });
+            response = await fetchWithTimeout(
+                `https://identitytoolkit.googleapis.com/v1/accounts:${action}?key=${API_KEY}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: em, password: pw, returnSecureToken: true })
+                }
+            );
             data = await response.json().catch(() => null);
         } catch (networkError) {
-            throw new Error('Network error during token validation. Please check your connection.');
+            throw new Error('Network error. Please check your connection.');
         }
 
-        if (!data) {
-            throw new Error('Empty/invalid token validation response');
+        if (!data) throw new Error('Empty/invalid sign-in response');
+        if (data.error) throw new Error(mapAuthError(data.error?.message));
+        if (!data.idToken || !data.refreshToken || !data.expiresIn) {
+            throw new Error('Unexpected response from auth endpoint.');
         }
 
-        if (data.error) throw new Error('Token expired or invalid. Please export a fresh token from Chrome.');
-        if (!data.id_token || !data.refresh_token || !data.expires_in) {
-            throw new Error('Unexpected response from token endpoint.');
-        }
-
-        currentUser = tokenData.user;
-        const tokens = {
-            idToken: data.id_token,
-            refreshToken: data.refresh_token,
-            expiresAt: Date.now() + (parseInt(data.expires_in) * 1000)
-        };
-
-        await chrome.storage.local.set({
-            [STORAGE_KEYS.USER]: currentUser,
-            [STORAGE_KEYS.TOKENS]: tokens
-        });
-
-        notifyAuthStateListeners(currentUser);
-        return currentUser;
+        return persistSession(data);
     }
 
-    async function exportSessionToken() {
-        const stored = await chrome.storage.local.get([STORAGE_KEYS.USER, STORAGE_KEYS.TOKENS]);
-        if (!stored[STORAGE_KEYS.USER] || !stored[STORAGE_KEYS.TOKENS]) {
-            throw new Error('Not signed in');
+    function signInWithEmailPassword(email, password) {
+        return emailPasswordAuth('signInWithPassword', email, password);
+    }
+
+    function signUpWithEmailPassword(email, password) {
+        return emailPasswordAuth('signUp', email, password);
+    }
+
+    // Adds a password to the CURRENT account (uid unchanged) so a Google-only
+    // user can also sign in with email/password — e.g. on mobile where the
+    // OAuth flow is unavailable. Returns fresh tokens, which we persist.
+    async function setPasswordForCurrentUser(password) {
+        const pw = String(password || '');
+        if (pw.length < 6) throw new Error('Password must be at least 6 characters.');
+
+        const storedUser = await chrome.storage.local.get([STORAGE_KEYS.USER]);
+        const accountUser = currentUser || storedUser[STORAGE_KEYS.USER] || null;
+        const accountEmail = accountUser?.email || '';
+        if (!accountEmail) {
+            throw new Error('Account email is missing. Sign out and sign in again.');
         }
-        return {
-            user: stored[STORAGE_KEYS.USER],
-            tokens: { refreshToken: stored[STORAGE_KEYS.TOKENS].refreshToken },
-            expiresAt: Date.now() + 20 * 60 * 1000
+
+        const postPasswordLink = async (idToken) => {
+            const response = await fetchWithTimeout(
+                `https://identitytoolkit.googleapis.com/v1/accounts:update?key=${API_KEY}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        idToken,
+                        email: accountEmail,
+                        password: pw,
+                        returnSecureToken: true
+                    })
+                }
+            );
+            const payload = await response.json().catch(() => null);
+            if (payload?.error?.message) {
+                PopupLogger.warn('Firebase', `accounts:update failed: ${payload.error.message}`);
+            }
+            return payload;
         };
+
+        const applyLinkResponse = async (data) => {
+            if (!data) throw new Error('Empty/invalid response');
+            if (data.error) throw new Error(mapAuthError(data.error.message));
+
+            if (!data.idToken || !data.refreshToken || !data.expiresIn) {
+                throw new Error('Password was not saved. Please try again.');
+            }
+
+            const linkSession = sessionFromAuthResponse(data, accountUser?.providers || [], accountUser);
+            const providers = new Set(linkSession.user.providers || []);
+            providers.add('password');
+            linkSession.user.providers = [...providers];
+            if (!linkSession.user.passwordLinkedAt) {
+                linkSession.user.passwordLinkedAt = new Date().toISOString();
+            }
+
+            const hasPasswordOnServer = providers.has('password')
+                || !!data.passwordHash
+                || providerIdsFromAuthResponse(data).includes('password');
+            if (!hasPasswordOnServer) {
+                PopupLogger.warn('Firebase', 'accounts:update returned tokens but no password provider');
+            } else {
+                PopupLogger.log('Firebase', `Mobile password linked for ${linkSession.user.email}`);
+            }
+
+            currentUser = linkSession.user;
+            await chrome.storage.local.set({
+                [STORAGE_KEYS.USER]: linkSession.user,
+                [STORAGE_KEYS.TOKENS]: {
+                    idToken: linkSession.idToken,
+                    refreshToken: linkSession.refreshToken,
+                    expiresAt: linkSession.expiresAt
+                }
+            });
+            notifyAuthStateListeners(currentUser);
+            return true;
+        };
+
+        const canUseGoogleReauth = !!chrome.identity?.launchWebAuthFlow;
+        const needsGoogleReauth = userNeedsGoogleReauthForPasswordLink(accountUser);
+
+        // Sensitive link requires a *recent* Google sign-in. A refresh_token
+        // exchange does NOT update auth_time, so never use getIdToken(forceRefresh)
+        // after Google OAuth for this call — use the idToken returned by
+        // signInWithIdp directly.
+        let idToken = null;
+        if (needsGoogleReauth && canUseGoogleReauth) {
+            PopupLogger.log('Firebase', 'Confirming with Google before linking password...');
+            try {
+                const session = await signInWithGoogle({ prompt: 'consent' });
+                idToken = session?.idToken || null;
+            } catch (reauthError) {
+                const msg = reauthError?.message || '';
+                if (msg.includes('did not approve') || msg.includes('cancelled') || msg.includes('closed')) {
+                    throw new Error('Google verification was cancelled. Try again when you are ready.');
+                }
+                throw reauthError;
+            }
+        } else {
+            idToken = await getIdToken({ forceRefresh: true });
+        }
+
+        if (!idToken) throw new Error('You must be signed in to set a password.');
+
+        let data;
+        try {
+            data = await postPasswordLink(idToken);
+        } catch {
+            throw new Error('Network error. Please check your connection.');
+        }
+
+        if (data?.error && authErrorNeedsRecentLogin(data.error.message) && canUseGoogleReauth) {
+            PopupLogger.log('Firebase', 'Retrying password link with fresh Google sign-in...');
+            try {
+                const session = await signInWithGoogle({ prompt: 'consent' });
+                idToken = session?.idToken || null;
+            } catch (reauthError) {
+                const msg = reauthError?.message || '';
+                if (msg.includes('did not approve') || msg.includes('cancelled') || msg.includes('closed')) {
+                    throw new Error('Google verification was cancelled. Try again when you are ready.');
+                }
+                throw reauthError;
+            }
+            if (!idToken) throw new Error('Google verification failed. Please try again.');
+            try {
+                data = await postPasswordLink(idToken);
+            } catch {
+                throw new Error('Network error. Please check your connection.');
+            }
+        }
+
+        return applyLinkResponse(data);
+    }
+
+    async function sendPasswordReset(email) {
+        const em = String(email || '').trim();
+        if (!em) throw new Error('Please enter your email first.');
+
+        let response, data;
+        try {
+            response = await fetchWithTimeout(
+                `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${API_KEY}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ requestType: 'PASSWORD_RESET', email: em })
+                }
+            );
+            data = await response.json().catch(() => null);
+        } catch (networkError) {
+            throw new Error('Network error. Please check your connection.');
+        }
+
+        if (data && data.error) throw new Error(mapAuthError(data.error?.message));
+        return true;
+    }
+
+    async function refreshAuthProvidersFromServer() {
+        const idToken = await getIdToken();
+        if (!idToken || !currentUser) return currentUser;
+
+        let data;
+        try {
+            const response = await fetchWithTimeout(
+                `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${API_KEY}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ idToken: [idToken] })
+                }
+            );
+            data = await response.json().catch(() => null);
+        } catch {
+            return currentUser;
+        }
+
+        const record = data?.users?.[0];
+        if (!record) return currentUser;
+
+        const providers = (record.providerUserInfo || [])
+            .map((entry) => entry?.providerId)
+            .filter(Boolean);
+        if (!providers.length) return currentUser;
+
+        const updated = {
+            ...currentUser,
+            email: record.email || currentUser.email,
+            providers,
+            passwordLinkedAt: providers.includes('password')
+                ? (currentUser.passwordLinkedAt || new Date().toISOString())
+                : currentUser.passwordLinkedAt
+        };
+        currentUser = updated;
+        await chrome.storage.local.set({ [STORAGE_KEYS.USER]: updated });
+        notifyAuthStateListeners(currentUser);
+        return currentUser;
     }
 
     return {
         init,
         signInWithGoogle,
-        signInWithExportedToken,
-        exportSessionToken,
+        signInWithEmailPassword,
+        signUpWithEmailPassword,
+        setPasswordForCurrentUser,
+        sendPasswordReset,
         signOut,
         onAuthStateChanged,
         getDocument,
-        setDocument
+        setDocument,
+        userHasMobilePassword,
+        refreshAuthProvidersFromServer
     };
 })();
 

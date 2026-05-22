@@ -20,6 +20,7 @@
     let badgeState = {};
     let lastBadgeSnapshot = [];
     let currentViewMode = null;
+    let emailAuthMode = 'signIn';
     const COPY_GUARD_STORAGE_KEY = 'copyGuardEnabled';
     const GOAL_SETTINGS_KEY = 'goalSettings';
     const BADGE_STATE_KEY = 'badgeUnlocks';
@@ -127,7 +128,11 @@
     // and only when the cache window has rolled over. Was 60s+forceFresh,
     // which produced ~60 Firestore reads/hour just for an idle open popup.
     const POPUP_CLOUD_REFRESH_MS = 5 * 60 * 1000;
+    // Avoid back-to-back full merges when sign-in, visibility, and the 5-min
+    // timer fire close together — each used to run a full Firestore merge.
+    const POPUP_FULL_SYNC_MIN_GAP_MS = 30 * 1000;
     let popupCloudRefreshTimer = null;
+    let lastPopupFullSyncAt = 0;
 
     function getSettingsDonateButton() {
         return document.getElementById('settingsDonate');
@@ -1359,7 +1364,16 @@
             return;
         }
 
-        const user = AT?.FirebaseSync?.getUser?.() || null;
+        let user = AT?.FirebaseSync?.getUser?.() || null;
+        let hasMobilePassword = AT?.FirebaseSync?.userHasMobilePassword?.(user) || false;
+        if (user && !hasMobilePassword) {
+            try {
+                user = await AT.FirebaseSync.refreshAuthProvidersFromServer() || user;
+                hasMobilePassword = AT.FirebaseSync.userHasMobilePassword(user);
+            } catch (e) {
+                PopupLogger.debug('Settings', 'Auth provider refresh skipped:', e?.message || e);
+            }
+        }
 
         // Read all toggle states from storage so the UI matches reality. We
         // can avoid this if main.js already has them in memory — but reading
@@ -1385,7 +1399,8 @@
 
         SettingsView.render(container, {
             user,
-            settings: storedSettings
+            settings: storedSettings,
+            hasMobilePassword
         });
 
         container.scrollTop = 0;
@@ -1716,11 +1731,17 @@
      * Load and sync with cloud
      */
     async function loadAndSyncData(options = {}) {
+        const { forceFresh = false, skipAutoFetch = false } = options;
+
         if (loadAndSyncInProgress) return;
+        if (!forceFresh && (Date.now() - lastPopupFullSyncAt) < POPUP_FULL_SYNC_MIN_GAP_MS) {
+            PopupLogger.debug('Sync', 'Skipping full sync (synced recently)');
+            return;
+        }
+
         loadAndSyncInProgress = true;
 
         const { FirebaseSync } = AT;
-        const { skipAutoFetch = false } = options;
 
         try {
             const prefs = await chrome.storage.local.get(['userPreferences']);
@@ -1780,6 +1801,7 @@
             await loadData({ skipAutoFetch });
         } finally {
             loadAndSyncInProgress = false;
+            lastPopupFullSyncAt = Date.now();
         }
     }
 
@@ -1788,7 +1810,7 @@
         if (forceFresh) {
             try { AT.FirebaseSync.clearCachedUserDocument(); } catch {}
         }
-        await loadAndSyncData();
+        await loadAndSyncData({ forceFresh });
     }
 
     function stopPopupCloudRefresh() {
@@ -2709,41 +2731,215 @@
     }
 
     function showAuthToast(message, type = 'error') {
-        const existing = document.getElementById('authToast');
-        if (existing) existing.remove();
-        const toast = document.createElement('div');
-        toast.id = 'authToast';
-        toast.textContent = message;
-        toast.style.cssText = `
-            position:absolute; bottom:20px; left:50%; transform:translateX(-50%);
-            background:${type === 'error' ? 'rgba(240,69,69,0.9)' : 'rgba(54,212,116,0.9)'};
-            color:#fff; padding:8px 18px; border-radius:50px; font-size:12px;
-            font-weight:600; z-index:10; white-space:nowrap;
-            box-shadow:0 4px 16px rgba(0,0,0,0.4);
-            animation:fadeIn 0.2s ease;`;
-        document.getElementById('authSection')?.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
+        try {
+            AT.UIHelpers?.showToast?.(String(message || ''), { type, duration: 3000 });
+        } catch {}
     }
 
-    // Non-blocking toast that replaces native alert() in error paths. alert()
-    // freezes the popup and feels broken; this matches the rest of the toast UX.
-    function showToast(message, type = 'error') {
-        const existing = document.getElementById('atGenericToast');
+    function setAuthFormMessage(message = '', type = 'error') {
+        const errorEl = document.getElementById('authFormError');
+        const noteEl = document.getElementById('authFormNote');
+        if (errorEl) {
+            errorEl.textContent = type === 'error' ? message : '';
+            errorEl.style.display = type === 'error' && message ? 'block' : 'none';
+        }
+        if (noteEl) {
+            noteEl.textContent = type !== 'error' ? message : '';
+            noteEl.style.display = type !== 'error' && message ? 'block' : 'none';
+        }
+    }
+
+    function setEmailAuthLoading(loading, label = null) {
+        const submitBtn = document.getElementById('emailSignIn');
+        const labelEl = document.getElementById('emailSignInLabel');
+        const modeLabel = emailAuthMode === 'signUp' ? 'Create account' : 'Sign in';
+        if (submitBtn) submitBtn.disabled = !!loading;
+        if (labelEl) labelEl.textContent = loading ? (label || 'Working...') : modeLabel;
+        const toggle = document.getElementById('authToggleMode');
+        const forgot = document.getElementById('authForgotPassword');
+        if (toggle) toggle.disabled = !!loading;
+        if (forgot) forgot.disabled = !!loading;
+    }
+
+    function setEmailAuthMode(mode) {
+        emailAuthMode = mode === 'signUp' ? 'signUp' : 'signIn';
+        const password = document.getElementById('authPassword');
+        const toggle = document.getElementById('authToggleMode');
+        const forgot = document.getElementById('authForgotPassword');
+        if (password) {
+            password.autocomplete = emailAuthMode === 'signUp' ? 'new-password' : 'current-password';
+        }
+        if (toggle) {
+            toggle.textContent = emailAuthMode === 'signUp' ? 'Already have an account?' : 'Create account';
+        }
+        if (forgot) forgot.hidden = emailAuthMode === 'signUp';
+        setEmailAuthLoading(false);
+        setAuthFormMessage('');
+    }
+
+    async function submitEmailAuth() {
+        const { FirebaseSync } = AT;
+        const email = document.getElementById('authEmail')?.value?.trim() || '';
+        const password = document.getElementById('authPassword')?.value || '';
+        const isSignUp = emailAuthMode === 'signUp';
+
+        setAuthFormMessage('');
+        if (!email) {
+            setAuthFormMessage('Please enter your email.');
+            document.getElementById('authEmail')?.focus();
+            return;
+        }
+        if (!password) {
+            setAuthFormMessage('Please enter your password.');
+            document.getElementById('authPassword')?.focus();
+            return;
+        }
+
+        setEmailAuthLoading(true, isSignUp ? 'Creating...' : 'Signing in...');
+        try {
+            await chrome.storage.local.set({ pendingBackgroundMetadataRepair: true });
+            if (isSignUp) {
+                await FirebaseSync.signUpWithEmailPassword(email, password);
+            } else {
+                await FirebaseSync.signInWithEmailPassword(email, password);
+            }
+        } catch (error) {
+            await chrome.storage.local.set({ pendingBackgroundMetadataRepair: false });
+            setAuthFormMessage(error?.message || 'Authentication failed.');
+        } finally {
+            setEmailAuthLoading(false);
+        }
+    }
+
+    async function sendAuthPasswordReset() {
+        const { FirebaseSync } = AT;
+        const email = document.getElementById('authEmail')?.value?.trim() || '';
+        if (!email) {
+            setAuthFormMessage('Enter your email first, then tap forgot password.');
+            document.getElementById('authEmail')?.focus();
+            return;
+        }
+        setAuthFormMessage('');
+        setEmailAuthLoading(true, 'Sending...');
+        try {
+            await FirebaseSync.sendPasswordReset(email);
+            setAuthFormMessage('Password reset email sent.', 'note');
+        } catch (error) {
+            setAuthFormMessage(error?.message || 'Could not send reset email.');
+        } finally {
+            setEmailAuthLoading(false);
+        }
+    }
+
+    function openSetPasswordDialog() {
+        const existing = document.getElementById('setPasswordDialog');
         if (existing) existing.remove();
-        const toast = document.createElement('div');
-        toast.id = 'atGenericToast';
-        toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
-        toast.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
-        toast.textContent = String(message || '');
-        toast.style.cssText = `
-            position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
-            background:${type === 'error' ? 'rgba(240,69,69,0.95)' : 'rgba(54,212,116,0.95)'};
-            color:#fff; padding:10px 18px; border-radius:14px; font-size:13px;
-            font-weight:600; z-index:10001; max-width:calc(100vw - 32px);
-            box-shadow:0 6px 22px rgba(0,0,0,0.45); animation:fadeIn 0.18s ease;
-            word-wrap:break-word; text-align:center;`;
-        document.body.appendChild(toast);
-        setTimeout(() => { try { toast.remove(); } catch {} }, 4000);
+
+        const accountUser = AT?.FirebaseSync?.getUser?.() || null;
+        const hasMobilePassword = AT?.FirebaseSync?.userHasMobilePassword?.(accountUser) || false;
+        const dialogTitle = hasMobilePassword ? 'Change mobile password' : 'Set password for mobile';
+        const saveLabel = hasMobilePassword ? 'Update password' : 'Save password';
+
+        const overlay = document.createElement('div');
+        overlay.className = 'dialog-overlay visible';
+        overlay.id = 'setPasswordDialog';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-labelledby', 'setPasswordDialogTitle');
+        overlay.innerHTML = `
+            <div class="dialog add-anime-dialog set-password-dialog">
+                <div class="dialog-header">
+                    <h3 id="setPasswordDialogTitle">${dialogTitle}</h3>
+                    <button class="dialog-close" id="closeSetPassword" type="button" aria-label="Close dialog">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="dialog-body">
+                    <div class="form-group">
+                        <label for="setPasswordInput">New password</label>
+                        <input type="password" id="setPasswordInput" autocomplete="new-password" placeholder="At least 6 characters">
+                        <span class="form-hint">Save opens Google to confirm it is you, then links this password to your account email for mobile sign-in.</span>
+                    </div>
+                    <p class="auth-error" id="setPasswordError" style="display:none"></p>
+                    <p class="auth-note" id="setPasswordNote" style="display:none"></p>
+                </div>
+                <div class="dialog-actions">
+                    <button class="btn btn-secondary" id="cancelSetPassword" type="button">Cancel</button>
+                    <button class="btn btn-primary" id="confirmSetPassword" type="button">${saveLabel}</button>
+                </div>
+            </div>
+        `;
+
+        const close = () => overlay.remove();
+        const errorEl = overlay.querySelector('#setPasswordError');
+        const noteEl = overlay.querySelector('#setPasswordNote');
+        const passwordInput = overlay.querySelector('#setPasswordInput');
+        const confirmBtn = overlay.querySelector('#confirmSetPassword');
+        const setDialogMessage = (message, type = 'error') => {
+            if (errorEl) {
+                errorEl.textContent = type === 'error' ? message : '';
+                errorEl.style.display = type === 'error' && message ? 'block' : 'none';
+            }
+            if (noteEl) {
+                noteEl.textContent = type !== 'error' ? message : '';
+                noteEl.style.display = type !== 'error' && message ? 'block' : 'none';
+            }
+        };
+        const save = async () => {
+            const password = passwordInput?.value || '';
+            if (password.length < 6) {
+                setDialogMessage('Password must be at least 6 characters.');
+                passwordInput?.focus();
+                return;
+            }
+            if (confirmBtn) {
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = 'Saving...';
+            }
+            setDialogMessage('');
+            try {
+                setDialogMessage('Complete Google sign-in when the window opens…', 'note');
+                await AT.FirebaseSync.setPasswordForCurrentUser(password);
+                const email = AT.FirebaseSync.getUser()?.email || accountUser?.email || '';
+                setDialogMessage('Password saved to your Firebase account.', 'note');
+                AT.UIHelpers?.showToast?.('Mobile password active — use email + password on mobile.', { type: 'success', duration: 3200 });
+                try {
+                    window.AnimeTracker?.SettingsView?.updateMobilePasswordRow?.(true, email);
+                } catch {}
+                setTimeout(close, 900);
+            } catch (error) {
+                setDialogMessage(error?.message || 'Could not set password.');
+            } finally {
+                if (confirmBtn) {
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = saveLabel;
+                }
+            }
+        };
+
+        overlay.querySelector('#closeSetPassword')?.addEventListener('click', close);
+        overlay.querySelector('#cancelSetPassword')?.addEventListener('click', close);
+        overlay.addEventListener('click', (event) => {
+            if (event.target === overlay) close();
+        });
+        confirmBtn?.addEventListener('click', save);
+        passwordInput?.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') save();
+        });
+        document.body.appendChild(overlay);
+        setTimeout(() => passwordInput?.focus(), 30);
+    }
+
+    // Non-blocking toast — delegates to UIHelpers (dark 3D .at-toast in popup.css).
+    function showToast(message, type = 'error') {
+        const duration = type === 'error' ? 4000 : 2800;
+        try {
+            AT.UIHelpers?.showToast?.(String(message || ''), { type, duration });
+            return;
+        } catch {}
     }
     // Expose so other popup modules (share-card, etc.) can use the same
     // toast UX instead of falling back to native alert().
@@ -2767,118 +2963,18 @@
 
         if (elements.googleSignIn) elements.googleSignIn.addEventListener('click', signInWithGoogle);
 
-        const collapsible = document.getElementById('advancedCollapsible');
-        const collapsibleHeader = collapsible?.querySelector('.auth-collapsible-header');
-        if (collapsibleHeader) {
-            const authContent = document.querySelector('.auth-content');
-            const toggleTokenMode = (expanded) => {
-                collapsible.classList.toggle('expanded', expanded);
-                authContent?.classList.toggle('token-mode', expanded);
-            };
-            collapsibleHeader.addEventListener('click', () => {
-                const isExpanded = !collapsible.classList.contains('expanded');
-                toggleTokenMode(isExpanded);
-                try { localStorage.setItem('authAdvancedExpanded', isExpanded); } catch {}
-            });
-            try {
-                const wasExpanded = localStorage.getItem('authAdvancedExpanded') === 'true';
-                if (wasExpanded) toggleTokenMode(true);
-            } catch {}
-        }
-
-        const pasteTokenBtn = document.getElementById('pasteTokenBtn');
-        if (pasteTokenBtn) {
-            pasteTokenBtn.addEventListener('click', async () => {
-                try {
-                    const text = await navigator.clipboard.readText();
-                    const input = document.getElementById('authTokenInput');
-                    if (input) {
-                        input.value = text;
-                        input.dispatchEvent(new Event('input'));
-                        pasteTokenBtn.textContent = '✓';
-                        pasteTokenBtn.style.background = 'linear-gradient(160deg,#1a8a5a 0%,#0e6644 45%,#075230 100%)';
-                        setTimeout(() => {
-                            pasteTokenBtn.textContent = 'Paste';
-                            pasteTokenBtn.style.background = '';
-                        }, 1500);
-                    }
-                } catch {
-                    // Clipboard read failed — focus textarea so user can Ctrl+V
-                    document.getElementById('authTokenInput')?.focus();
-                }
+        const emailAuthForm = document.getElementById('emailAuthForm');
+        if (emailAuthForm) {
+            emailAuthForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+                submitEmailAuth();
             });
         }
-
-        const tokenSignInBtn = document.getElementById('tokenSignIn');
-        if (tokenSignInBtn) {
-            tokenSignInBtn.addEventListener('click', async () => {
-                const tokenInput = document.getElementById('authTokenInput')?.value?.trim();
-                const errorEl = document.getElementById('tokenAuthError');
-                if (!tokenInput) {
-                    if (errorEl) { errorEl.textContent = 'Please paste your exported token.'; errorEl.style.display = 'block'; }
-                    return;
-                }
-                tokenSignInBtn.disabled = true;
-                tokenSignInBtn.textContent = 'Importing...';
-                if (errorEl) errorEl.style.display = 'none';
-                try {
-                    // Set the flag; SW honors it via storage.onChanged and
-                    // runs the metadata repair silently. No popup-side modal.
-                    await chrome.storage.local.set({ pendingBackgroundMetadataRepair: true });
-                    const tokenData = JSON.parse(tokenInput);
-                    await FirebaseLib.signInWithExportedToken(tokenData);
-                } catch (err) {
-                    await chrome.storage.local.set({ pendingBackgroundMetadataRepair: false });
-                    const msg = (err instanceof SyntaxError || (err.message && err.message.includes('JSON')))
-                        ? 'Invalid token format. Please copy it again from Chrome.'
-                        : (err.message || 'Import failed');
-                    if (errorEl) { errorEl.textContent = msg; errorEl.style.display = 'block'; }
-                } finally {
-                    tokenSignInBtn.disabled = false;
-                    tokenSignInBtn.textContent = 'Import & Sign In';
-                }
-            });
-        }
-
-        const exportTokenBtn = document.getElementById('settingsExportToken');
-        if (exportTokenBtn) {
-            exportTokenBtn.addEventListener('click', async () => {                try {
-                    const tokenData = await FirebaseLib.exportSessionToken();
-                    const tokenStr = JSON.stringify(tokenData);
-                    const overlay = document.createElement('div');
-                    overlay.className = 'export-token-overlay';
-                    overlay.innerHTML = `
-                        <div class="export-token-box">
-                            <div class="export-token-header">
-                                <span class="export-token-header-dot"></span>
-                                <h3>Export Token</h3>
-                            </div>
-                            <div class="export-token-body">
-                                <p>Copy this token and paste it in the <strong>Import Token</strong> panel on Orion/Safari. Valid for 20 minutes.</p>
-                                <textarea class="export-token-text" readonly></textarea>
-                                <div class="export-token-actions">
-                                    <button class="btn-copy-token">Copy Token</button>
-                                    <button class="btn-close-token">Close</button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    overlay.querySelector('.export-token-text').value = tokenStr;
-                    overlay.querySelector('.btn-copy-token').addEventListener('click', async () => {
-                        try {
-                            await navigator.clipboard.writeText(tokenStr);
-                            overlay.querySelector('.btn-copy-token').textContent = '✓ Copied!';
-                        } catch { overlay.querySelector('.export-token-text').select(); }
-                    });
-                    overlay.querySelector('.btn-close-token').addEventListener('click', () => overlay.remove());
-                    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-                    document.body.appendChild(overlay);
-                    setTimeout(() => overlay.querySelector('.export-token-text')?.select(), 50);
-                } catch (err) {
-                    showToast('Export failed: ' + (err?.message || err), 'error');
-                }
-            });
-        }
+        document.getElementById('authToggleMode')?.addEventListener('click', () => {
+            setEmailAuthMode(emailAuthMode === 'signUp' ? 'signIn' : 'signUp');
+        });
+        document.getElementById('authForgotPassword')?.addEventListener('click', sendAuthPasswordReset);
+        setEmailAuthMode('signIn');
 
         if (elements.settingsBtn) {
             // Settings is now a view-mode (full popup) like Stats/Goals.
@@ -3032,7 +3128,7 @@
                 setSettingsPreferencesExpanded(false);
                 try {
                     if (FirebaseSync.getUser()) {
-                        await loadAndSyncData({ skipAutoFetch: true });
+                        await loadAndSyncData({ skipAutoFetch: true, forceFresh: true });
                     } else {
                         await loadData({ skipAutoFetch: true });
                     }
@@ -3048,6 +3144,13 @@
                 setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
                 showDialog();
+                return;
+            }
+
+            if (e.target.closest('#settingsSetPassword')) {
+                setSettingsDataToolsExpanded(false);
+                setSettingsPreferencesExpanded(false);
+                openSetPasswordDialog();
                 return;
             }
 
@@ -3663,7 +3766,7 @@
                 startPopupCloudRefresh();
                 // Sign-in is always silent — the SW picks up the
                 // `pendingBackgroundMetadataRepair` flag we wrote in
-                // signInWithGoogle / tokenSignInBtn and runs the repair in
+                // signInWithGoogle / email sign-in and runs the repair in
                 // background. Progress is surfaced via the footer
                 // sync-status badge (storage.onChanged → applyMetadataRepairState).
                 await maybePromptPostUpdateFetch();
@@ -3796,7 +3899,7 @@
         }
 
         startPopupCloudRefresh();
-        refreshPopupCloudData(true).catch((error) => {
+        refreshPopupCloudData(false).catch((error) => {
             PopupLogger.debug('Sync', 'Visibility refresh skipped:', error?.message || error);
         });
     });

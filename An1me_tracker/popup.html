@@ -51,36 +51,21 @@
                     </span>
                 </button>
                 <div class="auth-or-divider"><span>OR</span></div>
-                <div class="auth-collapsible" id="advancedCollapsible">
-                    <div class="auth-collapsible-header">
-                        <span class="token-icon">🔑</span>
-                        <span class="token-text">Import Token</span>
-                        <span class="token-badge">ADVANCED</span>
+                <form class="auth-email-form" id="emailAuthForm" novalidate>
+                    <input class="auth-input" id="authEmail" type="email" placeholder="Email"
+                        autocomplete="email" spellcheck="false">
+                    <input class="auth-input" id="authPassword" type="password" placeholder="Password"
+                        autocomplete="current-password">
+                    <p class="auth-error" id="authFormError" style="display:none"></p>
+                    <p class="auth-note" id="authFormNote" style="display:none"></p>
+                    <button class="btn-email-submit" id="emailSignIn" type="submit">
+                        <span id="emailSignInLabel">Sign in</span>
+                    </button>
+                    <div class="auth-email-links">
+                        <button type="button" class="auth-link" id="authToggleMode">Create account</button>
+                        <button type="button" class="auth-link" id="authForgotPassword">Forgot password?</button>
                     </div>
-                    <div class="auth-collapsible-content">
-                        <div class="token-expand-panel">
-                            <p class="token-expand-hint">Chrome → Settings (⋮) → <strong>Export Token</strong>, paste
-                                below:</p>
-                            <div style="position:relative;">
-                                <textarea class="auth-input auth-textarea" id="authTokenInput"
-                                    placeholder="Paste your exported token here..."
-                                    style="padding-right:66px;"></textarea>
-                                <button id="pasteTokenBtn"
-                                    style="position:absolute; right:7px; top:7px; height:26px; padding:0 10px; background:linear-gradient(160deg,#1a7fa8 0%,#0e6690 45%,#074f72 100%); border:none; border-radius:999px; font-size:10px; font-weight:700; font-family:inherit; color:#d0eeff; cursor:pointer; box-shadow:0 1px 0 rgba(255,255,255,0.12) inset,0 -1px 0 rgba(0,0,0,0.3) inset,0 2px 6px rgba(0,0,0,0.4); transition:all 0.12s ease; letter-spacing:0.2px;"
-                                    title="Paste from clipboard">Paste</button>
-                            </div>
-                            <p class="auth-error" id="tokenAuthError" style="display:none"></p>
-                            <button class="btn-token-submit" id="tokenSignIn">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"
-                                    height="16">
-                                    <path
-                                        d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-                                </svg>
-                                Import Token
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                </form>
             </div>
         </div>
 
