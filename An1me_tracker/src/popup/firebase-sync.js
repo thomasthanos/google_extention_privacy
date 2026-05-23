@@ -49,6 +49,10 @@ const FirebaseSync = {
     cloudSaveRetryCount: 0,
     userDocumentCache: null,
     USER_DOCUMENT_CACHE_TTL_MS: 5 * 60 * 1000,
+    // Last result of loadAndSyncData — captured for diagnostics so the popup
+    // can show the user a clear "what just happened" message instead of a
+    // generic "Cloud Synced" badge that hides empty-init / 404 / auth errors.
+    lastSyncResult: null,
 
     // Playback-settings save state (separate from main library save so a
     // toggle flip doesn't piggyback a full animeData write).
@@ -635,7 +639,7 @@ const FirebaseSync = {
                 // to a direct GET on cache hit, but costs zero Firestore reads.
                 // Falls through to FirebaseLib.getDocument on cache miss or when
                 // the SW isn't reachable (e.g. signed-out state, rare race).
-                let swAuthoritative = false;
+                let swReturnedDoc = false;
                 try {
                     const swResp = await new Promise((resolve) => {
                         try {
@@ -645,17 +649,34 @@ const FirebaseSync = {
                             });
                         } catch { resolve(null); }
                     });
-                    if (swResp?.success) {
-                        cloudData = swResp.doc || null;
+                    // Only TRUST the SW response when it actually returned a
+                    // non-null doc. If success=true but doc=null, the SW's
+                    // fetchCloudData swallowed an error (401/403/404/500) and
+                    // returned null silently — we MUST fall through to a direct
+                    // popup GET because the popup may have a fresher token, or
+                    // the doc may genuinely exist but the SW couldn't see it.
+                    // The previous logic trusted any success=true reply and
+                    // skipped the fallback, which on mobile (SW with stale
+                    // token after login) caused empty libraries even when the
+                    // cloud doc was populated.
+                    if (swResp?.success && swResp.doc) {
+                        cloudData = swResp.doc;
                         this.setCachedUserDocument(this.currentUser.uid, cloudData);
-                        swAuthoritative = true;
+                        swReturnedDoc = true;
                         PopupLogger.debug('Sync', 'Using SW-cached cloud document');
+                    } else if (swResp?.success && !swResp.doc) {
+                        PopupLogger.log('Sync', 'SW returned null doc — falling through to direct popup GET');
+                    } else if (swResp && !swResp.success) {
+                        PopupLogger.warn('Sync',
+                            `SW cloud fetch failed: ${swResp.error || 'unknown'}` +
+                            (swResp.status ? ` (HTTP ${swResp.status})` : '') +
+                            ' — falling through to direct popup GET');
                     }
                 } catch (e) {
                     PopupLogger.debug('Sync', 'SW cloud-doc fetch skipped:', e?.message || e);
                 }
 
-                if (!swAuthoritative && !cloudData) {
+                if (!swReturnedDoc) {
                     let retryCount = 0;
                     const maxRetries = 3;
 
@@ -665,6 +686,21 @@ const FirebaseSync = {
                             this.setCachedUserDocument(this.currentUser.uid, cloudData);
                             break;
                         } catch (e) {
+                            // Auth errors (401/403) — token rejected by
+                            // Firestore. Don't retry, surface immediately so
+                            // the caller can prompt re-auth. Network errors
+                            // and 5xx are retryable; 401/403 mean the session
+                            // is permanently invalid for this resource.
+                            if (e?.status === 401 || e?.status === 403) {
+                                const authErr = new Error(
+                                    e.status === 401
+                                        ? 'Session expired. Please sign in again.'
+                                        : 'Permission denied. Check Firestore rules or sign in again.'
+                                );
+                                authErr.code = 'AUTH_REJECTED';
+                                authErr.status = e.status;
+                                throw authErr;
+                            }
                             retryCount++;
                             if (retryCount < maxRetries) {
                                 PopupLogger.warn('Sync', `Cloud fetch failed, retrying (${retryCount}/${maxRetries})...`);
@@ -933,6 +969,22 @@ const FirebaseSync = {
 
             PopupLogger.log('Sync', `Cloud sync complete (${syncSource}) · ${this.summarizeSyncDataString(finalData)}`);
 
+            // Expose last-sync diagnostics so the popup can show the user a
+            // clear explanation of what happened (cloud doc found / not found,
+            // counts, source). Critical for mobile users who see "Cloud Synced"
+            // but an empty library — they need to know if it's because the
+            // cloud doc was missing (wrong account) or genuinely empty.
+            this.lastSyncResult = {
+                source: syncSource,
+                cloudDocFound: !!cloudData,
+                animeCount: Object.keys(finalData.animeData || {}).length,
+                progressCount: Object.keys(finalData.videoProgress || {}).length,
+                uid: this.currentUser.uid,
+                email: this.currentUser.email,
+                completedAt: Date.now(),
+                error: null
+            };
+
             return finalData;
         } catch (error) {
             PopupLogger.error('Firebase', 'Sync error:', error);
@@ -940,6 +992,20 @@ const FirebaseSync = {
                 elements.syncStatus.classList.remove('syncing');
                 elements.syncText.textContent = 'Sync Error';
             }
+            this.lastSyncResult = {
+                source: 'error',
+                cloudDocFound: false,
+                animeCount: 0,
+                progressCount: 0,
+                uid: this.currentUser?.uid || null,
+                email: this.currentUser?.email || null,
+                completedAt: Date.now(),
+                error: {
+                    message: error?.message || String(error),
+                    code: error?.code || null,
+                    status: error?.status || null
+                }
+            };
             throw error;
         }
     },

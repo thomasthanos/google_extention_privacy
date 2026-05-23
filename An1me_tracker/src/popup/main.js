@@ -483,38 +483,7 @@
         elements.authSection.style.display = 'flex';
         elements.mainApp.style.display = 'none';
 
-        // Detect whether the Chrome OAuth flow can actually run here. The
-        // tricky part is that Orion (Kagi's WebKit-based browser that runs
-        // both Chrome AND Firefox extensions) spoofs `Chrome/…` in its UA
-        // *and* ships a `chrome.identity.launchWebAuthFlow` stub, so neither
-        // signal alone tells us anything. We bias toward "this is a mobile /
-        // alt browser" whenever any of these is true:
-        //   • UA contains an explicit Orion / Firefox / mobile platform marker
-        //   • `getRedirectURL()` returns anything other than a real
-        //     `<id>.chromiumapp.org` URL (Orion / Firefox return their own
-        //     formats, e.g. `*.extensions.allizom.org`)
-        //   • `chrome.identity.launchWebAuthFlow` simply isn't there
-        // Only when every signal lines up do we treat this as desktop Chrome.
-        const hasGoogleAuth = (() => {
-            const ua = navigator.userAgent || '';
-            // Explicit alt-browser markers — most reliable.
-            if (/Orion|Firefox|FxiOS/i.test(ua)) return false;
-            // Mobile platforms — Google OAuth via launchWebAuthFlow is not
-            // supported in extension popups there, regardless of engine.
-            if (/Android|iPhone|iPad|iPod|Mobile|CriOS|EdgiOS/i.test(ua)) return false;
-            // Pure Apple WebKit (Safari macOS / iOS) — has Safari token but
-            // no Chromium marker in the UA.
-            if (/AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg/i.test(ua)) return false;
-            // API surface check.
-            if (!chrome?.identity?.launchWebAuthFlow) return false;
-            // Redirect URL must look like a real Chromium extension URL —
-            // Orion / Firefox return different formats here.
-            let redirectUrl = '';
-            try { redirectUrl = chrome.identity.getRedirectURL?.() || ''; }
-            catch { return false; }
-            if (!/^https:\/\/[a-z0-9]+\.chromiumapp\.org/.test(redirectUrl)) return false;
-            return true;
-        })();
+        const hasGoogleAuth = detectHasGoogleAuth();
         // One-line diagnostic so we can see in the popup console *why* a given
         // surface ended up on Google vs email — saves a "what does your UA
         // say?" round-trip when debugging mobile detection issues.
@@ -534,6 +503,38 @@
         const orDivider = document.querySelector('.auth-or-divider');
         if (emailForm) emailForm.style.display = hasGoogleAuth ? 'none' : '';
         if (orDivider) orDivider.style.display = hasGoogleAuth ? 'none' : '';
+    }
+
+    /**
+     * Detect whether the Chrome OAuth flow can actually run here.
+     *
+     * The tricky part is that Orion (Kagi's WebKit-based browser that runs
+     * both Chrome AND Firefox extensions) spoofs `Chrome/…` in its UA *and*
+     * ships a `chrome.identity.launchWebAuthFlow` stub, so neither signal
+     * alone tells us anything. We bias toward "this is a mobile / alt
+     * browser" whenever any of these is true:
+     *   • UA contains an explicit Orion / Firefox / mobile platform marker
+     *   • `getRedirectURL()` returns anything other than a real
+     *     `<id>.chromiumapp.org` URL (Orion / Firefox return their own
+     *     formats, e.g. `orion-oauth://...`)
+     *   • `chrome.identity.launchWebAuthFlow` simply isn't there
+     * Only when every signal lines up do we treat this as desktop Chrome.
+     *
+     * Used by both showAuthScreen (to pick which auth UI to show) and
+     * renderSettingsView (to hide "Set password for mobile" — that button
+     * makes no sense on mobile itself; you set it FROM desktop).
+     */
+    function detectHasGoogleAuth() {
+        const ua = navigator.userAgent || '';
+        if (/Orion|Firefox|FxiOS/i.test(ua)) return false;
+        if (/Android|iPhone|iPad|iPod|Mobile|CriOS|EdgiOS/i.test(ua)) return false;
+        if (/AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg/i.test(ua)) return false;
+        if (!chrome?.identity?.launchWebAuthFlow) return false;
+        let redirectUrl = '';
+        try { redirectUrl = chrome.identity.getRedirectURL?.() || ''; }
+        catch { return false; }
+        if (!/^https:\/\/[a-z0-9]+\.chromiumapp\.org/.test(redirectUrl)) return false;
+        return true;
     }
 
     function showMainApp(user) {
@@ -1501,7 +1502,8 @@
         SettingsView.render(container, {
             user,
             settings: storedSettings,
-            passwordIsSet
+            passwordIsSet,
+            isMobile: !detectHasGoogleAuth()
         });
 
         container.scrollTop = 0;
@@ -1897,6 +1899,19 @@
                     await loadData({ skipAutoFetch });
                     return;
                 }
+            }
+            // Auth rejected by Firestore (token expired or rules deny access).
+            // Surface clearly and force re-auth — otherwise the user sees
+            // "Cloud Synced" + empty library with no actionable feedback.
+            if (error?.code === 'AUTH_REJECTED') {
+                showToast({
+                    title: 'Session expired',
+                    body: error.message || 'Please sign in again to sync your library.',
+                    type: 'error',
+                    duration: 7000
+                });
+                try { await AT.FirebaseSync.signOut(); } catch {}
+                return;
             }
             await loadData({ skipAutoFetch });
         } finally {
@@ -3958,6 +3973,34 @@
                 return;
             }
 
+            if (e.target.closest('#settingsDebugConsole')) {
+                try { window.AnimeTracker?.DebugConsole?.show?.(); }
+                catch (err) { PopupLogger.error('DebugConsole', 'open failed:', err); }
+                return;
+            }
+
+            // Click on the uid pill → copy to clipboard. Lets the user
+            // compare uids across devices without needing DevTools.
+            const uidPill = e.target.closest('#settingsUserUid');
+            if (uidPill) {
+                const text = uidPill.textContent || '';
+                (async () => {
+                    try {
+                        await navigator.clipboard.writeText(text);
+                    } catch {
+                        // Orion / Safari may block clipboard — fallback to selection
+                        const range = document.createRange();
+                        range.selectNodeContents(uidPill);
+                        const sel = window.getSelection();
+                        sel?.removeAllRanges();
+                        sel?.addRange(range);
+                    }
+                    uidPill.classList.add('copied');
+                    setTimeout(() => uidPill.classList.remove('copied'), 1200);
+                })();
+                return;
+            }
+
             if (e.target.closest('#settingsSignOut')) {
                 setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
@@ -4680,6 +4723,19 @@
                 try { chrome.runtime.sendMessage({ type: 'GET_VERSION' }); } catch {}
                 await refreshPopupCloudData(true);
                 startPopupCloudRefresh();
+
+                // Sign-in diagnostic — kept as console log only (visible via
+                // Debug Console in Settings → Library if needed). No toast UI.
+                const syncResult = AT.FirebaseSync.lastSyncResult || null;
+                const providers = user.providers || [];
+                PopupLogger.log('Sync',
+                    `Sign-in diagnostic: source=${syncResult?.source || 'unknown'} ` +
+                    `cloudDocFound=${syncResult?.cloudDocFound} ` +
+                    `animeCount=${syncResult?.animeCount} ` +
+                    `uid=${user.uid?.slice(0, 8)}… ` +
+                    `providers=[${providers.join(', ')}] ` +
+                    `signedInVia=${user.signedInVia || 'google'}`);
+
                 // Set the repair flag NOW — after the cloud library has been
                 // loaded and merged. The SW picks it up via storage.onChanged
                 // and runs the silent metadata repair in background. Setting

@@ -12,7 +12,7 @@
  *   - `splitCanonAndFillers(slug, episodeNumbers)`
  *   - `extractSlugFromInput(input)`
  *   - `generateTitleFromSlug(slug)`
- *   - `renderEpisodesPreview(input)`  — DOM side-effect (uses #episodesPreview etc.)
+ *   - `renderEpisodesPreview(input)`  — DOM side-effect (counter + filler label)
  */
 (function () {
     'use strict';
@@ -107,13 +107,11 @@
      * popup-local `elements` closure.
      *
      * Drives:
-     *   - #episodesPreview (canon vs filler text)
      *   - #episodesCounter (live count + progress bar against known total)
      *   - #includeFillerLabel (visibility based on filler presence)
      *   - .episodes-input.invalid-range (validation border)
      */
     function renderEpisodesPreview(input) {
-        const preview = document.getElementById('episodesPreview');
         const fillerLabel = document.getElementById('includeFillerLabel');
         const includeFillerText = document.getElementById('includeFillerText');
         const counter = document.getElementById('episodesCounter');

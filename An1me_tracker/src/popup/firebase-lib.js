@@ -317,7 +317,10 @@ const FirebaseLib = (function () {
 
     async function getDocument(collection, docId, retryCount = 0) {
         const idToken = await getIdToken();
-        if (!idToken) return null;
+        if (!idToken) {
+            (window.PopupLogger || console).warn?.('Firebase', `getDocument(${collection}/${docId}) — no idToken available`);
+            return null;
+        }
 
         const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collection}/${docId}`;
 
@@ -327,7 +330,10 @@ const FirebaseLib = (function () {
             });
 
             if (!response.ok) {
-                if (response.status === 404) return null;
+                if (response.status === 404) {
+                    (window.PopupLogger || console).log?.('Firebase', `Document ${collection}/${docId.slice(0, 8)}… not found (404)`);
+                    return null;
+                }
 
                 if (response.status >= 500 && retryCount < 3) {
                     const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
@@ -336,7 +342,16 @@ const FirebaseLib = (function () {
                     return getDocument(collection, docId, retryCount + 1);
                 }
 
-                throw new Error(`Firestore error: ${response.status}`);
+                // 401/403: surface as a real error so loadAndSyncData can
+                // show a clear "permission denied" status to the user
+                // instead of silently treating it as "no cloud doc".
+                const errorBody = await response.text().catch(() => '');
+                (window.PopupLogger || console).error?.('Firebase',
+                    `getDocument(${collection}/${docId.slice(0, 8)}…) HTTP ${response.status}: ${errorBody.slice(0, 200)}`);
+                const err = new Error(`Firestore error: ${response.status}`);
+                err.status = response.status;
+                err.body = errorBody;
+                throw err;
             }
 
             const data = await response.json();
@@ -349,7 +364,12 @@ const FirebaseLib = (function () {
                 return getDocument(collection, docId, retryCount + 1);
             }
 
-            (window.PopupLogger || console).error?.('Firebase', 'Get error:', error);
+            // Network errors (TypeError after retries exhausted) → return null
+            // so callers can fall back to local data. Auth errors (already
+            // thrown above with a status code) propagate to the caller.
+            if (error.status) throw error;
+
+            (window.PopupLogger || console).error?.('Firebase', `getDocument(${collection}/${docId.slice(0, 8)}…) network error:`, error.message);
             return null;
         }
     }
@@ -474,7 +494,9 @@ const FirebaseLib = (function () {
             uid: data.localId,
             email: data.email,
             displayName,
-            photoURL
+            photoURL,
+            providers: providerIds,
+            signedInVia: 'password'
         };
         const tokens = {
             idToken: data.idToken,

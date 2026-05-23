@@ -359,9 +359,7 @@ body {
    password form + Forgot password — no Google button, no OR divider, no
    Create account (sign-up is expected to happen on desktop). */
 .auth-content.auth-mobile .btn-google-primary,
-.auth-content.auth-mobile .auth-or-divider,
-.auth-content.auth-mobile #authCreateAccountBtn,
-.auth-content.auth-mobile .auth-link-sep {
+.auth-content.auth-mobile .auth-or-divider {
   display: none
 }
 
@@ -512,12 +510,6 @@ body {
 .auth-link:disabled {
   opacity: 0.55;
   cursor: not-allowed
-}
-
-.auth-link-sep {
-  color: var(--t3);
-  font-size: 11px;
-  pointer-events: none
 }
 
 .main-app {
@@ -3529,48 +3521,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   line-height: 1.5
 }
 
-.episodes-preview {
-  display: none;
-  margin-top: 6px;
-  padding: 6px 9px;
-  border-radius: var(--r-xs);
-  font-size: 11px;
-  line-height: 1.5
-}
-
-.episodes-preview.preview-visible {
-  display: block;
-  background: rgba(76, 175, 130, 0.05);
-  border: 1px solid rgba(76, 175, 130, 0.18);
-  animation: fadeIn 0.15s ease
-}
-
-.episodes-preview.preview-error-state {
-  background: rgba(240, 69, 69, 0.05);
-  border: 1px solid rgba(240, 69, 69, 0.18)
-}
-
-.preview-ok {
-  color: var(--green);
-  font-weight: 500
-}
-
-.preview-ok strong {
-  color: #86efac;
-  font-weight: 700
-}
-
-.preview-error {
-  color: #f04545;
-  font-weight: 500
-}
-
-.preview-fillers {
-  color: var(--purple);
-  font-size: 10px;
-  opacity: 0.9
-}
-
 /* ── Add Anime dialog v2 redesign ─────────────────────────────────── */
 
 /* Container — glass-morphism, larger radius, larger max-width.
@@ -4123,28 +4073,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1)
 }
 
-/* Override for old preview style — keep tight & subtle */
-.episodes-preview {
-  display: none;
-  margin-top: 6px;
-  padding: 7px 10px;
-  border-radius: var(--r-sm);
-  font-size: 11px;
-  line-height: 1.5
-}
-
-.episodes-preview.preview-visible {
-  display: block;
-  background: rgba(76,175,130,0.04);
-  border: 1px solid rgba(76,175,130,0.15);
-  animation: fadeIn 0.15s ease
-}
-
-.episodes-preview.preview-error-state {
-  background: rgba(240,69,69,0.05);
-  border: 1px solid rgba(240,69,69,0.18)
-}
-
 .include-fillers-label {
   display: inline-flex;
   align-items: center;
@@ -4395,7 +4323,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 /* Reduced-motion respect */
 @media (prefers-reduced-motion: reduce) {
   .add-anime-dialog,
-  .filler-card,
+  .filler-action-bar,
   .episodes-counter,
   .slug-detected-hint,
   .slug-meta {
@@ -7406,6 +7334,38 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   text-overflow: ellipsis
 }
 
+.settings-account-uid {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 10px;
+  color: rgba(160, 175, 200, 0.6);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin-top: 3px;
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  user-select: all;
+  transition: all var(--tf)
+}
+
+.settings-account-uid:hover {
+  background: rgba(79, 195, 247, 0.08);
+  border-color: rgba(79, 195, 247, 0.2);
+  color: var(--cyan)
+}
+
+.settings-account-uid.copied {
+  background: rgba(76, 175, 130, 0.15);
+  border-color: rgba(76, 175, 130, 0.4);
+  color: var(--green)
+}
+
 .settings-account-status {
   font-size: 10px;
   font-weight: 600;
@@ -7850,4 +7810,315 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important
   }
+}
+
+
+/* ── In-popup Debug Console ────────────────────────────────────────── */
+.debug-console-overlay {
+  position: fixed;
+  inset: 0;
+  background: #0a0d14;
+  z-index: 99998;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
+  animation: fadeIn 0.18s ease
+}
+
+.debug-console-panel {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #0a0d14;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace
+}
+
+.dbg-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, #1a2030 0%, #0e1218 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0
+}
+
+.dbg-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e8edf8;
+  letter-spacing: 0.2px;
+  font-family: inherit
+}
+
+.dbg-count {
+  color: var(--t2);
+  font-weight: 500;
+  font-size: 12px
+}
+
+.dbg-btn-close {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: var(--t1);
+  font-size: 16px;
+  cursor: pointer;
+  transition: all var(--tf);
+  font-family: inherit;
+  flex-shrink: 0
+}
+
+.dbg-btn-close:hover {
+  background: rgba(240, 69, 69, 0.15);
+  border-color: rgba(240, 69, 69, 0.3);
+  color: #ffb3b3
+}
+
+.dbg-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0
+}
+
+.dbg-filter {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: var(--t1);
+  font-family: inherit
+}
+
+.dbg-filter:focus {
+  outline: none;
+  border-color: rgba(79, 195, 247, 0.5);
+  background: rgba(79, 195, 247, 0.04)
+}
+
+.dbg-btn-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--tf);
+  font-family: inherit;
+  white-space: nowrap;
+  flex-shrink: 0
+}
+
+.dbg-btn-copy {
+  background: linear-gradient(135deg, #4fc3f7 0%, #2196f3 100%);
+  color: #051018;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(79, 195, 247, 0.25)
+}
+
+.dbg-btn-copy:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(79, 195, 247, 0.4)
+}
+
+.dbg-btn-copy:active {
+  transform: translateY(0)
+}
+
+.dbg-btn-action-success {
+  background: linear-gradient(135deg, var(--green) 0%, #2e9e6a 100%) !important;
+  color: #051018 !important;
+  box-shadow: 0 0 16px rgba(76, 175, 130, 0.45) !important
+}
+
+.dbg-btn-clear {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--t2)
+}
+
+.dbg-btn-clear:hover {
+  background: rgba(240, 69, 69, 0.1);
+  border-color: rgba(240, 69, 69, 0.3);
+  color: #ffb3b3
+}
+
+.dbg-btn-icon {
+  font-size: 14px
+}
+
+.dbg-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 6px 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  -webkit-overflow-scrolling: touch
+}
+
+.dbg-empty {
+  text-align: center;
+  color: var(--t2);
+  font-size: 12px;
+  padding: 24px
+}
+
+.dbg-entry {
+  margin-bottom: 4px;
+  padding: 6px 9px;
+  border-radius: 5px;
+  border-left: 2px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 11px;
+  line-height: 1.45;
+  word-break: break-word;
+  white-space: pre-wrap
+}
+
+.dbg-entry.dbg-lvl-error {
+  border-left-color: #f04545;
+  background: rgba(240, 69, 69, 0.06)
+}
+
+.dbg-entry.dbg-lvl-warn {
+  border-left-color: var(--amber);
+  background: rgba(240, 192, 64, 0.05)
+}
+
+.dbg-entry.dbg-lvl-success {
+  border-left-color: var(--green);
+  background: rgba(76, 175, 130, 0.04)
+}
+
+.dbg-entry.dbg-lvl-debug {
+  opacity: 0.65
+}
+
+.dbg-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+  font-size: 10px;
+  color: var(--t2)
+}
+
+.dbg-time {
+  color: rgba(160, 175, 200, 0.6);
+  font-variant-numeric: tabular-nums
+}
+
+.dbg-level {
+  font-weight: 700;
+  font-size: 9.5px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--t1);
+  letter-spacing: 0.5px
+}
+
+.dbg-lvl-error .dbg-level { background: rgba(240, 69, 69, 0.25); color: #ffb3b3 }
+.dbg-lvl-warn  .dbg-level { background: rgba(240, 192, 64, 0.22); color: #f5dc8e }
+.dbg-lvl-success .dbg-level { background: rgba(76, 175, 130, 0.22); color: #a3e7c2 }
+
+.dbg-tag {
+  font-weight: 600;
+  color: var(--cyan);
+  font-size: 10px
+}
+
+.dbg-msg {
+  color: var(--t1);
+  font-size: 11px
+}
+
+.dbg-extras {
+  color: rgba(180, 195, 215, 0.6);
+  font-size: 10px;
+  margin-top: 2px;
+  padding-left: 6px;
+  border-left: 1px dashed rgba(255, 255, 255, 0.08)
+}
+
+.dbg-footer {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  font-size: 10px;
+  color: rgba(160, 175, 200, 0.5);
+  background: rgba(0, 0, 0, 0.3);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-family: inherit;
+  text-align: center
+}
+
+/* Copy fallback — full-screen textarea for Orion / Safari where
+   navigator.clipboard is blocked. User long-presses + Select all + Copy. */
+.dbg-copy-fallback {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px
+}
+
+.dbg-copy-fallback-inner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #0a0d14;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden
+}
+
+.dbg-copy-fallback-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, #1a2030 0%, #0e1218 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--t1);
+  flex-shrink: 0
+}
+
+.dbg-copy-fallback textarea {
+  flex: 1 1 auto;
+  width: 100%;
+  border: none;
+  outline: none;
+  background: #0a0d14;
+  color: #c0d4eb;
+  padding: 10px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  resize: none;
+  -webkit-user-select: all;
+  user-select: all
 }

@@ -441,10 +441,27 @@ async function fetchCloudData(user, token) {
     try {
         const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         const response = await fetchWithTimeout(url, { headers: { 'Authorization': `Bearer ${token}` } });
-        if (!response.ok) return null;
+        if (!response.ok) {
+            // Log the actual status so we can diagnose silent fetch failures
+            // (a 401 from a stale SW token, 403 from rules denial, 404 for
+            // genuinely-missing doc, etc.). Previously every non-OK was
+            // collapsed into a silent null and the popup couldn't tell why.
+            const body = await response.text().catch(() => '');
+            console.warn(`[BG] fetchCloudData HTTP ${response.status} for users/${user.uid.slice(0, 8)}…: ${body.slice(0, 160)}`);
+            // Annotate the cache with the failure status so the SW message
+            // handler can surface it to the popup.
+            const err = new Error(`HTTP ${response.status}`);
+            err.status = response.status;
+            err.body = body;
+            throw err;
+        }
         return fromFSDoc(await response.json());
     } catch (e) {
-        console.warn('[BG] Could not fetch cloud data:', e);
+        console.warn('[BG] Could not fetch cloud data:', e?.message || e);
+        // Re-throw status errors so callers can distinguish them from
+        // network errors. Network/timeout errors still resolve to null
+        // (no `e.status`) so the existing fallback paths still work.
+        if (e?.status) throw e;
         return null;
     }
 }
@@ -494,7 +511,17 @@ async function fetchCloudDataCached(user, token) {
     if (_bgCloudDocCache && (now - _bgCloudDocCacheTime) < _BG_CLOUD_TTL) {
         return _bgCloudDocCache;
     }
-    const doc = await fetchCloudData(user, token);
+    let doc = null;
+    try {
+        doc = await fetchCloudData(user, token);
+    } catch (e) {
+        // Status errors (401/403/404) — don't cache, let the next attempt
+        // (e.g. with a refreshed token) try again. Surface the error code
+        // via a throw to GET_CLOUD_DOC so the popup can do a direct fetch.
+        const err = new Error(e?.message || 'Fetch failed');
+        err.status = e?.status || null;
+        throw err;
+    }
     if (doc) {
         _bgCloudDocCache = doc;
         _bgCloudDocCacheTime = Date.now();
@@ -1204,7 +1231,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 const doc = await fetchCloudDataCached(user, token);
                 sendResponse({ success: true, doc: doc || null });
             } catch (e) {
-                sendResponse({ success: false, error: e.message });
+                // Surface the HTTP status (if any) so the popup knows whether
+                // the doc genuinely doesn't exist (404), the token was rejected
+                // (401/403), or it was a transient network error. Without this,
+                // the popup couldn't distinguish "no doc" from "fetch failed".
+                sendResponse({
+                    success: false,
+                    error: e?.message || String(e),
+                    status: e?.status || null
+                });
             }
         })();
         return true;

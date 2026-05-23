@@ -60,6 +60,7 @@
         const name = escapeHtml(user?.displayName || user?.email?.split('@')[0] || 'User');
         const email = escapeHtml(user?.email || '');
         const signedIn = !!user;
+        const uid = escapeHtml(user?.uid || '');
 
         // Both the Sign-Out button and the "Local only" badge are always in
         // the DOM (just one is hidden) so partial updates can flip their
@@ -72,6 +73,7 @@
                     <div class="settings-account-info">
                         <span class="settings-account-name" id="settingsUserName">${name}</span>
                         <span class="settings-account-email" id="settingsUserEmail">${email}</span>
+                        ${uid ? `<span class="settings-account-uid" id="settingsUserUid" title="Click to copy — must match across devices">${uid}</span>` : ''}
                     </div>
                     <button class="settings-btn settings-btn-secondary" id="settingsSignOut" type="button"
                             ${signedIn ? '' : 'hidden'}>
@@ -168,6 +170,13 @@
                             <span class="settings-action-subtitle">Restore from a previous JSON export</span>
                         </span>
                     </button>
+                    <button class="settings-action" id="settingsDebugConsole" type="button">
+                        ${svg('info')}
+                        <span class="settings-action-text">
+                            <span class="settings-action-title">Debug Console</span>
+                            <span class="settings-action-subtitle">View logs and errors (mobile-friendly)</span>
+                        </span>
+                    </button>
                     <input type="file" id="settingsImportFile" accept="application/json,.json"
                            style="display:none" aria-hidden="true">
                 </div>
@@ -175,14 +184,13 @@
         `;
     }
 
-    function renderDangerCard(user, passwordIsSet) {
-        // "Set password for mobile" only makes sense for signed-in users —
-        // it linkάρει password στον τρέχοντα Firebase λογαριασμό. Hide it
-        // when local-only so we don't show a button that can only error out.
-        // Once the user has linked a password we keep the button clickable
-        // (so they can update/recover if they forget it) and just swap the
-        // visuals + copy to "Password set" / "Tap to update".
-        const setPasswordBtn = !user ? '' : (passwordIsSet ? `
+    function renderDangerCard(user, passwordIsSet, isMobile) {
+        // "Set password for mobile" only makes sense for signed-in users on
+        // desktop — it links a password to the current Firebase account so the
+        // user can later sign in with email+password on Orion/Safari mobile.
+        // On mobile itself the button is pointless (you ARE on mobile already)
+        // so we hide it when isMobile=true.
+        const setPasswordBtn = (!user || isMobile) ? '' : (passwordIsSet ? `
                     <button class="settings-action settings-action--set" id="settingsSetPassword" type="button">
                         ${svg('check')}
                         <span class="settings-action-text">
@@ -239,7 +247,8 @@
         const {
             user = null,
             settings = {},
-            passwordIsSet = false
+            passwordIsSet = false,
+            isMobile = false
         } = params;
 
         const state = {
@@ -259,7 +268,7 @@
                     ${renderAccountCard(user)}
                     ${renderPlaybackCard(state)}
                     ${renderLibraryCard()}
-                    ${renderDangerCard(user, passwordIsSet)}
+                    ${renderDangerCard(user, passwordIsSet, isMobile)}
                     ${renderAboutCard()}
                 </div>
             `;
@@ -275,12 +284,29 @@
         const avatar = container.querySelector('#settingsAvatar');
         const nameEl = container.querySelector('#settingsUserName');
         const emailEl = container.querySelector('#settingsUserEmail');
+        const uidEl = container.querySelector('#settingsUserUid');
+        const accountInfo = container.querySelector('.settings-account-info');
         const signOutBtn = container.querySelector('#settingsSignOut');
         const localOnlyBadge = container.querySelector('[data-when="signed-out"]');
         const accountCard = container.querySelector('.settings-card[data-signed-in]');
         if (avatar)  avatar.src = user?.photoURL || 'src/icons/icon48.png';
         if (nameEl)  nameEl.textContent = user?.displayName || user?.email?.split('@')[0] || 'User';
         if (emailEl) emailEl.textContent = user?.email || '';
+        // uid: present element only when signed in. Add/remove dynamically.
+        if (user?.uid) {
+            if (uidEl) {
+                uidEl.textContent = user.uid;
+            } else if (accountInfo) {
+                const newUidEl = document.createElement('span');
+                newUidEl.className = 'settings-account-uid';
+                newUidEl.id = 'settingsUserUid';
+                newUidEl.title = 'Click to copy — must match across devices';
+                newUidEl.textContent = user.uid;
+                accountInfo.appendChild(newUidEl);
+            }
+        } else if (uidEl) {
+            uidEl.remove();
+        }
         if (signOutBtn) {
             if (user) signOutBtn.removeAttribute('hidden');
             else signOutBtn.setAttribute('hidden', '');
@@ -298,7 +324,7 @@
         // triggering a full re-render of the whole view.
         const dangerCard = container.querySelector('.settings-card--danger .settings-action-grid');
         const existingSetPwBtn = dangerCard?.querySelector('#settingsSetPassword');
-        const expectedState = !user ? 'absent' : (passwordIsSet ? 'set' : 'unset');
+        const expectedState = (!user || isMobile) ? 'absent' : (passwordIsSet ? 'set' : 'unset');
         const currentState = !existingSetPwBtn ? 'absent' :
             (existingSetPwBtn.classList.contains('settings-action--set') ? 'set' : 'unset');
         if (dangerCard && expectedState !== currentState) {
