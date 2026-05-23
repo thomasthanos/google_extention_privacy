@@ -251,6 +251,7 @@
                         <span class="badge-next-up-icon badge-tier-${b.tier}">${renderSvgIcon(b.svg, b.icon)}</span>
                         <span class="badge-next-up-title-wrap">
                             <span class="badge-next-up-title">${escapeHtml(b.title)}</span>
+                            <span class="badge-next-up-fraction">${escapeHtml(formatBadgeProgress(b))}</span>
                         </span>
                         <span class="badge-next-up-pct">${pct}%</span>
                     </div>
@@ -258,9 +259,6 @@
                         <div class="goal-progress-bar" style="width:${pct}%"></div>
                     </div>
                     <div class="badge-next-up-desc">${escapeHtml(b.desc)}</div>
-                    <div class="badge-next-up-meta">
-                        <span class="badge-next-up-target">${escapeHtml(formatBadgeProgress(b))}</span>
-                    </div>
                 </div>
             `;
         }).join('');
@@ -419,6 +417,20 @@
                 btn.addEventListener('mouseleave', stopHold);
                 btn.addEventListener('touchstart', (e) => { e.preventDefault(); startHold(); }, { passive: false });
                 btn.addEventListener('touchend', stopHold);
+            });
+        });
+
+        // Single-open accordion behaviour for the achievement category
+        // groups. Native `<details>` lets multiple panels stay open; this
+        // listener closes siblings the moment one opens, matching Settings'
+        // "Volume" / "Variety" / "Tempo" mental model.
+        const groupSections = container.querySelectorAll('.badge-group-section');
+        groupSections.forEach((section) => {
+            section.addEventListener('toggle', () => {
+                if (!section.open) return;
+                groupSections.forEach((other) => {
+                    if (other !== section && other.open) other.open = false;
+                });
             });
         });
     }

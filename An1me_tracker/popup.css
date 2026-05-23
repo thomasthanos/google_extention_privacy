@@ -50,7 +50,49 @@
   --tn: 0.2s ease;
   --w: 420px;
   --h: 590px;
-  --accent: var(--grad-cyan)
+  --accent: var(--grad-cyan);
+
+  /* ── Semantic color tokens (Batch A) ────────────────────────────────────
+     Preferred for new code. Defined in oklch so future-tweaks can pivot
+     hue/chroma in one place. Existing --cyan / --amber / --green stay as
+     hex aliases so rules that already reference them keep their exact
+     visual without a mass refactor. */
+  --primary:           oklch(0.78 0.135 232);   /* ~ #4fc3f7 */
+  --warning:           oklch(0.82 0.155 88);    /* ~ #f0c040 */
+  --success:           oklch(0.69 0.13 158);    /* ~ #4caf82 */
+  --danger:            oklch(0.65 0.21 22);     /* ~ #f04545 */
+  --surface:           var(--bg-1);
+  --surface-elevated:  var(--bg-card);
+
+  /* Soft fills (10–12% alpha) for chip backgrounds, hover states, focus rings */
+  --primary-soft:      oklch(0.78 0.135 232 / 0.12);
+  --warning-soft:      oklch(0.82 0.155 88 / 0.14);
+  --success-soft:      oklch(0.69 0.13 158 / 0.14);
+  --danger-soft:       oklch(0.65 0.21 22 / 0.12);
+
+  /* Stronger fills for active chip / selected tab state */
+  --primary-fill:      oklch(0.78 0.135 232 / 0.20);
+  --warning-fill:      oklch(0.82 0.155 88 / 0.22);
+  --success-fill:      oklch(0.69 0.13 158 / 0.22);
+  --danger-fill:       oklch(0.65 0.21 22 / 0.20);
+
+  /* Focus ring — translucent halo around inputs/buttons on keyboard nav */
+  --primary-ring:      oklch(0.78 0.135 232 / 0.32);
+
+  /* ── Spacing rhythm (Batch A) ──────────────────────────────────────────
+     Use these instead of magic numbers when adding new layouts. Existing
+     code keeps its current spacing — this is opt-in. */
+  --gap-card:    10px;   /* card-to-card vertical gap inside lists */
+  --gap-section: 16px;   /* between Stats → Tabs → Search → List rows */
+  --pad-h:       18px;   /* horizontal page padding (matches header.18px) */
+
+  /* ── Typography stacks (Batch D) ───────────────────────────────────────
+     Display fonts (PROXON / ComicSans) reserved for the brand logo + the
+     hero stat numbers only. Body / titles / labels all fall back to Inter
+     so hierarchy is driven by size + colour, not by font face. */
+  --font-display: 'PROXON', 'Bebas Neue', sans-serif;
+  --font-stat:    'ComicSans', 'Bebas Neue', sans-serif;
+  --font-body:    'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif
 }
 
 *,
@@ -63,8 +105,27 @@
   -webkit-user-select: none
 }
 
+/* Global focus-visible ring (Batch D · a11y).
+   Default browser outlines get suppressed by lots of components below.
+   This rule only fires when the user is keyboard-navigating (focus-visible),
+   so mouse clicks don't paint rings on every button. Per-component rules
+   override this where a tighter / inset ring fits better. */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px
+}
+
+input:focus-visible,
+textarea:focus-visible {
+  /* Inputs already drive their own glow via `box-shadow` on focus, so a
+     hard outline on top would double-up. Suppress and let the box-shadow
+     carry the affordance. */
+  outline: none
+}
+
 body {
-  font-family: 'ComicSans', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font-body);
   font-size: 14px;
   line-height: 1.5;
   color: var(--t1);
@@ -473,7 +534,36 @@ body {
   padding: 14px 18px 0;
   flex-shrink: 0;
   position: relative;
-  z-index: 20
+  z-index: 20;
+  transition: padding 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease
+}
+
+/* Compact-header signal — when the library scrolls, header tightens its
+   padding and gains a subtle drop shadow so it feels anchored to the top
+   instead of floating. statsBar follows the same compaction so the visual
+   stays cohesive. JS toggles `.is-scrolled` on `.main-app` (Batch D). */
+.main-app.is-scrolled .header {
+  padding-top: 8px;
+  border-bottom-color: var(--b1);
+  box-shadow: 0 6px 12px -8px rgba(0, 0, 0, 0.55)
+}
+
+.main-app.is-scrolled #statsBar {
+  padding: 6px 0
+}
+
+.main-app.is-scrolled #statsBar .stat-value {
+  font-size: 20px
+}
+
+.main-app #statsBar,
+.main-app .header {
+  /* Smooth the compaction so the user sees a transition, not a snap. */
+  transition: padding 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, font-size 0.18s ease
+}
+
+.main-app #statsBar .stat-value {
+  transition: font-size 0.18s ease
 }
 
 .header-content {
@@ -526,8 +616,8 @@ body {
 }
 
 .btn-icon {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -638,10 +728,19 @@ body {
   flex: 1;
   overflow-y: scroll;
   overflow-x: hidden;
-  padding: 12px 14px 14px;
+  padding: 4px var(--pad-h) var(--pad-h);
   display: flex;
   flex-direction: column;
-  gap: 10px
+  /* Tight default gap — individual sections add their own breathing room
+     via margin-top so each pair can have a different visual weight. */
+  gap: 6px;
+  /* Treat the scroll viewport as the local origin for any nested fixed/
+     absolute children — keeps the progress bar at `bottom: 0` of each card
+     painting in the same compositing context as the scroll itself. */
+  contain: layout style;
+  /* Let the GPU drive scroll; mobile/Orion benefit from momentum. */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain
 }
 
 #statsView,
@@ -701,28 +800,36 @@ body {
   background: rgba(79, 195, 247, 0.25)
 }
 
+/* ── Category tabs (Batch B) ────────────────────────────────────────────
+   Underline segmented control. Inactive tabs are bare (no background,
+   muted text). Active tab gets bold text + a 2px primary underline that
+   slides between positions via the JS-driven `.category-tabs-slider`
+   element (kept from the old pill design — repurposed as the underline). */
+
 .category-tabs {
   display: flex;
   gap: 0;
-  padding: 4px;
-  background: var(--bg-2);
-  border-radius: var(--r-pill);
-  border: 1px solid var(--b1);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--b1);
+  border-radius: 0;
   position: relative;
-  margin-top: 6px
+  margin-top: 0
 }
 
 .category-tabs-slider {
   position: absolute;
-  top: 4px;
-  bottom: 4px;
-  left: 4px;
-  border-radius: var(--r-pill);
-  background: var(--bg-4);
-  border: 1px solid rgba(79, 195, 247, 0.2);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-  transition: transform 0.35s cubic-bezier(0.4, 0, 0.15, 1), width 0.3s cubic-bezier(0.4, 0, 0.15, 1), opacity 0.18s ease;
-  z-index: 0;
+  top: auto;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--primary);
+  border: 0;
+  box-shadow: 0 0 8px var(--primary-soft);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.15, 1), width 0.25s cubic-bezier(0.4, 0, 0.15, 1), opacity 0.18s ease;
+  z-index: 1;
   pointer-events: none;
   opacity: 0
 }
@@ -737,18 +844,20 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 7px 10px;
+  padding: 10px 8px;
   background: transparent;
-  border: none;
-  border-radius: var(--r-pill);
+  border: 0;
+  border-radius: 0;
   color: var(--t2);
   font-size: 12px;
   font-weight: 500;
   font-family: inherit;
+  letter-spacing: 0.1px;
   cursor: pointer;
-  transition: color 0.25s ease, font-weight 0.15s ease;
+  transition: color 0.2s ease, font-weight 0.15s ease;
   position: relative;
-  z-index: 1
+  z-index: 0;
+  min-height: 40px  /* a11y tap target */
 }
 
 .category-tab svg {
@@ -761,16 +870,17 @@ body {
 }
 
 .category-tab.active {
-  color: var(--cyan);
+  color: var(--primary);
   font-weight: 700;
   background: transparent;
-  border: none;
+  border: 0;
   outline: none
 }
 
+/* Slider-disabled fallback: emulate the underline without animation. */
 .category-tabs:not(.slider-ready) .category-tab.active {
-  background: var(--bg-4);
-  box-shadow: inset 0 0 0 1px rgba(79, 195, 247, 0.2)
+  background: transparent;
+  box-shadow: inset 0 -2px 0 0 var(--primary)
 }
 
 .toolbar {
@@ -828,9 +938,17 @@ body {
   box-shadow: 0 0 0 1px rgba(30, 180, 230, 0.08)
 }
 
+/* ── Search bar (Batch B) ───────────────────────────────────────────────
+   Full-width input with the search icon as a leading affordance, and the
+   add-anime + sort buttons docked inside as trailing icons. The sort
+   dropdown still anchors to the search-container (relative parent), so
+   its absolute positioning lands beneath the sort icon as before. */
+
 .search-container {
   position: relative;
-  flex: 1
+  flex: 1;
+  display: flex;
+  align-items: center
 }
 
 .search-icon {
@@ -841,59 +959,82 @@ body {
   width: 15px;
   height: 15px;
   color: var(--t3);
-  pointer-events: none
+  pointer-events: none;
+  z-index: 1
 }
 
 .search-input {
   width: 100%;
-  padding: 10px 12px 10px 34px;
+  padding: 10px 82px 10px 36px;   /* room for two 32×32 trailing icons + gaps */
   background: var(--bg-2);
   border: 1px solid var(--b1);
   border-radius: var(--r-md);
   color: var(--t1);
   font-size: 13px;
   font-family: inherit;
-  transition: border-color var(--tn), background var(--tn)
+  transition: border-color var(--tn), background var(--tn), box-shadow var(--tn)
 }
 
 .search-input::placeholder {
-  color: var(--t3)
+  color: rgba(133, 147, 176, 0.6)   /* muted-foreground 60% */
 }
 
 .search-input:focus {
   outline: none;
   background: var(--bg-3);
-  border-color: rgba(79, 195, 247, 0.28)
+  border-color: var(--primary-ring);
+  box-shadow: 0 0 0 3px var(--primary-soft)
 }
 
-.sort-container {
-  position: relative
-}
-
-.btn-sort {
-  width: 40px;
-  height: 40px;
+.search-actions {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
+  gap: 2px;
+  z-index: 2
+}
+
+.search-actions .btn-add-anime,
+.search-actions .btn-sort {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  background: var(--bg-2);
-  border: 1px solid var(--b1);
-  border-radius: var(--r-md);
-  color: var(--t2);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--t3);
   cursor: pointer;
-  transition: all var(--tf)
+  box-shadow: none;
+  transition: color var(--tf), background var(--tf)
 }
 
-.btn-sort svg {
-  width: 16px;
-  height: 16px
+.search-actions .btn-add-anime::before {
+  content: none   /* drop the inner highlight gradient from the standalone variant */
 }
 
-.btn-sort:hover,
-.btn-sort.active {
-  background: var(--bg-3);
-  color: var(--t1);
-  border-color: var(--b2)
+.search-actions .btn-add-anime svg,
+.search-actions .btn-sort svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.2
+}
+
+.search-actions .btn-add-anime:hover,
+.search-actions .btn-sort:hover,
+.search-actions .btn-sort.active {
+  color: var(--primary);
+  background: var(--primary-soft)
+}
+
+.search-actions .btn-add-anime:active,
+.search-actions .btn-sort:active {
+  background: var(--primary-fill)
 }
 
 .sort-dropdown {
@@ -973,11 +1114,101 @@ body {
 .anime-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--gap-card);
   opacity: 1;
   transform: translateY(0);
   filter: none;
   transition: opacity 0.16s ease, transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), filter 0.16s ease
+}
+
+/* ── Skeleton loaders (Batch D · #11) ───────────────────────────────────
+   Sit inside #animeList from initial HTML paint until renderAnimeList()
+   does its first replaceChildren(). After that they're gone for the
+   lifetime of the popup. Three placeholder cards mirror the real card
+   layout: cover thumbnail + title row + meta row. */
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-card)
+}
+
+.skeleton-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 16px;
+  background: #161922;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--r-lg);
+  min-height: 78px;
+  position: relative;
+  overflow: hidden
+}
+
+.skeleton-cover {
+  flex-shrink: 0;
+  width: 40px;
+  height: 56px;
+  border-radius: 8px;
+  background: linear-gradient(110deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.04) 100%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.4s linear infinite
+}
+
+.skeleton-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px
+}
+
+.skeleton-line {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(110deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.04) 100%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.4s linear infinite
+}
+
+.skeleton-line--title {
+  width: 70%
+}
+
+.skeleton-line--medium {
+  width: 55%
+}
+
+.skeleton-line--short {
+  width: 40%
+}
+
+.skeleton-line--meta {
+  width: 90%;
+  height: 9px;
+  opacity: 0.7
+}
+
+/* Stagger the shimmer offset across cards so they don't all pulse in sync. */
+.skeleton-card:nth-child(2) .skeleton-cover,
+.skeleton-card:nth-child(2) .skeleton-line {
+  animation-delay: -0.35s
+}
+.skeleton-card:nth-child(3) .skeleton-cover,
+.skeleton-card:nth-child(3) .skeleton-line {
+  animation-delay: -0.7s
+}
+
+@keyframes skeletonShimmer {
+  0%   { background-position: 200% 0 }
+  100% { background-position: -200% 0 }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-cover,
+  .skeleton-line {
+    animation: none
+  }
 }
 
 .anime-list.no-transition * {
@@ -1008,39 +1239,55 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 2px 2px 0;
-  margin-top: 2px;
+  padding: 0;
+  margin-top: 6px;
+  margin-bottom: 0;
   flex-wrap: wrap
 }
 
+/* ── Status chips (Batch B) ─────────────────────────────────────────────
+   Pill style with soft tinted background ALWAYS visible (10–14% alpha),
+   solid text in the chip's semantic colour, no borders, fixed 22px height.
+   Active state intensifies the background (20–22% alpha) — same chip, more
+   commitment. Airing chip carries a leading dot indicator; the others rely
+   on colour alone to keep the row compact. */
+
 .status-chip {
+  --chip-fg:   var(--t2);
+  --chip-bg:   transparent;
+  --chip-fill: rgba(255, 255, 255, 0.06);
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
+  gap: 6px;
+  height: 22px;
+  padding: 0 10px;
   border-radius: var(--r-pill);
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--t2);
-  font-size: 10px;
+  border: 0;
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+  font-size: 10.5px;
   font-weight: 600;
   line-height: 1;
+  letter-spacing: 0.1px;
   font-family: inherit;
   cursor: pointer;
-  transition: color var(--tn), border-color var(--tn), background var(--tn)
+  transition: background var(--tn), color var(--tn)
 }
 
 .status-chip:hover {
-  color: var(--t1);
-  background: rgba(255, 255, 255, 0.04)
+  background: var(--chip-fill)
 }
 
 .status-chip.active {
-  color: var(--t1);
-  background: rgba(255, 255, 255, 0.06)
+  background: var(--chip-fill)
 }
 
-.status-chip .status-chip-count {
+.status-chip-label {
+  display: inline-flex;
+  align-items: center
+}
+
+.status-chip-count {
   color: var(--t3);
   font-weight: 700
 }
@@ -1049,40 +1296,41 @@ body {
   color: currentColor
 }
 
+/* ── Per-status colour mappings ─────────────────────────────────────────
+   Each variant sets its own --chip-fg / --chip-bg / --chip-fill so the
+   shared rules above just read the variables. */
+
 .status-chip.airing {
-  color: #64b5f6
+  --chip-fg:   var(--primary);
+  --chip-bg:   var(--primary-soft);
+  --chip-fill: var(--primary-fill)
+}
+.status-chip.airing::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 6px var(--primary);
+  flex-shrink: 0
 }
 
 .status-chip.on-hold {
-  color: #ffb74d
+  --chip-fg:   var(--warning);
+  --chip-bg:   var(--warning-soft);
+  --chip-fill: var(--warning-fill)
 }
 
 .status-chip.completed {
-  color: var(--green)
+  --chip-fg:   var(--success);
+  --chip-bg:   var(--success-soft);
+  --chip-fill: var(--success-fill)
 }
 
 .status-chip.dropped {
-  color: #e57373
-}
-
-.status-chip.airing.active {
-  border-color: rgba(100, 181, 246, 0.35);
-  background: rgba(100, 181, 246, 0.12)
-}
-
-.status-chip.on-hold.active {
-  border-color: rgba(255, 183, 77, 0.35);
-  background: rgba(255, 183, 77, 0.12)
-}
-
-.status-chip.completed.active {
-  border-color: rgba(76, 175, 130, 0.35);
-  background: rgba(76, 175, 130, 0.12)
-}
-
-.status-chip.dropped.active {
-  border-color: rgba(229, 115, 115, 0.35);
-  background: rgba(229, 115, 115, 0.12)
+  --chip-fg:   var(--danger);
+  --chip-bg:   var(--danger-soft);
+  --chip-fill: var(--danger-fill)
 }
 
 .status-chip-sep {
@@ -1411,7 +1659,7 @@ body {
   background: #161922;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--r-lg);
-  padding: 10px 12px;
+  padding: 10px 12px 10px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
   position: relative;
   overflow: hidden;
@@ -1422,6 +1670,64 @@ body {
      height; expanded cards re-paint when scrolled into view. */
   content-visibility: auto;
   contain-intrinsic-size: auto 78px;
+  /* GPU layer promotion (Batch D · scroll polish).
+     The card combines rounded corners + overflow:hidden + absolutely-
+     positioned progress bar — that's a recipe for sub-pixel flicker on
+     scroll because the browser re-clips the bar's bottom corners against
+     the card curve every paint frame. Promoting each card to its own
+     compositor layer (translateZ + backface-visibility) tells the GPU to
+     move the whole card as a baked bitmap instead of re-rasterising. The
+     `contain` declaration localises paint + layout so siblings' re-paints
+     don't bleed in. */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  contain: layout paint
+}
+
+/* Permanent progress strip — full-width along the bottom edge of the card,
+   relying on the card's `overflow: hidden` + `border-radius` to mask the
+   bottom-left and bottom-right corners so the bar follows the card curve
+   instead of sticking out as straight 90° corners.
+
+   Hidden in:
+   • the expanded view — the detailed bar inside `.anime-card-content`
+     already shows the same data with percentages + canon/filler split
+   • the Completed list — 100% is implied by the section itself, the bar
+     just adds visual noise once the anime is finished. */
+.anime-card-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 0;             /* card's overflow:hidden does the masking */
+  pointer-events: none;
+  overflow: hidden;
+  transition: opacity 0.18s ease
+}
+
+.anime-card.expanded .anime-card-progress,
+.completed-list-cards .anime-card-progress {
+  opacity: 0;
+  visibility: hidden
+}
+
+.anime-card-progress-fill {
+  display: block;
+  height: 100%;
+  /* Subtle teal → cyan gradient — gives a hint of motion/depth without
+     screaming for attention. Right edge keeps a small radius so the cyan
+     stop "glides" into the dark track instead of cutting at 90°, like a
+     slider thumb at the leading edge. */
+  background: linear-gradient(90deg, oklch(0.62 0.11 215) 0%, var(--primary) 100%);
+  border-radius: 0 4px 4px 0;
+  transition: width 0.25s ease
+}
+
+.anime-card.in-progress-only .anime-card-progress-fill {
+  background: linear-gradient(90deg, oklch(0.66 0.11 75) 0%, var(--warning) 100%)
 }
 
 .anime-card:hover {
@@ -1534,8 +1840,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .season-group-logo>div,
 .movie-group-logo img,
 .movie-group-logo>div {
-  width: 50px;
-  height: 66px;
+  width: 40px;
+  height: 56px;
   border-radius: 8px;
   object-fit: cover;
   border: 1px solid var(--b2);
@@ -1556,7 +1862,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
   color: #fff
 }
@@ -1566,15 +1872,15 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .anime-cover-container .at-cover,
 .season-group-logo .at-cover,
 .movie-group-logo .at-cover {
-  width: 44px;
-  height: 58px
+  width: 40px;
+  height: 56px
 }
 
 .anime-title {
-  font-family: 'PROXON', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font-body);
   font-size: 15px;
   font-weight: 600;
-  letter-spacing: 0.3px;
+  letter-spacing: 0;
   color: var(--t1);
   flex: 1;
   display: flex;
@@ -1584,7 +1890,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .anime-title-text {
-  font-family: 'PROXON', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font-body);
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -1692,17 +1998,17 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   min-width: 0;
   max-width: 128px;
   gap: 4px;
-  padding: 4px 8px;
+  padding: 6px 10px;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  border: 0;
   color: var(--t2);
   cursor: pointer;
-  font-size: 10px;
-  font-weight: 650;
+  font-size: 10.5px;
+  font-weight: 600;
   line-height: 1;
-  min-height: 26px;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  min-height: 30px;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
   white-space: nowrap;
   overflow: hidden
 }
@@ -1720,81 +2026,58 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .anime-card-actions button:hover {
-  background: rgba(255, 255, 255, 0.055);
-  color: var(--t1);
-  border-color: rgba(255, 255, 255, 0.16);
-  transform: translateY(-1px)
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--t1)
 }
 
 .anime-card-actions button:active {
-  transform: translateY(0);
+  transform: scale(0.97);
   filter: brightness(0.94)
 }
 
-.anime-card-actions .anime-favorite-toggle {
-  color: #f7b955;
-  border-color: rgba(247, 185, 85, 0.24);
-  background: rgba(247, 185, 85, 0.06)
-}
+/* Per-action accents — the colour only flashes on hover or when the action
+   is actively engaged (data-* state attribute). Default state is neutral
+   ghost so the row reads as one calm unit instead of four loud chips. */
 
 .anime-card-actions .anime-favorite-toggle:hover {
   color: #ffd88a;
-  border-color: rgba(247, 185, 85, 0.46);
-  background: rgba(247, 185, 85, 0.14);
-  box-shadow: 0 0 0 1px rgba(247, 185, 85, 0.07), 0 7px 18px rgba(247, 185, 85, 0.09)
+  background: rgba(247, 185, 85, 0.10)
 }
 
-.anime-card-actions .anime-onhold-toggle {
-  color: #74a7ff;
-  border-color: rgba(116, 167, 255, 0.24);
-  background: rgba(116, 167, 255, 0.055)
+.anime-card-actions .anime-favorite-toggle.is-favorite,
+.anime-card-actions .anime-favorite-toggle.is-favorite:hover {
+  color: #ffd88a;
+  background: rgba(247, 185, 85, 0.18)
 }
 
 .anime-card-actions .anime-onhold-toggle:hover {
   color: #a6c7ff;
-  border-color: rgba(116, 167, 255, 0.48);
-  background: rgba(116, 167, 255, 0.13);
-  box-shadow: 0 0 0 1px rgba(116, 167, 255, 0.07), 0 7px 18px rgba(116, 167, 255, 0.1)
+  background: rgba(116, 167, 255, 0.10)
 }
 
 .anime-card-actions .anime-onhold-toggle[data-onhold="true"] {
   color: #d6e5ff;
-  background: linear-gradient(180deg, rgba(116, 167, 255, 0.26), rgba(116, 167, 255, 0.13));
-  border-color: rgba(116, 167, 255, 0.58);
-  box-shadow: inset 0 0 0 1px rgba(214, 229, 255, 0.09)
-}
-
-.anime-card-actions .anime-complete-toggle {
-  color: #4edb82;
-  border-color: rgba(78, 219, 130, 0.22);
-  background: rgba(78, 219, 130, 0.055)
+  background: rgba(116, 167, 255, 0.20)
 }
 
 .anime-card-actions .anime-complete-toggle:hover {
   color: #79f0a1;
-  border-color: rgba(78, 219, 130, 0.42);
-  background: rgba(78, 219, 130, 0.13);
-  box-shadow: 0 0 0 1px rgba(78, 219, 130, 0.06), 0 7px 18px rgba(78, 219, 130, 0.08)
+  background: rgba(78, 219, 130, 0.10)
 }
 
 .anime-card-actions .anime-complete-toggle[data-completed="true"] {
   color: #b6ffd0;
-  background: linear-gradient(180deg, rgba(78, 219, 130, 0.24), rgba(78, 219, 130, 0.13));
-  border-color: rgba(78, 219, 130, 0.54);
-  box-shadow: inset 0 0 0 1px rgba(182, 255, 208, 0.08)
-}
-
-.anime-card-actions .anime-drop-toggle {
-  color: #ff777d;
-  border-color: rgba(255, 119, 125, 0.22);
-  background: rgba(255, 119, 125, 0.055)
+  background: rgba(78, 219, 130, 0.20)
 }
 
 .anime-card-actions .anime-drop-toggle:hover {
   color: #ffa0a4;
-  border-color: rgba(255, 119, 125, 0.42);
-  background: rgba(255, 119, 125, 0.13);
-  box-shadow: 0 0 0 1px rgba(255, 119, 125, 0.06), 0 7px 18px rgba(255, 119, 125, 0.08)
+  background: rgba(255, 119, 125, 0.10)
+}
+
+.anime-card-actions .anime-drop-toggle[data-dropped="true"] {
+  color: #ffc4c8;
+  background: rgba(255, 119, 125, 0.20)
 }
 
 .anime-card-actions .anime-drop-toggle[data-dropped="true"] {
@@ -2321,7 +2604,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .ip-group {
-  margin-bottom: 8px
+  margin-top: 2px;
+  margin-bottom: 0
 }
 
 .ip-group-header {
@@ -2489,7 +2773,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .ip-title {
-  font-family: 'PROXON', 'ComicSans', sans-serif;
+  font-family: var(--font-body);
   font-size: 12px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.96);
@@ -2644,7 +2928,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 48px 24px;
+  padding: 40px 24px;
   flex: 1
 }
 
@@ -2652,6 +2936,29 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   display: flex
 }
 
+/* Minimal illustration container — sits inside a soft circle so the SVG
+   strokes don't float in the void. The cyan tint links it visually to the
+   primary CTA below. */
+.empty-illustration {
+  width: 72px;
+  height: 72px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-ring);
+  border-radius: 50%;
+  color: var(--primary);
+  box-shadow: 0 8px 24px -10px var(--primary-soft)
+}
+
+.empty-illustration svg {
+  width: 36px;
+  height: 36px
+}
+
+/* Legacy alias — old callsites may still reference .empty-icon. */
 .empty-icon {
   width: 52px;
   height: 52px;
@@ -2661,28 +2968,65 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .empty-state h3 {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
   color: var(--t1);
-  margin-bottom: 7px
+  margin-bottom: 8px;
+  letter-spacing: -0.1px
 }
 
 .empty-state p {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t2);
-  max-width: 240px;
-  line-height: 1.6
+  max-width: 280px;
+  line-height: 1.55;
+  margin-bottom: 18px
+}
+
+/* Primary CTA — gradient pill so a fresh user has one obvious thing to
+   click. Mirrors the brand cyan→pink gradient used in auth screens. */
+.empty-state-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  background: linear-gradient(135deg, var(--primary) 0%, oklch(0.74 0.16 270) 100%);
+  border: 0;
+  border-radius: var(--r-pill);
+  color: #0e1117;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px -10px var(--primary-ring);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.12s ease
+}
+
+.empty-state-cta svg {
+  width: 14px;
+  height: 14px
+}
+
+.empty-state-cta:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+  box-shadow: 0 10px 28px -10px var(--primary-ring)
+}
+
+.empty-state-cta:active {
+  transform: scale(0.97)
 }
 
 .empty-state-tips {
   list-style: none;
-  margin: 18px 0 0;
-  padding: 14px 16px;
-  background: var(--b0);
+  margin: 22px 0 0;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.025);
   border: 1px solid var(--b1);
   border-radius: var(--r-md);
   max-width: 280px;
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--t2);
   text-align: left;
   line-height: 1.5;
@@ -2716,7 +3060,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 18px;
+  padding: 8px 18px calc(8px + env(safe-area-inset-bottom, 0px));
   background: var(--bg-1);
   border-top: 1px solid var(--b0);
   font-size: 10px;
@@ -3580,7 +3924,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .season-group-name {
-  font-family: 'PROXON', 'ComicSans', sans-serif;
+  font-family: var(--font-body);
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -3740,7 +4084,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .season-label {
-  font-family: 'PROXON', 'ComicSans', sans-serif;
+  font-family: var(--font-body);
   font-size: 12px;
   font-weight: 600;
   color: var(--t1);
@@ -3977,7 +4321,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .movie-group-name {
-  font-family: 'PROXON', 'ComicSans', sans-serif;
+  font-family: var(--font-body);
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -4096,7 +4440,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .anime-title-text,
 .season-group-name,
 .movie-group-name {
-  font-family: 'PROXON', 'ComicSans', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font-body);
   flex: 1;
   min-width: 0;
   max-width: none;
@@ -4207,7 +4551,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .movie-label {
-  font-family: 'PROXON', 'ComicSans', sans-serif;
+  font-family: var(--font-body);
   font-size: 12px;
   font-weight: 600;
   color: var(--t1);
@@ -4318,58 +4662,69 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .meta-badge {
+  --badge-fg:   var(--t2);
+  --badge-bg:   rgba(255, 255, 255, 0.04);
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  font-size: 9px;
+  gap: 5px;
+  font-size: 9.5px;
   font-weight: 700;
-  padding: 2px 7px;
+  padding: 2px 8px;
   border-radius: var(--r-pill);
+  border: 0;
+  background: var(--badge-bg);
+  color: var(--badge-fg);
   white-space: nowrap;
   flex-shrink: 0;
-  line-height: 1.5
+  line-height: 1.5;
+  letter-spacing: 0.1px
 }
 
+/* Each variant just sets its colour pair — the shared rule above paints. */
 .meta-badge-progress {
-  color: var(--cyan);
-  background: rgba(79, 195, 247, 0.1);
-  border: 1px solid rgba(79, 195, 247, 0.22)
+  --badge-fg: var(--primary);
+  --badge-bg: var(--primary-soft)
 }
 
 .meta-badge-watching {
-  color: var(--amber);
-  background: rgba(240, 192, 64, 0.1);
-  border: 1px solid rgba(240, 192, 64, 0.22)
+  --badge-fg: var(--warning);
+  --badge-bg: var(--warning-soft)
 }
 
 .meta-badge-complete {
-  color: var(--green);
-  background: rgba(76, 175, 130, 0.1);
-  border: 1px solid rgba(76, 175, 130, 0.22)
+  --badge-fg: var(--success);
+  --badge-bg: var(--success-soft)
 }
 
 .meta-badge-notstarted {
-  color: var(--t3);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--b0)
+  --badge-fg: var(--t3);
+  --badge-bg: rgba(255, 255, 255, 0.03)
 }
 
 .meta-badge-onhold {
-  color: #ffb74d;
-  background: rgba(255, 183, 77, 0.1);
-  border: 1px solid rgba(255, 183, 77, 0.25)
+  --badge-fg: #ffb74d;
+  --badge-bg: rgba(255, 183, 77, 0.10)
 }
 
 .meta-badge-dropped {
-  color: #e57373;
-  background: rgba(229, 115, 115, 0.1);
-  border: 1px solid rgba(229, 115, 115, 0.25)
+  --badge-fg: var(--danger);
+  --badge-bg: var(--danger-soft)
 }
 
+/* Airing carries a leading pulsing dot — the only badge with an icon
+   beyond the inline emoji glyphs that come from JS. */
 .meta-badge-airing {
-  color: #ff6b6b;
-  background: rgba(255, 107, 107, 0.1);
-  border: 1px solid rgba(255, 107, 107, 0.3)
+  --badge-fg: #ff6b6b;
+  --badge-bg: rgba(255, 107, 107, 0.10)
+}
+.meta-badge-airing::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 5px currentColor;
+  flex-shrink: 0
 }
 
 .meta-time-row {
@@ -5466,16 +5821,16 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .goal-progress-track {
   width: 100%;
-  height: 6px;
-  background: var(--bg-3);
-  border-radius: 3px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
   overflow: hidden
 }
 
 .goal-progress-bar {
   height: 100%;
-  background: var(--accent);
-  border-radius: 3px;
+  background: linear-gradient(90deg, oklch(0.62 0.11 215) 0%, var(--primary) 100%);
+  border-radius: 999px;
   transition: width 300ms ease
 }
 
@@ -5720,6 +6075,14 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   font-variant-numeric: tabular-nums
 }
 
+.badge-next-up-fraction {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--t3);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.1px
+}
+
 .badge-next-up-desc {
   font-size: 11px;
   color: var(--t2);
@@ -5928,10 +6291,12 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   transform: scale(1.05)
 }
 
-/* ─── Locked tile mini progress bar ─────────────────────────────────── */
+/* ─── Locked tile mini progress bar — uniform 4px height matches the
+   goal-progress-track + the bottom-of-card bar so every progress bar in
+   the app reads as the same primitive. */
 .badge-tile-mini-track {
   width: 100%;
-  height: 5px;
+  height: 4px;
   background: rgba(255, 255, 255, 0.06);
   border-radius: 999px;
   overflow: hidden;
@@ -5940,7 +6305,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .badge-tile-mini-bar {
   height: 100%;
-  background: linear-gradient(90deg, rgba(79, 195, 247, 0.9), rgba(112, 216, 255, 1));
+  background: linear-gradient(90deg, oklch(0.62 0.11 215) 0%, var(--primary) 100%);
   border-radius: 999px;
   transition: width 300ms ease
 }

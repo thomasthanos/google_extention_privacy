@@ -160,12 +160,6 @@
                         </svg>Movies</button>
                 </div>
                 <div class="toolbar">
-                    <button class="btn-add-anime" id="addAnimeBtn" type="button" title="Add watched anime"
-                        aria-label="Add watched anime"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" aria-hidden="true" focusable="false">
-                            <line x1="12" y1="5" x2="12" y2="19" />
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                        </svg></button>
                     <div class="search-container">
                         <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                             aria-hidden="true" focusable="false">
@@ -174,15 +168,21 @@
                         </svg>
                         <input type="text" class="search-input" id="searchInput" placeholder="Search anime..."
                             aria-label="Search anime">
-                    </div>
-                    <div class="sort-container">
-                        <button class="btn-sort" id="sortBtn" type="button" title="Sort" aria-label="Sort options"
-                            aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none"
-                                stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
-                                <line x1="4" y1="6" x2="11" y2="6" />
-                                <line x1="4" y1="12" x2="16" y2="12" />
-                                <line x1="4" y1="18" x2="20" y2="18" />
-                            </svg></button>
+                        <div class="search-actions">
+                            <button class="btn-add-anime" id="addAnimeBtn" type="button" title="Add watched anime"
+                                aria-label="Add watched anime"><svg viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                                    <line x1="12" y1="5" x2="12" y2="19" />
+                                    <line x1="5" y1="12" x2="19" y2="12" />
+                                </svg></button>
+                            <button class="btn-sort" id="sortBtn" type="button" title="Sort" aria-label="Sort options"
+                                aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                                    <line x1="4" y1="6" x2="11" y2="6" />
+                                    <line x1="4" y1="12" x2="16" y2="12" />
+                                    <line x1="4" y1="18" x2="20" y2="18" />
+                                </svg></button>
+                        </div>
                         <div class="sort-dropdown" id="sortDropdown">
                             <div class="sort-dropdown-content">
                                 <button class="sort-option active" data-sort="date"><svg viewBox="0 0 24 24" fill="none"
@@ -210,27 +210,62 @@
                         </div>
                     </div>
                 </div>
-                <div class="anime-list" id="animeList"></div>
+                <div class="anime-list" id="animeList">
+                    <!-- Initial skeleton — wiped out by the first renderAnimeList()
+                         call since it uses replaceChildren(). Stays visible during
+                         the brief window between popup paint and first cloud/local
+                         data render so the screen never sits empty. -->
+                    <div class="skeleton-list" aria-hidden="true">
+                        <div class="skeleton-card">
+                            <div class="skeleton-cover"></div>
+                            <div class="skeleton-text">
+                                <div class="skeleton-line skeleton-line--title"></div>
+                                <div class="skeleton-line skeleton-line--meta"></div>
+                            </div>
+                        </div>
+                        <div class="skeleton-card">
+                            <div class="skeleton-cover"></div>
+                            <div class="skeleton-text">
+                                <div class="skeleton-line skeleton-line--title skeleton-line--medium"></div>
+                                <div class="skeleton-line skeleton-line--meta"></div>
+                            </div>
+                        </div>
+                        <div class="skeleton-card">
+                            <div class="skeleton-cover"></div>
+                            <div class="skeleton-text">
+                                <div class="skeleton-line skeleton-line--title skeleton-line--short"></div>
+                                <div class="skeleton-line skeleton-line--meta"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="stats-view" id="statsView" hidden></div>
                 <div class="goals-view" id="goalsView" hidden></div>
                 <div class="settings-view" id="settingsView" hidden></div>
                 <div class="empty-state" id="emptyState">
-                    <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
-                        aria-hidden="true" focusable="false">
-                        <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" />
-                        <line x1="7" y1="2" x2="7" y2="22" />
-                        <line x1="17" y1="2" x2="17" y2="22" />
-                        <line x1="2" y1="12" x2="22" y2="12" />
-                        <line x1="2" y1="7" x2="7" y2="7" />
-                        <line x1="2" y1="17" x2="7" y2="17" />
-                        <line x1="17" y1="17" x2="22" y2="17" />
-                        <line x1="17" y1="7" x2="22" y2="7" />
-                    </svg>
-                    <h3>Nothing tracked yet</h3>
-                    <p>Start watching anime on <strong>an1me.to</strong> and progress will land here automatically.</p>
+                    <div class="empty-illustration" aria-hidden="true">
+                        <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"
+                             stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="8" y="14" width="48" height="36" rx="6"/>
+                            <path d="M8 22h48"/>
+                            <circle cx="14" cy="18" r="1.2" fill="currentColor"/>
+                            <circle cx="19" cy="18" r="1.2" fill="currentColor"/>
+                            <circle cx="24" cy="18" r="1.2" fill="currentColor"/>
+                            <path d="M28 36l8-5v10z" fill="currentColor" stroke="none"/>
+                        </svg>
+                    </div>
+                    <h3>Your library is empty</h3>
+                    <p>Watch on <strong>an1me.to</strong> and we'll track progress here, or add anime you've already finished.</p>
+                    <button class="empty-state-cta" id="emptyStateAddBtn" type="button">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                             stroke-linecap="round" aria-hidden="true">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        <span>Add your first anime</span>
+                    </button>
                     <ul class="empty-state-tips" aria-label="Quick tips">
                         <li>Sign in with Google in <strong>Settings</strong> to sync across devices.</li>
-                        <li>Click <strong>+</strong> above to add anime you've already watched.</li>
                         <li>Open the player on an1me.to — episodes you complete are detected automatically.</li>
                     </ul>
                 </div>

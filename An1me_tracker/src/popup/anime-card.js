@@ -108,15 +108,6 @@ const AnimeCardRenderer = {
 
         const currentEpText = currentEpisode > 0 ? `Ep ${currentEpisode}` : '';
         const unknownTotal = progressData.total == null;
-        const canonProgressPercent = unknownTotal ? null
-            : hasFillerData ? (totalCanon > 0 ? Math.round((canonWatched / totalCanon) * 100) : 0)
-                : Math.round(progressData.progress);
-        const canonProgressWidth = unknownTotal ? 0
-            : hasFillerData ? (totalCanon > 0 ? (canonWatched / totalCanon) * 100 : 0)
-                : progressData.progress;
-
-        const totalDisplay = unknownTotal ? null : progressData.total;
-        const totalCanonDisplay = unknownTotal ? null : totalCanon;
 
         const AnilistService = window.AnimeTracker?.AnilistService;
         const anilistStatusForProgress = AnilistService?.getStatus(slug);
@@ -124,6 +115,29 @@ const AnimeCardRenderer = {
         const _mainMetaTotal = AnilistService?.getTotalEpisodes(slug);
         const _mainPartial = _mainMetaTotal && _mainLatest && _mainLatest < _mainMetaTotal;
         const availableInfo = _mainPartial && _mainLatest > 0 ? ` / ${_mainLatest} available` : '';
+
+        // Airing-aware progress: when only some episodes have aired so far,
+        // use the *aired count* as the denominator instead of the season's
+        // planned total. Otherwise the bar pretends the user is permanently
+        // behind ("13 / 24 = 54%") when they're actually fully caught up
+        // ("10 / 10 = 100%"). The percentage automatically re-derives when
+        // AniList polling refreshes `_mainLatest` after a new episode airs.
+        const isAiringPartial = _mainPartial && _mainLatest > 0 && anilistStatusForProgress === 'RELEASING';
+        const airingDenominator = isAiringPartial ? _mainLatest : null;
+
+        const canonProgressPercent = unknownTotal ? null
+            : airingDenominator
+                ? Math.min(100, Math.round((Math.min(episodeCount, airingDenominator) / airingDenominator) * 100))
+                : hasFillerData ? (totalCanon > 0 ? Math.round((canonWatched / totalCanon) * 100) : 0)
+                    : Math.round(progressData.progress);
+        const canonProgressWidth = unknownTotal ? 0
+            : airingDenominator
+                ? Math.min(100, (Math.min(episodeCount, airingDenominator) / airingDenominator) * 100)
+                : hasFillerData ? (totalCanon > 0 ? (canonWatched / totalCanon) * 100 : 0)
+                    : progressData.progress;
+
+        const totalDisplay = unknownTotal ? null : progressData.total;
+        const totalCanonDisplay = unknownTotal ? null : totalCanon;
 
         const progressInfoText = unknownTotal
             ? (anilistStatusForProgress === 'FINISHED'
@@ -321,6 +335,7 @@ const AnimeCardRenderer = {
                         ${metaRowHtml}
                     </div>
                 </div>
+                <div class="anime-card-progress" aria-hidden="true"><span class="anime-card-progress-fill" style="width:${canonProgressWidth}%"></span></div>
                 <div class="anime-card-content">
                     <div class="progress-container header-progress">
                         <div class="progress-info">
@@ -338,7 +353,7 @@ const AnimeCardRenderer = {
                     </div>
                     <div class="anime-episodes collapsible collapsed">
                         <div class="episodes-header">
-                            <span class="episodes-title">Watched ${episodeCount}${progressData.total ? `/${progressData.total}` : ''}</span>
+                            <span class="episodes-title">Watched episodes</span>
                             <svg class="collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="6 9 12 15 18 9"/>
                             </svg>

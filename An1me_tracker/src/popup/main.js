@@ -3728,6 +3728,41 @@
             });
         }
 
+        // Compact-header signal: when the user scrolls the library, the
+        // header card adds a subtle elevation shadow + the stats row tightens.
+        // Pure CSS does the visuals; this listener just toggles the class on
+        // the closest stable ancestor (`.main-app`) so the rule can target
+        // both header and #statsBar in one pass.
+        //
+        // Hysteresis: turn ON at 12px, turn OFF only when back to 4px.
+        // This prevents rapid toggling (flicker) when the list has barely
+        // enough content to scroll and the user hovers near the threshold.
+        // Debounce: skip frames that arrive within 60ms of each other.
+        const _mainContentScroll = document.querySelector('.main-content');
+        const _mainAppRoot = document.querySelector('.main-app');
+        if (_mainContentScroll && _mainAppRoot) {
+            const THRESHOLD_ON  = 12;
+            const THRESHOLD_OFF = 4;
+            let _scrollDebounce = null;
+            const updateScrolledClass = () => {
+                const top = _mainContentScroll.scrollTop;
+                const isScrolled = _mainAppRoot.classList.contains('is-scrolled');
+                if (!isScrolled && top > THRESHOLD_ON) {
+                    _mainAppRoot.classList.add('is-scrolled');
+                } else if (isScrolled && top <= THRESHOLD_OFF) {
+                    _mainAppRoot.classList.remove('is-scrolled');
+                }
+            };
+            _mainContentScroll.addEventListener('scroll', () => {
+                if (_scrollDebounce) return;
+                _scrollDebounce = requestAnimationFrame(() => {
+                    _scrollDebounce = null;
+                    updateScrolledClass();
+                });
+            }, { passive: true });
+            updateScrolledClass();
+        }
+
         if (elements.confirmClear) elements.confirmClear.addEventListener('click', clearAllData);
         if (elements.cancelClear) elements.cancelClear.addEventListener('click', hideDialog);
         if (elements.confirmDialog) {
@@ -3737,6 +3772,10 @@
         }
 
         if (elements.addAnimeBtn) elements.addAnimeBtn.addEventListener('click', showAddAnimeDialog);
+        // Empty-state CTA mirrors the toolbar's `+` button so a brand-new
+        // user has an obvious starting action without searching the header.
+        const emptyStateAddBtn = document.getElementById('emptyStateAddBtn');
+        if (emptyStateAddBtn) emptyStateAddBtn.addEventListener('click', showAddAnimeDialog);
         if (elements.closeAddAnime) elements.closeAddAnime.addEventListener('click', hideAddAnimeDialog);
         if (elements.cancelAddAnime) elements.cancelAddAnime.addEventListener('click', hideAddAnimeDialog);
         if (elements.confirmAddAnime) elements.confirmAddAnime.addEventListener('click', addAnimeWithEpisodes);
@@ -3838,7 +3877,10 @@
                 const containerRect = elements.categoryTabs.getBoundingClientRect();
                 const tabRect = activeTab.getBoundingClientRect();
                 if (!containerRect.width || !tabRect.width) return;
-                const offsetX = tabRect.left - containerRect.left - 4; // 4px padding
+                // Underline is anchored to bottom-left of the tab now (no
+                // container padding to subtract — was 4px in the old pill
+                // design).
+                const offsetX = tabRect.left - containerRect.left;
                 slider.style.width = tabRect.width + 'px';
                 slider.style.transform = `translateX(${offsetX}px)`;
                 slider.classList.add('is-ready');
