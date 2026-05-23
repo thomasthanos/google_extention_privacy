@@ -1100,6 +1100,7 @@
                 if (nextStatus !== currentCompactStatus) {
                     currentCompactStatus = nextStatus;
                     _lastRenderedListMarkup = null;
+                    suppressHoverUntilMouseMove();
                     renderAnimeList(getActiveFilter());
                 }
                 return;
@@ -1350,6 +1351,48 @@
         }
     }
 
+    // Suppresses :hover lighting on cards/groups until the user actually
+    // moves the mouse. Called after a click that re-renders the list (status
+    // chip swap, sort change, etc.) — without it, whatever card lands under
+    // the static cursor immediately gets `:hover` styling, which looks like
+    // the click activated some unrelated element.
+    let _hoverSuppressionActive = false;
+    function suppressHoverUntilMouseMove() {
+        if (_hoverSuppressionActive) return;
+        _hoverSuppressionActive = true;
+        document.body.classList.add('is-suppressing-hover');
+        const startedAt = performance.now();
+        // Minimum window — even an involuntary mousemove tick within ~150ms
+        // of the click should NOT release the suppression, otherwise the
+        // newly-rendered card under the still-near-stationary cursor lights
+        // up for one frame as the user's finger settles on the trackpad.
+        const MIN_DURATION_MS = 180;
+        const release = () => {
+            const elapsed = performance.now() - startedAt;
+            if (elapsed < MIN_DURATION_MS) {
+                // Re-arm: wait the remaining gap then try again.
+                setTimeout(() => {
+                    if (_hoverSuppressionActive) cleanup();
+                }, MIN_DURATION_MS - elapsed);
+                return;
+            }
+            cleanup();
+        };
+        const cleanup = () => {
+            _hoverSuppressionActive = false;
+            document.body.classList.remove('is-suppressing-hover');
+            document.removeEventListener('mousemove', release, true);
+            document.removeEventListener('pointermove', release, true);
+            clearTimeout(safetyTimer);
+        };
+        // Belt-and-suspenders: if the user never moves the mouse (keyboard /
+        // touch surface) drop the suppression after a beat so cards don't
+        // stay un-hoverable forever.
+        const safetyTimer = setTimeout(cleanup, 800);
+        document.addEventListener('mousemove', release, true);
+        document.addEventListener('pointermove', release, true);
+    }
+
     function setViewMode(mode) {
         const appRoot = document.querySelector('.app');
         const mainContent = document.querySelector('.main-content');
@@ -1367,6 +1410,12 @@
             appRoot.classList.toggle('goals-mode', mode === 'goals');
             appRoot.classList.toggle('settings-mode', mode === 'settings');
         }
+
+        // Category tabs are only meaningful when the library is visible —
+        // hide them when any view-mode is active.
+        const isViewMode = !!mode;
+        if (elements.categoryTabs) elements.categoryTabs.style.display = isViewMode ? 'none' : '';
+
         if (viewStatsBtn) {
             viewStatsBtn.classList.toggle('is-active', mode === 'stats');
             viewStatsBtn.setAttribute('aria-pressed', mode === 'stats' ? 'true' : 'false');
@@ -4035,6 +4084,7 @@
                     if (nextStatus !== currentCompactStatus) {
                         currentCompactStatus = nextStatus;
                         _lastRenderedListMarkup = null;
+                        suppressHoverUntilMouseMove();
                         renderAnimeList(getActiveFilter());
                     }
                     return;

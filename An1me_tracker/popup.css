@@ -1429,6 +1429,52 @@ body {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.06)
 }
 
+/* Hover suppression — applied for ~one mousemove after a click that mutates
+   the list (status chip swap, sort change). Without it, whatever card lands
+   under a stationary cursor immediately gets `:hover` styling, which looks
+   like the click activated some unrelated card.
+
+   Belt-and-suspenders approach:
+   1. `pointer-events: none` on every card-like element under #animeList —
+      kills any hover from firing at all (even on cards re-inserted under the
+      cursor by the re-render).
+   2. Hover styles overridden to resting visuals — defensive backup if a
+      browser ever ignores #1 for some descendant.
+   3. `transition: none` on the same elements — guards against any in-flight
+      transition still being visible during the suppression window.
+   The chips themselves stay interactive so clicks chain through correctly. */
+
+body.is-suppressing-hover #animeList .anime-card,
+body.is-suppressing-hover #animeList .anime-season-group,
+body.is-suppressing-hover #animeList .anime-movie-group,
+body.is-suppressing-hover #animeList .ip-card {
+  pointer-events: none !important;
+  transition: none !important;
+}
+
+body.is-suppressing-hover #animeList .anime-card:hover,
+body.is-suppressing-hover #animeList .anime-season-group:hover,
+body.is-suppressing-hover #animeList .anime-movie-group:hover,
+body.is-suppressing-hover #animeList .ip-card:hover,
+body.is-suppressing-hover #animeList .ip-card.ip-card-untracked:hover,
+body.is-suppressing-hover #animeList .anime-card.in-progress-only:hover,
+body.is-suppressing-hover #animeList .completed-list-cards .anime-card:hover,
+body.is-suppressing-hover #animeList .completed-list-cards .anime-season-group:hover,
+body.is-suppressing-hover #animeList .completed-list-cards .anime-movie-group:hover,
+body.is-suppressing-hover #animeList .dropped-list-cards .anime-card:hover,
+body.is-suppressing-hover #animeList .dropped-list-cards .anime-season-group:hover,
+body.is-suppressing-hover #animeList .dropped-list-cards .anime-movie-group:hover,
+body.is-suppressing-hover #animeList .onhold-list-cards .anime-card:hover,
+body.is-suppressing-hover #animeList .onhold-list-cards .anime-season-group:hover,
+body.is-suppressing-hover #animeList .onhold-list-cards .anime-movie-group:hover,
+body.is-suppressing-hover #animeList .airing-list-cards .anime-card:hover,
+body.is-suppressing-hover #animeList .airing-list-cards .anime-season-group:hover,
+body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  border-top-color: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
 .anime-card-content {
   margin-top: 0;
   max-height: 0;
