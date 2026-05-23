@@ -1246,8 +1246,6 @@ body {
 
 .status-chip {
   --chip-fg:   var(--t2);
-  --chip-bg:   transparent;
-  --chip-fill: rgba(255, 255, 255, 0.06);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1255,7 +1253,7 @@ body {
   padding: 0 10px;
   border-radius: var(--r-pill);
   border: 0;
-  background: var(--chip-bg);
+  background: transparent;
   color: var(--chip-fg);
   font-size: 10.5px;
   font-weight: 600;
@@ -1263,15 +1261,22 @@ body {
   letter-spacing: 0.1px;
   font-family: inherit;
   cursor: pointer;
-  transition: background var(--tn), color var(--tn)
+  transition: color var(--tn)
 }
 
 .status-chip:hover {
-  background: var(--chip-fill)
+  background: rgba(255,255,255,0.05);
+  opacity: 1
 }
 
+.status-chip.airing:hover   { background: rgba(79,195,247,0.08) }
+.status-chip.on-hold:hover  { background: rgba(240,192,64,0.08) }
+.status-chip.completed:hover{ background: rgba(76,175,130,0.08) }
+.status-chip.dropped:hover  { background: rgba(240,69,69,0.08) }
+
 .status-chip.active {
-  background: var(--chip-fill)
+  background: transparent;
+  font-weight: 700
 }
 
 .status-chip-label {
@@ -1288,14 +1293,8 @@ body {
   color: currentColor
 }
 
-/* ── Per-status colour mappings ─────────────────────────────────────────
-   Each variant sets its own --chip-fg / --chip-bg / --chip-fill so the
-   shared rules above just read the variables. */
-
 .status-chip.airing {
-  --chip-fg:   var(--primary);
-  --chip-bg:   var(--primary-soft);
-  --chip-fill: var(--primary-fill)
+  --chip-fg: var(--primary)
 }
 .status-chip.airing::before {
   content: '';
@@ -1307,23 +1306,9 @@ body {
   flex-shrink: 0
 }
 
-.status-chip.on-hold {
-  --chip-fg:   var(--warning);
-  --chip-bg:   var(--warning-soft);
-  --chip-fill: var(--warning-fill)
-}
-
-.status-chip.completed {
-  --chip-fg:   var(--success);
-  --chip-bg:   var(--success-soft);
-  --chip-fill: var(--success-fill)
-}
-
-.status-chip.dropped {
-  --chip-fg:   var(--danger);
-  --chip-bg:   var(--danger-soft);
-  --chip-fill: var(--danger-fill)
-}
+.status-chip.on-hold   { --chip-fg: var(--warning) }
+.status-chip.completed { --chip-fg: var(--success) }
+.status-chip.dropped   { --chip-fg: var(--danger) }
 
 .status-chip-sep {
   color: var(--t3);
