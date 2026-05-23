@@ -19,7 +19,7 @@ Current version: `6.4.5`.
 - Watchlist mirroring back to an1me.to (`watching` / `completed` / `dropped` / `on_hold`)
 - Library backup: export / import JSON, CRDT-merged on import
 - Stats dashboard, goals view, achievements engine, weekly share-card image
-- Email/password sign-in for mobile and browsers without Google OAuth
+- Token export/import for cross-browser sign-in (e.g. Orion/Safari)
 - Opens both as toolbar popup and side panel
 
 ## Project Structure
@@ -130,7 +130,7 @@ Handles:
 
 Loaded both as toolbar popup (`action.default_popup`) and as side panel (`side_panel.default_path`).
 
-- Firebase auth: Google OAuth via `chrome.identity` + email/password login (single-flight refresh)
+- Firebase auth: Google OAuth via `chrome.identity` + exported-token import flow (single-flight refresh)
 - Render pipeline: `partitionEntriesByStatus` → `renderAnimeList` with cards split between `anime-card.js` (regular) + `anime-card-seasons.js` (multi-season groups) + `anime-card-movies.js` (movie groups) + `anime-card-inprogress.js` ("Continue watching" group)
 - Coalesced storage-event re-renders (list + stats + goals fold into one debounce)
 - Stats engine with identity+signature cache for `buildWatchIndex`, share-card image generator

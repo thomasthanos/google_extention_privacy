@@ -152,45 +152,19 @@ const FirebaseSync = {
      * the desired payload already matches what's in the cache.
      */
     async queuePlaybackSettingsSave({ immediate = false } = {}) {
-        const { settings, updatedAt: localStamp } = await this.readPlaybackSettingsFromStorage();
-
-        if (!this.currentUser) {
-            // Signed out: stamp once so a later sign-in can resolve offline edits.
-            if (!localStamp) {
-                try {
-                    await window.AnimeTracker.Storage.set({
-                        [PLAYBACK_SETTINGS_UPDATED_AT_KEY]: new Date().toISOString()
-                    });
-                } catch (e) {
-                    PopupLogger.warn('Firebase', `Failed to stamp local playbackSettingsUpdatedAt: ${e?.message}`);
-                }
-            }
-            return;
-        }
-
-        const { data: cached } = this.getCachedUserDocument(this.currentUser.uid);
-        const cachedPlayback = cached?.playbackSettings || null;
-        const needsPush = !cachedPlayback || !playbackSettingsEqual(cachedPlayback, settings);
-
-        if (!needsPush) {
-            if (!localStamp && cachedPlayback?.updatedAt) {
-                try {
-                    await window.AnimeTracker.Storage.set({
-                        [PLAYBACK_SETTINGS_UPDATED_AT_KEY]: cachedPlayback.updatedAt
-                    });
-                } catch (e) {
-                    PopupLogger.warn('Firebase', `Failed to align local playback stamp: ${e?.message}`);
-                }
-            }
-            return;
-        }
-
+        const { settings } = await this.readPlaybackSettingsFromStorage();
         const updatedAt = new Date().toISOString();
+        // Stamp the local copy unconditionally. When the user is signed out
+        // this still records "the user changed something at time X", so a
+        // later sign-in's loadAndSyncData picks the right side in the
+        // last-write-wins compare instead of clobbering offline edits.
         try {
             await window.AnimeTracker.Storage.set({ [PLAYBACK_SETTINGS_UPDATED_AT_KEY]: updatedAt });
         } catch (e) {
             PopupLogger.warn('Firebase', `Failed to stamp local playbackSettingsUpdatedAt: ${e?.message}`);
         }
+
+        if (!this.currentUser) return;
 
         this.pendingPlaybackSave = { ...settings, updatedAt };
 
@@ -371,16 +345,6 @@ const FirebaseSync = {
         return this.currentUser;
     },
 
-    userHasMobilePassword(user) {
-        return FirebaseLib.userHasMobilePassword(user || this.currentUser);
-    },
-
-    async refreshAuthProvidersFromServer() {
-        const user = await FirebaseLib.refreshAuthProvidersFromServer();
-        this.currentUser = user;
-        return user;
-    },
-
     /**
      * Initialize Firebase and check auth state
      */
@@ -415,36 +379,8 @@ const FirebaseSync = {
     /**
      * Sign in with Google
      */
-    async signInWithGoogle(options = {}) {
-        return await FirebaseLib.signInWithGoogle(options);
-    },
-
-    /**
-     * Sign in with an existing email/password account
-     */
-    async signInWithEmailPassword(email, password) {
-        return await FirebaseLib.signInWithEmailPassword(email, password);
-    },
-
-    /**
-     * Create a new email/password account
-     */
-    async signUpWithEmailPassword(email, password) {
-        return await FirebaseLib.signUpWithEmailPassword(email, password);
-    },
-
-    /**
-     * Add a password to the current account (for mobile sign-in)
-     */
-    async setPasswordForCurrentUser(password) {
-        return await FirebaseLib.setPasswordForCurrentUser(password);
-    },
-
-    /**
-     * Send a password-reset email
-     */
-    async sendPasswordReset(email) {
-        return await FirebaseLib.sendPasswordReset(email);
+    async signInWithGoogle() {
+        return await FirebaseLib.signInWithGoogle();
     },
 
     /**
@@ -929,14 +865,20 @@ const FirebaseSync = {
                 if (!applied) {
                     const { settings: localPlayback, updatedAt: localPlaybackStamp } =
                         await this.readPlaybackSettingsFromStorage();
+                    const cloudNewerOrEqual = cloudPlayback?.updatedAt
+                        && localPlaybackStamp
+                        && Date.parse(cloudPlayback.updatedAt) >= Date.parse(localPlaybackStamp);
                     const cloudMatches = cloudPlayback
                         && playbackSettingsEqual(cloudPlayback, localPlayback);
-                    if (!cloudMatches) {
+                    if (!cloudNewerOrEqual || !cloudMatches) {
+                        // Ensure local has a stamp before pushing — first-ever push
+                        // for a user who never toggled anything still seeds the cloud
+                        // doc so future devices have a baseline.
+                        if (!localPlaybackStamp) {
+                            const seedStamp = new Date().toISOString();
+                            await Storage.set({ [PLAYBACK_SETTINGS_UPDATED_AT_KEY]: seedStamp });
+                        }
                         await this.queuePlaybackSettingsSave({ immediate: false });
-                    } else if (!localPlaybackStamp && cloudPlayback?.updatedAt) {
-                        await Storage.set({
-                            [PLAYBACK_SETTINGS_UPDATED_AT_KEY]: cloudPlayback.updatedAt
-                        });
                     }
                 }
             } catch (e) {
