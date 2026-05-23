@@ -1,19 +1,25 @@
 /**
- * Anime Tracker β€” Settings View
+ * Anime Tracker — Settings View
  *
- * Full-popup settings panel that replaces the legacy dropdown.
- * Renders 5 cards: Account, Playback & Tracking, Library, Danger zone, About.
+ * Compact full-popup settings panel.
  *
- * Existing handler IDs are preserved on every button/input so the wiring in
- * `main.js` keeps working without changes:
+ * Layout:
+ *   • Header bar — page title + compact account pill (avatar + name + sign-out icon).
+ *   • PREFERENCES label + single card with 4 toggle rows (internal dividers).
+ *   • CONNECTIONS label — anilist-api.js auto-injects its card under here.
+ *   • DATA label — top row (Fetch & Import + Refresh / Sync) + Backup card.
+ *   • Danger zone card (Clear, Set password on desktop only).
+ *   • About card (donate).
+ *
+ * All existing handler IDs are preserved so main.js wiring works unchanged:
  *   #settingsAvatar, #settingsUserName, #settingsUserEmail, #settingsSignOut,
  *   #settingsCopyGuard (+ subtitle), #settingsSmartNotif (+ subtitle),
- *   #settingsAutoSkipFiller (+ subtitle), #settingsSkiptime (+ subtitle), [NEW]
- *   #settingsRefresh, #settingsExportData,
- *   #settingsImportData, #settingsImportFile, #settingsFetchFillers,
- *   #settingsClear, #settingsSetPassword, #settingsDonate.
+ *   #settingsAutoSkipFiller (+ subtitle), #settingsSkiptime (+ subtitle),
+ *   #settingsRefresh, #settingsExportData, #settingsImportData,
+ *   #settingsImportFile, #settingsFetchFillers, #settingsClear,
+ *   #settingsSetPassword, #settingsDonate.
  *
- * Render is idempotent β€” safe to call repeatedly when storage settings change.
+ * Render is idempotent — safe to call repeatedly when storage settings change.
  */
 (function () {
     'use strict';
@@ -24,15 +30,11 @@
         })[c]);
     }
 
-    // β”€β”€β”€ SVG icon registry (24Γ—24, currentColor stroke) β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€
-    // Mirrored from the legacy dropdown's inline SVGs so visual identity stays
-    // identical. Kept inline (not referenced from a sprite) because the popup
-    // CSP doesn't allow external icon hosts.
+    // ─── SVG icon registry ───────────────────────────────────────────
     const ICONS = {
         signOut:  '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
         heart:    '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
         refresh:  '<path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
-        info:     '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/><path d="M8.5 3.5A9 9 0 0 1 21 12"/>',
         download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
         upload:   '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
         trash:    '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
@@ -53,43 +55,49 @@
                      class="settings-icon ${extraClass}" aria-hidden="true" focusable="false">${paths}</svg>`;
     }
 
-    // β”€β”€β”€ Card builders β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€
+    // ─── Header pill ─────────────────────────────────────────────────
 
-    function renderAccountCard(user) {
+    function renderHeader(user) {
         const photo = user?.photoURL ? escapeHtml(user.photoURL) : 'src/icons/icon48.png';
         const name = escapeHtml(user?.displayName || user?.email?.split('@')[0] || 'User');
         const email = escapeHtml(user?.email || '');
         const signedIn = !!user;
 
-        // Both the Sign-Out button and the "Local only" badge are always in
-        // the DOM (just one is hidden) so partial updates can flip their
-        // visibility without re-creating handlers.
+        // Sign-out icon button is part of the pill on the right; sized as a
+        // tap target but visually subtle. Local-only badge replaces the pill
+        // when the user isn't signed in.
         return `
-            <section class="settings-card" data-signed-in="${signedIn}">
-
-                <div class="settings-account-row">
-                    <img class="settings-account-avatar" id="settingsAvatar" src="${photo}" alt="${name}">
-                    <div class="settings-account-info">
-                        <span class="settings-account-name" id="settingsUserName">${name}</span>
-                        <span class="settings-account-email" id="settingsUserEmail">${email}</span>
-                    </div>
-                    <button class="settings-btn settings-btn-secondary" id="settingsSignOut" type="button"
-                            ${signedIn ? '' : 'hidden'}>
-                        ${svg('signOut')}<span>Sign out</span>
+            <header class="settings-header" data-signed-in="${signedIn}">
+                <div class="settings-account-pill" ${signedIn ? '' : 'hidden'}
+                     title="${email}" data-tooltip="${email}">
+                    <img class="settings-pill-avatar" id="settingsAvatar" src="${photo}" alt="">
+                    <span class="settings-pill-name" id="settingsUserName">${name}</span>
+                    <span class="settings-pill-email" id="settingsUserEmail" hidden>${email}</span>
+                    <button class="settings-pill-signout" id="settingsSignOut" type="button"
+                            aria-label="Sign out" title="Sign out">
+                        ${svg('signOut')}
                     </button>
-                    <span class="settings-account-status" data-when="signed-out"
-                          ${signedIn ? 'hidden' : ''}>Local only</span>
                 </div>
-            </section>
+                <span class="settings-account-status" data-when="signed-out"
+                      ${signedIn ? 'hidden' : ''}>Local only</span>
+            </header>
         `;
     }
+
+    // ─── Section label helper ────────────────────────────────────────
+
+    function sectionLabel(text) {
+        return `<div class="settings-section-label">${escapeHtml(text)}</div>`;
+    }
+
+    // ─── Preferences (4 toggles in ONE card with internal dividers) ──
 
     function renderToggleItem({ id, subtitleId, iconKey, title, subtitle, enabled }) {
         const en = !!enabled;
         return `
             <button class="settings-toggle-row" id="${id}" type="button"
                     data-enabled="${en}" aria-pressed="${en}">
-                <span class="settings-toggle-icon">${svg(iconKey)}</span>
+                <span class="settings-toggle-icon-wrap">${svg(iconKey, 'settings-toggle-icon-svg')}</span>
                 <span class="settings-toggle-text">
                     <span class="settings-toggle-title">${escapeHtml(title)}</span>
                     <span class="settings-toggle-subtitle" id="${subtitleId}">${escapeHtml(subtitle)}</span>
@@ -99,7 +107,7 @@
         `;
     }
 
-    function renderPlaybackCard(state) {
+    function renderPreferencesSection(state) {
         const items = [
             renderToggleItem({
                 id: 'settingsCopyGuard', subtitleId: 'settingsCopyGuardSubtitle',
@@ -128,66 +136,62 @@
         ].join('');
 
         return `
+            ${sectionLabel('PREFERENCES')}
             <section class="settings-card">
-
                 <div class="settings-toggle-list">${items}</div>
             </section>
         `;
     }
 
-    function renderLibraryCard() {
-        return `
-            <section class="settings-card">
+    // ─── Connections (label only — anilist-api.js injects its card) ──
 
-                <div class="settings-action-grid">
-                    <button class="settings-action" id="settingsRefresh" type="button">
-                        ${svg('refresh')}
-                        <span class="settings-action-text">
-                            <span class="settings-action-title">Refresh Data</span>
-                            <span class="settings-action-subtitle">Sync with cloud</span>
-                        </span>
-                    </button>
-                    <button class="settings-action" id="settingsFetchFillers" type="button">
-                        ${svg('sparkles')}
-                        <span class="settings-action-text">
-                            <span class="settings-action-title">Fetch &amp; Import All</span>
-                            <span class="settings-action-subtitle">Fillers, counts, status &amp; missing info</span>
-                        </span>
-                    </button>
-                    <button class="settings-action" id="settingsExportData" type="button">
-                        ${svg('download')}
-                        <span class="settings-action-text">
-                            <span class="settings-action-title">Export Backup</span>
-                            <span class="settings-action-subtitle">Download a JSON of your library</span>
-                        </span>
-                    </button>
-                    <button class="settings-action" id="settingsImportData" type="button">
-                        ${svg('upload')}
-                        <span class="settings-action-text">
-                            <span class="settings-action-title">Import Backup</span>
-                            <span class="settings-action-subtitle">Restore from a previous JSON export</span>
-                        </span>
-                    </button>
-                    <button class="settings-action" id="settingsDebugConsole" type="button">
-                        ${svg('info')}
-                        <span class="settings-action-text">
-                            <span class="settings-action-title">Debug Console</span>
-                            <span class="settings-action-subtitle">View logs and errors (mobile-friendly)</span>
-                        </span>
-                    </button>
-                    <input type="file" id="settingsImportFile" accept="application/json,.json"
-                           style="display:none" aria-hidden="true">
+    function renderConnectionsSection() {
+        return `${sectionLabel('CONNECTIONS')}`;
+    }
+
+    // ─── Data section: top row + Backup card ─────────────────────────
+
+    function renderDataSection() {
+        return `
+            ${sectionLabel('DATA')}
+            <div class="settings-data-top">
+                <button class="settings-data-action settings-data-action--primary" id="settingsFetchFillers" type="button">
+                    ${svg('sparkles')}
+                    <span class="settings-data-action-text">
+                        <span class="settings-data-action-title">Fetch &amp; Import</span>
+                        <span class="settings-data-action-subtitle">Fillers, counts &amp; info</span>
+                    </span>
+                </button>
+                <button class="settings-data-action" id="settingsRefresh" type="button">
+                    ${svg('refresh')}
+                    <span class="settings-data-action-text">
+                        <span class="settings-data-action-title">Refresh / Sync</span>
+                        <span class="settings-data-action-subtitle">Sync with cloud</span>
+                    </span>
+                </button>
+            </div>
+            <section class="settings-card settings-backup-card">
+                <div class="settings-backup-head">
+                    <span class="settings-backup-title">Backup</span>
+                    <span class="settings-backup-sub">Keep a local copy of your library</span>
                 </div>
+                <div class="settings-backup-actions">
+                    <button class="settings-btn-outline" id="settingsExportData" type="button">
+                        ${svg('download')}<span>Export JSON</span>
+                    </button>
+                    <button class="settings-btn-outline" id="settingsImportData" type="button">
+                        ${svg('upload')}<span>Import JSON</span>
+                    </button>
+                </div>
+                <input type="file" id="settingsImportFile" accept="application/json,.json"
+                       style="display:none" aria-hidden="true">
             </section>
         `;
     }
 
+    // ─── Danger zone ─────────────────────────────────────────────────
+
     function renderDangerCard(user, passwordIsSet, isMobile) {
-        // "Set password for mobile" only makes sense for signed-in users on
-        // desktop — it links a password to the current Firebase account so the
-        // user can later sign in with email+password on Orion/Safari mobile.
-        // On mobile itself the button is pointless (you ARE on mobile already)
-        // so we hide it when isMobile=true.
         const setPasswordBtn = (!user || isMobile) ? '' : (passwordIsSet ? `
                     <button class="settings-action settings-action--set" id="settingsSetPassword" type="button">
                         ${svg('check')}
@@ -205,7 +209,6 @@
                     </button>`);
         return `
             <section class="settings-card settings-card--danger">
-
                 <div class="settings-action-grid">
                     <button class="settings-action settings-action--danger" id="settingsClear" type="button">
                         ${svg('trash')}
@@ -218,6 +221,8 @@
             </section>
         `;
     }
+
+    // ─── About ───────────────────────────────────────────────────────
 
     function renderAboutCard() {
         return `
@@ -236,7 +241,7 @@
         `;
     }
 
-    // β”€β”€β”€ Public API β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€
+    // ─── Public API ──────────────────────────────────────────────────
 
     function render(container, params = {}) {
         if (!container) return;
@@ -250,22 +255,23 @@
         } = params;
 
         const state = {
-            copyGuard: settings.copyGuard !== false,           // default ON
-            smartNotif: settings.smartNotif === true,          // default OFF
-            autoSkipFiller: settings.autoSkipFiller === true,  // default OFF
-            skiptimeHelper: settings.skiptimeHelper === true   // default OFF
+            copyGuard: settings.copyGuard !== false,
+            smartNotif: settings.smartNotif === true,
+            autoSkipFiller: settings.autoSkipFiller === true,
+            skiptimeHelper: settings.skiptimeHelper === true
         };
 
-        // Full HTML render only on first call (or after a structural change).
-        // Subsequent calls just update toggle state + Account card so already-
-        // bound click handlers in main.js stay attached to the same DOM nodes.
+        // Full HTML render only on first call. Subsequent calls just patch the
+        // mutable account pill + toggle states so click handlers attached in
+        // main.js stay bound to the same DOM nodes.
         const alreadyRendered = container.querySelector('.settings-view-inner');
         if (!alreadyRendered) {
             container.innerHTML = `
                 <div class="settings-view-inner">
-                    ${renderAccountCard(user)}
-                    ${renderPlaybackCard(state)}
-                    ${renderLibraryCard()}
+                    ${renderHeader(user)}
+                    ${renderPreferencesSection(state)}
+                    ${renderConnectionsSection()}
+                    ${renderDataSection()}
                     ${renderDangerCard(user, passwordIsSet, isMobile)}
                     ${renderAboutCard()}
                 </div>
@@ -273,36 +279,35 @@
             return;
         }
 
-        // Partial update: refresh ONLY mutable Account fields without
-        // replacing nodes. The Sign-Out button keeps its identity so any
-        // pre-bound click handler in main.js continues to fire. If the
-        // signed-in/signed-out STATE itself changes (e.g. button needs to
-        // appear/disappear) the caller should pass `forceRerender: true`
-        // (handled below) to trigger a full re-render.
+        // ── Account pill partial update ──────────────────────────────
         const avatar = container.querySelector('#settingsAvatar');
         const nameEl = container.querySelector('#settingsUserName');
         const emailEl = container.querySelector('#settingsUserEmail');
-        const signOutBtn = container.querySelector('#settingsSignOut');
+        const pill = container.querySelector('.settings-account-pill');
         const localOnlyBadge = container.querySelector('[data-when="signed-out"]');
-        const accountCard = container.querySelector('.settings-card[data-signed-in]');
+        const headerEl = container.querySelector('.settings-header');
+
         if (avatar)  avatar.src = user?.photoURL || 'src/icons/icon48.png';
         if (nameEl)  nameEl.textContent = user?.displayName || user?.email?.split('@')[0] || 'User';
         if (emailEl) emailEl.textContent = user?.email || '';
-        if (signOutBtn) {
-            if (user) signOutBtn.removeAttribute('hidden');
-            else signOutBtn.setAttribute('hidden', '');
+        if (pill) {
+            if (user) {
+                pill.removeAttribute('hidden');
+                pill.setAttribute('title', user.email || '');
+                pill.dataset.tooltip = user.email || '';
+            } else {
+                pill.setAttribute('hidden', '');
+            }
         }
         if (localOnlyBadge) {
             if (user) localOnlyBadge.setAttribute('hidden', '');
             else localOnlyBadge.removeAttribute('hidden');
         }
-        if (accountCard) accountCard.dataset.signedIn = user ? 'true' : 'false';
+        if (headerEl) headerEl.dataset.signedIn = user ? 'true' : 'false';
 
-        // Set-password button lives in the Danger zone but is gated by both
-        // auth state AND the local "password set" marker. Recompute the
-        // expected DOM and swap if it differs from what's there — keeps the
-        // partial-update path in sync with the full-render path without
-        // triggering a full re-render of the whole view.
+        // ── Set-password button (Danger zone) partial update ─────────
+        // The button visibility depends on (user + passwordIsSet + isMobile).
+        // Recompute desired state and mutate only when it differs from current.
         const dangerCard = container.querySelector('.settings-card--danger .settings-action-grid');
         const existingSetPwBtn = dangerCard?.querySelector('#settingsSetPassword');
         const expectedState = (!user || isMobile) ? 'absent' : (passwordIsSet ? 'set' : 'unset');
@@ -332,6 +337,8 @@
                 `);
             }
         }
+
+        // ── Toggle subtitle live updates ─────────────────────────────
         updateToggle('settingsCopyGuard', state.copyGuard,
             state.copyGuard ? 'Block copy outside allowed text' : 'Copy protection is turned off');
         updateToggle('settingsSmartNotif', state.smartNotif,
@@ -342,10 +349,7 @@
             state.skiptimeHelper ? 'Capture intro/outro on an1me.to/watch' : 'Floating panel for intro/outro contributions');
     }
 
-    // Lazy-create a hidden aria-live region so screen readers announce toggle
-    // state changes. Without this, sighted users get the visual cue but
-    // keyboard / SR users get silent toggling — confusing if the change
-    // actually went through.
+    // ─── Aria-live region for toggle announcements ───────────────────
     function _ensureSettingsLiveRegion() {
         let live = document.getElementById('settingsLiveRegion');
         if (live) return live;
@@ -377,14 +381,10 @@
                 if (subEl) subEl.textContent = subtitle;
             }
         }
-        // Announce only when state actually flipped (skip silent no-op updates
-        // and the initial render).
         if (prev !== en) {
             const titleEl = btn.querySelector('.settings-toggle-title');
             const titleText = titleEl?.textContent?.trim() || 'Setting';
             const live = _ensureSettingsLiveRegion();
-            // Force re-announce by clearing first — some SRs ignore identical
-            // sequential text in the same live region.
             live.textContent = '';
             requestAnimationFrame(() => {
                 live.textContent = `${titleText} ${en ? 'enabled' : 'disabled'}`;
@@ -395,16 +395,13 @@
     window.AnimeTracker = window.AnimeTracker || {};
     window.AnimeTracker.SettingsView = { render, updateToggle };
 
-    // β”€β”€β”€ Initial render at script-parse time β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€β”€
-    // Rendered NOW (not on view-mode click) so all IDs (#settingsCopyGuard,
-    // #settingsRefresh, etc.) exist in the DOM by the time main.js's IIFE
-    // caches them in its `elements` object. main.js then re-calls render()
-    // later with the actual user/settings to refresh the visible content.
+    // ─── Initial render at script-parse time ─────────────────────────
+    // Rendered NOW (not on view-mode click) so all IDs exist in the DOM by
+    // the time main.js's IIFE caches them. main.js re-calls render() later
+    // with the actual user/settings to refresh the visible content.
     const initialContainer = document.getElementById('settingsView');
     if (initialContainer) {
         render(initialContainer, { user: null, settings: {} });
-        // Keep it hidden until view-mode='settings' switches to it. The CSS
-        // rule `.app.settings-mode #settingsView` handles the show.
         initialContainer.setAttribute('hidden', '');
     }
 })();

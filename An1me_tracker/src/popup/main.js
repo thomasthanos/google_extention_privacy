@@ -3973,12 +3973,6 @@
                 return;
             }
 
-            if (e.target.closest('#settingsDebugConsole')) {
-                try { window.AnimeTracker?.DebugConsole?.show?.(); }
-                catch (err) { PopupLogger.error('DebugConsole', 'open failed:', err); }
-                return;
-            }
-
             if (e.target.closest('#settingsSignOut')) {
                 setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);

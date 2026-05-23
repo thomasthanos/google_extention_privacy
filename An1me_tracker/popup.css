@@ -7665,10 +7665,353 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   transform: translateY(-1px)
 }
 
+/* ─── Settings redesign v3 ─────────────────────────────────────────── */
+
+/* Tighten container — section labels create rhythm so card gap goes down */
+.settings-view-inner {
+  gap: 6px !important
+}
+
+/* Section label — 11px uppercase tracking-wider muted, 8px below = mt-3 */
+.settings-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(133, 147, 176, 0.7);
+  margin: 12px 4px 4px;
+  user-select: none
+}
+
+.settings-section-label:first-child {
+  margin-top: 4px
+}
+
+/* Header bar — full-width account pill */
+.settings-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 4px 8px;
+  margin-bottom: 4px
+}
+
+/* Account pill spans the full header width — avatar + name on the left,
+   sign-out icon on the right, with name flexing to fill the space. */
+.settings-account-pill {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  flex: 1;
+  padding: 5px 6px 5px 5px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  position: relative;
+  transition: background var(--tf), border-color var(--tf)
+}
+
+.settings-account-pill:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.16)
+}
+
+.settings-pill-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.08)
+}
+
+.settings-pill-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t1);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 0 4px 0 2px;
+  letter-spacing: 0.01em
+}
+
+/* Email is hidden but available via the pill's title attribute (browser tooltip).
+   We also keep it in the DOM (hidden) so existing #settingsUserEmail handlers
+   still find a node. */
+.settings-pill-email[hidden] { display: none }
+
+/* Sign-out icon button — subtle; turns red on hover */
+.settings-pill-signout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  color: rgba(133, 147, 176, 0.85);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--tf);
+  padding: 0
+}
+
+.settings-pill-signout:hover {
+  background: rgba(240, 69, 69, 0.15);
+  border-color: rgba(240, 69, 69, 0.35);
+  color: #ff7676
+}
+
+.settings-pill-signout .settings-icon {
+  width: 15px;
+  height: 15px
+}
+
+/* When signed out, the pill is hidden and we show the Local-only badge instead.
+   Account-status reused from old CSS — already styled. */
+
+/* ─── Toggle list — single card, internal dividers, compact rows ─── */
+.settings-card .settings-toggle-list {
+  gap: 0
+}
+
+.settings-card .settings-toggle-row {
+  position: relative;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 9px 12px 9px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+  transition: background 0.18s ease, padding-left 0.18s ease, color 0.18s ease;
+  overflow: hidden
+}
+
+.settings-card .settings-toggle-row:last-child {
+  border-bottom: none !important
+}
+
+/* Vertical accent bar that slides in on hover — pure CSS, no JS */
+.settings-card .settings-toggle-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 0;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, var(--cyan) 0%, rgba(79, 195, 247, 0.6) 100%);
+  transform: translateY(-50%);
+  transition: height 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease;
+  opacity: 0;
+  pointer-events: none
+}
+
+.settings-card .settings-toggle-row:hover {
+  background: linear-gradient(90deg,
+    rgba(79, 195, 247, 0.06) 0%,
+    rgba(79, 195, 247, 0.02) 60%,
+    transparent 100%) !important;
+  padding-left: 16px
+}
+
+.settings-card .settings-toggle-row:hover::before {
+  height: 60%;
+  opacity: 1
+}
+
+/* When toggle is ON, the accent bar is always visible at half intensity
+   so the user can see at a glance which rows are active. */
+.settings-card .settings-toggle-row[data-enabled="true"]::before {
+  height: 50%;
+  opacity: 0.55
+}
+
+.settings-card .settings-toggle-row[data-enabled="true"]:hover::before {
+  height: 60%;
+  opacity: 1
+}
+
+/* Active / pressed feedback — subtle press */
+.settings-card .settings-toggle-row:active {
+  transform: scale(0.997);
+  transition: transform 0.08s ease
+}
+
+/* Outline icon (no filled background box) */
+.settings-toggle-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: rgba(160, 175, 200, 0.65);
+  flex-shrink: 0
+}
+
+.settings-toggle-icon-svg {
+  width: 16px;
+  height: 16px
+}
+
+.settings-card .settings-toggle-row[data-enabled="true"] .settings-toggle-icon-wrap {
+  color: var(--cyan)
+}
+
+/* DATA section — top row: 2 equal-width buttons */
+.settings-data-top {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px
+}
+
+.settings-data-action {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--b1);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--t1);
+  transition: all var(--tf);
+  min-height: 60px
+}
+
+.settings-data-action:hover {
+  border-color: rgba(79, 195, 247, 0.32);
+  background: var(--bg-3)
+}
+
+.settings-data-action:active {
+  transform: scale(0.99)
+}
+
+.settings-data-action--primary {
+  background: linear-gradient(135deg, rgba(79, 195, 247, 0.14) 0%, rgba(79, 195, 247, 0.05) 100%);
+  border-color: rgba(79, 195, 247, 0.35);
+  color: var(--t1)
+}
+
+.settings-data-action--primary:hover {
+  background: linear-gradient(135deg, rgba(79, 195, 247, 0.2) 0%, rgba(79, 195, 247, 0.08) 100%);
+  border-color: rgba(79, 195, 247, 0.55);
+  box-shadow: 0 2px 12px rgba(79, 195, 247, 0.15)
+}
+
+.settings-data-action .settings-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--cyan);
+  flex-shrink: 0
+}
+
+.settings-data-action--primary .settings-icon {
+  color: var(--cyan)
+}
+
+.settings-data-action-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px
+}
+
+.settings-data-action-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis
+}
+
+.settings-data-action-subtitle {
+  font-size: 10.5px;
+  color: var(--t2);
+  line-height: 1.35
+}
+
+/* Backup card */
+.settings-backup-card {
+  padding: 14px 14px 12px !important;
+  gap: 10px !important
+}
+
+.settings-backup-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap
+}
+
+.settings-backup-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--t1);
+  letter-spacing: 0.02em
+}
+
+.settings-backup-sub {
+  font-size: 11px;
+  color: var(--t2)
+}
+
+.settings-backup-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px
+}
+
+/* Outline button used in Backup actions */
+.settings-btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--t1);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--tf)
+}
+
+.settings-btn-outline:hover {
+  background: rgba(79, 195, 247, 0.06);
+  border-color: rgba(79, 195, 247, 0.32);
+  color: var(--cyan)
+}
+
+.settings-btn-outline:active {
+  transform: scale(0.98)
+}
+
+.settings-btn-outline .settings-icon {
+  width: 14px;
+  height: 14px
+}
+
+
 /* Keyboard focus on settings interactive elements */
 .settings-toggle-row:focus-visible,
 .settings-action:focus-visible,
 .settings-btn:focus-visible,
+.settings-data-action:focus-visible,
+.settings-btn-outline:focus-visible,
+.settings-pill-signout:focus-visible,
 .settings-about-donate:focus-visible {
   outline: 2px solid rgba(79, 195, 247, 0.7);
   outline-offset: 2px

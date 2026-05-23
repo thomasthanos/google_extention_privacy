@@ -237,118 +237,300 @@
                 --anilist-surface:rgba(255,255,255,0.045);
                 --anilist-surface-strong:rgba(255,255,255,0.075);
                 --anilist-border:rgba(255,255,255,0.1);
+                --anilist-success:#4caf82;
                 font-family:'Inter','Segoe UI',system-ui,sans-serif;
             }
-            #${CARD_ID} .anilist-account {
+
+            /* ─── LOGGED-OUT — logo left, text right ────────────────── */
+            #${CARD_ID} .anilist-empty {
+                display:flex; flex-direction:column;
+                gap:10px;
+                padding:8px 4px 4px;
+            }
+            #${CARD_ID} .anilist-empty-hero {
+                display:grid;
+                grid-template-columns:auto minmax(0,1fr);
+                column-gap:14px;
+                align-items:center;
+            }
+            #${CARD_ID} .anilist-logo {
+                width:48px; height:48px; display:grid; place-items:center;
+                border-radius:12px;
+                background:linear-gradient(135deg, rgba(47,183,255,0.18) 0%, rgba(16,168,247,0.08) 100%);
+                border:1px solid rgba(47,183,255,0.28);
+                color:var(--anilist-accent);
+                box-shadow:0 4px 18px rgba(47,183,255,0.18), inset 0 1px 0 rgba(255,255,255,0.06);
+            }
+            #${CARD_ID} .anilist-logo svg { width:22px; height:22px; }
+            #${CARD_ID} .anilist-empty-text {
+                display:flex; flex-direction:column;
+                gap:2px;
+                min-width:0;
+                text-align:left;
+            }
+            #${CARD_ID} .anilist-empty-title {
+                font-size:16px; font-weight:600; color:#f4f7ff;
+                margin:0;
+                letter-spacing:-0.01em;
+            }
+            #${CARD_ID} .anilist-empty-desc {
+                font-size:12.5px; color:#8ea0ba; line-height:1.4;
+                margin:0;
+            }
+            #${CARD_ID} .anilist-btn--connect {
+                width:100%; min-height:38px; padding:9px 16px;
+                background:linear-gradient(135deg, var(--anilist-accent) 0%, var(--anilist-accent-strong) 100%);
+                border:1px solid rgba(47,183,255,0.55);
+                color:#02131f; font-weight:700; font-size:13px;
+                border-radius:10px; cursor:pointer;
+                box-shadow:0 4px 16px rgba(47,183,255,0.22), inset 0 1px 0 rgba(255,255,255,0.18);
+                display:inline-flex; align-items:center; justify-content:center; gap:7px;
+                transition:all .18s ease;
+            }
+            #${CARD_ID} .anilist-btn--connect:hover:not(:disabled) {
+                transform:translateY(-1px);
+                box-shadow:0 6px 24px rgba(47,183,255,0.4), inset 0 1px 0 rgba(255,255,255,0.22);
+            }
+            #${CARD_ID} .anilist-btn--connect:active:not(:disabled) {
+                transform:translateY(0);
+            }
+            #${CARD_ID} .anilist-btn--connect svg {
+                width:14px; height:14px; fill:currentColor; stroke:none;
+            }
+
+            /* ─── Collapsibles — How does this work / Advanced import ── */
+            #${CARD_ID} .anilist-collapsible {
+                width:100%; margin-top:4px;
+            }
+            #${CARD_ID} .anilist-collapsible--inline { width:100%; text-align:left; }
+            #${CARD_ID} .anilist-collapsible summary {
+                list-style:none;
+                display:inline-flex; align-items:center; gap:6px;
+                font-size:12px; color:#9aa8bf; cursor:pointer;
+                padding:4px 6px; border-radius:6px;
+                transition:background .12s ease, color .12s ease;
+                user-select:none;
+            }
+            #${CARD_ID} .anilist-collapsible summary::-webkit-details-marker { display:none; }
+            #${CARD_ID} .anilist-collapsible summary:hover {
+                background:rgba(255,255,255,0.03); color:#cfd6e4;
+            }
+            #${CARD_ID} .anilist-collapsible-arrow {
+                display:inline-block; width:0; height:0;
+                border-left:5px solid currentColor;
+                border-top:4px solid transparent;
+                border-bottom:4px solid transparent;
+                transition:transform .15s ease;
+                margin-right:1px;
+            }
+            #${CARD_ID} .anilist-collapsible[open] .anilist-collapsible-arrow {
+                transform:rotate(90deg);
+            }
+            #${CARD_ID} .anilist-collapsible-body {
+                padding:8px 4px 2px 18px;
+                animation:anilist-fade-in .18s ease;
+            }
+            #${CARD_ID} .anilist-collapsible-text {
+                font-size:11.5px; color:#8ea0ba; line-height:1.5;
+                margin:0 0 6px;
+            }
+            @keyframes anilist-fade-in {
+                from { opacity:0; transform:translateY(-2px); }
+                to { opacity:1; transform:translateY(0); }
+            }
+
+            /* Redirect URL row inside the collapsible */
+            #${CARD_ID} .anilist-url-row {
+                display:flex; align-items:stretch; gap:6px; margin-top:4px;
+            }
+            #${CARD_ID} .anilist-url-code {
+                flex:1; min-width:0;
+                padding:6px 10px;
+                font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+                font-size:10.5px; color:#8eb5ff;
+                background:rgba(0,0,0,0.25);
+                border:1px solid var(--anilist-border);
+                border-radius:6px;
+                overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+                user-select:all;
+                line-height:24px;
+            }
+            #${CARD_ID} .anilist-url-copy {
+                min-height:36px; padding:0 12px; font-size:11px;
+            }
+            #${CARD_ID} .anilist-url-copy--done {
+                color:var(--anilist-success) !important;
+                border-color:rgba(76,175,130,0.4) !important;
+            }
+
+            /* ─── Disconnected: divider + import-without-connecting ──── */
+            #${CARD_ID} .anilist-divider {
+                height:1px; background:rgba(255,255,255,0.07);
+                margin:14px 0 10px;
+            }
+            #${CARD_ID} .anilist-sub {
+                font-size:11px; font-weight:700; color:#9aa8bf;
+                text-transform:uppercase; letter-spacing:0.05em;
+                margin-bottom:4px;
+            }
+            #${CARD_ID} .anilist-sub-helper {
+                font-size:12px; color:#8ea0ba; line-height:1.45;
+                margin:0 0 8px;
+            }
+            #${CARD_ID} .anilist-import-row {
+                display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px;
+            }
+            #${CARD_ID} .anilist-input {
+                width:100%; min-width:0; height:36px; padding:0 12px;
+                border-radius:8px;
+                border:1px solid var(--anilist-border);
+                background:rgba(0,0,0,0.18);
+                color:#eef4ff; font:inherit; font-size:12px;
+            }
+            #${CARD_ID} .anilist-input:focus {
+                outline:none; border-color:rgba(47,183,255,0.6);
+                box-shadow:0 0 0 3px rgba(47,183,255,0.14);
+            }
+            #${CARD_ID} .anilist-input::placeholder { color:#66738b; }
+            #${CARD_ID} .anilist-hint {
+                font-size:11px; color:#7f8da6; line-height:1.45;
+                margin-top:6px; word-break:break-word;
+            }
+
+            /* ─── LOGGED-IN — compact head ──────────────────────────── */
+            #${CARD_ID} .anilist-head {
                 display:grid; grid-template-columns:auto minmax(0,1fr) auto;
-                align-items:center; gap:12px; margin-bottom:12px;
+                align-items:center; gap:11px;
+                margin-bottom:10px;
             }
             #${CARD_ID} .anilist-avatar {
-                position:relative; width:44px; height:44px; flex-shrink:0;
-                border-radius:14px; overflow:hidden;
+                position:relative; width:32px; height:32px; flex-shrink:0;
+                border-radius:10px; overflow:hidden;
                 display:flex; align-items:center; justify-content:center;
-                background:linear-gradient(135deg,rgba(47,183,255,0.95),rgba(44,103,255,0.88));
-                color:#fff; font-size:16px; font-weight:800;
-                box-shadow:0 8px 22px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.18);
+                background:linear-gradient(135deg,rgba(47,183,255,0.95),rgba(44,103,255,0.85));
+                color:#fff; font-size:13px; font-weight:800;
+                box-shadow:0 4px 12px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.18);
             }
-            #${CARD_ID} .anilist-avatar img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
-            #${CARD_ID} .anilist-account-text { display:flex; flex-direction:column; gap:2px; min-width:0; }
-            #${CARD_ID} .anilist-account-name {
-                font-size:15px; font-weight:800; color:#f4f7ff;
+            #${CARD_ID} .anilist-avatar img {
+                position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+            }
+            #${CARD_ID} .anilist-head-text {
+                display:flex; flex-direction:column; gap:1px; min-width:0;
+            }
+            #${CARD_ID} .anilist-head-name {
+                font-size:15px; font-weight:700; color:#f4f7ff;
                 white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+                letter-spacing:-0.005em;
             }
-            #${CARD_ID} .anilist-account-sub { font-size:11px; color:#9aa8bf; line-height:1.35; }
+            #${CARD_ID} .anilist-head-sub {
+                font-size:12px; color:#8ea0ba; line-height:1.3;
+            }
             #${CARD_ID} .anilist-pill {
-                display:inline-flex; align-items:center; gap:6px; justify-self:end;
-                min-height:26px; padding:0 10px; border-radius:999px;
-                border:1px solid rgba(76,175,130,0.28);
-                background:rgba(76,175,130,0.1); color:#7be0ac;
-                font-size:11px; font-weight:750; white-space:nowrap;
+                display:inline-flex; align-items:center; gap:6px;
+                justify-self:end;
+                min-height:24px; padding:0 10px;
+                border-radius:999px;
+                border:1px solid rgba(76,175,130,0.32);
+                background:rgba(76,175,130,0.1);
+                color:#7be0ac;
+                font-size:11px; font-weight:600;
+                white-space:nowrap;
             }
             #${CARD_ID} .anilist-pill::before {
-                content:''; width:6px; height:6px; border-radius:50%; background:currentColor;
-                box-shadow:0 0 0 3px rgba(123,224,172,0.12);
+                content:''; width:7px; height:7px; border-radius:50%;
+                background:var(--anilist-success);
+                box-shadow:0 0 0 3px rgba(76,175,130,0.18), 0 0 8px rgba(76,175,130,0.55);
             }
-            #${CARD_ID} .anilist-intro { margin-bottom:14px; }
-            #${CARD_ID} .anilist-intro-title { font-size:16px; font-weight:800; color:#f4f7ff; margin-bottom:4px; }
-            #${CARD_ID} .anilist-intro-text { font-size:12px; color:#9aa8bf; line-height:1.45; max-width:34ch; }
+
+            /* ─── Status strip + progress bar ──────────────────────── */
             #${CARD_ID} .anilist-progress {
-                height:5px; border-radius:999px; background:rgba(255,255,255,0.08);
+                height:4px; border-radius:999px;
+                background:rgba(255,255,255,0.06);
                 overflow:hidden; margin:2px 0 8px;
             }
             #${CARD_ID} .anilist-progress-fill {
                 height:100%; width:0%; border-radius:999px;
-                background:linear-gradient(90deg,var(--anilist-accent-strong),#71d7ff); transition:width .3s ease;
+                background:linear-gradient(90deg,var(--anilist-accent-strong),#71d7ff);
+                transition:width .3s ease;
             }
             #${CARD_ID} .anilist-status {
-                display:flex; align-items:center; min-height:0; margin-bottom:12px;
-                padding:8px 10px; border-radius:10px;
-                border:1px solid var(--anilist-border); background:var(--anilist-surface);
-                color:#9aa8bf; font-size:11.5px; line-height:1.35;
-                overflow-wrap:anywhere;
+                padding:7px 10px; border-radius:8px;
+                border:1px solid var(--anilist-border);
+                background:var(--anilist-surface);
+                color:#9aa8bf; font-size:11.5px; line-height:1.4;
+                margin-bottom:10px;
+                white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
             }
             #${CARD_ID} .anilist-status:empty { display:none; }
             #${CARD_ID} .anilist-status[data-kind="ok"] {
-                border-color:rgba(76,175,130,0.22); background:rgba(76,175,130,0.08); color:#7be0ac;
+                border-color:rgba(76,175,130,0.22);
+                background:rgba(76,175,130,0.06);
+                color:#a3d9bd;
             }
             #${CARD_ID} .anilist-status[data-kind="err"] {
-                border-color:rgba(255,107,107,0.26); background:rgba(255,107,107,0.08); color:#ff8f8f;
+                border-color:rgba(255,107,107,0.26);
+                background:rgba(255,107,107,0.07);
+                color:#ff8f8f;
+                white-space:normal;
             }
-            #${CARD_ID} .anilist-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-            #${CARD_ID} .anilist-actions { margin-bottom:2px; }
+
+            /* ─── Action row (Sync now + Disconnect) ──────────────── */
+            #${CARD_ID} .anilist-actions-row {
+                display:flex; gap:8px; align-items:center;
+                margin-bottom:6px;
+            }
             #${CARD_ID} .anilist-btn {
-                display:inline-flex; align-items:center; justify-content:center; gap:7px;
-                min-height:36px; padding:8px 13px; border-radius:10px;
+                display:inline-flex; align-items:center; justify-content:center; gap:6px;
+                min-height:32px; padding:6px 12px;
+                border-radius:8px;
                 border:1px solid var(--anilist-border);
-                background:var(--anilist-surface); color:#eef4ff;
-                font:inherit; font-size:12px; font-weight:750; cursor:pointer;
-                transition:background .15s ease, border-color .15s ease, opacity .15s ease, transform .1s ease;
+                background:transparent; color:#cfd6e4;
+                font:inherit; font-size:12px; font-weight:600;
+                cursor:pointer;
+                transition:all .15s ease;
             }
-            #${CARD_ID} .anilist-btn:hover:not(:disabled) { background:var(--anilist-surface-strong); border-color:rgba(255,255,255,0.16); }
+            #${CARD_ID} .anilist-btn:hover:not(:disabled) {
+                background:var(--anilist-surface);
+                border-color:rgba(255,255,255,0.18);
+                color:#f4f7ff;
+            }
             #${CARD_ID} .anilist-btn:active:not(:disabled) { transform:translateY(1px); }
-            #${CARD_ID} .anilist-btn:disabled { opacity:.5; cursor:default; }
-            #${CARD_ID} .anilist-btn:focus-visible,
-            #${CARD_ID} .anilist-input:focus-visible {
+            #${CARD_ID} .anilist-btn:disabled { opacity:.45; cursor:default; }
+            #${CARD_ID} .anilist-btn:focus-visible {
                 outline:none; box-shadow:0 0 0 3px rgba(47,183,255,0.16);
             }
             #${CARD_ID} .anilist-btn svg {
-                width:14px; height:14px; fill:none; stroke:currentColor;
+                width:13px; height:13px; fill:none; stroke:currentColor;
                 stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round;
             }
-            #${CARD_ID} .anilist-btn--primary {
-                background:var(--anilist-accent-strong); border-color:rgba(16,168,247,0.9);
-                color:#02131f; box-shadow:0 8px 20px rgba(16,168,247,0.18);
+            #${CARD_ID} .anilist-btn--sync {
+                background:rgba(47,183,255,0.08);
+                border-color:rgba(47,183,255,0.28);
+                color:var(--anilist-accent);
             }
-            #${CARD_ID} .anilist-btn--primary:hover:not(:disabled) { background:#35bdff; border-color:#35bdff; }
-            #${CARD_ID} .anilist-btn--ghost { background:transparent; color:#b5c1d5; }
-            #${CARD_ID} .anilist-btn--block { flex:1; }
-            #${CARD_ID}.anilist-syncing .anilist-btn--primary svg { animation:anilist-spin 1s linear infinite; }
+            #${CARD_ID} .anilist-btn--sync:hover:not(:disabled) {
+                background:rgba(47,183,255,0.14);
+                border-color:rgba(47,183,255,0.45);
+                color:#71d7ff;
+            }
+            #${CARD_ID} .anilist-btn--ghost { background:transparent; }
+            #${CARD_ID}.anilist-syncing .anilist-btn--sync svg {
+                animation:anilist-spin 1s linear infinite;
+            }
             @keyframes anilist-spin { to { transform:rotate(360deg); } }
-            #${CARD_ID} .anilist-divider { height:1px; background:rgba(255,255,255,0.07); margin:15px 0 12px; }
-            #${CARD_ID} .anilist-sub {
-                font-size:11px; font-weight:800; color:#9aa8bf;
-                text-transform:uppercase; margin-bottom:8px;
-            }
-            #${CARD_ID} .anilist-import-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; }
-            #${CARD_ID} .anilist-input {
-                width:100%; min-width:0; height:36px; padding:0 12px; border-radius:10px;
-                border:1px solid var(--anilist-border); background:rgba(0,0,0,0.18);
-                color:#eef4ff; font:inherit; font-size:12px;
-            }
-            #${CARD_ID} .anilist-input:focus { outline:none; border-color:rgba(47,183,255,0.75); }
-            #${CARD_ID} .anilist-input::placeholder { color:#66738b; }
-            #${CARD_ID} .anilist-hint { font-size:11px; color:#7f8da6; line-height:1.45; margin-top:8px; word-break:break-word; }
-            #${CARD_ID} .anilist-hint code { color:#8eb5ff; word-break:break-all; }
+
             @media (max-width:380px) {
-                #${CARD_ID} .anilist-account { grid-template-columns:auto minmax(0,1fr); }
+                #${CARD_ID} .anilist-head { grid-template-columns:auto minmax(0,1fr); }
                 #${CARD_ID} .anilist-pill { grid-column:1 / -1; justify-self:start; }
                 #${CARD_ID} .anilist-import-row { grid-template-columns:1fr; }
                 #${CARD_ID} .anilist-import-row .anilist-btn { width:100%; }
             }
             @media (prefers-reduced-motion:reduce) {
-                #${CARD_ID}.anilist-syncing .anilist-btn--primary svg { animation:none; }
+                #${CARD_ID}.anilist-syncing .anilist-btn--sync svg { animation:none; }
                 #${CARD_ID} .anilist-progress-fill { transition:none; }
-                #${CARD_ID} .anilist-btn { transition:none; }
+                #${CARD_ID} .anilist-btn,
+                #${CARD_ID} .anilist-btn--connect { transition:none; }
+                #${CARD_ID} .anilist-collapsible-body { animation:none; }
             }
         `;
         (document.head || document.documentElement).appendChild(style);
@@ -358,6 +540,8 @@
         const connected = isConnected();
         const importName = escapeHtml(_lastUsername || (connected && _auth?.viewer?.name) || '');
 
+        // Status strip + progress bar are reused by both states. The status
+        // div is hidden when empty (CSS rule `:empty { display:none }`).
         const statusArea = `
             <div class="anilist-progress" id="anilistProgress" hidden>
                 <div class="anilist-progress-fill" id="anilistProgressFill"></div>
@@ -365,60 +549,89 @@
             <div class="anilist-status" id="anilistStatus"></div>
         `;
 
-        const importSection = `
-            <div class="anilist-divider"></div>
-            <div class="anilist-sub">Import from AniList</div>
+        // Reusable import row (used in both Advanced import + standalone).
+        // Re-renders preserve any value the user already typed via `importName`.
+        const importInputRow = `
             <div class="anilist-import-row">
                 <input class="anilist-input" id="anilistUsername" type="text"
-                       placeholder="Username" value="${importName}"
+                       placeholder="AniList username" value="${importName}"
                        autocomplete="off" spellcheck="false">
-                <button class="anilist-btn" id="anilistImportBtn" type="button">Import</button>
+                <button class="anilist-btn anilist-btn--ghost" id="anilistImportBtn" type="button">Import</button>
             </div>
-            <div class="anilist-hint">Adds public AniList entries to your library. Existing entries stay untouched.</div>
         `;
 
         if (connected) {
+            // ─── LOGGED-IN STATE — compact, calm ────────────────────────
             const name = escapeHtml(_auth?.viewer?.name || 'AniList user');
             const initial = escapeHtml((name[0] || 'A').toUpperCase());
             const avatar = _auth?.viewer?.avatar || '';
             const avatarImg = avatar ? `<img id="anilistAvatar" src="${escapeHtml(avatar)}" alt="">` : '';
+
             return `
-                <div class="anilist-account">
+                <div class="anilist-head">
                     <div class="anilist-avatar"><span>${initial}</span>${avatarImg}</div>
-                    <div class="anilist-account-text">
-                        <span class="anilist-account-name">${name}</span>
-                        <span class="anilist-account-sub">Progress syncs automatically in the background</span>
+                    <div class="anilist-head-text">
+                        <span class="anilist-head-name">${name}</span>
+                        <span class="anilist-head-sub">Auto-sync enabled</span>
                     </div>
                     <span class="anilist-pill" title="Connected">Connected</span>
                 </div>
                 ${statusArea}
-                <div class="anilist-row anilist-actions">
-                    <button class="anilist-btn anilist-btn--primary" id="anilistSyncBtn" type="button">
+                <div class="anilist-actions-row">
+                    <button class="anilist-btn anilist-btn--sync" id="anilistSyncBtn" type="button">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                         <span>Sync now</span>
                     </button>
                     <button class="anilist-btn anilist-btn--ghost" id="anilistDisconnectBtn" type="button">Disconnect</button>
                 </div>
-                ${importSection}
+                <details class="anilist-collapsible">
+                    <summary><span class="anilist-collapsible-arrow"></span>Advanced import</summary>
+                    <div class="anilist-collapsible-body">
+                        ${importInputRow}
+                        <div class="anilist-hint">Pulls public AniList entries into your library. Existing entries stay untouched.</div>
+                    </div>
+                </details>
             `;
         }
 
+        // ─── LOGGED-OUT STATE — welcoming, centered hierarchy ───────────
+        const redirectUri = escapeHtml(getRedirectUri());
         return `
-            <div class="anilist-intro">
-                <div class="anilist-intro-title">Sync with AniList</div>
-                <div class="anilist-intro-text">Connect your account to mirror watch progress and status to your AniList list automatically.</div>
-            </div>
-            ${statusArea}
-            <div class="anilist-row">
-                <button class="anilist-btn anilist-btn--primary anilist-btn--block" id="anilistConnectBtn" type="button">
+            <div class="anilist-empty">
+                <div class="anilist-empty-hero">
+                    <div class="anilist-logo" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                            <path d="M2 17l10 5 10-5"/>
+                            <path d="M2 12l10 5 10-5"/>
+                        </svg>
+                    </div>
+                    <div class="anilist-empty-text">
+                        <h3 class="anilist-empty-title">Sync with AniList</h3>
+                        <p class="anilist-empty-desc">Keep your watch progress in sync automatically.</p>
+                    </div>
+                </div>
+                <button class="anilist-btn anilist-btn--connect" id="anilistConnectBtn" type="button">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="13 2 4 14 12 14 11 22 20 10 12 10 13 2"/></svg>
                     <span>Connect AniList</span>
                 </button>
+                ${statusArea}
+                <details class="anilist-collapsible anilist-collapsible--inline">
+                    <summary><span class="anilist-collapsible-arrow"></span>How does this work?</summary>
+                    <div class="anilist-collapsible-body">
+                        <p class="anilist-collapsible-text">Connect opens AniList sign-in in a new tab. Use the side panel — the toolbar popup closes during sign-in.</p>
+                        <p class="anilist-collapsible-text">Register this redirect URL for your AniList client:</p>
+                        <div class="anilist-url-row">
+                            <code class="anilist-url-code" id="anilistRedirectCode">${redirectUri}</code>
+                            <button class="anilist-btn anilist-btn--ghost anilist-url-copy" id="anilistRedirectCopy" type="button">Copy</button>
+                        </div>
+                    </div>
+                </details>
             </div>
-            <div class="anilist-hint">
-                Opens AniList sign-in — use the side panel, the toolbar popup closes mid-sign-in.<br>
-                Redirect URL for your AniList client: <code>${escapeHtml(getRedirectUri())}</code>
-            </div>
-            ${importSection}
+            <div class="anilist-divider"></div>
+            <div class="anilist-sub">Import without connecting</div>
+            <p class="anilist-sub-helper">Just want to import a public list?</p>
+            ${importInputRow}
         `;
     }
 
@@ -484,24 +697,27 @@
         setSyncing(false);
 
         if (st && st.state === 'error') {
-            if (st.error === 'reconnect') setStatus('AniList session expired — please reconnect', 'err');
+            if (st.error === 'reconnect') setStatus('AniList session expired — reconnect needed', 'err');
             else setStatus(`Sync error: ${st.error || 'unknown'}`, 'err');
             return;
         }
 
         if (st && st.state === 'idle') {
             const bits = [];
+            // Compact strip: "23m ago · 0 updated · 68 unchanged · 28 unmatched"
+            // Time first (most useful at-a-glance), then counts.
+            if (st.finishedAt) bits.push(relativeTime(st.finishedAt));
             if (typeof st.ok === 'number') bits.push(`${st.ok} updated`);
             if (typeof st.skipped === 'number') bits.push(`${st.skipped} unchanged`);
             if (st.failed) bits.push(`${st.failed} unmatched`);
-            const when = st.finishedAt ? ` · ${relativeTime(st.finishedAt)}` : '';
             if (bits.length) {
-                setStatus(`Last sync · ${bits.join(' · ')}${when}`, 'ok');
+                setStatus(`Last sync · ${bits.join(' · ')}`, 'ok');
                 return;
             }
         }
 
-        setStatus('Auto-sync is on — your progress mirrors to AniList automatically.');
+        // No sync ran yet — clear status so the strip collapses (CSS :empty).
+        setStatus('');
     }
 
     async function doConnect() {
@@ -581,6 +797,28 @@
         document.getElementById('anilistUsername')?.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { e.preventDefault(); doImport(); }
         });
+        // Copy-redirect button (logged-out state, inside "How does this work?")
+        document.getElementById('anilistRedirectCopy')?.addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            const code = document.getElementById('anilistRedirectCode');
+            const text = code?.textContent || '';
+            try { await navigator.clipboard.writeText(text); }
+            catch {
+                // Clipboard blocked — fall back to text selection
+                const range = document.createRange();
+                if (code) range.selectNodeContents(code);
+                const sel = window.getSelection();
+                sel?.removeAllRanges();
+                if (code) sel?.addRange(range);
+            }
+            const orig = btn.textContent;
+            btn.textContent = 'Copied';
+            btn.classList.add('anilist-url-copy--done');
+            setTimeout(() => {
+                btn.textContent = orig;
+                btn.classList.remove('anilist-url-copy--done');
+            }, 1400);
+        });
         // Drop a broken avatar image so the gradient + initial show instead.
         document.getElementById('anilistAvatar')?.addEventListener('error', (e) => {
             e.target.remove();
@@ -605,12 +843,27 @@
         const card = document.createElement('section');
         card.className = 'settings-card';
         card.id = CARD_ID;
-        card.innerHTML = '<h2 class="settings-card-title">AniList</h2><div id="anilistBody"></div>';
+        card.innerHTML = '<div id="anilistBody"></div>';
 
-        // Slot it just above the Danger-zone card; fall back to appending.
-        const danger = inner.querySelector('.settings-card--danger');
-        if (danger) inner.insertBefore(card, danger);
-        else inner.appendChild(card);
+        // Slot under the "CONNECTIONS" section label if present (new layout).
+        // Find the label whose text matches and insert immediately after it.
+        // Falls back to slotting above the Danger zone (legacy slot), then to
+        // appending — keeps this resilient to settings-view reshuffles.
+        const labels = inner.querySelectorAll('.settings-section-label');
+        let connectionsLabel = null;
+        for (const lbl of labels) {
+            if ((lbl.textContent || '').trim().toUpperCase() === 'CONNECTIONS') {
+                connectionsLabel = lbl;
+                break;
+            }
+        }
+        if (connectionsLabel) {
+            connectionsLabel.insertAdjacentElement('afterend', card);
+        } else {
+            const danger = inner.querySelector('.settings-card--danger');
+            if (danger) inner.insertBefore(card, danger);
+            else inner.appendChild(card);
+        }
 
         renderCard();
     }
