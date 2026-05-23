@@ -438,14 +438,43 @@ const FirebaseLib = (function () {
     }
 
     async function _persistEmailPasswordSession(data) {
-        // Identity Toolkit returns `displayName` only when the account has one
-        // set — fall back to the local-part of the email so the popup always
-        // has *something* to render in the account row.
+        // Identity Toolkit's signInWithPassword response doesn't include
+        // photoURL or rich displayName — those live in providerUserInfo,
+        // which we need a follow-up `accounts:lookup` call to get. This is
+        // critical for accounts that have BOTH password and Google providers
+        // linked (the desktop "set password for mobile" flow): without the
+        // lookup, the mobile UI shows a default avatar even though the same
+        // uid has a Google avatar set.
+        let displayName = data.displayName || (data.email || '').split('@')[0];
+        let photoURL = null;
+        let providerIds = [];
+
+        try {
+            const lookup = await _identityToolkitPost('accounts:lookup', {
+                idToken: data.idToken
+            });
+            const userInfo = lookup?.users?.[0];
+            if (userInfo) {
+                providerIds = (userInfo.providerUserInfo || []).map(p => p.providerId);
+                // Prefer Google provider's photo + name when present (richer
+                // info than the password provider). Fall back to whatever
+                // the lookup gives us at the top level.
+                const google = (userInfo.providerUserInfo || []).find(p => p.providerId === 'google.com');
+                photoURL = google?.photoUrl || userInfo.photoUrl || null;
+                if (google?.displayName) displayName = google.displayName;
+                else if (userInfo.displayName) displayName = userInfo.displayName;
+            }
+        } catch (lookupErr) {
+            // Lookup failure isn't fatal — sign-in still succeeded. Just log
+            // and use the basic info from signInWithPassword.
+            PopupLogger.warn('Firebase', `accounts:lookup failed (non-fatal): ${lookupErr?.message}`);
+        }
+
         const user = {
             uid: data.localId,
             email: data.email,
-            displayName: data.displayName || (data.email || '').split('@')[0],
-            photoURL: null
+            displayName,
+            photoURL
         };
         const tokens = {
             idToken: data.idToken,
@@ -457,6 +486,21 @@ const FirebaseLib = (function () {
             [STORAGE_KEYS.TOKENS]: tokens
         });
         currentUser = user;
+
+        // Diagnostic log: lets the user see in DevTools whether they signed
+        // into the SAME account as Google (multi-provider) or a standalone
+        // password-only account (which would explain an empty library).
+        if (providerIds.length > 0) {
+            PopupLogger.log('Firebase',
+                `Signed in as ${data.email} (uid=${data.localId.slice(0, 8)}…) · providers: ${providerIds.join(', ')}`);
+            if (!providerIds.includes('google.com')) {
+                PopupLogger.warn('Firebase',
+                    'This account is password-only (not linked to Google). ' +
+                    'If you expected your Google library here, you may have signed up with a separate password account. ' +
+                    'Sign out, then on desktop go to Settings → "Set password for mobile" with the same email.');
+            }
+        }
+
         notifyAuthStateListeners(currentUser);
         return user;
     }
@@ -497,15 +541,28 @@ const FirebaseLib = (function () {
             err.code = 'NO_AUTH';
             throw err;
         }
-        // accounts:update with `password` linkάρει password provider στον
-        // υπάρχοντα λογαριασμό (Google) χωρίς να αλλάζει uid. Επιστρέφει
-        // φρέσκο idToken/refreshToken που ΠΡΕΠΕΙ να αποθηκεύσουμε γιατί το
-        // παλιό μπορεί να ακυρωθεί λόγω της αλλαγής credentials.
+        // accounts:update with `password` links the password provider to the
+        // existing account (Google) without changing the uid. Returns a fresh
+        // idToken/refreshToken that MUST be persisted — the old token may be
+        // revoked after a credential change.
         const data = await _identityToolkitPost('accounts:update', {
             idToken,
             password,
             returnSecureToken: true
         });
+
+        // Verify the password provider was actually linked. Identity Toolkit
+        // returns providerUserInfo listing all linked providers. If
+        // password/email is absent the link silently failed (e.g. Email/Password
+        // provider is disabled in the Firebase console).
+        const providers = (data.providerUserInfo || []).map(p => p.providerId);
+        if (!providers.includes('password')) {
+            throw new Error(
+                'OPERATION_NOT_ALLOWED: Email/password sign-in is not enabled for this project. ' +
+                'Enable it in Firebase Console → Authentication → Sign-in methods.'
+            );
+        }
+
         if (data.idToken && data.refreshToken && data.expiresIn) {
             const tokens = {
                 idToken: data.idToken,
@@ -514,7 +571,7 @@ const FirebaseLib = (function () {
             };
             await chrome.storage.local.set({ [STORAGE_KEYS.TOKENS]: tokens });
         }
-        PopupLogger.log('Firebase', 'Password set/updated for current user');
+        PopupLogger.log('Firebase', `Password linked. Providers: ${providers.join(', ')}`);
         return true;
     }
 

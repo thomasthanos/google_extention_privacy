@@ -3127,7 +3127,7 @@
         INVALID_LOGIN_CREDENTIALS: 'Wrong email or password.',
         USER_DISABLED: 'This account has been disabled.',
         EMAIL_EXISTS: 'An account already exists for this email.',
-        OPERATION_NOT_ALLOWED: 'Email/password sign-in is disabled.',
+        OPERATION_NOT_ALLOWED: 'Email/password sign-in is not enabled for this project. Enable it in Firebase Console → Authentication → Sign-in methods.',
         WEAK_PASSWORD: 'Password is too weak (min 6 characters).',
         INVALID_EMAIL: 'Please enter a valid email address.',
         MISSING_PASSWORD: 'Please enter your password.',
@@ -3145,14 +3145,12 @@
 
     function setEmailFormBusy(busy, label) {
         const btn = document.getElementById('emailSignInBtn');
-        const createBtn = document.getElementById('authCreateAccountBtn');
         const forgotBtn = document.getElementById('authForgotPasswordBtn');
         if (btn) {
             btn.disabled = busy;
             const lbl = btn.querySelector('.btn-auth-label');
             if (lbl) lbl.textContent = label || 'Sign in';
         }
-        if (createBtn) createBtn.disabled = busy;
         if (forgotBtn) forgotBtn.disabled = busy;
         const inputs = document.querySelectorAll('#authEmailForm .auth-input');
         inputs.forEach((el) => { el.disabled = busy; });
@@ -3760,16 +3758,12 @@
 
         const emailForm = document.getElementById('authEmailForm');
         const emailSignInBtn = document.getElementById('emailSignInBtn');
-        const createAccountBtn = document.getElementById('authCreateAccountBtn');
         const forgotPasswordBtn = document.getElementById('authForgotPasswordBtn');
         if (emailForm && emailSignInBtn) {
             emailForm.addEventListener('submit', (e) => {
                 e.preventDefault();
                 handleEmailAuth({ mode: 'signin' });
             });
-        }
-        if (createAccountBtn) {
-            createAccountBtn.addEventListener('click', () => handleEmailAuth({ mode: 'signup' }));
         }
         if (forgotPasswordBtn) {
             forgotPasswordBtn.addEventListener('click', () => handleForgotPassword());
