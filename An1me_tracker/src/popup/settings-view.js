@@ -60,20 +60,18 @@
         const name = escapeHtml(user?.displayName || user?.email?.split('@')[0] || 'User');
         const email = escapeHtml(user?.email || '');
         const signedIn = !!user;
-        const uid = escapeHtml(user?.uid || '');
 
         // Both the Sign-Out button and the "Local only" badge are always in
         // the DOM (just one is hidden) so partial updates can flip their
         // visibility without re-creating handlers.
         return `
             <section class="settings-card" data-signed-in="${signedIn}">
-                <h2 class="settings-card-title">Account</h2>
+
                 <div class="settings-account-row">
                     <img class="settings-account-avatar" id="settingsAvatar" src="${photo}" alt="${name}">
                     <div class="settings-account-info">
                         <span class="settings-account-name" id="settingsUserName">${name}</span>
                         <span class="settings-account-email" id="settingsUserEmail">${email}</span>
-                        ${uid ? `<span class="settings-account-uid" id="settingsUserUid" title="Click to copy — must match across devices">${uid}</span>` : ''}
                     </div>
                     <button class="settings-btn settings-btn-secondary" id="settingsSignOut" type="button"
                             ${signedIn ? '' : 'hidden'}>
@@ -131,7 +129,7 @@
 
         return `
             <section class="settings-card">
-                <h2 class="settings-card-title">Playback &amp; Tracking</h2>
+
                 <div class="settings-toggle-list">${items}</div>
             </section>
         `;
@@ -140,7 +138,7 @@
     function renderLibraryCard() {
         return `
             <section class="settings-card">
-                <h2 class="settings-card-title">Library</h2>
+
                 <div class="settings-action-grid">
                     <button class="settings-action" id="settingsRefresh" type="button">
                         ${svg('refresh')}
@@ -207,7 +205,7 @@
                     </button>`);
         return `
             <section class="settings-card settings-card--danger">
-                <h2 class="settings-card-title">Danger zone</h2>
+
                 <div class="settings-action-grid">
                     <button class="settings-action settings-action--danger" id="settingsClear" type="button">
                         ${svg('trash')}
@@ -284,29 +282,12 @@
         const avatar = container.querySelector('#settingsAvatar');
         const nameEl = container.querySelector('#settingsUserName');
         const emailEl = container.querySelector('#settingsUserEmail');
-        const uidEl = container.querySelector('#settingsUserUid');
-        const accountInfo = container.querySelector('.settings-account-info');
         const signOutBtn = container.querySelector('#settingsSignOut');
         const localOnlyBadge = container.querySelector('[data-when="signed-out"]');
         const accountCard = container.querySelector('.settings-card[data-signed-in]');
         if (avatar)  avatar.src = user?.photoURL || 'src/icons/icon48.png';
         if (nameEl)  nameEl.textContent = user?.displayName || user?.email?.split('@')[0] || 'User';
         if (emailEl) emailEl.textContent = user?.email || '';
-        // uid: present element only when signed in. Add/remove dynamically.
-        if (user?.uid) {
-            if (uidEl) {
-                uidEl.textContent = user.uid;
-            } else if (accountInfo) {
-                const newUidEl = document.createElement('span');
-                newUidEl.className = 'settings-account-uid';
-                newUidEl.id = 'settingsUserUid';
-                newUidEl.title = 'Click to copy — must match across devices';
-                newUidEl.textContent = user.uid;
-                accountInfo.appendChild(newUidEl);
-            }
-        } else if (uidEl) {
-            uidEl.remove();
-        }
         if (signOutBtn) {
             if (user) signOutBtn.removeAttribute('hidden');
             else signOutBtn.setAttribute('hidden', '');

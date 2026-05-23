@@ -3979,28 +3979,6 @@
                 return;
             }
 
-            // Click on the uid pill → copy to clipboard. Lets the user
-            // compare uids across devices without needing DevTools.
-            const uidPill = e.target.closest('#settingsUserUid');
-            if (uidPill) {
-                const text = uidPill.textContent || '';
-                (async () => {
-                    try {
-                        await navigator.clipboard.writeText(text);
-                    } catch {
-                        // Orion / Safari may block clipboard — fallback to selection
-                        const range = document.createRange();
-                        range.selectNodeContents(uidPill);
-                        const sel = window.getSelection();
-                        sel?.removeAllRanges();
-                        sel?.addRange(range);
-                    }
-                    uidPill.classList.add('copied');
-                    setTimeout(() => uidPill.classList.remove('copied'), 1200);
-                })();
-                return;
-            }
-
             if (e.target.closest('#settingsSignOut')) {
                 setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
