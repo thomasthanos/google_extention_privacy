@@ -11,7 +11,7 @@
  *   #settingsAutoSkipFiller (+ subtitle), #settingsSkiptime (+ subtitle), [NEW]
  *   #settingsRefresh, #settingsExportData,
  *   #settingsImportData, #settingsImportFile, #settingsFetchFillers,
- *   #settingsClear, #settingsExportToken, #settingsDonate.
+ *   #settingsClear, #settingsSetPassword, #settingsDonate.
  *
  * Render is idempotent β€” safe to call repeatedly when storage settings change.
  */
@@ -41,7 +41,8 @@
         bell:     '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
         skipFwd:  '<polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/>',
         skipMark: '<polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/>',
-        sparkles: '<path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><path d="M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/><circle cx="12" cy="12" r="4"/>'
+        sparkles: '<path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><path d="M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/><circle cx="12" cy="12" r="4"/>',
+        check:    '<polyline points="20 6 9 17 4 12"/>'
     };
 
     function svg(iconKey, extraClass = '') {
@@ -174,7 +175,28 @@
         `;
     }
 
-    function renderDangerCard() {
+    function renderDangerCard(user, passwordIsSet) {
+        // "Set password for mobile" only makes sense for signed-in users —
+        // it linkάρει password στον τρέχοντα Firebase λογαριασμό. Hide it
+        // when local-only so we don't show a button that can only error out.
+        // Once the user has linked a password we keep the button clickable
+        // (so they can update/recover if they forget it) and just swap the
+        // visuals + copy to "Password set" / "Tap to update".
+        const setPasswordBtn = !user ? '' : (passwordIsSet ? `
+                    <button class="settings-action settings-action--set" id="settingsSetPassword" type="button">
+                        ${svg('check')}
+                        <span class="settings-action-text">
+                            <span class="settings-action-title">Password set</span>
+                            <span class="settings-action-subtitle">Tap to update — same email, new password</span>
+                        </span>
+                    </button>` : `
+                    <button class="settings-action" id="settingsSetPassword" type="button">
+                        ${svg('key')}
+                        <span class="settings-action-text">
+                            <span class="settings-action-title">Set password for mobile</span>
+                            <span class="settings-action-subtitle">Sign in on Orion / Safari with email + password</span>
+                        </span>
+                    </button>`);
         return `
             <section class="settings-card settings-card--danger">
                 <h2 class="settings-card-title">Danger zone</h2>
@@ -185,14 +207,7 @@
                             <span class="settings-action-title">Clear all data</span>
                             <span class="settings-action-subtitle">Delete all tracking data on this device</span>
                         </span>
-                    </button>
-                    <button class="settings-action" id="settingsExportToken" type="button">
-                        ${svg('key')}
-                        <span class="settings-action-text">
-                            <span class="settings-action-title">Export Auth Token</span>
-                            <span class="settings-action-subtitle">Transfer to Orion / Safari</span>
-                        </span>
-                    </button>
+                    </button>${setPasswordBtn}
                 </div>
             </section>
         `;
@@ -223,7 +238,8 @@
 
         const {
             user = null,
-            settings = {}
+            settings = {},
+            passwordIsSet = false
         } = params;
 
         const state = {
@@ -243,7 +259,7 @@
                     ${renderAccountCard(user)}
                     ${renderPlaybackCard(state)}
                     ${renderLibraryCard()}
-                    ${renderDangerCard()}
+                    ${renderDangerCard(user, passwordIsSet)}
                     ${renderAboutCard()}
                 </div>
             `;
@@ -274,6 +290,41 @@
             else localOnlyBadge.removeAttribute('hidden');
         }
         if (accountCard) accountCard.dataset.signedIn = user ? 'true' : 'false';
+
+        // Set-password button lives in the Danger zone but is gated by both
+        // auth state AND the local "password set" marker. Recompute the
+        // expected DOM and swap if it differs from what's there — keeps the
+        // partial-update path in sync with the full-render path without
+        // triggering a full re-render of the whole view.
+        const dangerCard = container.querySelector('.settings-card--danger .settings-action-grid');
+        const existingSetPwBtn = dangerCard?.querySelector('#settingsSetPassword');
+        const expectedState = !user ? 'absent' : (passwordIsSet ? 'set' : 'unset');
+        const currentState = !existingSetPwBtn ? 'absent' :
+            (existingSetPwBtn.classList.contains('settings-action--set') ? 'set' : 'unset');
+        if (dangerCard && expectedState !== currentState) {
+            existingSetPwBtn?.remove();
+            if (expectedState === 'set') {
+                dangerCard.insertAdjacentHTML('beforeend', `
+                    <button class="settings-action settings-action--set" id="settingsSetPassword" type="button">
+                        ${svg('check')}
+                        <span class="settings-action-text">
+                            <span class="settings-action-title">Password set</span>
+                            <span class="settings-action-subtitle">Tap to update — same email, new password</span>
+                        </span>
+                    </button>
+                `);
+            } else if (expectedState === 'unset') {
+                dangerCard.insertAdjacentHTML('beforeend', `
+                    <button class="settings-action" id="settingsSetPassword" type="button">
+                        ${svg('key')}
+                        <span class="settings-action-text">
+                            <span class="settings-action-title">Set password for mobile</span>
+                            <span class="settings-action-subtitle">Sign in on Orion / Safari with email + password</span>
+                        </span>
+                    </button>
+                `);
+            }
+        }
         updateToggle('settingsCopyGuard', state.copyGuard,
             state.copyGuard ? 'Block copy outside allowed text' : 'Copy protection is turned off');
         updateToggle('settingsSmartNotif', state.smartNotif,

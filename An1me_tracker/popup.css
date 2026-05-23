@@ -293,148 +293,47 @@ body {
   background: var(--b1)
 }
 
-.auth-content.token-mode .btn-google-primary,
-.auth-content.token-mode .auth-or-divider {
-  max-height: 0;
-  opacity: 0;
-  margin: 0;
-  pointer-events: none
+/* Mobile / non-Chromium-extension surfaces (Orion, Safari) where Google
+   sign-in is unsupported. We collapse the picker down to just the email +
+   password form + Forgot password — no Google button, no OR divider, no
+   Create account (sign-up is expected to happen on desktop). */
+.auth-content.auth-mobile .btn-google-primary,
+.auth-content.auth-mobile .auth-or-divider,
+.auth-content.auth-mobile #authCreateAccountBtn,
+.auth-content.auth-mobile .auth-link-sep {
+  display: none
 }
 
-.auth-collapsible {
-  width: 100%
+.auth-content.auth-mobile .auth-secondary-links {
+  justify-content: center
 }
 
-.auth-collapsible-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--r-pill);
-  color: var(--t3);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  font-family: inherit;
-  transition: all var(--tn);
-  text-align: left;
-  letter-spacing: 0.2px
-}
+/* ── Email/Password sign-in form ─────────────────────────────────────────
+   Renders below the OR divider. Mirrors the Google primary button's pill
+   shape + gradient palette so the auth screen reads as a single visual
+   group rather than two glued-together widgets. */
 
-.auth-collapsible-header:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--t2);
-  border-color: var(--b1)
-}
-
-.auth-collapsible.expanded .auth-collapsible-header {
-  border-radius: var(--r-md) var(--r-md) 0 0;
-  background: rgba(14, 102, 144, 0.12);
-  color: rgba(79, 195, 247, 0.8);
-  border-color: rgba(79, 195, 247, 0.15);
-  border-bottom-color: transparent
-}
-
-.auth-collapsible-content {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.3s ease-out
-}
-
-.auth-collapsible.expanded .auth-collapsible-content {
-  max-height: 320px
-}
-
-.token-expand-panel {
+.auth-email-form {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 14px 14px 16px;
-  background: rgba(8, 50, 72, 0.35);
-  backdrop-filter: blur(6px);
-  border: 1px solid rgba(79, 195, 247, 0.12);
-  border-top: none;
-  border-radius: 0 0 var(--r-md) var(--r-md)
+  width: 100%
 }
 
-.token-expand-hint {
-  font-size: 10px;
-  color: var(--t3);
-  line-height: 1.6;
-  text-align: center;
-  padding: 0 4px
-}
-
-.token-expand-hint strong {
-  color: rgba(79, 195, 247, 0.6);
-  font-weight: 600
-}
-
-.btn-token-submit {
-  width: 100%;
-  padding: 0;
-  height: 40px;
-  background: linear-gradient(160deg, #155f80 0%, #0a4d68 50%, #053a52 100%);
-  border: none;
-  border-radius: var(--r-pill);
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset, 0 -1px 0 rgba(0, 0, 0, 0.3) inset, 0 3px 0 #021e2e, 0 6px 14px rgba(0, 0, 0, 0.45);
-  transform: translateY(0);
-  transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.12s ease;
+.auth-field {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-family: inherit
+  flex-direction: column;
+  gap: 4px;
+  text-align: left
 }
 
-.btn-token-submit:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.15);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset, 0 -1px 0 rgba(0, 0, 0, 0.3) inset, 0 4px 0 #021e2e, 0 8px 20px rgba(0, 0, 0, 0.5)
-}
-
-.btn-token-submit:active {
-  transform: translateY(2px);
-  filter: brightness(0.88);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 1px 0 #021e2e, 0 2px 6px rgba(0, 0, 0, 0.4)
-}
-
-.token-icon {
-  font-size: 15px;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 1
-}
-
-.token-text {
-  flex: 1;
-  text-align: left;
+.auth-field-label {
+  font-size: 10px;
   font-weight: 600;
-  font-size: 12px;
-  color: #a8d8f0;
-  letter-spacing: 0.2px;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-  position: relative;
-  z-index: 1
-}
-
-.token-badge {
-  font-size: 8px;
-  font-weight: 700;
-  padding: 2px 7px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(79, 195, 247, 0.1);
-  border-radius: var(--r-pill);
-  letter-spacing: 1px;
-  color: rgba(79, 195, 247, 0.45);
-  position: relative;
-  z-index: 1
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--t3);
+  padding-left: 2px
 }
 
 .auth-input {
@@ -447,40 +346,117 @@ body {
   font-size: 13px;
   font-family: inherit;
   outline: none;
-  transition: border-color var(--tn)
+  transition: border-color var(--tn), box-shadow var(--tn);
+  user-select: text;
+  -webkit-user-select: text
+}
+
+.auth-input::placeholder {
+  color: var(--t3)
 }
 
 .auth-input:focus {
-  border-color: rgba(79, 195, 247, 0.3)
+  border-color: rgba(79, 195, 247, 0.3);
+  box-shadow: 0 0 0 3px rgba(79, 195, 247, 0.07)
 }
 
-.auth-textarea {
-  min-height: 75px;
-  resize: none;
-  font-size: 11px;
-  font-family: monospace;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(79, 195, 247, 0.18);
-  border-radius: var(--r-md);
-  color: rgba(255, 255, 255, 0.75);
-  transition: border-color var(--tn), box-shadow var(--tn)
-}
-
-.auth-textarea:focus {
-  border-color: rgba(79, 195, 247, 0.35);
-  box-shadow: 0 0 0 3px rgba(79, 195, 247, 0.07);
-  outline: none
-}
-
-.auth-textarea::placeholder {
-  color: var(--t3)
+.auth-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed
 }
 
 .auth-error {
   color: #f04545;
   font-size: 11px;
   text-align: center;
-  margin: 0
+  margin: 0;
+  padding: 6px 10px;
+  background: rgba(240, 69, 69, 0.08);
+  border: 1px solid rgba(240, 69, 69, 0.22);
+  border-radius: var(--r-sm);
+  line-height: 1.4
+}
+
+.auth-error--success {
+  color: #4caf82;
+  background: rgba(76, 175, 130, 0.10);
+  border-color: rgba(76, 175, 130, 0.32)
+}
+
+.btn-auth-primary {
+  width: 100%;
+  padding: 0;
+  height: 42px;
+  background: linear-gradient(160deg, #1a7fa8 0%, #0e6690 45%, #074f72 100%);
+  border: none;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  color: #d0eeff;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset, 0 -1px 0 rgba(0, 0, 0, 0.3) inset, 0 3px 0 #032d44, 0 5px 14px rgba(0, 0, 0, 0.45);
+  transform: translateY(0);
+  transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.12s ease
+}
+
+.btn-auth-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.12);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset, 0 -1px 0 rgba(0, 0, 0, 0.3) inset, 0 4px 0 #032d44, 0 8px 18px rgba(0, 0, 0, 0.5)
+}
+
+.btn-auth-primary:active:not(:disabled) {
+  transform: translateY(2px);
+  filter: brightness(0.9);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 1px 0 #032d44, 0 2px 6px rgba(0, 0, 0, 0.45)
+}
+
+.btn-auth-primary:disabled {
+  opacity: 0.55;
+  cursor: progress;
+  transform: none;
+  filter: grayscale(0.2)
+}
+
+.auth-secondary-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 11px
+}
+
+.auth-link {
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  color: var(--t2);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--tf);
+  text-decoration: none
+}
+
+.auth-link:hover:not(:disabled) {
+  color: rgba(79, 195, 247, 0.85);
+  text-decoration: underline
+}
+
+.auth-link:disabled {
+  opacity: 0.55;
+  cursor: not-allowed
+}
+
+.auth-link-sep {
+  color: var(--t3);
+  font-size: 11px;
+  pointer-events: none
 }
 
 .main-app {
@@ -4395,178 +4371,560 @@ body {
   color: var(--cyan)
 }
 
-.export-token-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(5, 7, 12, 0.88);
-  backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  padding: 16px;
-  animation: fadeIn 0.18s ease
+/* ── Set-password modal ──────────────────────────────────────────────────
+   Reuses .dialog-overlay/.dialog/.dialog-header/.dialog-body/.dialog-actions
+   from the Add Anime dialog and layers in modal-specific chrome:
+   - cyan icon chip in the header band
+   - cyan-tinted hint card with an info icon and an email pill
+   - single password input with inline show/hide toggle + 3-segment strength meter
+   - submit stays disabled until length ≥ 6
+   Show/hide of the overlay itself is handled by the shared `.dialog-overlay`
+   + `.visible` class (toggled by AnimeTracker.Dialogs.open/close). */
+
+.set-password-overlay.dialog-overlay {
+  background: rgba(5, 7, 12, 0.78);
+  z-index: 9999
 }
 
-.export-token-box {
-  background: #111520;
-  background-image: radial-gradient(ellipse at 50% 0%, rgba(79, 195, 247, 0.07) 0%, transparent 60%);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-top-color: rgba(79, 195, 247, 0.2);
-  border-radius: var(--r-xl);
+.set-password-overlay.visible {
+  animation: setPwOverlayIn 0.16s ease-out
+}
+
+.set-password-dialog.dialog {
+  /* Compact variant of the Add-Anime shell: tighter clamp, same skin. */
+  max-width: 300px;
+  text-align: left;
   padding: 0;
-  width: 100%;
-  max-width: 310px;
   overflow: hidden;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 12px 40px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(79, 195, 247, 0.06) inset;
-  animation: dlg-in 0.22s cubic-bezier(0.34, 1.3, 0.64, 1)
+  background: #0f1520;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(79, 195, 247, 0.05);
+  animation: setPwDialogIn 0.2s cubic-bezier(0.34, 1.3, 0.64, 1)
 }
 
-.export-token-header {
+@keyframes setPwOverlayIn {
+  from { opacity: 0 }
+  to   { opacity: 1 }
+}
+
+@keyframes setPwDialogIn {
+  from { opacity: 0; transform: scale(0.95) translateY(-4px) }
+  to   { opacity: 1; transform: scale(1)    translateY(0) }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .set-password-overlay.visible,
+  .set-password-dialog.dialog {
+    animation: none
+  }
+}
+
+/* ── Header band ─────────────────────────────────────────────────────── */
+.set-password-dialog .dialog-header {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 14px 16px 13px;
-  background: linear-gradient(180deg, rgba(79, 195, 247, 0.08) 0%, transparent 100%);
+  padding: 10px 14px;
+  background: linear-gradient(180deg, rgba(79, 195, 247, 0.07) 0%, rgba(79, 195, 247, 0.015) 100%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06)
 }
 
-.export-token-header-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: linear-gradient(135deg, #4fc3f7, #29b6f6);
-  box-shadow: 0 0 8px rgba(79, 195, 247, 0.7)
-}
-
-.export-token-box h3 {
-  margin: 0;
-  font-size: 13px;
+.set-password-dialog .dialog-header h3 {
+  flex: 1;
+  font-size: 12.5px;
   font-weight: 700;
-  color: var(--t1);
+  color: #e0eeff;
+  margin: 0;
   letter-spacing: 0.2px
 }
 
-.export-token-body {
-  padding: 14px 16px 16px;
+.set-password-icon {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(79, 195, 247, 0.12);
+  border: 1px solid rgba(79, 195, 247, 0.25);
+  border-radius: var(--r-xs);
+  color: var(--cyan);
+  flex-shrink: 0;
+  box-shadow: 0 0 10px rgba(79, 195, 247, 0.15) inset
+}
+
+.set-password-icon svg {
+  width: 12px;
+  height: 12px
+}
+
+.set-password-dialog .dialog-close {
+  width: 22px;
+  height: 22px
+}
+
+.set-password-dialog .dialog-close svg {
+  width: 11px;
+  height: 11px
+}
+
+/* ── Body layout ─────────────────────────────────────────────────────── */
+.set-password-dialog .dialog-body {
+  padding: 12px 14px 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px
+  gap: 11px
 }
 
-.export-token-box p {
-  font-size: 10px;
-  color: var(--t2);
-  margin: 0;
-  line-height: 1.6
-}
-
-.export-token-box p strong {
-  color: rgba(79, 195, 247, 0.7);
-  font-weight: 600
-}
-
-.export-token-text {
-  width: 100%;
-  min-height: 72px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(79, 195, 247, 0.14);
-  border-radius: var(--r-sm);
-  color: rgba(79, 195, 247, 0.65);
-  font-size: 10px;
-  font-family: monospace;
-  padding: 8px 10px;
-  box-sizing: border-box;
-  resize: none;
-  line-height: 1.5;
-  outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(79, 195, 247, 0.2) transparent
-}
-
-.export-token-text:focus {
-  border-color: rgba(79, 195, 247, 0.3);
-  box-shadow: 0 0 0 3px rgba(79, 195, 247, 0.07)
-}
-
-.export-token-text::-webkit-scrollbar {
-  width: 4px
-}
-
-.export-token-text::-webkit-scrollbar-track {
-  background: transparent
-}
-
-.export-token-text::-webkit-scrollbar-thumb {
-  background: rgba(79, 195, 247, 0.2);
-  border-radius: 4px
-}
-
-.export-token-text::-webkit-scrollbar-thumb:hover {
-  background: rgba(79, 195, 247, 0.38)
-}
-
-.export-token-actions {
+/* ── Hint card ───────────────────────────────────────────────────────── */
+.set-password-hint {
   display: flex;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(79, 195, 247, 0.06);
+  border: 1px solid rgba(79, 195, 247, 0.18);
+  border-radius: var(--r-sm)
+}
+
+.set-password-hint-icon {
+  width: 13px;
+  height: 13px;
+  margin-top: 1px;
+  flex-shrink: 0;
+  color: rgba(79, 195, 247, 0.85)
+}
+
+.set-password-hint-text {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  font-size: 10.5px;
+  color: var(--t2);
+  line-height: 1.5
+}
+
+.set-password-email-pill {
+  align-self: flex-start;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  background: rgba(79, 195, 247, 0.12);
+  border: 1px solid rgba(79, 195, 247, 0.28);
+  border-radius: var(--r-pill);
+  color: rgba(79, 195, 247, 0.92);
+  font-family: 'Inter', 'Segoe UI', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  word-break: break-all;
+  user-select: text;
+  -webkit-user-select: text
+}
+
+/* ── Field group ─────────────────────────────────────────────────────── */
+.set-password-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px
+}
+
+.set-password-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgba(208, 226, 245, 0.78);
+  padding-left: 2px;
+  letter-spacing: 0.1px
+}
+
+.set-password-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center
+}
+
+.set-password-input {
+  width: 100%;
+  padding: 8px 36px 8px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--r-sm);
+  color: #d8eaff;
+  font-size: 12.5px;
+  font-family: inherit;
+  letter-spacing: 0.2px;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  caret-color: var(--cyan);
+  user-select: text;
+  -webkit-user-select: text
+}
+
+/* Wider letter-spacing while masked makes the dots look intentional. The
+   reveal toggle adds .is-revealed and we drop back to the normal tracking
+   so the actual characters stay readable. */
+.set-password-input[type="password"] {
+  letter-spacing: 2px
+}
+
+.set-password-input::placeholder {
+  color: rgba(170, 195, 220, 0.35);
+  letter-spacing: normal
+}
+
+.set-password-input:focus {
+  background: rgba(79, 195, 247, 0.05);
+  border-color: rgba(79, 195, 247, 0.5);
+  box-shadow: 0 0 0 3px rgba(79, 195, 247, 0.12)
+}
+
+.set-password-input:disabled {
+  opacity: 0.55;
+  cursor: progress
+}
+
+/* Edge / Chrome (Windows) inject a built-in password reveal button on the
+   right edge of every <input type="password">. We already render our own
+   eye toggle, so suppress the native one to avoid the "two eyes" overlap. */
+.set-password-input::-ms-reveal,
+.set-password-input::-ms-clear {
+  display: none
+}
+
+.set-password-input::-webkit-credentials-auto-fill-button,
+.set-password-input::-webkit-strong-password-auto-fill-button,
+.set-password-input::-webkit-contacts-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+  pointer-events: none;
+  height: 0;
+  width: 0;
+  margin: 0
+}
+
+/* ── Show/hide toggle ────────────────────────────────────────────────── */
+.set-password-toggle {
+  position: absolute;
+  right: 3px;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-xs);
+  color: rgba(170, 195, 220, 0.55);
+  cursor: pointer;
+  transition: color var(--tf), background var(--tf)
+}
+
+.set-password-toggle:hover {
+  color: var(--cyan);
+  background: rgba(79, 195, 247, 0.08)
+}
+
+.set-password-toggle:focus-visible {
+  outline: 2px solid rgba(79, 195, 247, 0.6);
+  outline-offset: 1px
+}
+
+.set-password-toggle svg {
+  width: 13px;
+  height: 13px
+}
+
+/* Default: password is masked → show the "eye" (offer to reveal).
+   When the wrapper has .is-revealed → swap to "eye-off" (offer to hide). */
+.set-password-toggle .eye-off { display: none }
+.set-password-input-wrap.is-revealed .set-password-toggle .eye-on  { display: none }
+.set-password-input-wrap.is-revealed .set-password-toggle .eye-off { display: inline-block }
+
+/* ── Strength meter ──────────────────────────────────────────────────── */
+.set-password-strength {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 14px;
+  padding: 0 2px
+}
+
+.set-password-strength-bars {
+  display: flex;
+  gap: 3px;
+  flex: 1
+}
+
+.set-password-strength-bars span {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  transition: background 0.2s ease, box-shadow 0.2s ease
+}
+
+.set-password-strength[data-level="1"] .set-password-strength-bars span:nth-child(1) {
+  background: #f04545;
+  box-shadow: 0 0 6px rgba(240, 69, 69, 0.45)
+}
+
+.set-password-strength[data-level="2"] .set-password-strength-bars span:nth-child(-n+2) {
+  background: #f0c040;
+  box-shadow: 0 0 6px rgba(240, 192, 64, 0.4)
+}
+
+.set-password-strength[data-level="3"] .set-password-strength-bars span {
+  background: var(--cyan);
+  box-shadow: 0 0 6px rgba(79, 195, 247, 0.45)
+}
+
+.set-password-strength-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  min-width: 44px;
+  text-align: right;
+  color: var(--t3);
+  transition: color 0.15s ease
+}
+
+.set-password-strength[data-level="1"] .set-password-strength-label { color: #f04545 }
+.set-password-strength[data-level="2"] .set-password-strength-label { color: #f0c040 }
+.set-password-strength[data-level="3"] .set-password-strength-label { color: var(--cyan) }
+
+/* ── Server-side error line (shared style with auth-error) ──────────── */
+.set-password-error {
+  margin: 0;
+  padding: 6px 9px;
+  font-size: 10.5px;
+  text-align: left;
+  background: rgba(240, 69, 69, 0.08);
+  border: 1px solid rgba(240, 69, 69, 0.25);
+  border-radius: var(--r-sm)
+}
+
+/* ── Footer / actions band ───────────────────────────────────────────── */
+.set-password-dialog .dialog-actions {
+  padding: 9px 14px 11px;
+  margin: 0;
+  background: rgba(0, 0, 0, 0.22);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  justify-content: flex-end;
   gap: 7px
 }
 
-.btn-copy-token {
-  flex: 1;
-  height: 36px;
-  padding: 0;
-  background: linear-gradient(160deg, #3db8e8 0%, #1a96c8 45%, #0e79a8 100%);
-  border: none;
-  border-radius: var(--r-pill);
-  font-size: 12px;
-  font-weight: 700;
-  font-family: inherit;
-  cursor: pointer;
-  color: #fff;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.22) inset, 0 -2px 0 rgba(0, 0, 0, 0.3) inset, 0 3px 10px rgba(14, 121, 168, 0.5), 0 1px 3px rgba(0, 0, 0, 0.45);
-  transition: all 0.12s ease
+.set-password-dialog .dialog-actions .btn {
+  padding: 7px 14px;
+  border-radius: var(--r-sm);
+  font-size: 11.5px
 }
 
-.btn-copy-token::before {
+.set-password-dialog .btn-primary:disabled {
+  background: rgba(79, 195, 247, 0.18);
+  color: rgba(14, 17, 23, 0.55);
+  opacity: 1;
+  cursor: not-allowed
+}
+
+.set-password-dialog .btn-primary.is-loading {
+  cursor: progress
+}
+
+.set-password-dialog .btn-primary.is-loading::before {
   content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.11) 0%, transparent 55%);
-  border-radius: inherit;
-  pointer-events: none
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  display: inline-block;
+  vertical-align: -1px;
+  border: 2px solid rgba(14, 17, 23, 0.3);
+  border-top-color: rgba(14, 17, 23, 0.85);
+  border-radius: 50%;
+  animation: setPwSpin 0.7s linear infinite
 }
 
-.btn-copy-token:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.22) inset, 0 -2px 0 rgba(0, 0, 0, 0.3) inset, 0 5px 16px rgba(14, 121, 168, 0.6), 0 2px 5px rgba(0, 0, 0, 0.45)
+@keyframes setPwSpin {
+  to { transform: rotate(360deg) }
 }
 
-.btn-copy-token:active {
-  transform: translateY(1px);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset, 0 2px 6px rgba(14, 121, 168, 0.35)
+@media (prefers-reduced-motion: reduce) {
+  .set-password-dialog .btn-primary.is-loading::before {
+    animation: none
+  }
 }
 
-.btn-close-token {
-  height: 36px;
-  padding: 0 16px;
-  background: rgba(255, 255, 255, 0.04);
+/* Visible focus ring on every interactive control inside the modal so
+   keyboard users always know where they are. */
+.set-password-dialog button:focus-visible,
+.set-password-dialog .dialog-close:focus-visible {
+  outline: 2px solid rgba(79, 195, 247, 0.6);
+  outline-offset: 2px
+}
+
+/* ── Generic toast (success / error) ─────────────────────────────────────
+   Apple/Linear-style: compact, rounded rectangle, gradient fill, soft tinted
+   shadow, slim progress bar at the bottom. Used by `AT.showToast()` and
+   exposed at `window.AnimeTracker.showToast` for other popup modules. */
+
+.at-toast {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translate(-50%, 14px);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: max-content;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 9px 12px 10px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--at-toast-top) 0%, var(--at-toast-bottom) 100%);
+  box-shadow: var(--at-toast-shadow);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--r-pill);
-  font-size: 12px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  color: var(--t2);
-  transition: all 0.12s ease
+  color: #fff;
+  z-index: 10001;
+  opacity: 0;
+  pointer-events: auto;
+  overflow: hidden;
+  transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.34, 1.2, 0.64, 1)
 }
 
-.btn-close-token:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--t1)
+.at-toast--visible {
+  opacity: 1;
+  transform: translate(-50%, 0)
+}
+
+.at-toast--leaving {
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  transition-duration: 0.16s
+}
+
+.at-toast--success {
+  --at-toast-top: #3ddc97;
+  --at-toast-bottom: #2ecc71;
+  --at-toast-shadow: 0 8px 24px -6px rgba(46, 204, 113, 0.45),
+                     0 1px 0 rgba(255, 255, 255, 0.15) inset
+}
+
+.at-toast--error {
+  --at-toast-top: #f25c5c;
+  --at-toast-bottom: #e0383a;
+  --at-toast-shadow: 0 8px 24px -6px rgba(220, 50, 55, 0.45),
+                     0 1px 0 rgba(255, 255, 255, 0.15) inset
+}
+
+.at-toast-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.95);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.18))
+}
+
+.at-toast-icon svg {
+  width: 18px;
+  height: 18px
+}
+
+.at-toast-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left
+}
+
+.at-toast-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #ffffff;
+  letter-spacing: 0.1px;
+  word-wrap: break-word
+}
+
+.at-toast-body {
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.1px;
+  word-wrap: break-word
+}
+
+.at-toast-close {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  margin-top: -1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease
+}
+
+.at-toast-close svg {
+  width: 12px;
+  height: 12px
+}
+
+.at-toast-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14)
+}
+
+.at-toast-close:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.55);
+  outline-offset: 1px
+}
+
+/* Slim progress bar that drains the auto-dismiss window. Pause on hover via
+   animation-play-state so a reader gets to finish the message. */
+.at-toast-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.45);
+  transform-origin: left center;
+  animation: atToastProgress var(--at-toast-duration, 4000ms) linear forwards;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px
+}
+
+.at-toast--paused .at-toast-progress {
+  animation-play-state: paused
+}
+
+@keyframes atToastProgress {
+  from { transform: scaleX(1) }
+  to   { transform: scaleX(0) }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .at-toast,
+  .at-toast--leaving {
+    transition: opacity 0.12s ease
+  }
+  .at-toast-progress {
+    animation: none;
+    transform: scaleX(1)
+  }
 }
 
 @keyframes shimmer {
@@ -5987,6 +6345,27 @@ body {
 .settings-action--danger:hover {
   background: rgba(240, 80, 80, 0.1);
   border-color: rgba(240, 80, 80, 0.5)
+}
+
+/* "Password set" interactive state — green-tinted to confirm a password
+   already exists, but still clickable so the user can update / recover. */
+.settings-action--set {
+  background: linear-gradient(180deg, rgba(76, 175, 130, 0.10) 0%, rgba(76, 175, 130, 0.04) 100%);
+  border-color: rgba(76, 175, 130, 0.32);
+  color: #c8efd9
+}
+
+.settings-action--set:hover {
+  background: linear-gradient(180deg, rgba(76, 175, 130, 0.16) 0%, rgba(76, 175, 130, 0.07) 100%);
+  border-color: rgba(76, 175, 130, 0.5)
+}
+
+.settings-action--set:active {
+  transform: scale(0.98)
+}
+
+.settings-action--set .settings-icon {
+  color: var(--green)
 }
 
 .settings-action .settings-icon {

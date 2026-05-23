@@ -384,6 +384,46 @@ const FirebaseSync = {
     },
 
     /**
+     * Sign in with email + password (Identity Toolkit accounts:signInWithPassword)
+     */
+    async signInWithEmailPassword(email, password) {
+        return await FirebaseLib.signInWithEmailPassword(email, password);
+    },
+
+    /**
+     * Create a new account with email + password
+     */
+    async signUpWithEmailPassword(email, password) {
+        return await FirebaseLib.signUpWithEmailPassword(email, password);
+    },
+
+    /**
+     * Link/update a password on the currently signed-in account.
+     * Used by the "Set password for mobile" flow so Google-only users can
+     * also sign in via email + password on Orion/Safari with the same uid.
+     */
+    async setPasswordForCurrentUser(password) {
+        return await FirebaseLib.setPasswordForCurrentUser(password);
+    },
+
+    /**
+     * Send a password-reset email via Firebase's transactional template.
+     */
+    async sendPasswordReset(email) {
+        return await FirebaseLib.sendPasswordReset(email);
+    },
+
+    /**
+     * Probe an email/password combo without persisting the session.
+     * Returns true if the credentials are valid (i.e. matches the current
+     * password); false if Firebase rejects them. Used by the "Update
+     * password" flow to block no-op saves.
+     */
+    async verifyPasswordSilently(email, password) {
+        return await FirebaseLib.verifyPasswordSilently(email, password);
+    },
+
+    /**
      * Sign out
      */
     async signOut() {

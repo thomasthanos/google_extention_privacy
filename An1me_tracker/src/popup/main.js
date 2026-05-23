@@ -257,6 +257,14 @@
     // lives in src/content/skiptime-helper.js and listens for chrome.storage
     // changes on this key to mount/unmount itself live.
     const SKIPTIME_HELPER_KEY = 'skiptimeHelperEnabled';
+    // Tracks per-account "user has set a password via the Set-Password modal"
+    // so the Danger zone button can switch to a "Password set ✓" state once
+    // the link succeeds. Stored as `{ uid, setAt }` — the uid guard means
+    // the marker doesn't leak between accounts on a shared browser. This is
+    // a local hint, not the source of truth (which lives on Identity Toolkit's
+    // providerUserInfo); a fresh sign-in on a different device won't have it
+    // until the user sets a password again from there.
+    const PASSWORD_SET_MARKER_KEY = 'passwordSetMarker';
 
     const TOGGLE_SETTINGS = {
         copyGuard: {
@@ -475,6 +483,58 @@
     function showAuthScreen() {
         elements.authSection.style.display = 'flex';
         elements.mainApp.style.display = 'none';
+
+        // Detect whether the Chrome OAuth flow can actually run here. The
+        // tricky part is that Orion (Kagi's WebKit-based browser that runs
+        // both Chrome AND Firefox extensions) spoofs `Chrome/…` in its UA
+        // *and* ships a `chrome.identity.launchWebAuthFlow` stub, so neither
+        // signal alone tells us anything. We bias toward "this is a mobile /
+        // alt browser" whenever any of these is true:
+        //   • UA contains an explicit Orion / Firefox / mobile platform marker
+        //   • `getRedirectURL()` returns anything other than a real
+        //     `<id>.chromiumapp.org` URL (Orion / Firefox return their own
+        //     formats, e.g. `*.extensions.allizom.org`)
+        //   • `chrome.identity.launchWebAuthFlow` simply isn't there
+        // Only when every signal lines up do we treat this as desktop Chrome.
+        const hasGoogleAuth = (() => {
+            const ua = navigator.userAgent || '';
+            // Explicit alt-browser markers — most reliable.
+            if (/Orion|Firefox|FxiOS/i.test(ua)) return false;
+            // Mobile platforms — Google OAuth via launchWebAuthFlow is not
+            // supported in extension popups there, regardless of engine.
+            if (/Android|iPhone|iPad|iPod|Mobile|CriOS|EdgiOS/i.test(ua)) return false;
+            // Pure Apple WebKit (Safari macOS / iOS) — has Safari token but
+            // no Chromium marker in the UA.
+            if (/AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg/i.test(ua)) return false;
+            // API surface check.
+            if (!chrome?.identity?.launchWebAuthFlow) return false;
+            // Redirect URL must look like a real Chromium extension URL —
+            // Orion / Firefox return different formats here.
+            let redirectUrl = '';
+            try { redirectUrl = chrome.identity.getRedirectURL?.() || ''; }
+            catch { return false; }
+            if (!/^https:\/\/[a-z0-9]+\.chromiumapp\.org/.test(redirectUrl)) return false;
+            return true;
+        })();
+        // One-line diagnostic so we can see in the popup console *why* a given
+        // surface ended up on Google vs email — saves a "what does your UA
+        // say?" round-trip when debugging mobile detection issues.
+        PopupLogger.log('Auth',
+            `hasGoogleAuth=${hasGoogleAuth} · redirect=${(() => {
+                try { return chrome?.identity?.getRedirectURL?.() || '∅'; } catch { return '∅'; }
+            })()} · ua="${(navigator.userAgent || '').slice(0, 140)}"`);
+        const authContent = document.querySelector('.auth-content');
+        if (authContent) {
+            authContent.classList.toggle('auth-mobile', !hasGoogleAuth);
+        }
+        // Inverse split: desktop = Google only (hide email form + OR), mobile
+        // = email/password only (Google button is already hidden via the
+        // .auth-mobile class above). Driving these inline keeps the JS as
+        // the single source of truth for "which surface am I on?".
+        const emailForm = document.getElementById('authEmailForm');
+        const orDivider = document.querySelector('.auth-or-divider');
+        if (emailForm) emailForm.style.display = hasGoogleAuth ? 'none' : '';
+        if (orDivider) orDivider.style.display = hasGoogleAuth ? 'none' : '';
     }
 
     function showMainApp(user) {
@@ -1366,12 +1426,14 @@
         // here keeps the view self-sufficient and tolerant of out-of-band
         // changes (e.g. another popup tab toggled something).
         let storedSettings = {};
+        let passwordIsSet = false;
         try {
             const stored = await chrome.storage.local.get([
                 COPY_GUARD_STORAGE_KEY,
                 SMART_NOTIF_STORAGE_KEY,
                 AUTO_SKIP_FILLER_STORAGE_KEY,
-                SKIPTIME_HELPER_KEY
+                SKIPTIME_HELPER_KEY,
+                PASSWORD_SET_MARKER_KEY
             ]);
             storedSettings = {
                 copyGuard: stored[COPY_GUARD_STORAGE_KEY] !== false,
@@ -1379,13 +1441,19 @@
                 autoSkipFiller: stored[AUTO_SKIP_FILLER_STORAGE_KEY] === true,
                 skiptimeHelper: stored[SKIPTIME_HELPER_KEY] === true
             };
+            const marker = stored[PASSWORD_SET_MARKER_KEY];
+            // Marker is only meaningful for the *current* account — guards
+            // against stale state when the user switches Google identities
+            // on a shared browser.
+            passwordIsSet = !!(marker?.uid && user?.uid && marker.uid === user.uid && marker.setAt);
         } catch (e) {
             PopupLogger.warn('Settings', 'Failed to load toggle state for view:', e);
         }
 
         SettingsView.render(container, {
             user,
-            settings: storedSettings
+            settings: storedSettings,
+            passwordIsSet
         });
 
         container.scrollTop = 0;
@@ -2708,6 +2776,512 @@
         }
     }
 
+    // ── Email/Password auth ──────────────────────────────────────────────
+    // Maps Identity Toolkit's terse error codes to user-facing strings. Falls
+    // back to the raw message for anything we haven't seen before so we don't
+    // silently swallow a real failure.
+    const EMAIL_AUTH_ERRORS = {
+        EMAIL_NOT_FOUND: 'No account found for this email.',
+        INVALID_PASSWORD: 'Wrong password. Try again or reset it.',
+        INVALID_LOGIN_CREDENTIALS: 'Wrong email or password.',
+        USER_DISABLED: 'This account has been disabled.',
+        EMAIL_EXISTS: 'An account already exists for this email.',
+        OPERATION_NOT_ALLOWED: 'Email/password sign-in is disabled.',
+        WEAK_PASSWORD: 'Password is too weak (min 6 characters).',
+        INVALID_EMAIL: 'Please enter a valid email address.',
+        MISSING_PASSWORD: 'Please enter your password.',
+        MISSING_EMAIL: 'Please enter your email.',
+        TOO_MANY_ATTEMPTS_TRY_LATER: 'Too many attempts. Please wait a minute and try again.',
+        CREDENTIAL_TOO_OLD_LOGIN_AGAIN: 'For security, please sign in with Google again before setting a password.'
+    };
+
+    function friendlyAuthError(err) {
+        const raw = (err?.message || '').trim();
+        // Firebase REST often returns "CODE : extra info" — strip the suffix.
+        const code = raw.split(':')[0].trim().toUpperCase().replace(/\s+/g, '_');
+        return EMAIL_AUTH_ERRORS[code] || raw || 'Sign-in failed.';
+    }
+
+    function setEmailFormBusy(busy, label) {
+        const btn = document.getElementById('emailSignInBtn');
+        const createBtn = document.getElementById('authCreateAccountBtn');
+        const forgotBtn = document.getElementById('authForgotPasswordBtn');
+        if (btn) {
+            btn.disabled = busy;
+            const lbl = btn.querySelector('.btn-auth-label');
+            if (lbl) lbl.textContent = label || 'Sign in';
+        }
+        if (createBtn) createBtn.disabled = busy;
+        if (forgotBtn) forgotBtn.disabled = busy;
+        const inputs = document.querySelectorAll('#authEmailForm .auth-input');
+        inputs.forEach((el) => { el.disabled = busy; });
+    }
+
+    function setEmailFormError(message, opts = {}) {
+        const errEl = document.getElementById('authEmailError');
+        if (!errEl) return;
+        const isSuccess = opts.success === true;
+        errEl.classList.toggle('auth-error--success', isSuccess);
+        if (message) {
+            errEl.textContent = message;
+            errEl.style.display = 'block';
+        } else {
+            errEl.textContent = '';
+            errEl.style.display = 'none';
+            errEl.classList.remove('auth-error--success');
+        }
+    }
+
+    function readEmailFormCredentials() {
+        const email = (document.getElementById('authEmailInput')?.value || '').trim();
+        const password = document.getElementById('authPasswordInput')?.value || '';
+        return { email, password };
+    }
+
+    async function handleEmailAuth({ mode }) {
+        const { FirebaseSync } = AT;
+        const { email, password } = readEmailFormCredentials();
+        setEmailFormError('');
+
+        if (!email) { setEmailFormError(EMAIL_AUTH_ERRORS.MISSING_EMAIL); return; }
+        if (!password) { setEmailFormError(EMAIL_AUTH_ERRORS.MISSING_PASSWORD); return; }
+        if (mode === 'signup' && password.length < 6) {
+            setEmailFormError(EMAIL_AUTH_ERRORS.WEAK_PASSWORD);
+            return;
+        }
+
+        const busyLabel = mode === 'signup' ? 'Creating…' : 'Signing in…';
+        const idleLabel = 'Sign in';
+        setEmailFormBusy(true, busyLabel);
+
+        try {
+            // Mirror Google sign-in: ask the SW to silently repair metadata
+            // for the freshly-pulled cloud library after the sign-in lands.
+            await chrome.storage.local.set({ pendingBackgroundMetadataRepair: true });
+            if (mode === 'signup') {
+                await FirebaseSync.signUpWithEmailPassword(email, password);
+            } else {
+                await FirebaseSync.signInWithEmailPassword(email, password);
+            }
+            // Clear the password field on success — we don't want it sitting
+            // in the DOM if the user gets signed out later.
+            const pwEl = document.getElementById('authPasswordInput');
+            if (pwEl) pwEl.value = '';
+        } catch (err) {
+            await chrome.storage.local.set({ pendingBackgroundMetadataRepair: false });
+            PopupLogger.error('Firebase', `${mode === 'signup' ? 'Sign-up' : 'Sign-in'} error:`, err);
+            setEmailFormError(friendlyAuthError(err));
+        } finally {
+            setEmailFormBusy(false, idleLabel);
+        }
+    }
+
+    async function handleForgotPassword() {
+        const { FirebaseSync } = AT;
+        const { email } = readEmailFormCredentials();
+        setEmailFormError('');
+
+        const emailInput = document.getElementById('authEmailInput');
+        if (!email) {
+            setEmailFormError('Enter your email above first, then tap "Forgot password?".');
+            emailInput?.focus();
+            return;
+        }
+        // Trivial sanity check — keeps us from burning a request on
+        // obvious garbage like "asdf" and surfaces feedback instantly.
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            setEmailFormError('That doesn\'t look like a valid email address.');
+            emailInput?.focus();
+            return;
+        }
+
+        // Drive only the forgot-password button's loading state — the rest
+        // of the form (Sign in / Create account) stays interactive so the
+        // user isn't trapped while we wait for the OOB email round-trip.
+        const forgotBtn = document.getElementById('authForgotPasswordBtn');
+        const originalText = forgotBtn?.textContent || 'Forgot password?';
+        if (forgotBtn) {
+            forgotBtn.disabled = true;
+            forgotBtn.textContent = 'Sending…';
+        }
+
+        try {
+            await FirebaseSync.sendPasswordReset(email);
+            PopupLogger.log('Firebase', `Password reset email sent to ${email}`);
+            // Inline success — survives until the user types again. A 3s
+            // toast was easy to miss; this is impossible to miss.
+            setEmailFormError(
+                `Reset email sent to ${email}. Check your inbox (and spam folder).`,
+                { success: true }
+            );
+        } catch (err) {
+            PopupLogger.error('Firebase', 'Password reset error:', err);
+            setEmailFormError(friendlyAuthError(err));
+        } finally {
+            if (forgotBtn) {
+                forgotBtn.disabled = false;
+                forgotBtn.textContent = originalText;
+            }
+        }
+    }
+
+    // ── Set-password modal (for Google users who want to log in on mobile) ─
+    // Build steps run in this order so the function reads top-down:
+    //   1. tear down any prior overlay (handles double-clicks)
+    //   2. detect "update mode" if the user already linked a password —
+    //      we change the labels but keep the same submit flow (Identity
+    //      Toolkit's accounts:update overwrites whatever password is set)
+    //   3. build DOM with `<form>` so Enter submits naturally
+    //   4. wire show/hide toggle, live strength validation
+    //   5. wire submit + cancel via the shared Dialogs helper
+    //      (gives us focus trap + ESC + focus restore for free)
+    async function openSetPasswordModal() {
+        document.getElementById('setPasswordOverlay')?.remove();
+
+        const { FirebaseSync, Dialogs } = AT;
+        const user = FirebaseSync.getUser?.() || null;
+
+        // Detect update vs first-time setup so we can swap copy. The local
+        // marker is per-uid so switching accounts on a shared browser still
+        // shows the right state. This is best-effort UX — the actual server
+        // call (accounts:update) overwrites any existing password silently
+        // either way, so even a stale marker can't put us in a wrong state.
+        let isUpdate = false;
+        try {
+            const stored = await chrome.storage.local.get([PASSWORD_SET_MARKER_KEY]);
+            const marker = stored[PASSWORD_SET_MARKER_KEY];
+            isUpdate = !!(marker?.uid && user?.uid && marker.uid === user.uid && marker.setAt);
+        } catch { /* marker unreadable; default to first-time copy */ }
+
+        const COPY = isUpdate ? {
+            title:        'Update password',
+            hint:         'Replace your existing password — same email, new password.',
+            saveIdle:     'Update password',
+            saveBusy:     'Updating…',
+            successTitle: 'Password updated.',
+            successBody:  'Use the new password on mobile.'
+        } : {
+            title:        'Set password for mobile',
+            hint:         'Sign in on Orion / Safari with this password — same library, same account.',
+            saveIdle:     'Save password',
+            saveBusy:     'Saving…',
+            successTitle: 'Password set.',
+            successBody:  'Use it to sign in on mobile.'
+        };
+
+        const overlay = document.createElement('div');
+        overlay.id = 'setPasswordOverlay';
+        overlay.className = 'dialog-overlay set-password-overlay';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-labelledby', 'setPasswordTitle');
+        overlay.setAttribute('aria-describedby', 'setPasswordHint');
+        overlay.setAttribute('aria-hidden', 'true');
+        overlay.innerHTML = `
+            <form class="dialog set-password-dialog" novalidate autocomplete="on">
+                <input type="email" name="username" autocomplete="username"
+                       value="${(user?.email || '').replace(/"/g, '&quot;')}"
+                       hidden tabindex="-1" aria-hidden="true">
+                <div class="dialog-header">
+                    <span class="set-password-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+                        </svg>
+                    </span>
+                    <h3 id="setPasswordTitle"></h3>
+                    <button class="dialog-close" type="button" aria-label="Close dialog" data-close>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                             aria-hidden="true" focusable="false">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="dialog-body">
+                    <div class="set-password-hint" id="setPasswordHint">
+                        <svg class="set-password-hint-icon" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                             stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="16" x2="12" y2="12"/>
+                            <line x1="12" y1="8" x2="12.01" y2="8"/>
+                        </svg>
+                        <div class="set-password-hint-text">
+                            <span class="set-password-hint-copy"></span>
+                            <span class="set-password-email-pill" id="setPasswordEmailPill"></span>
+                        </div>
+                    </div>
+
+                    <div class="set-password-field">
+                        <label class="set-password-label" for="setPasswordInput">New password</label>
+                        <div class="set-password-input-wrap">
+                            <input type="password" id="setPasswordInput" class="set-password-input"
+                                   autocomplete="new-password" minlength="6"
+                                   placeholder="At least 6 characters"
+                                   aria-describedby="setPasswordStrengthLabel">
+                            <button type="button" class="set-password-toggle"
+                                    data-toggle="setPasswordInput"
+                                    aria-label="Show password" aria-pressed="false">
+                                <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                     aria-hidden="true">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                     aria-hidden="true">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="set-password-strength" data-level="0">
+                            <div class="set-password-strength-bars" aria-hidden="true">
+                                <span></span><span></span><span></span>
+                            </div>
+                            <span class="set-password-strength-label" id="setPasswordStrengthLabel">&nbsp;</span>
+                        </div>
+                    </div>
+
+                    <p class="auth-error set-password-error" id="setPasswordError"
+                       role="alert" style="display:none"></p>
+                </div>
+                <div class="dialog-actions">
+                    <button class="btn btn-secondary" type="button" data-close>Cancel</button>
+                    <button class="btn btn-primary" type="submit" id="setPasswordSubmit" disabled>
+                        <span class="set-password-submit-label"></span>
+                    </button>
+                </div>
+            </form>
+        `;
+
+        // Inject the mode-specific copy via textContent so user-supplied
+        // strings (the email) can't ever escape into the DOM as HTML.
+        overlay.querySelector('#setPasswordTitle').textContent = COPY.title;
+        overlay.querySelector('.set-password-hint-copy').textContent = COPY.hint;
+        overlay.querySelector('.set-password-submit-label').textContent = COPY.saveIdle;
+
+        // ── Email pill ───────────────────────────────────────────────────
+        const pillEl = overlay.querySelector('#setPasswordEmailPill');
+        if (pillEl) {
+            if (user?.email) {
+                pillEl.textContent = user.email;
+            } else {
+                // Defensive: never render an empty pill (looks like a layout bug).
+                pillEl.style.display = 'none';
+            }
+        }
+
+        const pwInput = overlay.querySelector('#setPasswordInput');
+        const submitBtn = overlay.querySelector('#setPasswordSubmit');
+        const errEl = overlay.querySelector('#setPasswordError');
+        const strengthRow = overlay.querySelector('.set-password-strength');
+        const strengthLabel = overlay.querySelector('#setPasswordStrengthLabel');
+        const formEl = overlay.querySelector('form.set-password-dialog');
+
+        const showErr = (msg) => {
+            if (!errEl) return;
+            errEl.textContent = msg || '';
+            errEl.style.display = msg ? 'block' : 'none';
+        };
+
+        // ── Show / hide password toggle ──────────────────────────────────
+        // Single eye button on the password input; flips type and updates
+        // aria-pressed + aria-label so screen readers track the state.
+        overlay.querySelectorAll('.set-password-toggle').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const id = btn.dataset.toggle;
+                const target = overlay.querySelector(`#${id}`);
+                if (!target) return;
+                const isPassword = target.type === 'password';
+                target.type = isPassword ? 'text' : 'password';
+                btn.setAttribute('aria-pressed', isPassword ? 'true' : 'false');
+                btn.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+                btn.closest('.set-password-input-wrap')?.classList.toggle('is-revealed', isPassword);
+                // Keep cursor at end of revealed value so the user sees what
+                // they were typing rather than the start of the string.
+                target.focus();
+                try {
+                    const len = target.value.length;
+                    target.setSelectionRange(len, len);
+                } catch { /* type=text supports it; fail safe just in case */ }
+            });
+        });
+
+        // ── Strength meter ───────────────────────────────────────────────
+        // 0=empty 1=weak 2=medium 3=strong. Heuristic: length floor + class
+        // diversity. Not a security guarantee — a hint to nudge users away
+        // from `password` / `123456`. Identity Toolkit enforces ≥6 anyway.
+        const computeStrength = (pw) => {
+            if (!pw) return 0;
+            let classes = 0;
+            if (/[a-z]/.test(pw)) classes++;
+            if (/[A-Z]/.test(pw)) classes++;
+            if (/\d/.test(pw))    classes++;
+            if (/[^A-Za-z0-9]/.test(pw)) classes++;
+            if (pw.length < 6) return 1;
+            if (pw.length >= 12 && classes >= 3) return 3;
+            if (pw.length >= 8  && classes >= 2) return 2;
+            return 1;
+        };
+        const STRENGTH_LABELS = { 0: '', 1: 'Weak', 2: 'Medium', 3: 'Strong' };
+        const updateStrength = () => {
+            const lvl = computeStrength(pwInput.value);
+            strengthRow.dataset.level = String(lvl);
+            strengthLabel.textContent = STRENGTH_LABELS[lvl] || '';
+        };
+
+        // ── Save enablement ──────────────────────────────────────────────
+        const refreshSubmitState = () => {
+            submitBtn.disabled = pwInput.value.length < 6;
+        };
+        const onAnyChange = () => {
+            // Clear any prior server-side error the moment the user resumes
+            // typing — keeps the UI honest about *current* validity.
+            if (errEl?.textContent) showErr('');
+            updateStrength();
+            refreshSubmitState();
+        };
+        pwInput.addEventListener('input', onAnyChange);
+
+        // ── Close + cancel ───────────────────────────────────────────────
+        const close = () => { Dialogs.close(overlay); setTimeout(() => overlay.remove(), 0); };
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) close();
+            if (e.target.closest('[data-close]')) {
+                e.preventDefault();
+                close();
+            }
+        });
+
+        // ── Submit ───────────────────────────────────────────────────────
+        formEl.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (submitBtn.disabled) return;
+            const pw = pwInput.value;
+            showErr('');
+            if (pw.length < 6) { showErr('Password must be at least 6 characters.'); return; }
+
+            const labelEl = submitBtn.querySelector('.set-password-submit-label');
+            const setLoadingLabel = (text) => {
+                submitBtn.disabled = true;
+                submitBtn.classList.add('is-loading');
+                if (labelEl) labelEl.textContent = text;
+            };
+            const restoreIdleLabel = () => {
+                submitBtn.classList.remove('is-loading');
+                if (labelEl) labelEl.textContent = COPY.saveIdle;
+                refreshSubmitState();
+            };
+
+            // Wraps `setPasswordForCurrentUser` and on `CREDENTIAL_TOO_OLD_LOGIN_AGAIN`
+            // transparently re-signs in with Google to refresh the idToken,
+            // then retries once. Firebase requires a recent sign-in for any
+            // sensitive credential change; this gives the user a single-click
+            // experience instead of forcing a manual sign-out / sign-in cycle.
+            const trySetPasswordWithReauth = async () => {
+                try {
+                    await FirebaseSync.setPasswordForCurrentUser(pw);
+                    return true;
+                } catch (firstErr) {
+                    const code = (firstErr?.message || '').split(':')[0]
+                        .trim().toUpperCase().replace(/\s+/g, '_');
+                    if (code !== 'CREDENTIAL_TOO_OLD_LOGIN_AGAIN') throw firstErr;
+
+                    PopupLogger.log('Firebase', 'Credential too old — reauthenticating via Google before retry');
+                    setLoadingLabel('Verifying with Google…');
+                    try {
+                        await FirebaseSync.signInWithGoogle();
+                    } catch (reauthErr) {
+                        const m = (reauthErr?.message || '').toLowerCase();
+                        const cancelled = m.includes('did not approve') ||
+                            m.includes('cancelled') || m.includes('closed') ||
+                            m.includes('popup_closed');
+                        if (cancelled) {
+                            throw new Error('Reauthentication cancelled. Please try again.');
+                        }
+                        throw reauthErr;
+                    }
+                    setLoadingLabel(COPY.saveBusy);
+                    await FirebaseSync.setPasswordForCurrentUser(pw);
+                    return true;
+                }
+            };
+
+            setLoadingLabel(COPY.saveBusy);
+            try {
+                // Update mode only: probe whether the typed value already
+                // matches the current password and bail early — Identity
+                // Toolkit happily accepts an unchanged password, and silently
+                // re-saving the same one is a footgun (user thinks they
+                // changed it; they didn't). For first-time setup there's no
+                // existing password to compare against, so we skip the check.
+                if (isUpdate && user?.email) {
+                    setLoadingLabel('Checking…');
+                    try {
+                        const sameAsCurrent = await FirebaseSync.verifyPasswordSilently(user.email, pw);
+                        if (sameAsCurrent) {
+                            showErr('That\'s already your current password. Pick a new one.');
+                            restoreIdleLabel();
+                            return;
+                        }
+                    } catch (probeErr) {
+                        // Probe failed for a non-credential reason (network /
+                        // rate limit). Don't block the user — fall through
+                        // to the actual save which will surface the real
+                        // error in context if it persists.
+                        PopupLogger.warn('Firebase', 'Same-password probe failed:', probeErr?.message);
+                    }
+                    setLoadingLabel(COPY.saveBusy);
+                }
+                await trySetPasswordWithReauth();
+                // Persist the per-account marker so the Settings danger zone
+                // can flip the button into its "Password set" state. Tying
+                // it to the uid means switching Google accounts on the same
+                // browser doesn't carry the marker over.
+                const currentUser = FirebaseSync.getUser?.();
+                if (currentUser?.uid) {
+                    try {
+                        await chrome.storage.local.set({
+                            [PASSWORD_SET_MARKER_KEY]: {
+                                uid: currentUser.uid,
+                                setAt: new Date().toISOString()
+                            }
+                        });
+                    } catch (e) {
+                        PopupLogger.warn('Settings', `Failed to persist password-set marker: ${e?.message}`);
+                    }
+                }
+                close();
+                showToast({
+                    title: COPY.successTitle,
+                    body:  COPY.successBody,
+                    type:  'success'
+                });
+                // If the user is currently looking at Settings, refresh the
+                // Danger zone so the button flips to its "set" state without
+                // requiring a manual close+reopen of the view.
+                if (currentViewMode === 'settings') {
+                    renderSettingsView();
+                }
+            } catch (err) {
+                PopupLogger.error('Firebase', 'Set password error:', err);
+                showErr(friendlyAuthError(err));
+                restoreIdleLabel();
+            }
+        });
+
+        document.body.appendChild(overlay);
+        // Defer until appended so focus actually lands inside the overlay.
+        // Dialogs.open handles ESC, Tab cycling and focus restoration.
+        Dialogs.open(overlay, { initialFocus: pwInput });
+    }
+    // Expose so settings-view delegated handler can pop the modal.
+    window.AnimeTracker = window.AnimeTracker || {};
+    window.AnimeTracker.openSetPasswordModal = openSetPasswordModal;
+
     function showAuthToast(message, type = 'error') {
         const existing = document.getElementById('authToast');
         if (existing) existing.remove();
@@ -2727,23 +3301,100 @@
 
     // Non-blocking toast that replaces native alert() in error paths. alert()
     // freezes the popup and feels broken; this matches the rest of the toast UX.
-    function showToast(message, type = 'error') {
-        const existing = document.getElementById('atGenericToast');
-        if (existing) existing.remove();
+    //
+    // Two call signatures, both supported:
+    //   showToast('Simple message', 'success')
+    //   showToast({ title: '…', body: '…', type: 'success', duration: 4000 })
+    //
+    // When a string is passed and contains a sentence-end early on
+    // ("Title. Rest of the body…") it auto-splits into a bold title +
+    // muted body so the toast carries visual hierarchy without the caller
+    // having to think about it.
+    function showToast(messageOrOpts, typeArg) {
+        const opts = (messageOrOpts && typeof messageOrOpts === 'object' && !Array.isArray(messageOrOpts))
+            ? messageOrOpts
+            : { message: String(messageOrOpts ?? ''), type: typeArg };
+        const type = opts.type === 'success' ? 'success' : 'error';
+        const duration = Math.max(1500, Math.min(opts.duration || 4000, 10000));
+
+        // Caller can be explicit with title/body; otherwise we try to split a
+        // single string at the first period followed by ≥5 trailing chars.
+        let title = (opts.title || '').trim();
+        let body  = (opts.body  || '').trim();
+        if (!title && !body) {
+            const raw = String(opts.message || '').trim();
+            const m = raw.match(/^([^.!?]{2,40}[.!?])\s+(.{4,})$/);
+            if (m) { title = m[1].trim(); body = m[2].trim(); }
+            else   { title = raw; }
+        }
+
+        // Tear down a prior toast so spamming actions doesn't stack them.
+        document.getElementById('atGenericToast')?.remove();
+
         const toast = document.createElement('div');
         toast.id = 'atGenericToast';
+        toast.className = `at-toast at-toast--${type}`;
         toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
         toast.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
-        toast.textContent = String(message || '');
-        toast.style.cssText = `
-            position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
-            background:${type === 'error' ? 'rgba(240,69,69,0.95)' : 'rgba(54,212,116,0.95)'};
-            color:#fff; padding:10px 18px; border-radius:14px; font-size:13px;
-            font-weight:600; z-index:10001; max-width:calc(100vw - 32px);
-            box-shadow:0 6px 22px rgba(0,0,0,0.45); animation:fadeIn 0.18s ease;
-            word-wrap:break-word; text-align:center;`;
+        toast.style.setProperty('--at-toast-duration', `${duration}ms`);
+
+        // Inline SVGs (no external icons): check-circle for success, alert
+        // triangle for error. Stroke-only at 1.8 so they read crisp at 16px.
+        const iconMarkup = type === 'success'
+            ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                  <polyline points="22 4 12 14.01 9 11.01"/>
+               </svg>`
+            : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+               </svg>`;
+
+        toast.innerHTML = `
+            <span class="at-toast-icon" aria-hidden="true">${iconMarkup}</span>
+            <div class="at-toast-text">
+                <span class="at-toast-title"></span>
+                ${body ? '<span class="at-toast-body"></span>' : ''}
+            </div>
+            <button type="button" class="at-toast-close" aria-label="Dismiss">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+            <span class="at-toast-progress" aria-hidden="true"></span>
+        `;
+        // Use textContent so user-supplied strings can't inject HTML.
+        toast.querySelector('.at-toast-title').textContent = title;
+        if (body) toast.querySelector('.at-toast-body').textContent = body;
+
+        const dismiss = () => {
+            if (toast._dismissed) return;
+            toast._dismissed = true;
+            toast.classList.add('at-toast--leaving');
+            setTimeout(() => { try { toast.remove(); } catch { /* no-op */ } }, 180);
+        };
+        toast.querySelector('.at-toast-close').addEventListener('click', dismiss);
+
         document.body.appendChild(toast);
-        setTimeout(() => { try { toast.remove(); } catch {} }, 4000);
+        // Force a reflow so the slide-in transition fires.
+        requestAnimationFrame(() => toast.classList.add('at-toast--visible'));
+
+        const timerId = setTimeout(dismiss, duration);
+        // If the user hovers, pause the auto-dismiss so they can read it.
+        toast.addEventListener('mouseenter', () => {
+            clearTimeout(timerId);
+            toast.classList.add('at-toast--paused');
+        });
+        toast.addEventListener('mouseleave', () => {
+            toast.classList.remove('at-toast--paused');
+            // Restart with a shorter window — they've already read most of it.
+            setTimeout(dismiss, 1500);
+        });
     }
     // Expose so other popup modules (share-card, etc.) can use the same
     // toast UX instead of falling back to native alert().
@@ -2767,117 +3418,21 @@
 
         if (elements.googleSignIn) elements.googleSignIn.addEventListener('click', signInWithGoogle);
 
-        const collapsible = document.getElementById('advancedCollapsible');
-        const collapsibleHeader = collapsible?.querySelector('.auth-collapsible-header');
-        if (collapsibleHeader) {
-            const authContent = document.querySelector('.auth-content');
-            const toggleTokenMode = (expanded) => {
-                collapsible.classList.toggle('expanded', expanded);
-                authContent?.classList.toggle('token-mode', expanded);
-            };
-            collapsibleHeader.addEventListener('click', () => {
-                const isExpanded = !collapsible.classList.contains('expanded');
-                toggleTokenMode(isExpanded);
-                try { localStorage.setItem('authAdvancedExpanded', isExpanded); } catch {}
-            });
-            try {
-                const wasExpanded = localStorage.getItem('authAdvancedExpanded') === 'true';
-                if (wasExpanded) toggleTokenMode(true);
-            } catch {}
-        }
-
-        const pasteTokenBtn = document.getElementById('pasteTokenBtn');
-        if (pasteTokenBtn) {
-            pasteTokenBtn.addEventListener('click', async () => {
-                try {
-                    const text = await navigator.clipboard.readText();
-                    const input = document.getElementById('authTokenInput');
-                    if (input) {
-                        input.value = text;
-                        input.dispatchEvent(new Event('input'));
-                        pasteTokenBtn.textContent = '✓';
-                        pasteTokenBtn.style.background = 'linear-gradient(160deg,#1a8a5a 0%,#0e6644 45%,#075230 100%)';
-                        setTimeout(() => {
-                            pasteTokenBtn.textContent = 'Paste';
-                            pasteTokenBtn.style.background = '';
-                        }, 1500);
-                    }
-                } catch {
-                    // Clipboard read failed — focus textarea so user can Ctrl+V
-                    document.getElementById('authTokenInput')?.focus();
-                }
+        const emailForm = document.getElementById('authEmailForm');
+        const emailSignInBtn = document.getElementById('emailSignInBtn');
+        const createAccountBtn = document.getElementById('authCreateAccountBtn');
+        const forgotPasswordBtn = document.getElementById('authForgotPasswordBtn');
+        if (emailForm && emailSignInBtn) {
+            emailForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                handleEmailAuth({ mode: 'signin' });
             });
         }
-
-        const tokenSignInBtn = document.getElementById('tokenSignIn');
-        if (tokenSignInBtn) {
-            tokenSignInBtn.addEventListener('click', async () => {
-                const tokenInput = document.getElementById('authTokenInput')?.value?.trim();
-                const errorEl = document.getElementById('tokenAuthError');
-                if (!tokenInput) {
-                    if (errorEl) { errorEl.textContent = 'Please paste your exported token.'; errorEl.style.display = 'block'; }
-                    return;
-                }
-                tokenSignInBtn.disabled = true;
-                tokenSignInBtn.textContent = 'Importing...';
-                if (errorEl) errorEl.style.display = 'none';
-                try {
-                    // Set the flag; SW honors it via storage.onChanged and
-                    // runs the metadata repair silently. No popup-side modal.
-                    await chrome.storage.local.set({ pendingBackgroundMetadataRepair: true });
-                    const tokenData = JSON.parse(tokenInput);
-                    await FirebaseLib.signInWithExportedToken(tokenData);
-                } catch (err) {
-                    await chrome.storage.local.set({ pendingBackgroundMetadataRepair: false });
-                    const msg = (err instanceof SyntaxError || (err.message && err.message.includes('JSON')))
-                        ? 'Invalid token format. Please copy it again from Chrome.'
-                        : (err.message || 'Import failed');
-                    if (errorEl) { errorEl.textContent = msg; errorEl.style.display = 'block'; }
-                } finally {
-                    tokenSignInBtn.disabled = false;
-                    tokenSignInBtn.textContent = 'Import & Sign In';
-                }
-            });
+        if (createAccountBtn) {
+            createAccountBtn.addEventListener('click', () => handleEmailAuth({ mode: 'signup' }));
         }
-
-        const exportTokenBtn = document.getElementById('settingsExportToken');
-        if (exportTokenBtn) {
-            exportTokenBtn.addEventListener('click', async () => {                try {
-                    const tokenData = await FirebaseLib.exportSessionToken();
-                    const tokenStr = JSON.stringify(tokenData);
-                    const overlay = document.createElement('div');
-                    overlay.className = 'export-token-overlay';
-                    overlay.innerHTML = `
-                        <div class="export-token-box">
-                            <div class="export-token-header">
-                                <span class="export-token-header-dot"></span>
-                                <h3>Export Token</h3>
-                            </div>
-                            <div class="export-token-body">
-                                <p>Copy this token and paste it in the <strong>Import Token</strong> panel on Orion/Safari. Valid for 20 minutes.</p>
-                                <textarea class="export-token-text" readonly></textarea>
-                                <div class="export-token-actions">
-                                    <button class="btn-copy-token">Copy Token</button>
-                                    <button class="btn-close-token">Close</button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    overlay.querySelector('.export-token-text').value = tokenStr;
-                    overlay.querySelector('.btn-copy-token').addEventListener('click', async () => {
-                        try {
-                            await navigator.clipboard.writeText(tokenStr);
-                            overlay.querySelector('.btn-copy-token').textContent = '✓ Copied!';
-                        } catch { overlay.querySelector('.export-token-text').select(); }
-                    });
-                    overlay.querySelector('.btn-close-token').addEventListener('click', () => overlay.remove());
-                    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-                    document.body.appendChild(overlay);
-                    setTimeout(() => overlay.querySelector('.export-token-text')?.select(), 50);
-                } catch (err) {
-                    showToast('Export failed: ' + (err?.message || err), 'error');
-                }
-            });
+        if (forgotPasswordBtn) {
+            forgotPasswordBtn.addEventListener('click', () => handleForgotPassword());
         }
 
         if (elements.settingsBtn) {
@@ -3073,6 +3628,13 @@
                 setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
                 signOut();
+                return;
+            }
+
+            if (e.target.closest('#settingsSetPassword')) {
+                setSettingsDataToolsExpanded(false);
+                setSettingsPreferencesExpanded(false);
+                openSetPasswordModal();
                 return;
             }
 
@@ -3663,7 +4225,7 @@
                 startPopupCloudRefresh();
                 // Sign-in is always silent — the SW picks up the
                 // `pendingBackgroundMetadataRepair` flag we wrote in
-                // signInWithGoogle / tokenSignInBtn and runs the repair in
+                // signInWithGoogle / handleEmailAuth and runs the repair in
                 // background. Progress is surfaced via the footer
                 // sync-status badge (storage.onChanged → applyMetadataRepairState).
                 await maybePromptPostUpdateFetch();

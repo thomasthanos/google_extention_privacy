@@ -406,72 +406,174 @@ const FirebaseLib = (function () {
     };
     const jsonToFirestoreFields = (obj) => _fsCodec ? _fsCodec.encodeFields(obj) : {};
 
-    async function signInWithExportedToken(tokenData) {
-        if (!tokenData || !tokenData.user || !tokenData.tokens) throw new Error('Invalid token data');
-        if (!tokenData.tokens.refreshToken || typeof tokenData.tokens.refreshToken !== 'string') {
-            throw new Error('Invalid or missing refresh token in exported data.');
-        }
-        if (tokenData.expiresAt && Date.now() > tokenData.expiresAt) {
-            throw new Error('Token has expired (valid for 20 minutes). Please export a new token from Chrome.');
-        }
+    // ── Email/Password auth ──────────────────────────────────────────────
+    // All four endpoints share the same response shape (localId/email/idToken/
+    // refreshToken/expiresIn) and the same auth side-effects: persist user +
+    // tokens, fire the auth-state listeners. Identity Toolkit error responses
+    // come back with HTTP 4xx + `{ error: { message: 'CODE' } }`; we surface
+    // `error.message` so the popup layer can map known codes to friendly
+    // strings without the network response leaking through.
 
+    async function _identityToolkitPost(path, body) {
+        const url = `https://identitytoolkit.googleapis.com/v1/${path}?key=${API_KEY}`;
         let response, data;
         try {
-            response = await fetchWithTimeout(`https://securetoken.googleapis.com/v1/token?key=${API_KEY}`, {
+            response = await fetchWithTimeout(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    grant_type: 'refresh_token',
-                    refresh_token: tokenData.tokens.refreshToken
-                })
+                body: JSON.stringify(body)
             });
             data = await response.json().catch(() => null);
         } catch (networkError) {
-            throw new Error('Network error during token validation. Please check your connection.');
+            throw new Error('Network error. Please check your connection.');
         }
-
         if (!data) {
-            throw new Error('Empty/invalid token validation response');
+            throw new Error('Empty/invalid response from auth endpoint');
         }
-
-        if (data.error) throw new Error('Token expired or invalid. Please export a fresh token from Chrome.');
-        if (!data.id_token || !data.refresh_token || !data.expires_in) {
-            throw new Error('Unexpected response from token endpoint.');
+        if (data.error) {
+            const msg = data.error?.message || 'Authentication failed';
+            throw new Error(msg);
         }
-
-        currentUser = tokenData.user;
-        const tokens = {
-            idToken: data.id_token,
-            refreshToken: data.refresh_token,
-            expiresAt: Date.now() + (parseInt(data.expires_in) * 1000)
-        };
-
-        await chrome.storage.local.set({
-            [STORAGE_KEYS.USER]: currentUser,
-            [STORAGE_KEYS.TOKENS]: tokens
-        });
-
-        notifyAuthStateListeners(currentUser);
-        return currentUser;
+        return data;
     }
 
-    async function exportSessionToken() {
-        const stored = await chrome.storage.local.get([STORAGE_KEYS.USER, STORAGE_KEYS.TOKENS]);
-        if (!stored[STORAGE_KEYS.USER] || !stored[STORAGE_KEYS.TOKENS]) {
-            throw new Error('Not signed in');
-        }
-        return {
-            user: stored[STORAGE_KEYS.USER],
-            tokens: { refreshToken: stored[STORAGE_KEYS.TOKENS].refreshToken },
-            expiresAt: Date.now() + 20 * 60 * 1000
+    async function _persistEmailPasswordSession(data) {
+        // Identity Toolkit returns `displayName` only when the account has one
+        // set — fall back to the local-part of the email so the popup always
+        // has *something* to render in the account row.
+        const user = {
+            uid: data.localId,
+            email: data.email,
+            displayName: data.displayName || (data.email || '').split('@')[0],
+            photoURL: null
         };
+        const tokens = {
+            idToken: data.idToken,
+            refreshToken: data.refreshToken,
+            expiresAt: Date.now() + (parseInt(data.expiresIn) * 1000)
+        };
+        await chrome.storage.local.set({
+            [STORAGE_KEYS.USER]: user,
+            [STORAGE_KEYS.TOKENS]: tokens
+        });
+        currentUser = user;
+        notifyAuthStateListeners(currentUser);
+        return user;
+    }
+
+    async function signInWithEmailPassword(email, password) {
+        if (!email || !password) throw new Error('MISSING_EMAIL');
+        const data = await _identityToolkitPost('accounts:signInWithPassword', {
+            email,
+            password,
+            returnSecureToken: true
+        });
+        if (!data.idToken || !data.refreshToken || !data.expiresIn || !data.localId) {
+            throw new Error('Unexpected response from sign-in endpoint');
+        }
+        PopupLogger.log('Firebase', `Email sign-in successful for ${data.email}`);
+        return _persistEmailPasswordSession(data);
+    }
+
+    async function signUpWithEmailPassword(email, password) {
+        if (!email || !password) throw new Error('MISSING_EMAIL');
+        const data = await _identityToolkitPost('accounts:signUp', {
+            email,
+            password,
+            returnSecureToken: true
+        });
+        if (!data.idToken || !data.refreshToken || !data.expiresIn || !data.localId) {
+            throw new Error('Unexpected response from sign-up endpoint');
+        }
+        PopupLogger.log('Firebase', `Account created for ${data.email}`);
+        return _persistEmailPasswordSession(data);
+    }
+
+    async function setPasswordForCurrentUser(password) {
+        if (!password || password.length < 6) throw new Error('WEAK_PASSWORD');
+        const idToken = await getIdToken();
+        if (!idToken) {
+            const err = new Error('Not signed in');
+            err.code = 'NO_AUTH';
+            throw err;
+        }
+        // accounts:update with `password` linkάρει password provider στον
+        // υπάρχοντα λογαριασμό (Google) χωρίς να αλλάζει uid. Επιστρέφει
+        // φρέσκο idToken/refreshToken που ΠΡΕΠΕΙ να αποθηκεύσουμε γιατί το
+        // παλιό μπορεί να ακυρωθεί λόγω της αλλαγής credentials.
+        const data = await _identityToolkitPost('accounts:update', {
+            idToken,
+            password,
+            returnSecureToken: true
+        });
+        if (data.idToken && data.refreshToken && data.expiresIn) {
+            const tokens = {
+                idToken: data.idToken,
+                refreshToken: data.refreshToken,
+                expiresAt: Date.now() + (parseInt(data.expiresIn) * 1000)
+            };
+            await chrome.storage.local.set({ [STORAGE_KEYS.TOKENS]: tokens });
+        }
+        PopupLogger.log('Firebase', 'Password set/updated for current user');
+        return true;
+    }
+
+    async function sendPasswordReset(email) {
+        if (!email) throw new Error('MISSING_EMAIL');
+        await _identityToolkitPost('accounts:sendOobCode', {
+            requestType: 'PASSWORD_RESET',
+            email
+        });
+        PopupLogger.log('Firebase', `Password reset email sent to ${email}`);
+        return true;
+    }
+
+    /**
+     * Probe an email/password combination against Identity Toolkit *without*
+     * touching the stored session. Used by the "Update password" flow to
+     * reject silently re-saving the same password — Firebase itself happily
+     * accepts an unchanged password and we'd otherwise burn an
+     * `accounts:update` round-trip on a no-op.
+     *
+     * Returns:
+     *   true  → credentials valid (i.e. caller's "new" password matches the
+     *           current one — the caller should treat this as "no change")
+     *   false → credentials rejected (INVALID_PASSWORD / INVALID_LOGIN_CREDENTIALS)
+     *           which is the *expected* path for a genuinely new password
+     * Throws on every other error (network, rate-limit, disabled account…)
+     * so the caller can decide whether to surface it or continue.
+     */
+    async function verifyPasswordSilently(email, password) {
+        if (!email || !password) return false;
+        try {
+            await _identityToolkitPost('accounts:signInWithPassword', {
+                email,
+                password,
+                returnSecureToken: false
+            });
+            return true;
+        } catch (err) {
+            const code = (err?.message || '').split(':')[0]
+                .trim().toUpperCase().replace(/\s+/g, '_');
+            if (code === 'INVALID_PASSWORD' || code === 'INVALID_LOGIN_CREDENTIALS') {
+                return false;
+            }
+            // EMAIL_NOT_FOUND on a Google-only account is also "not the same"
+            // — there's no password provider linked yet, so any input is
+            // genuinely new.
+            if (code === 'EMAIL_NOT_FOUND') return false;
+            throw err;
+        }
     }
 
     return {
         init,
         signInWithGoogle,
-        signInWithExportedToken,
-        exportSessionToken,
+        signInWithEmailPassword,
+        signUpWithEmailPassword,
+        setPasswordForCurrentUser,
+        sendPasswordReset,
+        verifyPasswordSilently,
         signOut,
         onAuthStateChanged,
         getDocument,
