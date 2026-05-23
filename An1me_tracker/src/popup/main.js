@@ -2307,14 +2307,23 @@
         const includeFillersCb = document.getElementById('includeFillers');
         if (includeFillersCb) includeFillersCb.checked = false;
         const includeFillerLabel = document.getElementById('includeFillerLabel');
-        if (includeFillerLabel) includeFillerLabel.style.display = 'none';
+        if (includeFillerLabel) includeFillerLabel.style.display = '';
+        const includeFillersBlock = document.getElementById('includeFillersBlock');
+        if (includeFillersBlock) {
+            includeFillersBlock.style.display = 'none';
+            includeFillersBlock.dataset.checked = 'false';
+        }
 
         // Reset slug status + meta + filler card
         _setSlugStatus('idle');
         const slugDetectedHint = document.getElementById('slugDetectedHint');
         if (slugDetectedHint) { slugDetectedHint.style.display = 'none'; slugDetectedHint.textContent = ''; }
         const slugMeta = document.getElementById('slugMeta');
-        if (slugMeta) slugMeta.style.display = 'none';
+        if (slugMeta) {
+            slugMeta.style.display = 'none';
+            const slugCard = slugMeta.closest('.slug-card');
+            if (slugCard) slugCard.dataset.hasMeta = 'false';
+        }
         const fillerActionBar = document.getElementById('fillerActionBar');
         if (fillerActionBar) fillerActionBar.style.display = 'none';
 
@@ -2402,7 +2411,11 @@
         if (!slug) {
             _setSlugStatus('idle');
             if (bar) bar.style.display = 'none';
-            if (slugMeta) slugMeta.style.display = 'none';
+            if (slugMeta) {
+            slugMeta.style.display = 'none';
+            const slugCard = slugMeta.closest('.slug-card');
+            if (slugCard) slugCard.dataset.hasMeta = 'false';
+        }
             _addDialogKnownTotal = null;
             _addDialogTotalCanon = null;
             return;
@@ -2485,6 +2498,7 @@
                     b.setAttribute('role', 'button');
                     b.setAttribute('tabindex', '0');
                     b.setAttribute('aria-expanded', 'false');
+                    b.setAttribute('aria-controls', 'fabFillerDetails');
                     b.setAttribute('title', 'Show filler episodes');
                     const { buildRangeString: brs } = AT.EpisodeParse;
                     const fillerStr = brs([...fillerNums].sort((a, b) => a - b));
@@ -2492,13 +2506,24 @@
                         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>` +
                         `<span>${fillerNums.length} fillers</span>` +
                         `<svg class="fab-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>`;
-                    // Inline details (hidden by default)
-                    const details = document.createElement('span');
+                    left.appendChild(b);
+
+                    // Details panel — SIBLING of `left`/`right` so it can take
+                    // the full width of the action-bar when expanded. Putting
+                    // it inside the badge would force the badge to width:100%
+                    // of its parent (.fab-left), pushing .fab-right off-screen.
+                    // The toggle's aria-controls points here so screen readers
+                    // know they're related.
+                    const details = document.createElement('div');
                     details.className = 'fab-filler-details';
+                    details.id = 'fabFillerDetails';
                     details.hidden = true;
                     details.textContent = fillerStr;
-                    b.appendChild(details);
-                    left.appendChild(b);
+                    // Stash the details ref on the toggle so the click handler
+                    // can find it via a single property lookup instead of
+                    // walking the DOM.
+                    b._detailsEl = details;
+                    bar._detailsEl = details;
                 }
 
                 bar.appendChild(left);
@@ -2530,6 +2555,15 @@
                     bar.appendChild(right);
                 }
 
+                // Append the filler details row last, AFTER left+right, so
+                // when expanded it lands on its own row at full width
+                // (.filler-action-bar is flex-wrap:wrap and the details
+                // element gets `flex-basis: 100%`). Until then, hidden=true
+                // keeps it out of the layout.
+                if (bar._detailsEl) {
+                    bar.appendChild(bar._detailsEl);
+                }
+
                 bar.style.display = 'flex';
             }
         }
@@ -2549,12 +2583,30 @@
             const status = animeInfoFromCache?.status || cachedAnilist?.status || null;
 
             if (detectedTitle || coverUrl || availableTotal) {
-                slugMeta.style.display = 'flex';
+                const slugCard = slugMeta.closest('.slug-card');
+                if (slugCard) slugCard.dataset.hasMeta = 'true';
+                slugMeta.style.display = '';
                 if (cover) {
                     if (coverUrl) { cover.src = coverUrl; cover.style.display = ''; }
                     else { cover.removeAttribute('src'); cover.style.display = 'none'; }
                 }
-                if (titleEl) titleEl.textContent = detectedTitle || generateTitleFromSlug(slug);
+                if (titleEl) {
+                    // Show title only when it adds info beyond the slug the user
+                    // already typed. If detectedTitle is missing or basically just
+                    // the slug capitalized (what generateTitleFromSlug would produce),
+                    // hide the row to avoid visual repetition.
+                    const slugFallback = generateTitleFromSlug(slug);
+                    const finalTitle = detectedTitle || slugFallback;
+                    const looksRedundant = !detectedTitle
+                        || detectedTitle.toLowerCase().replace(/\s+/g, '-') === slug.toLowerCase();
+                    if (looksRedundant) {
+                        titleEl.textContent = '';
+                        titleEl.style.display = 'none';
+                    } else {
+                        titleEl.textContent = finalTitle;
+                        titleEl.style.display = '';
+                    }
+                }
                 if (statsEl) {
                     const parts = [];
                     if (availableTotal) parts.push(`<span>${availableTotal} eps</span>`);
@@ -2563,6 +2615,8 @@
                     statsEl.innerHTML = parts.join(' · ');
                 }
             } else {
+                const slugCard = slugMeta.closest('.slug-card');
+                if (slugCard) slugCard.dataset.hasMeta = 'false';
                 slugMeta.style.display = 'none';
             }
         }
@@ -4098,7 +4152,11 @@
                     const fillerActionBar = document.getElementById('fillerActionBar');
                     if (fillerActionBar) fillerActionBar.style.display = 'none';
                     const slugMeta = document.getElementById('slugMeta');
-                    if (slugMeta) slugMeta.style.display = 'none';
+                    if (slugMeta) {
+            slugMeta.style.display = 'none';
+            const slugCard = slugMeta.closest('.slug-card');
+            if (slugCard) slugCard.dataset.hasMeta = 'false';
+        }
                     const slugDetectedHint = document.getElementById('slugDetectedHint');
                     if (slugDetectedHint) slugDetectedHint.style.display = 'none';
                 }
@@ -4161,13 +4219,22 @@
                     return;
                 }
 
-                // Filler badge toggle (shows inline filler episode list)
+                // Filler badge toggle (shows the filler episode list as a
+                // sibling row inside the same .filler-action-bar — never
+                // nested inside the badge, otherwise width:100% on the
+                // details would force the badge to push siblings off-screen).
                 const toggle = e.target.closest('.fab-filler-toggle');
                 if (toggle && elements.addAnimeDialog.contains(toggle)) {
                     e.preventDefault();
                     const expanded = toggle.getAttribute('aria-expanded') === 'true';
                     toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-                    const details = toggle.querySelector('.fab-filler-details');
+                    // Prefer the cached ref (faster); fall back to aria-controls
+                    // lookup if the badge was rebuilt without the prop.
+                    let details = toggle._detailsEl;
+                    if (!details) {
+                        const id = toggle.getAttribute('aria-controls');
+                        if (id) details = document.getElementById(id);
+                    }
                     if (details) details.hidden = expanded;
                     const chevron = toggle.querySelector('.fab-chevron');
                     if (chevron) chevron.style.transform = expanded ? '' : 'rotate(180deg)';

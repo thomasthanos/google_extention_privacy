@@ -497,16 +497,44 @@ async function pollCloudData(reason = 'consumer-connected') {
     return _cloudPollInFlight;
 }
 
+// SW cloud-doc cache. Kept in memory for hot reads, AND persisted to
+// chrome.storage.local under `_bgCloudDocCache` so an SW kill (MV3 idle
+// after ~30s) doesn't lose it. Without persistence, every cold popup open
+// burns a Firestore read; with it, the same library can be served for a
+// full TTL window without touching Firestore.
 let _bgCloudDocCache = null;
 let _bgCloudDocCacheTime = 0;
 const _BG_CLOUD_TTL = 5 * 60 * 1000;
+const _BG_CLOUD_CACHE_KEY = '_bgCloudDocCachePersisted';
+
+// Hydrate on SW boot — restores cache from disk if still fresh.
+let _bgCloudCacheHydratePromise = null;
+async function hydrateBgCloudDocCache() {
+    if (_bgCloudDocCache) return;        // already hot
+    if (_bgCloudCacheHydratePromise) return _bgCloudCacheHydratePromise;
+    _bgCloudCacheHydratePromise = (async () => {
+        try {
+            const stored = await bgStorageGet([_BG_CLOUD_CACHE_KEY]);
+            const entry = stored[_BG_CLOUD_CACHE_KEY];
+            if (entry && entry.cachedAt && (Date.now() - entry.cachedAt) < _BG_CLOUD_TTL) {
+                _bgCloudDocCache = entry.doc;
+                _bgCloudDocCacheTime = entry.cachedAt;
+            }
+        } catch { /* fresh start */ }
+    })();
+    return _bgCloudCacheHydratePromise;
+}
 
 function invalidateBgCloudDocCache() {
     _bgCloudDocCache = null;
     _bgCloudDocCacheTime = 0;
+    // Best-effort: drop the persisted copy too. Failures here are non-fatal —
+    // worst case we serve a stale doc until the next successful fetch.
+    bgStorageSet({ [_BG_CLOUD_CACHE_KEY]: null }).catch(() => {});
 }
 
 async function fetchCloudDataCached(user, token) {
+    await hydrateBgCloudDocCache();
     const now = Date.now();
     if (_bgCloudDocCache && (now - _bgCloudDocCacheTime) < _BG_CLOUD_TTL) {
         return _bgCloudDocCache;
@@ -525,6 +553,10 @@ async function fetchCloudDataCached(user, token) {
     if (doc) {
         _bgCloudDocCache = doc;
         _bgCloudDocCacheTime = Date.now();
+        // Persist asynchronously so the next SW boot can serve from disk.
+        bgStorageSet({
+            [_BG_CLOUD_CACHE_KEY]: { doc, cachedAt: _bgCloudDocCacheTime }
+        }).catch(() => {});
     }
     return doc;
 }
@@ -1254,10 +1286,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === 'UPDATE_BG_CLOUD_DOC_CACHE') {
         // Popup just wrote `doc` to Firestore — seed the SW cache with it so
         // the SW's next storage.onChanged-driven sync skips the Firestore read.
-        // Saves ~1 read per popup-side save.
+        // Saves ~1 read per popup-side save. Also persisted to disk so an SW
+        // kill mid-session doesn't lose the seed.
         if (message.doc && typeof message.doc === 'object') {
             _bgCloudDocCache = message.doc;
             _bgCloudDocCacheTime = Date.now();
+            bgStorageSet({
+                [_BG_CLOUD_CACHE_KEY]: { doc: message.doc, cachedAt: _bgCloudDocCacheTime }
+            }).catch(() => {});
         } else {
             invalidateBgCloudDocCache();
         }

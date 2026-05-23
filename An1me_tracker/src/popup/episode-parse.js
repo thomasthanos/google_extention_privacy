@@ -121,7 +121,8 @@
         const epInput = document.getElementById('episodesWatched');
 
         const hideAll = () => {
-            if (fillerLabel) fillerLabel.style.display = 'none';
+            const block = document.getElementById('includeFillersBlock');
+            if (block) block.style.display = 'none';
             if (counter) counter.style.display = 'none';
             if (epInput) epInput.classList.remove('invalid-range');
         };
@@ -133,7 +134,8 @@
 
         const allEpisodes = parseRanges(input);
         if (allEpisodes.length === 0) {
-            if (fillerLabel) fillerLabel.style.display = 'none';
+            const block = document.getElementById('includeFillersBlock');
+            if (block) block.style.display = 'none';
             if (counter) counter.style.display = 'none';
             if (epInput) epInput.classList.add('invalid-range');
             return;
@@ -166,17 +168,29 @@
             }
         }
 
-        // ── Filler-include checkbox visibility ─────────────────────────
-        if (fillerLabel) {
+        // ── Filler-include block (toggle + ranges preview, unified box) ──
+        const block = document.getElementById('includeFillersBlock');
+        const rangesPreview = document.getElementById('fillersRangesPreview');
+        if (block) {
             if (fillers.length > 0) {
-                fillerLabel.style.display = 'flex';
+                block.style.display = 'block';
+                block.dataset.checked = includeFillers ? 'true' : 'false';
                 if (includeFillerText) {
+                    // Pill stays compact — count only. Full ranges are shown
+                    // in the preview row below ONLY when the toggle is ON.
+                    const n = fillers.length;
                     includeFillerText.textContent = includeFillers
-                        ? `Fillers included (${fillers.length} eps: ${buildRangeString(fillers)})`
-                        : `Include ${fillers.length} filler episode${fillers.length !== 1 ? 's' : ''} too (${buildRangeString(fillers)})`;
+                        ? `Fillers included (${n})`
+                        : `Include ${n} filler${n !== 1 ? 's' : ''}`;
+                }
+                if (rangesPreview) {
+                    rangesPreview.textContent = `Fillers: ${buildRangeString(fillers)}`;
+                    // Visibility is driven purely by the parent block's
+                    // [data-checked] attribute via CSS — no inline display
+                    // toggling here so the transition stays in CSS.
                 }
             } else {
-                fillerLabel.style.display = 'none';
+                block.style.display = 'none';
             }
         }
     }
