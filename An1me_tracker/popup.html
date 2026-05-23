@@ -300,36 +300,119 @@
     </div>
 
     <div class="dialog-overlay" id="addAnimeDialog" role="dialog" aria-modal="true"
-        aria-labelledby="addAnimeDialogTitle" aria-hidden="true">
+        aria-labelledby="addAnimeDialogTitle" aria-describedby="addAnimeDialogSubtitle" aria-hidden="true">
         <div class="dialog add-anime-dialog">
-            <div class="dialog-header">
-                <h3 id="addAnimeDialogTitle">Add Watched Anime</h3><button class="dialog-close" id="closeAddAnime"
-                    type="button" aria-label="Close dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2" aria-hidden="true" focusable="false">
+            <div class="dialog-header add-anime-header">
+                <div class="add-anime-header-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="7" width="20" height="13" rx="2" ry="2"></rect>
+                        <polyline points="17 2 12 7 7 2"></polyline>
+                    </svg>
+                </div>
+                <div class="add-anime-header-text">
+                    <h3 id="addAnimeDialogTitle">Add Watched Anime</h3>
+                    <p id="addAnimeDialogSubtitle" class="add-anime-subtitle">Track what you've watched from an1me.to</p>
+                </div>
+                <button class="dialog-close" id="closeAddAnime" type="button" aria-label="Close dialog">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        aria-hidden="true" focusable="false">
                         <line x1="18" y1="6" x2="6" y2="18" />
                         <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg></button>
+                    </svg>
+                </button>
             </div>
-            <div class="dialog-body">
-                <div class="form-group"><label for="animeSlug">Anime URL or Slug</label><input type="text"
-                        id="animeSlug" placeholder="e.g., one-piece or https://an1me.to/anime/one-piece"><span
-                        class="form-hint">Paste the an1me.to URL or just the anime slug</span></div>
-                <div class="form-group"><label for="animeTitle">Title (optional)</label><input type="text"
-                        id="animeTitle" placeholder="Will auto-generate from slug if empty"></div>
-                <div class="form-group"><label for="episodesWatched">Episodes Watched</label>
-                    <div class="episodes-input-group"><input type="text" id="episodesWatched"
-                            placeholder="e.g. 1-56, 72-90, 113-122"><span class="episodes-hint">Enter an episode (5), a
-                            range (1-56), or a combination (1-56, 72-90, 113)</span></div>
-                    <div class="episodes-preview" id="episodesPreview"></div><label class="include-fillers-label"
-                        id="includeFillerLabel"
-                        style="display:none; margin-top:8px; cursor:pointer; user-select:none; font-size:12px; color:var(--t2); align-items:center; gap:6px;"><input
-                            type="checkbox" id="includeFillers"
-                            style="accent-color:var(--accent); width:14px; height:14px; cursor:pointer;"><span
-                            id="includeFillerText">Include filler episodes too</span></label>
+            <div class="dialog-body add-anime-body">
+                <!-- ─── Slug section ─────────────────────────────────────── -->
+                <div class="form-group">
+                    <label for="animeSlug">Anime URL or Slug</label>
+                    <div class="slug-input-wrap" data-status="idle">
+                        <input type="text" id="animeSlug"
+                            placeholder="e.g., one-piece or https://an1me.to/anime/one-piece"
+                            autocomplete="off" spellcheck="false"
+                            aria-describedby="slugDetectedHint">
+                        <span class="slug-input-status" aria-hidden="true">
+                            <svg class="status-icon status-loading" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                                <circle cx="12" cy="12" r="10" stroke-opacity="0.25" />
+                                <path d="M12 2a10 10 0 0 1 10 10" />
+                            </svg>
+                            <svg class="status-icon status-ok" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            <svg class="status-icon status-fail" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                        </span>
+                    </div>
+                    <span class="form-hint slug-detected-hint" id="slugDetectedHint" style="display:none"></span>
+                    <div class="slug-meta" id="slugMeta" style="display:none">
+                        <img class="slug-meta-cover" id="slugMetaCover" alt="" />
+                        <div class="slug-meta-info">
+                            <div class="slug-meta-title" id="slugMetaTitle"></div>
+                            <div class="slug-meta-stats" id="slugMetaStats"></div>
+                        </div>
+                    </div>
+                    <!-- Filler info card (populated programmatically by main.js) -->
+                    <div class="filler-card" id="slugFillerInfo" style="display:none"></div>
+                </div>
+
+                <!-- ─── Episodes section ──────────────────────────────────── -->
+                <div class="form-group">
+                    <label for="episodesWatched">Episodes Watched</label>
+                    <input type="text" id="episodesWatched"
+                        class="episodes-input"
+                        placeholder="e.g. 1-56, 72-90, 113-122"
+                        autocomplete="off" spellcheck="false"
+                        aria-describedby="episodesHint episodesCounter">
+                    <span class="episodes-hint" id="episodesHint">
+                        Examples: <code>5</code> · <code>1-56</code> · <code>1-56, 72-90, 113</code>
+                    </span>
+                    <!-- Merged filler info + quick chips (populated by main.js) -->
+                    <div class="filler-action-bar" id="fillerActionBar" style="display:none"></div>
+                    <div class="episodes-counter" id="episodesCounter" style="display:none">
+                        <div class="episodes-counter-row">
+                            <span class="counter-text" id="episodesCounterText"></span>
+                            <span class="counter-percent" id="episodesCounterPercent"></span>
+                        </div>
+                        <div class="episodes-counter-bar" aria-hidden="true">
+                            <div class="episodes-counter-fill" id="episodesCounterFill" style="width:0%"></div>
+                        </div>
+                    </div>
+                    <label class="include-fillers-label" id="includeFillerLabel" style="display:none">
+                        <input type="checkbox" id="includeFillers">
+                        <span id="includeFillerText">Include filler episodes too</span>
+                    </label>
                 </div>
             </div>
-            <div class="dialog-actions"><button class="btn btn-secondary" id="cancelAddAnime">Cancel</button><button
-                    class="btn btn-primary" id="confirmAddAnime">Add Anime</button></div>
+            <div class="dialog-actions add-anime-actions">
+                <span class="kbd-hint" aria-hidden="true">
+                    <kbd>Enter</kbd> to add · <kbd>Esc</kbd> to cancel
+                </span>
+                <div class="add-anime-actions-buttons">
+                    <button class="btn btn-ghost" id="cancelAddAnime" type="button">Cancel</button>
+                    <button class="btn btn-primary btn-with-icon" id="confirmAddAnime" type="button">
+                        <svg class="btn-icon btn-icon-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        <svg class="btn-icon btn-icon-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="10" stroke-opacity="0.25" />
+                            <path d="M12 2a10 10 0 0 1 10 10" />
+                        </svg>
+                        <svg class="btn-icon btn-icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        <span class="btn-label">Add Anime</span>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 

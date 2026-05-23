@@ -81,7 +81,6 @@
         cancelAddAnime: document.getElementById('cancelAddAnime'),
         confirmAddAnime: document.getElementById('confirmAddAnime'),
         animeSlugInput: document.getElementById('animeSlug'),
-        animeTitleInput: document.getElementById('animeTitle'),
         episodesWatchedInput: document.getElementById('episodesWatched'),
         // Edit Title Dialog
         editTitleDialog: document.getElementById('editTitleDialog'),
@@ -1770,6 +1769,11 @@
     }
 
     async function runAutoFetchIfNeeded() {
+        // Only run when the user is signed in — prevents the popup-side
+        // auto-fetch from racing with the SW's metadata repair that fires
+        // immediately after the pendingBackgroundMetadataRepair flag is set.
+        if (!AT.FirebaseSync?.getUser?.()) return;
+
         const { FillerService } = AT;
         const slugsList = Object.keys(animeData);
         const { allFillersCached, allAnilistCached } = checkAllCached(slugsList);
@@ -2282,19 +2286,288 @@
 
     function showAddAnimeDialog() {
         elements.animeSlugInput.value = '';
-        elements.animeTitleInput.value = '';
         elements.episodesWatchedInput.value = '';
         elements.animeSlugInput.classList.remove('error');
-        elements.episodesWatchedInput.classList.remove('error');
+        elements.episodesWatchedInput.classList.remove('error', 'invalid-range');
         const includeFillersCb = document.getElementById('includeFillers');
         if (includeFillersCb) includeFillersCb.checked = false;
         const includeFillerLabel = document.getElementById('includeFillerLabel');
         if (includeFillerLabel) includeFillerLabel.style.display = 'none';
+
+        // Reset slug status + meta + filler card
+        _setSlugStatus('idle');
+        const slugDetectedHint = document.getElementById('slugDetectedHint');
+        if (slugDetectedHint) { slugDetectedHint.style.display = 'none'; slugDetectedHint.textContent = ''; }
+        const slugMeta = document.getElementById('slugMeta');
+        if (slugMeta) slugMeta.style.display = 'none';
+        const fillerActionBar = document.getElementById('fillerActionBar');
+        if (fillerActionBar) fillerActionBar.style.display = 'none';
+
+        // Reset counter
+        const counter = document.getElementById('episodesCounter');
+        if (counter) counter.style.display = 'none';
+
+        // Reset confirm button state
+        const confirmBtn = elements.confirmAddAnime;
+        if (confirmBtn) {
+            confirmBtn.dataset.state = 'idle';
+            confirmBtn.disabled = false;
+        }
+
+        _addDialogDetectedTitle = null;
+        _addDialogKnownTotal = null;
+        _addDialogTotalCanon = null;
+        _addDialogCurrentSlug = null;
+        _publishDialogState();
         updateEpisodesPreview('');
         openDialogA11y(elements.addAnimeDialog, {
             initialFocus: elements.animeSlugInput,
             onCancel: hideAddAnimeDialog
         });
+    }
+
+    // State for the Add Anime dialog's live slug-driven features.
+    // Title field was removed — we now derive the title at submit time from
+    // the auto-detected sources (animeinfo cache → AniList → slug fallback)
+    // and cache it here while the dialog is open so re-fetches don't re-do
+    // the lookup on every preview render.
+    let _addDialogDetectedTitle = null;
+    let _addDialogKnownTotal = null;
+    let _addDialogTotalCanon = null;
+    let _addDialogSlugDebounce = null;
+    let _addDialogCurrentSlug = null;
+
+    function _setSlugStatus(status) {
+        // status: 'idle' | 'loading' | 'ok' | 'fail'
+        const wrap = document.querySelector('.slug-input-wrap');
+        if (wrap) wrap.dataset.status = status;
+    }
+
+    // Publish dialog state so episode-parse.js can read knownTotal for
+    // out-of-range validation. Single small bag, updated on every fetch.
+    window.AnimeTracker = window.AnimeTracker || {};
+    window.AnimeTracker.__addDialogState = { knownTotal: null };
+
+    function _publishDialogState() {
+        window.AnimeTracker.__addDialogState.knownTotal = _addDialogKnownTotal;
+    }
+
+    function _setDetectedHint(rawInput, slug) {
+        const el = document.getElementById('slugDetectedHint');
+        if (!el) return;
+        const isUrl = /^https?:\/\//i.test(rawInput || '') || /\//.test(rawInput || '');
+        if (isUrl && slug && slug !== rawInput.trim()) {
+            el.innerHTML = `Detected slug: <code>${slug}</code>`;
+            el.style.display = 'block';
+        } else {
+            el.style.display = 'none';
+            el.textContent = '';
+        }
+    }
+
+    /**
+     * Called (debounced) whenever the slug input changes.
+     * Fetches filler data + AniList/scraper info; drives all live UI:
+     *   - input status pill (loading/ok/fail)
+     *   - "Detected slug: …" hint
+     *   - Cover thumbnail + AniList/scraper meta
+     *   - Filler badge pills (Canon / Fillers) + collapsible details
+     *   - Title auto-fill
+     *   - Episode quick-action chips
+     */
+    async function onSlugInputChange(rawSlug) {
+        const { FillerService } = AT;
+        const slug = extractSlugFromInput(rawSlug);
+        _addDialogCurrentSlug = slug;
+        _setDetectedHint(rawSlug, slug);
+
+        const bar = document.getElementById('fillerActionBar');
+        const slugMeta = document.getElementById('slugMeta');
+
+        if (!slug) {
+            _setSlugStatus('idle');
+            if (bar) bar.style.display = 'none';
+            if (slugMeta) slugMeta.style.display = 'none';
+            _addDialogKnownTotal = null;
+            _addDialogTotalCanon = null;
+            return;
+        }
+
+        // ── Loading state ────────────────────────────────────────────────
+        _setSlugStatus('loading');
+        if (bar) {
+            bar.style.display = 'flex';
+            bar.className = 'filler-action-bar is-loading';
+            bar.textContent = 'Fetching…';
+        }
+
+        const [episodeTypes, animeInfoFromCache] = await Promise.all([
+            FillerService.fetchEpisodeTypes(slug).catch(() => null),
+            (async () => {
+                try {
+                    const s = await chrome.storage.local.get([`animeinfo_${slug}`]);
+                    return s[`animeinfo_${slug}`] || null;
+                } catch { return null; }
+            })()
+        ]);
+
+        if (slug !== _addDialogCurrentSlug) return;
+
+        // ── Resolve totals ───────────────────────────────────────────────
+        let availableTotal = null;
+        let finalTotal = null;
+        if (animeInfoFromCache && !animeInfoFromCache.notFound) {
+            availableTotal = animeInfoFromCache.latestEpisode || null;
+            finalTotal = animeInfoFromCache.totalEpisodes || null;
+        }
+        if (!availableTotal && episodeTypes && !episodeTypes.notFound) {
+            availableTotal = episodeTypes.totalEpisodes || null;
+        }
+        if (!finalTotal) {
+            const al = AT.AnilistService.getTotalEpisodes?.(slug);
+            if (al && al > 0) finalTotal = al;
+        }
+        if (!availableTotal) availableTotal = finalTotal;
+
+        _addDialogKnownTotal = availableTotal;
+        _publishDialogState();
+
+        const hasFillerData = episodeTypes && !episodeTypes.notFound;
+        const fillerNums = hasFillerData ? (episodeTypes.filler || []) : [];
+        const totalEps = hasFillerData ? (episodeTypes.totalEpisodes || 0) : 0;
+        const canonCount = totalEps > 0
+            ? Math.max(0, totalEps - fillerNums.length)
+            : (availableTotal ? Math.max(0, availableTotal - fillerNums.length) : null);
+        _addDialogTotalCanon = canonCount;
+
+        const showAll = !!availableTotal;
+        const showCanon = !!canonCount && canonCount !== availableTotal;
+        const showSkip = fillerNums.length > 0;
+        const hasAnyChip = showAll || showCanon || showSkip;
+        const hasAnyInfo = hasFillerData || availableTotal;
+
+        // ── Build merged bar ─────────────────────────────────────────────
+        if (bar) {
+            if (!hasAnyInfo && !hasAnyChip) {
+                bar.style.display = 'none';
+            } else {
+                bar.className = 'filler-action-bar';
+                bar.textContent = '';
+
+                // Left: info badges
+                const left = document.createElement('div');
+                left.className = 'fab-left';
+
+                if (canonCount !== null) {
+                    const b = document.createElement('span');
+                    b.className = 'filler-badge filler-badge-canon';
+                    b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg><span>${canonCount} canon</span>`;
+                    left.appendChild(b);
+                }
+                if (fillerNums.length > 0) {
+                    const b = document.createElement('span');
+                    b.className = 'filler-badge filler-badge-fillers fab-filler-toggle';
+                    b.setAttribute('role', 'button');
+                    b.setAttribute('tabindex', '0');
+                    b.setAttribute('aria-expanded', 'false');
+                    b.setAttribute('title', 'Show filler episodes');
+                    const { buildRangeString: brs } = AT.EpisodeParse;
+                    const fillerStr = brs([...fillerNums].sort((a, b) => a - b));
+                    b.innerHTML =
+                        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>` +
+                        `<span>${fillerNums.length} fillers</span>` +
+                        `<svg class="fab-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>`;
+                    // Inline details (hidden by default)
+                    const details = document.createElement('span');
+                    details.className = 'fab-filler-details';
+                    details.hidden = true;
+                    details.textContent = fillerStr;
+                    b.appendChild(details);
+                    left.appendChild(b);
+                }
+
+                bar.appendChild(left);
+
+                // Right: action chips
+                if (hasAnyChip) {
+                    const right = document.createElement('div');
+                    right.className = 'fab-right';
+
+                    const mkChip = (action, label, sub) => {
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'ep-chip';
+                        btn.dataset.action = action;
+                        btn.textContent = label;
+                        if (sub) {
+                            const s = document.createElement('span');
+                            s.className = 'ep-chip-sub';
+                            s.textContent = sub;
+                            btn.appendChild(s);
+                        }
+                        return btn;
+                    };
+
+                    if (showAll) right.appendChild(mkChip('all', 'All', `1–${availableTotal}`));
+                    if (showCanon) right.appendChild(mkChip('canon', 'Canon', `${canonCount}`));
+                    if (showSkip) right.appendChild(mkChip('skip-fillers', '⏭ Skip fillers'));
+
+                    bar.appendChild(right);
+                }
+
+                bar.style.display = 'flex';
+            }
+        }
+
+        // ── Slug meta card ───────────────────────────────────────────────
+        if (slugMeta) {
+            const cover = document.getElementById('slugMetaCover');
+            const titleEl = document.getElementById('slugMetaTitle');
+            const statsEl = document.getElementById('slugMetaStats');
+            const cachedAnilist = AT.AnilistService.cache?.[slug];
+            const detectedTitle = animeInfoFromCache?.title
+                || (cachedAnilist && !cachedAnilist.notFound && cachedAnilist.title)
+                || null;
+            const coverUrl = animeInfoFromCache?.coverImage
+                || (cachedAnilist && cachedAnilist.coverImage)
+                || null;
+            const status = animeInfoFromCache?.status || cachedAnilist?.status || null;
+
+            if (detectedTitle || coverUrl || availableTotal) {
+                slugMeta.style.display = 'flex';
+                if (cover) {
+                    if (coverUrl) { cover.src = coverUrl; cover.style.display = ''; }
+                    else { cover.removeAttribute('src'); cover.style.display = 'none'; }
+                }
+                if (titleEl) titleEl.textContent = detectedTitle || generateTitleFromSlug(slug);
+                if (statsEl) {
+                    const parts = [];
+                    if (availableTotal) parts.push(`<span>${availableTotal} eps</span>`);
+                    if (status === 'RELEASING') parts.push(`<span class="stat-airing">⬤ Airing</span>`);
+                    else if (status === 'FINISHED') parts.push(`<span class="stat-finished">✓ Finished</span>`);
+                    statsEl.innerHTML = parts.join(' · ');
+                }
+            } else {
+                slugMeta.style.display = 'none';
+            }
+        }
+
+        // ── Status indicator ─────────────────────────────────────────────
+        const hasUsefulData = (episodeTypes && !episodeTypes.notFound)
+            || (animeInfoFromCache && !animeInfoFromCache.notFound);
+        _setSlugStatus(hasUsefulData ? 'ok' : (episodeTypes === null && !animeInfoFromCache ? 'idle' : 'fail'));
+
+        // ── Cache title for submit ───────────────────────────────────────
+        {
+            const cachedAnilist = AT.AnilistService.cache?.[slug];
+            _addDialogDetectedTitle = animeInfoFromCache?.title
+                || (cachedAnilist && !cachedAnilist.notFound && cachedAnilist.title)
+                || null;
+        }
+
+        if (elements.episodesWatchedInput.value) {
+            updateEpisodesPreview(elements.episodesWatchedInput.value);
+        }
     }
 
     function hideAddAnimeDialog() {
@@ -2365,8 +2638,11 @@
         const { Storage, FirebaseSync, SeasonGrouping } = AT;
         const slugInput = elements.animeSlugInput.value;
         const slug = extractSlugFromInput(slugInput);
-        const manualTitle = elements.animeTitleInput.value.trim();
-        const title = manualTitle || generateTitleFromSlug(slug);
+        // Title resolution (no manual field anymore):
+        //   1. Title detected during slug auto-fetch (animeinfo / AniList cache)
+        //   2. Slug fallback — generated by capitalising slug parts
+        const detectedTitle = _addDialogDetectedTitle && _addDialogDetectedTitle.trim();
+        const title = detectedTitle || generateTitleFromSlug(slug);
         const episodesRawInput = elements.episodesWatchedInput.value.trim();
 
         if (!slug) {
@@ -2394,8 +2670,12 @@
         }
         elements.episodesWatchedInput.classList.remove('error');
 
+        // Drive the new icon-based button state (idle → loading → success).
+        // The CSS swaps icons + label via [data-state]; we never touch the
+        // <span class="btn-label"> textContent so the structural <svg> children
+        // survive across state flips.
         elements.confirmAddAnime.disabled = true;
-        elements.confirmAddAnime.textContent = 'Adding...';
+        elements.confirmAddAnime.dataset.state = 'loading';
 
         try {
             const now = new Date().toISOString();
@@ -2419,9 +2699,10 @@
                     totalWatchTime: episodes.reduce((sum, ep) => sum + (ep.duration || 0), 0),
                     lastWatched: now, totalEpisodes: null
                 };
-                if (manualTitle) {
-                    animeData[slug].titleUpdatedAt = now;
-                }
+                // No manual title field anymore — `title` is auto-detected or
+                // generated from slug, so we DO NOT stamp titleUpdatedAt
+                // (which would otherwise mark this entry as user-overridden
+                // and block future metadata-repair from refreshing the title).
             }
 
             const deletedResult = await Storage.get(['deletedAnime']);
@@ -2434,7 +2715,18 @@
 
             renderAnimeList(elements.searchInput?.value || '');
             updateStats();
-            hideAddAnimeDialog();
+
+            // Success state — show a checkmark for ~800ms before closing.
+            elements.confirmAddAnime.dataset.state = 'success';
+            setTimeout(() => {
+                hideAddAnimeDialog();
+                // Reset to idle for next open (showAddAnimeDialog also does this,
+                // but reset here too in case something else re-opens fast).
+                if (elements.confirmAddAnime) {
+                    elements.confirmAddAnime.dataset.state = 'idle';
+                    elements.confirmAddAnime.disabled = false;
+                }
+            }, 800);
 
             // Fetch cover image + site metadata (incl. runtime) for the newly added
             // anime in background. Also triggers when any episode has a placeholder
@@ -2464,9 +2756,9 @@
         } catch (error) {
             PopupLogger.error('AddAnime', 'Error:', error);
             showToast('Failed to add anime. Please try again.', 'error');
-        } finally {
+            // Reset button so user can retry
             elements.confirmAddAnime.disabled = false;
-            elements.confirmAddAnime.textContent = 'Add Anime';
+            elements.confirmAddAnime.dataset.state = 'idle';
         }
     }
 
@@ -2796,9 +3088,6 @@
     async function signInWithGoogle() {
         const { FirebaseSync } = AT;
         try {
-            // Set the flag; SW honors it via storage.onChanged and runs the
-            // metadata repair silently. No popup-side modal/toast.
-            await chrome.storage.local.set({ pendingBackgroundMetadataRepair: true });
             elements.googleSignIn.disabled = true;
             elements.googleSignIn.innerHTML = `
                 <span class="btn-content">
@@ -2809,6 +3098,8 @@
                     <span>Signing in...</span>
                 </span>`;
             await FirebaseSync.signInWithGoogle();
+            // Flag is set AFTER successful sign-in, inside onUserSignedIn,
+            // so a cancelled or failed OAuth never leaves a stale flag.
         } catch (error) {
             const msg = (error.message || '').toLowerCase();
             const isCancelled = msg.includes('did not approve') || msg.includes('cancelled') ||
@@ -2818,6 +3109,7 @@
                 PopupLogger.error('Firebase', 'Sign in error:', error);
                 showAuthToast('Sign in failed. Please try again.', 'error');
             }
+            // Ensure any stale flag from a previous session is cleared.
             await chrome.storage.local.set({ pendingBackgroundMetadataRepair: false });
         } finally {
             elements.googleSignIn.disabled = false;
@@ -2904,19 +3196,18 @@
         setEmailFormBusy(true, busyLabel);
 
         try {
-            // Mirror Google sign-in: ask the SW to silently repair metadata
-            // for the freshly-pulled cloud library after the sign-in lands.
-            await chrome.storage.local.set({ pendingBackgroundMetadataRepair: true });
             if (mode === 'signup') {
                 await FirebaseSync.signUpWithEmailPassword(email, password);
             } else {
                 await FirebaseSync.signInWithEmailPassword(email, password);
             }
+            // Flag is set AFTER successful sign-in, inside onUserSignedIn.
             // Clear the password field on success — we don't want it sitting
             // in the DOM if the user gets signed out later.
             const pwEl = document.getElementById('authPasswordInput');
             if (pwEl) pwEl.value = '';
         } catch (err) {
+            // Ensure any stale flag from a previous session is cleared.
             await chrome.storage.local.set({ pendingBackgroundMetadataRepair: false });
             PopupLogger.error('Firebase', `${mode === 'signup' ? 'Sign-up' : 'Sign-in'} error:`, err);
             setEmailFormError(friendlyAuthError(err));
@@ -3787,12 +4078,92 @@
 
         if (elements.animeSlugInput) {
             elements.animeSlugInput.addEventListener('input', () => {
+                // Reset auto-fill flag + meta when user clears the slug
+                if (!elements.animeSlugInput.value.trim()) {
+                    _addDialogDetectedTitle = null;
+                    _addDialogKnownTotal = null;
+                    _addDialogTotalCanon = null;
+                    _addDialogCurrentSlug = null;
+                    _publishDialogState();
+                    _setSlugStatus('idle');
+                    const fillerActionBar = document.getElementById('fillerActionBar');
+                    if (fillerActionBar) fillerActionBar.style.display = 'none';
+                    const slugMeta = document.getElementById('slugMeta');
+                    if (slugMeta) slugMeta.style.display = 'none';
+                    const slugDetectedHint = document.getElementById('slugDetectedHint');
+                    if (slugDetectedHint) slugDetectedHint.style.display = 'none';
+                }
                 if (elements.episodesWatchedInput && elements.episodesWatchedInput.value) {
                     updateEpisodesPreview(elements.episodesWatchedInput.value);
                 }
+                // Debounced slug-driven fetch (filler + title + meta)
+                if (_addDialogSlugDebounce) clearTimeout(_addDialogSlugDebounce);
+                _addDialogSlugDebounce = setTimeout(() => {
+                    _addDialogSlugDebounce = null;
+                    const raw = elements.animeSlugInput.value.trim();
+                    if (raw) onSlugInputChange(raw).catch(() => {});
+                }, 500);
             });
             elements.animeSlugInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') elements.episodesWatchedInput.focus();
+            });
+        }
+
+        // (Title input listener removed — field no longer exists. Title is
+        // auto-detected from animeinfo / AniList during onSlugInputChange,
+        // cached in _addDialogDetectedTitle, and used at submit time.)
+
+        // Quick action chips inside the Add Anime dialog episodes section
+        if (elements.addAnimeDialog) {
+            elements.addAnimeDialog.addEventListener('click', (e) => {
+                const chip = e.target.closest('.ep-chip');
+                if (chip && elements.addAnimeDialog.contains(chip)) {
+                    e.preventDefault();
+                    const action = chip.dataset.action;
+                    if (action === 'all' && _addDialogKnownTotal) {
+                        elements.episodesWatchedInput.value = `1-${_addDialogKnownTotal}`;
+                        const cb = document.getElementById('includeFillers');
+                        if (cb) cb.checked = true;
+                        updateEpisodesPreview(elements.episodesWatchedInput.value);
+                        elements.episodesWatchedInput.focus();
+                    } else if (action === 'canon' && _addDialogKnownTotal) {
+                        // Fill 1-{total} then immediately strip fillers from current range
+                        const slug = _addDialogCurrentSlug;
+                        const all = [];
+                        for (let i = 1; i <= _addDialogKnownTotal; i++) all.push(i);
+                        const { canon } = AT.EpisodeParse.splitCanonAndFillers(slug, all);
+                        elements.episodesWatchedInput.value = AT.EpisodeParse.buildRangeString(canon);
+                        const cb = document.getElementById('includeFillers');
+                        if (cb) cb.checked = false;
+                        updateEpisodesPreview(elements.episodesWatchedInput.value);
+                        elements.episodesWatchedInput.focus();
+                    } else if (action === 'skip-fillers') {
+                        const raw = elements.episodesWatchedInput.value.trim();
+                        if (!raw) return;
+                        const slug = _addDialogCurrentSlug;
+                        const all = parseEpisodeRanges(raw);
+                        const { canon } = AT.EpisodeParse.splitCanonAndFillers(slug, all);
+                        if (canon.length === all.length) return;
+                        elements.episodesWatchedInput.value = AT.EpisodeParse.buildRangeString(canon);
+                        const cb = document.getElementById('includeFillers');
+                        if (cb) cb.checked = false;
+                        updateEpisodesPreview(elements.episodesWatchedInput.value);
+                    }
+                    return;
+                }
+
+                // Filler badge toggle (shows inline filler episode list)
+                const toggle = e.target.closest('.fab-filler-toggle');
+                if (toggle && elements.addAnimeDialog.contains(toggle)) {
+                    e.preventDefault();
+                    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+                    toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+                    const details = toggle.querySelector('.fab-filler-details');
+                    if (details) details.hidden = expanded;
+                    const chevron = toggle.querySelector('.fab-chevron');
+                    if (chevron) chevron.style.transform = expanded ? '' : 'rotate(180deg)';
+                    return;
+                }
             });
         }
         if (elements.episodesWatchedInput) {
@@ -4315,11 +4686,12 @@
                 try { chrome.runtime.sendMessage({ type: 'GET_VERSION' }); } catch {}
                 await refreshPopupCloudData(true);
                 startPopupCloudRefresh();
-                // Sign-in is always silent — the SW picks up the
-                // `pendingBackgroundMetadataRepair` flag we wrote in
-                // signInWithGoogle / handleEmailAuth and runs the repair in
-                // background. Progress is surfaced via the footer
-                // sync-status badge (storage.onChanged → applyMetadataRepairState).
+                // Set the repair flag NOW — after the cloud library has been
+                // loaded and merged. The SW picks it up via storage.onChanged
+                // and runs the silent metadata repair in background. Setting
+                // it before loadAndSyncData would let the SW start fetching
+                // before the library is ready (the sign-out→sign-in bug).
+                await chrome.storage.local.set({ pendingBackgroundMetadataRepair: true });
                 await maybePromptPostUpdateFetch();
             },
             onUserSignedOut: () => {

@@ -105,51 +105,77 @@
      * Live preview for the Add-Anime dialog. Reads the current slug input
      * directly from `#animeSlug` so the function stays decoupled from any
      * popup-local `elements` closure.
+     *
+     * Drives:
+     *   - #episodesPreview (canon vs filler text)
+     *   - #episodesCounter (live count + progress bar against known total)
+     *   - #includeFillerLabel (visibility based on filler presence)
+     *   - .episodes-input.invalid-range (validation border)
      */
     function renderEpisodesPreview(input) {
         const preview = document.getElementById('episodesPreview');
         const fillerLabel = document.getElementById('includeFillerLabel');
         const includeFillerText = document.getElementById('includeFillerText');
-        if (!preview) return;
+        const counter = document.getElementById('episodesCounter');
+        const counterText = document.getElementById('episodesCounterText');
+        const counterPct = document.getElementById('episodesCounterPercent');
+        const counterFill = document.getElementById('episodesCounterFill');
+        const epInput = document.getElementById('episodesWatched');
+
+        const hideAll = () => {
+            if (fillerLabel) fillerLabel.style.display = 'none';
+            if (counter) counter.style.display = 'none';
+            if (epInput) epInput.classList.remove('invalid-range');
+        };
 
         if (!input || !input.trim()) {
-            preview.innerHTML = '';
-            preview.className = 'episodes-preview';
-            if (fillerLabel) fillerLabel.style.display = 'none';
+            hideAll();
             return;
         }
 
         const allEpisodes = parseRanges(input);
         if (allEpisodes.length === 0) {
-            preview.innerHTML = '<span class="preview-error">⚠ No valid episodes found</span>';
-            preview.className = 'episodes-preview preview-visible preview-error-state';
             if (fillerLabel) fillerLabel.style.display = 'none';
+            if (counter) counter.style.display = 'none';
+            if (epInput) epInput.classList.add('invalid-range');
             return;
         }
 
         const slugInput = document.getElementById('animeSlug');
         const slug = extractSlugFromInput(slugInput ? slugInput.value : '');
         const { canon, fillers } = splitCanonAndFillers(slug, allEpisodes);
-
         const includeFillers = document.getElementById('includeFillers')?.checked || false;
+        const finalCount = (includeFillers || fillers.length === 0) ? allEpisodes.length : canon.length;
 
-        let html;
-        if (includeFillers || fillers.length === 0) {
-            html = `<span class="preview-ok">✓ ${allEpisodes.length} episodes: <strong>${buildRangeString(allEpisodes)}</strong></span>`;
-        } else {
-            html = `<span class="preview-ok">✓ ${canon.length} canon episodes: <strong>${buildRangeString(canon)}</strong></span>`;
-            html += `<br><span class="preview-fillers">⏭ ${fillers.length} fillers will be excluded: ${buildRangeString(fillers)}</span>`;
+        // ── Out-of-range validation ─────────────────────────────────────
+        const knownTotal = window.AnimeTracker?.__addDialogState?.knownTotal || null;
+        const maxEntered = allEpisodes[allEpisodes.length - 1];
+        const outOfRange = !!(knownTotal && maxEntered > knownTotal);
+        if (epInput) epInput.classList.toggle('invalid-range', outOfRange);
+
+        // ── Live counter + progress bar ────────────────────────────────
+        if (counter && counterText && counterFill) {
+            counter.style.display = 'block';
+            const ICON = '<svg class="counter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
+            counterText.innerHTML = `${ICON}${finalCount} episode${finalCount !== 1 ? 's' : ''} selected`;
+            if (knownTotal) {
+                const pct = Math.min(100, Math.round((finalCount / knownTotal) * 100));
+                if (counterPct) counterPct.textContent = `${finalCount} / ${knownTotal} · ${pct}%`;
+                counterFill.style.width = `${pct}%`;
+            } else {
+                if (counterPct) counterPct.textContent = '';
+                counterFill.style.width = '0%';
+            }
         }
-        preview.innerHTML = html;
-        preview.className = 'episodes-preview preview-visible';
 
+        // ── Filler-include checkbox visibility ─────────────────────────
         if (fillerLabel) {
             if (fillers.length > 0) {
                 fillerLabel.style.display = 'flex';
                 if (includeFillerText) {
                     includeFillerText.textContent = includeFillers
                         ? `Fillers included (${fillers.length} eps: ${buildRangeString(fillers)})`
-                        : `Include ${fillers.length} filler episodes too (${buildRangeString(fillers)})`;
+                        : `Include ${fillers.length} filler episode${fillers.length !== 1 ? 's' : ''} too (${buildRangeString(fillers)})`;
                 }
             } else {
                 fillerLabel.style.display = 'none';
