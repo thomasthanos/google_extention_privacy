@@ -313,7 +313,7 @@
                         const inProgressTags = inProgressEps.map(ep =>
                             `<span class="episode-tag in-progress" title="Saved: ${ep.percentage}%">
                             Ep ${ep.number} (${ep.timeStr})
-                            <button class="progress-delete-btn" data-slug="${slug}" data-episode="${ep.number}" title="Delete progress">×</button>
+                            <button class="progress-delete-btn" data-slug="${UIHelpers.escapeHtml(slug)}" data-episode="${ep.number}" title="Delete progress">×</button>
                         </span>`
                         ).join('');
                         const inProgressSection = inProgressTags ? `
@@ -356,13 +356,13 @@
                     ? `<span class="meta-badge season-movie-type-badge">Movie</span>
                        <span class="movie-duration">${episodeBadgeText}</span>
                        <div class="season-item-actions">
-                           <button class="season-edit-btn" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
-                           <button class="season-delete-btn" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
+                           <button class="season-edit-btn" data-slug="${UIHelpers.escapeHtml(slug)}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
+                           <button class="season-delete-btn" data-slug="${UIHelpers.escapeHtml(slug)}" title="Delete">${UIHelpers.createIcon('delete')}</button>
                        </div>`
                     : `<span class="season-episode-badge">${episodeBadgeText}</span>
                        <div class="season-item-actions">
-                           <button class="season-edit-btn" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
-                           <button class="season-delete-btn" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
+                           <button class="season-edit-btn" data-slug="${UIHelpers.escapeHtml(slug)}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
+                           <button class="season-delete-btn" data-slug="${UIHelpers.escapeHtml(slug)}" title="Delete">${UIHelpers.createIcon('delete')}</button>
                        </div>
                        ${expandIconHtml}`;
 

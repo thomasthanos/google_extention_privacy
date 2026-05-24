@@ -59,8 +59,8 @@
                             <div class="movie-item-right">
                                 <span class="movie-duration">${formattedTime}</span>
                                 <div class="movie-item-actions">
-                                    <button class="movie-edit-btn" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
-                                    <button class="movie-delete-btn" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
+                                    <button class="movie-edit-btn" data-slug="${UIHelpers.escapeHtml(slug)}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
+                                    <button class="movie-delete-btn" data-slug="${UIHelpers.escapeHtml(slug)}" title="Delete">${UIHelpers.createIcon('delete')}</button>
                                 </div>
                             </div>
                         </div>
@@ -169,7 +169,7 @@
                         </div>
                     </div>
                     <div class="movie-group-content">
-                        <div class="movie-item ${isWatched ? 'complete' : 'not-started'}" data-slug="${slug}">
+                        <div class="movie-item ${isWatched ? 'complete' : 'not-started'}" data-slug="${UIHelpers.escapeHtml(slug)}">
                             <div class="movie-item-header">
                                 <div class="movie-item-left">
                                     <span class="movie-status-icon">${isWatched ? '✓' : '○'}</span>
@@ -178,8 +178,8 @@
                                 <div class="movie-item-right">
                                     <span class="movie-duration">${formattedTime}</span>
                                     <div class="movie-item-actions">
-                                        <button class="movie-edit-btn" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
-                                        <button class="movie-delete-btn" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
+                                        <button class="movie-edit-btn" data-slug="${UIHelpers.escapeHtml(slug)}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
+                                        <button class="movie-delete-btn" data-slug="${UIHelpers.escapeHtml(slug)}" title="Delete">${UIHelpers.createIcon('delete')}</button>
                                     </div>
                                 </div>
                             </div>

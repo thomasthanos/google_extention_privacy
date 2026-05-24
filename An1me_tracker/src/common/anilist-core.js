@@ -127,9 +127,19 @@
             if (ts < minTs) { minTs = ts; minIso = ep.watchedAt; }
             if (ts > maxTs) { maxTs = ts; maxIso = ep.watchedAt; }
         }
+        // If no real episode dates exist for a completed entry, fall back to
+        // entry.completedAt — but only when the entry has at least one
+        // non-anilist episode (i.e. the user actually watched something here)
+        // or a manual marker (listStateUpdatedAt without any anilist episodes).
+        // For pure AniList-import entries we leave completedAt null so we
+        // never clobber the date AniList already holds.
+        const hasRealEpisode = eps.some(ep => ep && ep.durationSource !== 'anilist');
+        const completedIso = status === 'COMPLETED'
+            ? (maxIso || (hasRealEpisode && entry && entry.completedAt) || null)
+            : null;
         return {
             startedAt: isoToFuzzyDate(minIso),
-            completedAt: status === 'COMPLETED' ? isoToFuzzyDate(maxIso) : null
+            completedAt: isoToFuzzyDate(completedIso)
         };
     }
 
@@ -187,7 +197,7 @@
         const slugs = Object.keys(animeData);
         const total = slugs.length;
 
-        let done = 0, ok = 0, skipped = 0, failed = 0, work = 0, truncated = false;
+        let done = 0, ok = 0, skipped = 0, failed = 0, retryableFailed = 0, work = 0, truncated = false;
 
         for (const slug of slugs) {
             const entry = animeData[slug];
@@ -201,7 +211,33 @@
 
             const status = pushStatus(entry, progress);
             const prev = pushed[slug];
-            if (prev && prev.progress === progress && prev.status === status) {
+
+            // Migration: a pre-existing pushed record (from before datesLocked
+            // was introduced) for an entry that is now a pure AniList import
+            // (every episode is durationSource 'anilist') should have its lock
+            // backfilled — otherwise the dedupe below skips and we never get
+            // a chance to write the lock.
+            const eps = Array.isArray(entry.episodes) ? entry.episodes : [];
+            const isPureAniListImport = eps.length > 0 && eps.every(ep => ep && ep.durationSource === 'anilist');
+            if (prev && isPureAniListImport && prev.datesLocked == null) {
+                prev.datesLocked = true;
+                pushed[slug] = prev;
+                await sset({ [PUSHED_KEY]: pushed });
+            }
+
+            // datesLocked: set on import preseed so we never overwrite AniList's
+            // existing history with a "today" date from a newly-promoted episode.
+            // The lock is cleared when the user watches beyond the imported count.
+            const datesLocked = !!(prev && prev.datesLocked && progress <= (prev.progress || 0));
+            const { startedAt, completedAt } = datesLocked ? { startedAt: null, completedAt: null } : watchDates(entry, status);
+            const startedAtKey = startedAt ? `${startedAt.year}-${startedAt.month}-${startedAt.day}` : '';
+            const completedAtKey = completedAt ? `${completedAt.year}-${completedAt.month}-${completedAt.day}` : '';
+
+            if (prev &&
+                prev.progress === progress &&
+                prev.status === status &&
+                (prev.startedAtKey || '') === startedAtKey &&
+                (prev.completedAtKey || '') === completedAtKey) {
                 done++; skipped++;
                 if (onProgress) onProgress({ done, total, ok, skipped, failed });
                 continue;
@@ -216,12 +252,9 @@
                 if (!media || !media.mediaId) {
                     failed++;
                 } else {
-                    const { startedAt, completedAt } = watchDates(entry, status);
                     const varDefs = ['$m:Int', '$p:Int', '$s:MediaListStatus'];
                     const args = ['mediaId:$m', 'progress:$p', 'status:$s'];
                     const vars = { m: media.mediaId, p: progress, s: status };
-                    // Only include a date field when we actually have a value,
-                    // so a missing date never clobbers what AniList already holds.
                     if (startedAt) {
                         varDefs.push('$sa:FuzzyDateInput'); args.push('startedAt:$sa'); vars.sa = startedAt;
                     }
@@ -233,7 +266,12 @@
                         vars,
                         token
                     );
-                    pushed[slug] = { progress, status };
+                    pushed[slug] = { progress, status, startedAtKey, completedAtKey };
+                    // If progress advanced beyond the locked import count, the
+                    // lock is no longer needed — future pushes can send dates.
+                    if (prev && prev.datesLocked && progress > (prev.progress || 0)) {
+                        pushed[slug].datesLocked = false;
+                    }
                     await sset({ [PUSHED_KEY]: pushed });
                     ok++;
                 }
@@ -241,19 +279,20 @@
                 const msg = String(e?.message || '');
                 if (/invalid token|unauthor/i.test(msg)) throw new Error('reconnect');
                 if (msg === 'rate_limited') await sleep(60000);
-                failed++;
+                const isRetryable = msg === 'rate_limited' || msg.startsWith('network:') || msg.startsWith('http_5');
+                if (isRetryable) retryableFailed++; else failed++;
             }
 
             done++;
             if (onProgress) onProgress({ done, total, ok, skipped, failed });
         }
 
-        return { total, done, ok, skipped, failed, work, truncated };
+        return { total, done, ok, skipped, failed, retryableFailed, work, truncated };
     }
 
     const root = typeof globalThis !== 'undefined' ? globalThis : self;
     root.AniListCore = {
         gql, slugify, localProgress, pushStatus, resolveMedia, runPush,
-        AUTH_KEY, MEDIA_MAP_KEY, PUSHED_KEY
+        AUTH_KEY, MEDIA_MAP_KEY, PUSHED_KEY, SCHEMA_KEY, PUSH_SCHEMA
     };
 })();

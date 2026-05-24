@@ -20,7 +20,14 @@ const AnimeCardRenderer = {
             }
         }
 
-        const trackedEpisodeNumbers = new Set((anime.episodes || []).map(ep => ep.number));
+        // AniList-imported episodes without real watchedAt are not "truly"
+        // tracked — keep their resume snippets visible so the user can pick
+        // them up where they left off.
+        const trackedEpisodeNumbers = new Set(
+            (anime.episodes || [])
+                .filter(ep => !(ep?.durationSource === 'anilist' && !ep?.watchedAt))
+                .map(ep => ep.number)
+        );
 
         const episodesWithProgress = [];
         const slugEntries = videoProgress.__slugIndex?.[slug] || null;
@@ -236,7 +243,7 @@ const AnimeCardRenderer = {
 
         const anilistStatus = AnilistService?.getStatus(slug);
         const airingBadge = anilistStatus === 'RELEASING' && !isDropped && !isOnHold && !_isCaughtUpAiring
-            ? `<span class="meta-badge meta-badge-airing" title="Currently airing">⬤ Airing</span>`
+            ? `<span class="meta-badge meta-badge-airing" title="Currently airing">Airing</span>`
             : '';
 
         let inlineEtaHtml = '';
@@ -307,8 +314,8 @@ const AnimeCardRenderer = {
 
         const headerActionsHtml = `
             <div class="anime-header-actions">
-                <button class="anime-edit-title" data-slug="${slug}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
-                <button class="anime-delete" data-slug="${slug}" title="Delete">${UIHelpers.createIcon('delete')}</button>
+                <button class="anime-edit-title" data-slug="${UIHelpers.escapeHtml(slug)}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
+                <button class="anime-delete" data-slug="${UIHelpers.escapeHtml(slug)}" title="Delete">${UIHelpers.createIcon('delete')}</button>
             </div>`;
         const metaRowHtml = `
             <div class="anime-meta-row-wrap">
@@ -324,7 +331,7 @@ const AnimeCardRenderer = {
             </div>`;
 
         return `
-            <div class="anime-card" data-slug="${slug}" tabindex="0" role="button" aria-expanded="false" aria-label="${UIHelpers.escapeHtml(anime.title || slug)}, press Enter to expand">
+            <div class="anime-card" data-slug="${UIHelpers.escapeHtml(slug)}" tabindex="0" role="button" aria-expanded="false" aria-label="${UIHelpers.escapeHtml(anime.title || slug)}, press Enter to expand">
                 <div class="anime-card-header">
                     <div class="anime-cover-container" style="flex-shrink:0;">${coverHtml}</div>
                     <div class="anime-header-main" style="flex:1; display:flex; flex-direction:column; min-width:0; margin-left:8px;">
@@ -364,10 +371,10 @@ const AnimeCardRenderer = {
                         </div>
                     </div>
                     <div class="anime-card-actions">
-                        <button class="anime-favorite-toggle${anime.favorite ? ' is-favorite' : ''}" data-slug="${slug}" data-favorite="${!!anime.favorite}" title="${anime.favorite ? 'Remove from favorites' : 'Mark as favorite'}" aria-pressed="${!!anime.favorite}">${UIHelpers.createIcon(anime.favorite ? 'star-filled' : 'star')}<span>${anime.favorite ? 'Favorited' : 'Favorite'}</span></button>
-                        <button class="anime-onhold-toggle" data-slug="${slug}" data-onhold="${!!anime.onHoldAt}" title="${anime.onHoldAt ? 'Resume watching' : 'Put on hold'}">${UIHelpers.createIcon('pause')}<span>${anime.onHoldAt ? 'Resume' : 'Hold'}</span></button>
-                        <button class="anime-complete-toggle" data-slug="${slug}" data-completed="${isManuallyCompleted}" title="${isManuallyCompleted ? 'Unmark as completed' : 'Mark as completed'}">${UIHelpers.createIcon('check')}<span>${isManuallyCompleted ? 'Undo' : 'Complete'}</span></button>
-                        <button class="anime-drop-toggle" data-slug="${slug}" data-dropped="${!!anime.droppedAt}" title="${anime.droppedAt ? 'Unmark as dropped' : 'Drop'}">${UIHelpers.createIcon('drop')}<span>${anime.droppedAt ? 'Undrop' : 'Drop'}</span></button>
+                        <button class="anime-favorite-toggle${anime.favorite ? ' is-favorite' : ''}" data-slug="${UIHelpers.escapeHtml(slug)}" data-favorite="${!!anime.favorite}" title="${anime.favorite ? 'Remove from favorites' : 'Mark as favorite'}" aria-pressed="${!!anime.favorite}">${UIHelpers.createIcon(anime.favorite ? 'star-filled' : 'star')}<span>${anime.favorite ? 'Favorited' : 'Favorite'}</span></button>
+                        <button class="anime-onhold-toggle" data-slug="${UIHelpers.escapeHtml(slug)}" data-onhold="${!!anime.onHoldAt}" title="${anime.onHoldAt ? 'Resume watching' : 'Put on hold'}">${UIHelpers.createIcon('pause')}<span>${anime.onHoldAt ? 'Resume' : 'Hold'}</span></button>
+                        <button class="anime-complete-toggle" data-slug="${UIHelpers.escapeHtml(slug)}" data-completed="${isManuallyCompleted}" title="${isManuallyCompleted ? 'Unmark as completed' : 'Mark as completed'}">${UIHelpers.createIcon('check')}<span>${isManuallyCompleted ? 'Undo' : 'Complete'}</span></button>
+                        <button class="anime-drop-toggle" data-slug="${UIHelpers.escapeHtml(slug)}" data-dropped="${!!anime.droppedAt}" title="${anime.droppedAt ? 'Unmark as dropped' : 'Drop'}">${UIHelpers.createIcon('drop')}<span>${anime.droppedAt ? 'Undrop' : 'Drop'}</span></button>
                     </div>
                 </div>
             </div>

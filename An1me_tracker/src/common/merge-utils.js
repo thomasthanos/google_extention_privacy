@@ -424,11 +424,22 @@
             if (!cloudAnime || !localAnime) continue;
 
             const episodesByNumber = new Map();
-            for (const episode of [
+            for (let episode of [
                 ...(Array.isArray(cloudAnime.episodes) ? cloudAnime.episodes : []),
                 ...(Array.isArray(localAnime.episodes) ? localAnime.episodes : [])
             ]) {
                 if (!episode || typeof episode.number !== 'number' || isNaN(episode.number)) continue;
+
+                // AniList-imported episodes never carry a real watch date —
+                // older importer versions stamped them with the import time,
+                // which then re-pollutes daily stats (and survives merges
+                // because the bogus watchedAt looks "newer" than scrubbed
+                // local episodes). Strip it during the merge so the cloud
+                // copy can never resurrect the bogus stamp.
+                if (episode.durationSource === 'anilist' && episode.watchedAt != null) {
+                    const { watchedAt: _drop, ...rest } = episode;
+                    episode = rest;
+                }
 
                 const existing = episodesByNumber.get(episode.number);
                 if (!existing) {

@@ -244,6 +244,9 @@ const ProgressManager = {
         for (const [animeSlug, anime] of Object.entries(animeData)) {
             if (anime.episodes) {
                 anime.episodes.forEach(ep => {
+                    // AniList-imported episodes without a real watchedAt are not
+                    // "truly" tracked — keep their videoProgress so resume works.
+                    if (ep?.durationSource === 'anilist' && !ep?.watchedAt) return;
                     trackedIds.add(UIHelpers.getUniqueId(animeSlug, ep.number));
                 });
             }
@@ -307,7 +310,12 @@ const ProgressManager = {
             if (!trackedEpisodeNumbers) {
                 trackedEpisodeNumbers = new Set(
                     Array.isArray(trackedAnime?.episodes)
-                        ? trackedAnime.episodes.map(ep => Number(ep?.number)).filter(n => Number.isFinite(n) && n > 0)
+                        ? trackedAnime.episodes
+                            // AniList-imported episodes without a real watchedAt
+                            // haven't actually been watched — keep them showing
+                            // up as in-progress when there's resume data.
+                            .filter(ep => !(ep?.durationSource === 'anilist' && !ep?.watchedAt))
+                            .map(ep => Number(ep?.number)).filter(n => Number.isFinite(n) && n > 0)
                         : []
                 );
                 trackedEpsBySlug.set(animeSlug, trackedEpisodeNumbers);

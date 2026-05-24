@@ -172,7 +172,12 @@
             const count = (status === 'COMPLETED' && total > 0) ? total : progress;
             const episodes = [];
             for (let n = 1; n <= count; n++) {
-                episodes.push({ number: n, watchedAt: importedAt, duration: 1440, durationSource: 'anilist' });
+                // No per-episode `watchedAt` for AniList imports — we don't
+                // know the real watch date, and stamping every episode with
+                // `now` would dump the whole import onto a single day in
+                // "minutes today" / streak / weekday stats. The entry-level
+                // `lastWatched` (set below) gives the card a sensible date.
+                episodes.push({ number: n, duration: 1440, durationSource: 'anilist' });
             }
 
             const entryObj = {
@@ -206,7 +211,13 @@
                 mediaMap[slug] = { mediaId: media.id, episodes: total || null, cachedAt: now };
                 pushed[slug] = {
                     progress: Core.localProgress(entryObj),
-                    status: Core.pushStatus(entryObj, count)
+                    status: Core.pushStatus(entryObj, count),
+                    // Lock dates for pure imports: AniList already has the
+                    // correct history. We must not overwrite it with a
+                    // "today" date just because the user watches ep1 later.
+                    // The lock is cleared when progress advances beyond the
+                    // imported count (i.e. the user watches new episodes).
+                    datesLocked: true
                 };
             }
 
@@ -214,7 +225,9 @@
         }
 
         if (added > 0) {
-            await sset({ animeData, [Core.MEDIA_MAP_KEY]: mediaMap, [Core.PUSHED_KEY]: pushed });
+            // Also write SCHEMA_KEY so the background push doesn't wipe the
+            // pre-seeded pushed cache on first run after import.
+            await sset({ animeData, [Core.MEDIA_MAP_KEY]: mediaMap, [Core.PUSHED_KEY]: pushed, [Core.SCHEMA_KEY]: Core.PUSH_SCHEMA });
         }
         return { added, skipped, total: entries.length };
     }
@@ -699,6 +712,12 @@
         if (st && st.state === 'error') {
             if (st.error === 'reconnect') setStatus('AniList session expired — reconnect needed', 'err');
             else setStatus(`Sync error: ${st.error || 'unknown'}`, 'err');
+            return;
+        }
+
+        if (st && st.state === 'retrying') {
+            const retryIn = st.retryAt ? Math.max(0, Math.round((st.retryAt - Date.now()) / 60000)) : 5;
+            setStatus(`Sync paused — retrying in ${retryIn}m (${st.retryableFailed || 0} transient failures)`, 'err');
             return;
         }
 

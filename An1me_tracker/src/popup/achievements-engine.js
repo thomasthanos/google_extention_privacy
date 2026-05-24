@@ -45,6 +45,7 @@
             const anime = animeData[slug];
             if (!anime || !Array.isArray(anime.episodes)) continue;
             for (const ep of anime.episodes) {
+                if (ep?.durationSource === 'anilist') continue;
                 if (!ep?.watchedAt) continue;
                 const d = new Date(ep.watchedAt);
                 if (!Number.isFinite(d.getTime())) continue;
@@ -144,6 +145,7 @@
             const a = animeData[slug];
             if (!a || !Array.isArray(a.episodes)) continue;
             for (const ep of a.episodes) {
+                if (ep?.durationSource === 'anilist') continue;
                 if (!ep?.watchedAt) continue;
                 const d = new Date(ep.watchedAt);
                 if (!Number.isFinite(d.getTime())) continue;
@@ -173,6 +175,7 @@
             if (!a || !Array.isArray(a.episodes) || a.episodes.length < 2) continue;
             const times = [];
             for (const ep of a.episodes) {
+                if (ep?.durationSource === 'anilist') continue;
                 if (!ep?.watchedAt) continue;
                 const t = Date.parse(ep.watchedAt);
                 if (Number.isFinite(t)) times.push(t);

@@ -22,6 +22,7 @@ const METADATA_REPAIR_INFO_TTL_MS = 24 * 60 * 60 * 1000;
 const METADATA_REPAIR_INFO_TTL_AIRING_MS = 60 * 60 * 1000;
 const METADATA_REPAIR_EPISODE_TYPES_TTL_MS = 24 * 60 * 60 * 1000;
 const METADATA_REPAIR_NOT_FOUND_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+const METADATA_REPAIR_RETRYABLE_TTL_MS = 15 * 60 * 1000;   // retry transient failures after 15 min
 const METADATA_REPAIR_ITEMS_PER_TICK = 3;
 const METADATA_REPAIR_INTER_ITEM_DELAY_MS = 250;
 const METADATA_REPAIR_MAX_LOGS = 60;
@@ -94,6 +95,10 @@ function isAnimeInfoCacheFresh(entry) {
     if (!entry || typeof entry !== 'object') return false;
     const age = entry.cachedAt ? Date.now() - entry.cachedAt : Infinity;
     if (entry.notFound) return age < METADATA_REPAIR_NOT_FOUND_TTL_MS;
+    // Retryable errors must be treated as stale much sooner than a normal
+    // healthy cache entry — otherwise transient scraper failures stick around
+    // for the full 24h TTL.
+    if (entry.retryable) return age < METADATA_REPAIR_RETRYABLE_TTL_MS;
     const ttl = entry.status === 'RELEASING'
         ? METADATA_REPAIR_INFO_TTL_AIRING_MS
         : METADATA_REPAIR_INFO_TTL_MS;

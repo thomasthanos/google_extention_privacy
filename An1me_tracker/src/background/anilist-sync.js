@@ -102,6 +102,18 @@
                     ok: result.ok, skipped: result.skipped, failed: result.failed
                 });
                 armPushAlarm(1);
+            } else if (result.retryableFailed > 0) {
+                // All entries processed but some failed with transient errors
+                // (network / rate-limit). Use 'retrying' state so the UI
+                // doesn't show "Syncing 100/100" forever, and back off 5 min.
+                await writeStatus({
+                    state: 'retrying',
+                    done: result.done, total: result.total,
+                    ok: result.ok, skipped: result.skipped,
+                    failed: result.failed, retryableFailed: result.retryableFailed,
+                    retryAt: Date.now() + 5 * 60 * 1000
+                });
+                armPushAlarm(5);
             } else {
                 await writeStatus({
                     state: 'idle',

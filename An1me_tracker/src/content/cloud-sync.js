@@ -324,7 +324,12 @@
         const trackedIds = new Set();
         for (const [slug, anime] of Object.entries(animeData)) {
             if (anime?.episodes) {
-                for (const ep of anime.episodes) trackedIds.add(`${slug}__episode-${ep.number}`);
+                for (const ep of anime.episodes) {
+                    // AniList-imported episodes without a real watchedAt are
+                    // not "truly" tracked — keep videoProgress for resume.
+                    if (ep?.durationSource === 'anilist' && !ep?.watchedAt) continue;
+                    trackedIds.add(`${slug}__episode-${ep.number}`);
+                }
             }
         }
         const out = {};
@@ -354,7 +359,11 @@
             if (!Array.isArray(anime?.episodes)) continue;
             for (const ep of anime.episodes) {
                 const num = Number(ep?.number) || 0;
-                if (num > 0) trackedIds.add(`${slug}__episode-${num}`);
+                if (num <= 0) continue;
+                // AniList-imported episodes without a real watchedAt are not
+                // "truly" tracked — keep their videoProgress for resume.
+                if (ep?.durationSource === 'anilist' && !ep?.watchedAt) continue;
+                trackedIds.add(`${slug}__episode-${num}`);
             }
         }
 

@@ -135,6 +135,35 @@ const EpisodeWriter = {
         if (existingIndex !== -1) {
             const existingEpisode = animeData[slug].episodes[existingIndex] || {};
             const currentDuration = Number(existingEpisode.duration) || 0;
+            // Promote an AniList-imported episode to a real watched episode:
+            // the user has now actually watched it, so stamp watchedAt + video duration.
+            if (existingEpisode.durationSource === 'anilist') {
+                const nowIso = this._compactNow();
+                animeData[slug].episodes[existingIndex] = {
+                    ...existingEpisode,
+                    watchedAt: nowIso,
+                    duration: validDuration > 0 ? validDuration : currentDuration,
+                    durationSource: 'video'
+                };
+                // Also promote the second episode of a double if it was imported.
+                if (info.isDoubleEpisode && info.secondEpisodeNumber) {
+                    const secondNum = this._normalizeEpisodeNumber(info.secondEpisodeNumber);
+                    const secondIdx = animeData[slug].episodes
+                        .findIndex(ep => Number(ep?.number) === Number(secondNum));
+                    if (secondIdx !== -1 && animeData[slug].episodes[secondIdx]?.durationSource === 'anilist') {
+                        animeData[slug].episodes[secondIdx] = {
+                            ...animeData[slug].episodes[secondIdx],
+                            watchedAt: nowIso,
+                            duration: validDuration > 0 ? validDuration : (Number(animeData[slug].episodes[secondIdx].duration) || 0),
+                            durationSource: 'video'
+                        };
+                    }
+                }
+                animeData[slug].totalWatchTime = animeData[slug].episodes
+                    .reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
+                animeData[slug].lastWatched = nowIso;
+                return { changed: true, changeType: 'promoted-import' };
+            }
             if (this._isPlaceholderDuration(currentDuration) && validDuration > 0 && currentDuration !== validDuration) {
                 animeData[slug].episodes[existingIndex] = {
                     ...existingEpisode,

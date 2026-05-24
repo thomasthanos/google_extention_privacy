@@ -133,6 +133,9 @@ function cleanTrackedProgressBg(animeData, videoProgress, deletedAnime = {}) {
     for (const [slug, anime] of Object.entries(animeData)) {
         if (anime.episodes) {
             for (const ep of anime.episodes) {
+                // AniList-imported episodes without a real watchedAt are not
+                // "truly" tracked — keep their videoProgress so resume works.
+                if (ep?.durationSource === 'anilist' && !ep?.watchedAt) continue;
                 trackedIds.add(`${slug}__episode-${ep.number}`);
             }
         }
@@ -1446,8 +1449,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return true;
     }
 
-    sendResponse({ error: 'Unknown message type' });
-    return true;
+    // Unknown message type — return false so modular listeners (anilist-sync,
+    // filler-discovery, etc.) that registered their own onMessage handlers can
+    // handle it without getting a race from a double sendResponse here.
+    return false;
 });
 
 chrome.runtime.onInstalled.addListener((details) => {

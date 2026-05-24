@@ -4,6 +4,7 @@ const AnilistService = {
     CACHE_TTL: 24 * 60 * 60 * 1000,
     CACHE_TTL_AIRING: 60 * 60 * 1000,
     CACHE_TTL_NOT_FOUND: 3 * 24 * 60 * 60 * 1000,
+    CACHE_TTL_RETRYABLE: 15 * 60 * 1000,   // retry transient errors after 15 min
 
     getTotalEpisodes(slug) {
         const data = this.cache[slug];
@@ -85,6 +86,7 @@ const AnilistService = {
     async autoFetchMissing(animeData, onComplete, onProgress) {
         const { Storage } = window.AnimeTracker;
 
+        return new Promise(async (resolveOuter) => {
         try {
             await this.loadCachedData(animeData);
 
@@ -111,15 +113,15 @@ const AnilistService = {
                 const cached = this.cache[slug];
                 if (!cached || !cached.cachedAt) return true;
                 const age = now - cached.cachedAt;
-                if (cached.notFound) {
-                    return age >= this.CACHE_TTL_NOT_FOUND;
-                }
+                if (cached.notFound) return age >= this.CACHE_TTL_NOT_FOUND;
+                if (cached.retryable) return age >= this.CACHE_TTL_RETRYABLE;
                 const ttl = cached.status === 'RELEASING' ? this.CACHE_TTL_AIRING : this.CACHE_TTL;
                 return age >= ttl;
             });
 
             if (slugsToFetch.length === 0) {
                 if (onComplete) onComplete();
+                resolveOuter();
                 return;
             }
 
@@ -141,10 +143,9 @@ const AnilistService = {
                 }
                 if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
                 if (onComplete) onComplete();
+                resolveOuter();
             };
 
-            // Listen for `animeinfo_<slug>` writes that the BG emits as it
-            // works through the batch. Each write = one step of progress.
             storageListener = (changes, namespace) => {
                 if (namespace !== 'local') return;
                 for (const key of Object.keys(changes)) {
@@ -166,9 +167,6 @@ const AnilistService = {
             };
             chrome.storage.onChanged.addListener(storageListener);
 
-            // Safety net: BG batchFetchAnimeInfo paces ~3 anime per 1.2s, so
-            // give it generous headroom (max ≈ 5s/anime, capped at 5min). If
-            // anything stalls we still call onComplete so the UI unstucks.
             const MAX_WAIT_MS = Math.min(5 * 60 * 1000, Math.max(30000, total * 5000));
             timeoutId = setTimeout(finish, MAX_WAIT_MS);
 
@@ -179,7 +177,9 @@ const AnilistService = {
         } catch (error) {
             PopupLogger.error('AnimeInfo', 'Auto-fetch error:', error);
             if (onComplete) onComplete();
+            resolveOuter();
         }
+        }); // end new Promise
     }
 };
 

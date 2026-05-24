@@ -477,7 +477,7 @@
 
     // normalizeMovieDurations + cleanupPhantomMovies live in
     // src/popup/maintenance.js — pure helpers, independently testable.
-    const { normalizeMovieDurations, cleanupPhantomMovies } = AT.Maintenance;
+    const { normalizeMovieDurations, cleanupPhantomMovies, scrubAnilistImportDates } = AT.Maintenance;
 
     function showAuthScreen() {
         elements.authSection.style.display = 'flex';
@@ -1250,7 +1250,15 @@
                 (anime.episodes || []).map(ep => Number(ep?.number)).filter(n => Number.isFinite(n) && n > 0)
             );
             totalWatchedEpisodes += uniqueEpisodeNumbers.size;
-            totalWatchTime += anime.totalWatchTime || 0;
+            // Only count real watch time. AniList-imported episodes carry a
+            // synthetic duration (24 min × eps) which would otherwise inflate
+            // the global total — keep them in the per-anime totalWatchTime
+            // (used by individual cards) but exclude from the lifetime sum
+            // so it matches what stats engine reports.
+            for (const ep of (anime.episodes || [])) {
+                if (ep?.durationSource === 'anilist') continue;
+                totalWatchTime += Number(ep?.duration) || 0;
+            }
         }
 
         const totalTimeStr = UIHelpers.formatDurationShort(totalWatchTime);
@@ -1593,7 +1601,12 @@
         const allFillersCached = slugs.every(slug =>
             FillerService.isLikelyMovie(slug) || !!FillerService.episodeTypesCache[slug]
         );
-        const allAnilistCached = slugs.every(slug => !!AT.AnilistService.cache?.[slug]);
+        // A retryable error entry is not considered cached — let AnilistService
+        // decide via its own TTL logic (CACHE_TTL_RETRYABLE = 15 min).
+        const allAnilistCached = slugs.every(slug => {
+            const c = AT.AnilistService.cache?.[slug];
+            return !!c && !c.retryable;
+        });
         return { allFillersCached, allAnilistCached };
     }
 
@@ -1708,6 +1721,19 @@
 
         const durationKey = `normalizeMovieDurations${maintenanceSuffix}`;
         const phantomKey = `cleanupPhantomMovies${maintenanceSuffix}`;
+        // One-shot-effective scrub: removes the bogus `watchedAt = importTime`
+        // stamp from AniList-imported episodes (older importer behaviour).
+        // Idempotent — once scrubbed, the loop short-circuits on every entry.
+        const anilistDateScrub = scrubAnilistImportDates(repairedData);
+        if (anilistDateScrub.changed) {
+            try {
+                (window.PopupLogger || console).info?.(
+                    'Maintenance',
+                    `Scrubbed bogus watchedAt from ${anilistDateScrub.scrubbedEpisodes} ` +
+                    `AniList-imported episodes across ${anilistDateScrub.affectedAnime.length} anime`
+                );
+            } catch { /* logger unavailable */ }
+        }
         const durationFix = shouldRunMaintenance(durationKey)
             ? normalizeMovieDurations(repairedData, rawProgressForDurations)
             : { changed: false };
@@ -1724,6 +1750,7 @@
             withoutAutoRepaired.removedCount > 0 ||
             progressRemoved > 0 ||
             durationFix.changed ||
+            anilistDateScrub.changed ||
             normalized.changed ||
             phantomCleanup.changed;
 
@@ -2750,13 +2777,33 @@
             const now = new Date().toISOString();
             const isMovie = SeasonGrouping.isMovie(slug, { title });
             const defaultDuration = isMovie ? 0 : 1440;
-            const episodes = episodeNumbers.map(num => ({ number: num, duration: defaultDuration, watchedAt: now }));
+            // For existing anime, inherit the median duration from already-tracked
+            // real episodes (video-measured) so manually-added episodes don't
+            // default to 24min when the anime actually runs 28-32min.
+            let inferredDuration = defaultDuration;
+            if (animeData[slug]) {
+                const realDurs = (animeData[slug].episodes || [])
+                    .filter(ep => ep?.durationSource === 'video' && Number(ep.duration) > 0)
+                    .map(ep => Number(ep.duration))
+                    .sort((a, b) => a - b);
+                if (realDurs.length > 0) {
+                    inferredDuration = realDurs[Math.floor(realDurs.length / 2)]; // median
+                }
+            }
+            const episodes = episodeNumbers.map(num => ({ number: num, duration: inferredDuration, watchedAt: now }));
 
             if (animeData[slug]) {
                 const existingEpisodes = animeData[slug].episodes || [];
-                const existingNumbers = new Set(existingEpisodes.map(ep => ep.number));
+                const existingByNumber = new Map(existingEpisodes.map(ep => [ep.number, ep]));
                 for (const ep of episodes) {
-                    if (!existingNumbers.has(ep.number)) existingEpisodes.push(ep);
+                    const existing = existingByNumber.get(ep.number);
+                    if (!existing) {
+                        existingEpisodes.push(ep);
+                    } else if (existing.durationSource === 'anilist' && !existing.watchedAt) {
+                        // Promote imported episode to manually-confirmed watched.
+                        const idx = existingEpisodes.indexOf(existing);
+                        existingEpisodes[idx] = { ...existing, watchedAt: now, duration: inferredDuration, durationSource: 'manual' };
+                    }
                 }
                 existingEpisodes.sort((a, b) => a.number - b.number);
                 animeData[slug].episodes = existingEpisodes;

@@ -56,7 +56,14 @@ const ProgressTracker = {
         const num = parseInt(m[2], 10);
         const anime = animeData[slug];
         if (!anime || !Array.isArray(anime.episodes)) return false;
-        return anime.episodes.some(ep => Number(ep?.number) === num);
+        return anime.episodes.some(ep => {
+            if (Number(ep?.number) !== num) return false;
+            // AniList-imported episodes without a real watchedAt are not yet
+            // "truly" tracked — allow resume progress to be saved so the user
+            // can pick up where they left off when they actually watch it.
+            if (ep?.durationSource === 'anilist' && !ep?.watchedAt) return false;
+            return true;
+        });
     },
 
     _compactNow() {
@@ -150,7 +157,11 @@ const ProgressTracker = {
 
             if (progress.deleted) {
                 const tombstoneAge = now - (progress.deletedAt ? new Date(progress.deletedAt).getTime() : 0);
-                const TOMBSTONE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+                // 30 days — aligned with PROGRESS_TOMBSTONE_KEEP_MS in BG and
+                // content cloud-sync. Shorter retention here would prune delete
+                // markers before an offline device sees them and could
+                // resurrect stale progress on next sync.
+                const TOMBSTONE_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
                 if (tombstoneAge > TOMBSTONE_MAX_AGE) {
                     Logger.debug('Removing expired tombstone:', id);
                     return false;
@@ -534,7 +545,13 @@ const ProgressTracker = {
                 return false;
             }
 
-            return anime.episodes.some(ep => Number(ep?.number) === episodeNumber);
+            return anime.episodes.some(ep => {
+                if (Number(ep?.number) !== episodeNumber) return false;
+                // AniList-imported episodes without a real watchedAt are not
+                // "truly" tracked — let the user actually watch and promote them.
+                if (ep?.durationSource === 'anilist' && !ep?.watchedAt) return false;
+                return true;
+            });
         } catch (e) {
             Logger.error('Exception checking tracked episodes:', e);
             return false;

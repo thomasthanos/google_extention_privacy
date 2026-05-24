@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "An1me.to Tracker",
-  "version": "6.5.8",
+  "version": "6.5.9",
   "description": "Track your anime watching progress on an1me.to with cloud sync across all browsers",
   "author": "ThomasThanos",
   "permissions": [
@@ -18,6 +18,7 @@
     "https://identitytoolkit.googleapis.com/*",
     "https://securetoken.googleapis.com/*",
     "https://firestore.googleapis.com/*",
+    "https://graphql.anilist.co/*",
     "https://www.animefillerlist.com/*",
     "https://api.jikan.moe/*",
     "https://api.aniskip.com/*"
@@ -47,7 +48,8 @@
         "https://*.an1me.to/*"
       ],
       "exclude_matches": [
-        "https://an1me.to/watch/*"
+        "https://an1me.to/watch/*",
+        "https://*.an1me.to/watch/*"
       ],
       "js": [
         "src/content/watchlist-sync.js"
@@ -68,7 +70,8 @@
     },
     {
       "matches": [
-        "https://an1me.to/watch/*"
+        "https://an1me.to/watch/*",
+        "https://*.an1me.to/watch/*"
       ],
       "js": [
         "src/common/multipart-mappings.js",

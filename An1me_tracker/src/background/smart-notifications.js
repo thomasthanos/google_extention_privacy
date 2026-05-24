@@ -51,32 +51,35 @@ async function checkNewEpisodes() {
             checked++;
             try {
                 const info = await fetchAnimePageInfo(slug);
-                if (!info?.latestEpisode) continue;
+                if (info?.latestEpisode) {
+                    const prevLatest = cached.latestEpisode || 0;
+                    if (info.latestEpisode > prevLatest && prevLatest > 0) {
+                        const highestWatched = Math.max(0, ...(anime.episodes || []).map(ep => Number(ep.number) || 0));
+                        if (info.latestEpisode > highestWatched) {
+                            chrome.notifications.create(`new-ep-${slug}`, {
+                                type: 'basic',
+                                iconUrl: 'src/icons/icon128.png',
+                                title: `New Episode Available!`,
+                                message: `${anime.title} — Episode ${info.latestEpisode} is now available`,
+                                priority: 1
+                            });
+                        }
+                    }
 
-                const prevLatest = cached.latestEpisode || 0;
-                if (info.latestEpisode > prevLatest && prevLatest > 0) {
-                    const highestWatched = Math.max(0, ...(anime.episodes || []).map(ep => Number(ep.number) || 0));
-                    if (info.latestEpisode > highestWatched) {
-                        chrome.notifications.create(`new-ep-${slug}`, {
-                            type: 'basic',
-                            iconUrl: 'src/icons/icon128.png',
-                            title: `New Episode Available!`,
-                            message: `${anime.title} — Episode ${info.latestEpisode} is now available`,
-                            priority: 1
-                        });
+                    // Update cache whenever we have fresh info — even when prevLatest is 0
+                    // (e.g. anime cached before first episode aired). Without this, the
+                    // notification gate stays stuck because prevLatest never advances.
+                    if (info.latestEpisode !== prevLatest || cached.status !== info.status) {
+                        await bgStorageSet({ [cachedKey]: { ...cached, ...info, cachedAt: now } });
                     }
                 }
-
-                // Update cache whenever we have fresh info — even when prevLatest is 0
-                // (e.g. anime cached before first episode aired). Without this, the
-                // notification gate stays stuck because prevLatest never advances.
-                if (info.latestEpisode !== prevLatest || cached.status !== info.status) {
-                    await bgStorageSet({ [cachedKey]: { ...cached, ...info, cachedAt: now } });
-                }
-
-                updatedLastCheck[slug] = now;
             } catch {
+                // Swallow scrape errors — lastCheck still advances below so a
+                // persistently failing slug doesn't starve the rest of the queue.
             }
+            // Always advance lastCheck (success OR fail) so a few failing
+            // titles can't block the rotation: every tick scans a fresh slice.
+            updatedLastCheck[slug] = now;
 
             await new Promise(r => setTimeout(r, 1500));
         }

@@ -241,6 +241,14 @@ async function batchFetchAnimeInfo(slugs) {
                 }
             } catch (e) {
                 console.warn(`[BG] Fetch failed for ${slug}:`, e.message);
+                // Write a result so the popup's storage-listener counts this
+                // slug as done and doesn't wait until the safety-net timeout.
+                const is404 = /HTTP 404/i.test(e.message);
+                await bgStorageSet({
+                    [`animeinfo_${slug}`]: is404
+                        ? { notFound: true, cachedAt: Date.now() }
+                        : { error: e.message, retryable: true, cachedAt: Date.now() }
+                });
             }
         }));
 
