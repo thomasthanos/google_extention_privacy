@@ -1,16 +1,16 @@
 /**
  * Anime Tracker — AniList background sync (service worker)
  *
- * Pushes watch progress to AniList WITHOUT the popup being open. Batched via
+ * Pushes watch progress to AniList without the popup being open. Batched via
  * AniListCore.runPush so a large first sync finishes across several short
- * runs instead of hitting the MV3 service-worker lifetime cap.
+ * runs rather than hitting the MV3 service-worker lifetime cap.
  *
  * Triggers:
- *   • episodes tracked / imported (storage `animeData` change) — debounced
- *     via chrome.alarms so it survives SW termination
- *   • manual "Sync now" from the popup (ANILIST_SYNC_NOW) — runs immediately
+ *   • animeData storage change (debounced via chrome.alarms — survives SW kills)
+ *   • manual "Sync now" from the popup (ANILIST_SYNC_NOW — runs immediately)
+ *   • periodic safety-net alarm (every 30 min — catches missed storage events)
  *
- * Loaded by background.js via importScripts (after anilist-core.js).
+ * Loaded by background.js via importScripts after anilist-core.js.
  */
 (function () {
     'use strict';
@@ -22,9 +22,10 @@
     }
 
     const PUSH_ALARM = 'anilistPush';
+    const PUSH_ALARM_PERIODIC = 'anilistPushPeriodic';
     const STATUS_KEY = 'anilist_sync_status';
-    const MAX_WORK_PER_RUN = 35;            // ~35 × 1.8s ≈ 65s — safely under the SW lifetime
-    const PROGRESS_WRITE_GAP_MS = 1500;     // throttle status writes during a run
+    const MAX_WORK_PER_RUN = 25;
+    const PROGRESS_WRITE_GAP_MS = 800;
 
     function sget(keys) {
         return new Promise((res) => {
@@ -43,10 +44,9 @@
         return sset({ [STATUS_KEY]: { ...obj, updatedAt: Date.now() } });
     }
 
-    // Chrome clamps alarm delays under 1 minute to 1 minute in released
-    // (non-unpacked) extensions — so alarms are only used for the debounced
-    // background path, never for the user-facing "Sync now" (which runs
-    // runBackgroundPush directly for an immediate response).
+    // Chrome clamps alarm delays under 1 min in production extensions, so
+    // alarms are only used for the debounced background path — never for
+    // user-facing "Sync now" (which runs runBackgroundPush directly).
     function armPushAlarm(delayMinutes) {
         try {
             chrome.alarms.create(PUSH_ALARM, { delayInMinutes: Math.max(1, delayMinutes || 1) });
@@ -67,45 +67,81 @@
     let _pendingRerun = false;
 
     async function runBackgroundPush(reason) {
-        // A push is already in flight — remember that another was requested so
-        // we run one more pass afterwards (catches changes made mid-run).
-        if (_running) { _pendingRerun = true; return; }
+        if (_running) {
+            _pendingRerun = true;
+            return;
+        }
 
         const token = await getToken();
         if (!token) return;
 
         _running = true;
         let lastWrite = 0;
+        let lastProgress = null;
+        let lastAdvancedAt = Date.now();
+        let lastDone = -1;
+        let lastSlug = '';
+        let heartbeatTimer = null;
         try {
-            await writeStatus({ state: 'running', done: 0, total: 0, reason });
+            // Don't blank-out the status with done=0 at run start — that
+            // shows "0/N" on every alarm wake even when most are cached.
+            // The first onProgress overwrites this; just refresh updatedAt
+            // so the popup's stale-detector knows we're alive.
+            const existing = await sget([STATUS_KEY]);
+            const last = existing[STATUS_KEY];
+            if (last && last.state === 'running') {
+                await writeStatus({ ...last, reason });
+            } else {
+                await writeStatus({ state: 'running', done: last?.done || 0, total: last?.total || 0, reason });
+            }
+
+            // Heartbeat: refresh updatedAt every 10 s so the popup's stale
+            // detector (3 min) doesn't trip during a long resolveMedia call.
+            heartbeatTimer = setInterval(() => {
+                if (!lastProgress) return;
+                writeStatus({ state: 'running', ...lastProgress });
+            }, 10000);
 
             const result = await Core.runPush({
                 token,
                 maxWork: MAX_WORK_PER_RUN,
                 onProgress: (p) => {
                     const now = Date.now();
-                    if (now - lastWrite < PROGRESS_WRITE_GAP_MS) return;
-                    lastWrite = now;
-                    writeStatus({
-                        state: 'running',
+                    const currentSlug = p.currentSlug || '';
+                    const advanced = (typeof p.done === 'number' && p.done !== lastDone)
+                        || (currentSlug && currentSlug !== lastSlug);
+                    if (advanced) {
+                        lastAdvancedAt = now;
+                        lastDone = typeof p.done === 'number' ? p.done : lastDone;
+                        lastSlug = currentSlug || lastSlug;
+                    }
+
+                    lastProgress = {
                         done: p.done, total: p.total,
-                        ok: p.ok, skipped: p.skipped, failed: p.failed
-                    });
+                        ok: p.ok, skipped: p.skipped, failed: p.failed,
+                        currentTitle: p.currentTitle || null,
+                        currentSlug: currentSlug || null,
+                        phase: p.phase || null,
+                        advancedAt: lastAdvancedAt
+                    };
+                    // Bypass throttle when a new slug starts so the user sees
+                    // forward motion even through long fetches.
+                    const isNewSlug = !!p.currentSlug;
+                    if (!isNewSlug && now - lastWrite < PROGRESS_WRITE_GAP_MS) return;
+                    lastWrite = now;
+                    writeStatus({ state: 'running', ...lastProgress });
                 }
             });
 
             if (result.truncated) {
-                // More entries still need pushing — continue next alarm window.
                 await writeStatus({
                     state: 'running',
                     done: result.done, total: result.total,
-                    ok: result.ok, skipped: result.skipped, failed: result.failed
+                    ok: result.ok, skipped: result.skipped, failed: result.failed,
+                    advancedAt: Date.now()
                 });
                 armPushAlarm(1);
             } else if (result.retryableFailed > 0) {
-                // All entries processed but some failed with transient errors
-                // (network / rate-limit). Use 'retrying' state so the UI
-                // doesn't show "Syncing 100/100" forever, and back off 5 min.
                 await writeStatus({
                     state: 'retrying',
                     done: result.done, total: result.total,
@@ -130,9 +166,10 @@
                 await writeStatus({ state: 'error', error: 'reconnect', finishedAt: Date.now() });
             } else {
                 await writeStatus({ state: 'error', error: msg, finishedAt: Date.now() });
-                armPushAlarm(5); // transient — retry in a few minutes
+                armPushAlarm(5);
             }
         } finally {
+            if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
             _running = false;
             if (_pendingRerun) {
                 _pendingRerun = false;
@@ -141,38 +178,57 @@
         }
     }
 
-    // Alarm fire → run a (batched) background push.
     chrome.alarms.onAlarm.addListener((alarm) => {
-        if (alarm.name !== PUSH_ALARM) return;
-        runBackgroundPush('alarm').catch((e) =>
-            console.warn('[BG-AniList] Background push failed:', e?.message || e)
-        );
+        if (alarm.name !== PUSH_ALARM && alarm.name !== PUSH_ALARM_PERIODIC) return;
+        runBackgroundPush(alarm.name === PUSH_ALARM_PERIODIC ? 'periodic' : 'alarm').catch(() => { /* errors written to status */ });
     });
 
-    // Episodes were tracked (or imported) → schedule a push. The alarm
-    // debounces rapid changes and survives SW kills.
     chrome.storage.onChanged.addListener((changes, namespace) => {
         if (namespace !== 'local') return;
+
+        // Auth toggled — keep the periodic alarm in sync with connected state.
+        if (changes[Core.AUTH_KEY]) {
+            const newAuth = changes[Core.AUTH_KEY].newValue;
+            const connected = !!(newAuth && newAuth.accessToken && (!newAuth.expiresAt || newAuth.expiresAt > Date.now()));
+            if (connected) {
+                try { chrome.alarms.create(PUSH_ALARM_PERIODIC, { delayInMinutes: 5, periodInMinutes: 30 }); }
+                catch { /* ignore */ }
+            } else {
+                try { chrome.alarms.clear(PUSH_ALARM_PERIODIC); } catch { /* ignore */ }
+            }
+        }
+
         if (!changes.animeData) return;
         getToken().then((token) => { if (token) armPushAlarm(1); });
     });
 
-    // Manual "Sync now" from the popup — run immediately (no alarm delay).
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         if (message && message.type === 'ANILIST_SYNC_NOW') {
-            runBackgroundPush('manual').catch((e) =>
-                console.warn('[BG-AniList] Manual push failed:', e?.message || e)
-            );
+            runBackgroundPush('manual').catch(() => { /* errors written to status */ });
             sendResponse({ received: true });
             return true;
         }
         return false;
     });
 
-    // Resume an interrupted sync after an SW restart: if the last status says
-    // a run was still going, kick it off again (runPush dedup makes it cheap).
-    sget([STATUS_KEY]).then((s) => {
+    // SW startup: resume interrupted sync, (re)arm the periodic safety-net.
+    sget([STATUS_KEY, Core.AUTH_KEY]).then((s) => {
         const st = s[STATUS_KEY];
-        if (st && st.state === 'running') armPushAlarm(1);
+        const auth = s[Core.AUTH_KEY];
+        const connected = !!(auth && auth.accessToken && (!auth.expiresAt || auth.expiresAt > Date.now()));
+
+        if (connected) {
+            try { chrome.alarms.create(PUSH_ALARM_PERIODIC, { delayInMinutes: 5, periodInMinutes: 30 }); }
+            catch { /* ignore */ }
+        } else {
+            try { chrome.alarms.clear(PUSH_ALARM_PERIODIC); } catch { /* ignore */ }
+        }
+
+        if (st && st.state === 'running') {
+            armPushAlarm(1);
+        } else if (connected && st && st.state === 'retrying' && st.retryAt && st.retryAt > Date.now()) {
+            const mins = Math.max(1, Math.round((st.retryAt - Date.now()) / 60000));
+            armPushAlarm(mins);
+        }
     });
 })();

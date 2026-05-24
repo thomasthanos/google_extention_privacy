@@ -243,6 +243,77 @@ function bgStorageRemove(keys) {
 // Metadata-repair alarm/constants live in src/background/metadata-repair.js.
 const PROGRESS_SYNC_ALARM = 'progressSyncDebounce';
 
+// Retry alarms for failed Firestore writes. Previously a 5xx / network error
+// from syncToFirebase or syncProgressOnly logged + bailed, leaving
+// `pendingSyncFlush` set but with no scheduled retry — the next change had to
+// come along to wake the SW before another attempt would fire. These alarms
+// run independently so a quiet user (e.g. closed laptop, then reopened with
+// stale state) still gets the change pushed up.
+const FULL_SYNC_RETRY_ALARM = 'fullSyncRetry';
+const PROGRESS_SYNC_RETRY_ALARM = 'progressSyncRetry';
+// Backoff schedule (in minutes) — 1 min → 5 min → 15 min, then capped.
+// chrome.alarms clamps any delay < 1 min to 1 min in released extensions.
+const SYNC_RETRY_BACKOFF_MIN = [1, 5, 15];
+let _fullSyncRetryAttempts = 0;
+let _progressSyncRetryAttempts = 0;
+let _fullSyncRetryAuthAttempted = false;
+let _progressSyncRetryAuthAttempted = false;
+
+function _retryStateFor(kind) {
+    if (kind === 'full') {
+        return {
+            getAttempts: () => _fullSyncRetryAttempts,
+            incAttempts: () => { _fullSyncRetryAttempts++; },
+            resetAttempts: () => { _fullSyncRetryAttempts = 0; _fullSyncRetryAuthAttempted = false; },
+            getAuthAttempted: () => _fullSyncRetryAuthAttempted,
+            setAuthAttempted: (v) => { _fullSyncRetryAuthAttempted = !!v; },
+            alarmName: FULL_SYNC_RETRY_ALARM
+        };
+    }
+    return {
+        getAttempts: () => _progressSyncRetryAttempts,
+        incAttempts: () => { _progressSyncRetryAttempts++; },
+        resetAttempts: () => { _progressSyncRetryAttempts = 0; _progressSyncRetryAuthAttempted = false; },
+        getAuthAttempted: () => _progressSyncRetryAuthAttempted,
+        setAuthAttempted: (v) => { _progressSyncRetryAuthAttempted = !!v; },
+        alarmName: PROGRESS_SYNC_RETRY_ALARM
+    };
+}
+
+function armSyncRetry(kind, reason) {
+    const s = _retryStateFor(kind);
+    const idx = Math.min(s.getAttempts(), SYNC_RETRY_BACKOFF_MIN.length - 1);
+    const delayMin = SYNC_RETRY_BACKOFF_MIN[idx];
+    s.incAttempts();
+    try {
+        chrome.alarms.create(s.alarmName, { delayInMinutes: delayMin });
+        console.warn(`[BG] ${kind} sync retry scheduled in ${delayMin} min (attempt ${s.getAttempts()}, reason: ${reason})`);
+    } catch (e) {
+        console.warn(`[BG] Could not arm ${kind} retry alarm:`, e?.message || e);
+    }
+}
+
+function clearSyncRetry(kind) {
+    const s = _retryStateFor(kind);
+    s.resetAttempts();
+    try { chrome.alarms.clear(s.alarmName).catch(() => {}); } catch {}
+}
+
+// Force the next getFirebaseToken() to refresh by zeroing the cached expiry.
+// Used after a 401 response from Firestore so the next attempt picks up a
+// fresh idToken without us reaching into the refresh single-flight directly.
+async function _invalidateCachedTokenExpiry() {
+    try {
+        const stored = await bgStorageGet(['firebase_tokens']);
+        const tokens = stored.firebase_tokens;
+        if (!tokens) return;
+        tokens.expiresAt = 0;
+        await bgStorageSet({ firebase_tokens: tokens });
+    } catch (e) {
+        console.warn('[BG] Could not invalidate cached token expiry:', e?.message || e);
+    }
+}
+
 // Library metadata repair (state, plan, batch runner, retry helpers) lives
 // in src/background/metadata-repair.js. Loaded via importScripts above.
 
@@ -372,6 +443,10 @@ async function signOutDueToTokenFailure() {
     } catch (e) {
         console.error('[BG] Failed to clear auth storage during sign-out:', e);
     }
+    // Drop the cloud-doc cache eagerly so a subsequent sign-in (even as the
+    // same uid) doesn't serve a stale snapshot from before the token failure,
+    // and a sign-in as a different account can never receive account A's doc.
+    invalidateBgCloudDocCache();
 }
 
 async function getFirebaseToken() {
@@ -505,23 +580,46 @@ async function pollCloudData(reason = 'consumer-connected') {
 // after ~30s) doesn't lose it. Without persistence, every cold popup open
 // burns a Firestore read; with it, the same library can be served for a
 // full TTL window without touching Firestore.
+//
+// Cache entries are uid-bound — both in memory (`_bgCloudDocCacheUid`) and
+// on disk (persisted entry shape: `{ uid, doc, cachedAt }`). Without this,
+// signing out and signing back in as a different user inside the TTL window
+// could leak account A's library to account B (wrong-account merge / data
+// leak). Every read path verifies uid; auth changes (sign-out, uid swap)
+// invalidate the cache eagerly.
 let _bgCloudDocCache = null;
 let _bgCloudDocCacheTime = 0;
+let _bgCloudDocCacheUid = null;
 const _BG_CLOUD_TTL = 5 * 60 * 1000;
 const _BG_CLOUD_CACHE_KEY = '_bgCloudDocCachePersisted';
 
-// Hydrate on SW boot — restores cache from disk if still fresh.
+// Hydrate on SW boot — restores cache from disk if still fresh AND the
+// persisted uid matches the currently-stored firebase_user. Legacy entries
+// without `uid` are discarded (safer than guessing whose library it was).
 let _bgCloudCacheHydratePromise = null;
 async function hydrateBgCloudDocCache() {
     if (_bgCloudDocCache) return;        // already hot
     if (_bgCloudCacheHydratePromise) return _bgCloudCacheHydratePromise;
     _bgCloudCacheHydratePromise = (async () => {
         try {
-            const stored = await bgStorageGet([_BG_CLOUD_CACHE_KEY]);
+            const stored = await bgStorageGet([_BG_CLOUD_CACHE_KEY, 'firebase_user']);
             const entry = stored[_BG_CLOUD_CACHE_KEY];
-            if (entry && entry.cachedAt && (Date.now() - entry.cachedAt) < _BG_CLOUD_TTL) {
+            const currentUid = stored.firebase_user?.uid || null;
+            if (
+                entry &&
+                entry.cachedAt &&
+                entry.uid &&
+                currentUid &&
+                entry.uid === currentUid &&
+                (Date.now() - entry.cachedAt) < _BG_CLOUD_TTL
+            ) {
                 _bgCloudDocCache = entry.doc;
                 _bgCloudDocCacheTime = entry.cachedAt;
+                _bgCloudDocCacheUid = entry.uid;
+            } else if (entry) {
+                // Stale, mismatched, or schema-less — drop it eagerly so a
+                // later wrong-account read can never resurrect it.
+                bgStorageSet({ [_BG_CLOUD_CACHE_KEY]: null }).catch(() => {});
             }
         } catch { /* fresh start */ }
     })();
@@ -531,6 +629,7 @@ async function hydrateBgCloudDocCache() {
 function invalidateBgCloudDocCache() {
     _bgCloudDocCache = null;
     _bgCloudDocCacheTime = 0;
+    _bgCloudDocCacheUid = null;
     // Best-effort: drop the persisted copy too. Failures here are non-fatal —
     // worst case we serve a stale doc until the next successful fetch.
     bgStorageSet({ [_BG_CLOUD_CACHE_KEY]: null }).catch(() => {});
@@ -539,8 +638,15 @@ function invalidateBgCloudDocCache() {
 async function fetchCloudDataCached(user, token) {
     await hydrateBgCloudDocCache();
     const now = Date.now();
-    if (_bgCloudDocCache && (now - _bgCloudDocCacheTime) < _BG_CLOUD_TTL) {
+    // uid guard — never serve another user's cached doc, even if the in-memory
+    // copy is still inside the TTL window. A signed-out → signed-in-as-other
+    // flow inside 5 minutes would otherwise return account A's library to
+    // account B's PATCH path.
+    if (_bgCloudDocCache && _bgCloudDocCacheUid === user.uid && (now - _bgCloudDocCacheTime) < _BG_CLOUD_TTL) {
         return _bgCloudDocCache;
+    }
+    if (_bgCloudDocCache && _bgCloudDocCacheUid !== user.uid) {
+        invalidateBgCloudDocCache();
     }
     let doc = null;
     try {
@@ -556,9 +662,10 @@ async function fetchCloudDataCached(user, token) {
     if (doc) {
         _bgCloudDocCache = doc;
         _bgCloudDocCacheTime = Date.now();
+        _bgCloudDocCacheUid = user.uid;
         // Persist asynchronously so the next SW boot can serve from disk.
         bgStorageSet({
-            [_BG_CLOUD_CACHE_KEY]: { doc, cachedAt: _bgCloudDocCacheTime }
+            [_BG_CLOUD_CACHE_KEY]: { uid: user.uid, doc, cachedAt: _bgCloudDocCacheTime }
         }).catch(() => {});
     }
     return doc;
@@ -596,6 +703,40 @@ async function syncProgressOnly() {
 
         localVP = cleanTrackedProgressBg(result.animeData || {}, localVP, result.deletedAnime || {});
 
+        // Cloud-first merge: pull the current Firestore videoProgress (cached
+        // — usually a no-op read) and merge per-key into the local map before
+        // PATCH-ing. Without this, Firestore's updateMask would replace the
+        // whole `videoProgress` map field with our local copy, silently
+        // dropping any per-episode progress another device pushed inside our
+        // 5-min debounce window.
+        let mergedVP = localVP;
+        try {
+            const cloudDoc = await fetchCloudDataCached(user, token);
+            if (cloudDoc?.videoProgress) {
+                mergedVP = mergeVideoProgress(localVP, cloudDoc.videoProgress);
+                // Re-clean post-merge — cloud may carry tombstones / now-tracked
+                // episodes whose entries should now be filtered.
+                mergedVP = cleanTrackedProgressBg(result.animeData || {}, mergedVP, result.deletedAnime || {});
+            }
+        } catch (e) {
+            // Network/auth errors fetching cloud → fall back to local-only push.
+            // Better to surface our progress than to skip the write entirely;
+            // the next successful poll will resolve any divergence.
+            console.warn('[BG] Cloud-first merge in syncProgressOnly failed; pushing local only:', e?.message || e);
+        }
+
+        // If the merge produced something different from local, write the
+        // merged map back so the next save observes the unified state and we
+        // don't keep re-merging the same cloud delta forever.
+        if (!areProgressMapsEqual(localVP, mergedVP)) {
+            pauseSync();
+            await bgStorageSet({ videoProgress: mergedVP });
+        }
+
+        // After merge, if the result already matches what we last pushed,
+        // skip the network write entirely.
+        if (lastPushedProgressBG && areProgressMapsEqual(mergedVP, lastPushedProgressBG)) return;
+
         const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         const fieldMask = 'updateMask.fieldPaths=videoProgress&updateMask.fieldPaths=lastUpdated';
         const pushedAt = new Date().toISOString();
@@ -604,25 +745,51 @@ async function syncProgressOnly() {
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 fields: jsonToFirestoreFields({
-                    videoProgress: localVP,
+                    videoProgress: mergedVP,
                     lastUpdated: pushedAt
                 })
             })
         });
 
         if (response.ok) {
-            lastPushedProgressBG = structuredClone(localVP);
+            lastPushedProgressBG = structuredClone(mergedVP);
             invalidateBgCloudDocCache();
             bgRememberOwnWrite(pushedAt);
             _lastProgressSyncAt = Date.now();
             persistBgPollState({ progressSyncAt: _lastProgressSyncAt });
+            clearSyncRetry('progress');
         } else {
-            console.warn('[BG] Progress sync failed:', response.status);
-            if (response.status >= 500) invalidateBgCloudDocCache();
+            const status = response.status;
+            console.warn('[BG] Progress sync failed:', status);
+            if (status === 401) {
+                if (_progressSyncRetryAuthAttempted) {
+                    console.error('[BG] Progress sync still 401 after token refresh — signing out');
+                    await signOutDueToTokenFailure();
+                    clearSyncRetry('progress');
+                } else {
+                    _progressSyncRetryAuthAttempted = true;
+                    await _invalidateCachedTokenExpiry();
+                    armSyncRetry('progress', '401-needs-refresh');
+                }
+            } else if (status === 403) {
+                if (_progressSyncRetryAttempts >= SYNC_RETRY_BACKOFF_MIN.length) {
+                    console.error('[BG] Progress sync 403 — giving up after max retries');
+                    clearSyncRetry('progress');
+                } else {
+                    armSyncRetry('progress', '403');
+                }
+            } else if (status >= 500) {
+                invalidateBgCloudDocCache();
+                armSyncRetry('progress', `5xx (${status})`);
+            } else {
+                console.error(`[BG] Progress sync got non-retryable ${status}`);
+                clearSyncRetry('progress');
+            }
         }
         });
     } catch (error) {
         console.error('[BG] Progress sync error:', error);
+        armSyncRetry('progress', `network: ${error?.message || error}`);
     } finally {
         progressSyncInProgress = false;
         if (progressSyncPending) {
@@ -703,6 +870,7 @@ async function syncToFirebase() {
 
         if (!needsCloudWrite) {
             _bgCloudDocCacheTime = Date.now();
+            _bgCloudDocCacheUid = user.uid;
             return;
         }
 
@@ -735,13 +903,52 @@ async function syncToFirebase() {
             invalidateBgCloudDocCache();
             bgRememberOwnWrite(pushedAt);
             clearSyncPending();
+            clearSyncRetry('full');
         } else {
-            console.error('[BG] Sync failed:', response.status);
-            if (response.status >= 500) invalidateBgCloudDocCache();
+            const status = response.status;
+            console.error('[BG] Sync failed:', status);
+            // Keep the change in pendingSyncFlush so the retry attempt has
+            // something to write — clearSyncPending only on terminal success.
+            markSyncPending();
+
+            if (status === 401) {
+                // Token rejected. Force a refresh on next attempt and retry
+                // soon. If we already retried once with a fresh token, fall
+                // through to sign-out instead of looping.
+                if (_fullSyncRetryAuthAttempted) {
+                    console.error('[BG] Sync still 401 after token refresh — signing out');
+                    await signOutDueToTokenFailure();
+                    clearSyncRetry('full');
+                } else {
+                    _fullSyncRetryAuthAttempted = true;
+                    await _invalidateCachedTokenExpiry();
+                    armSyncRetry('full', '401-needs-refresh');
+                }
+            } else if (status === 403) {
+                // Permissions/rules issue — long backoff, won't fix itself
+                // by retrying fast. Cap attempts so we don't spam.
+                if (_fullSyncRetryAttempts >= SYNC_RETRY_BACKOFF_MIN.length) {
+                    console.error('[BG] Sync 403 — giving up after max retries (check Firestore rules)');
+                    clearSyncRetry('full');
+                } else {
+                    armSyncRetry('full', '403');
+                }
+            } else if (status >= 500) {
+                invalidateBgCloudDocCache();
+                armSyncRetry('full', `5xx (${status})`);
+            } else {
+                // 4xx other (400, 404, etc) — probably non-retryable.
+                console.error(`[BG] Sync got non-retryable ${status}; dropping pending flag`);
+                clearSyncPending();
+                clearSyncRetry('full');
+            }
         }
         });
     } catch (error) {
         console.error('[BG] Sync error:', error);
+        // Network / timeout / abort — treat like 5xx so we don't lose the change.
+        markSyncPending();
+        armSyncRetry('full', `network: ${error?.message || error}`);
     } finally {
         syncInProgress = false;
         if (pendingSync) {
@@ -762,8 +969,10 @@ const _MAX_CLOUD_UPDATE_WAITERS = 100;
 async function applyCloudUpdate(cloudDoc) {
     if (!cloudDoc) return;
 
-    _bgCloudDocCache = cloudDoc;
-    _bgCloudDocCacheTime = Date.now();
+    // Cache seeding moved into _doApplyCloudUpdate where we can stamp the
+    // active uid alongside the doc — seeding here without a uid risked
+    // letting the cache leak across an account switch that happened between
+    // fetch and apply.
 
     _applyCloudUpdateDoc = cloudDoc;
     if (_applyCloudDebounce) clearTimeout(_applyCloudDebounce);
@@ -829,6 +1038,22 @@ async function _doApplyCloudUpdate(cloudDoc) {
     if (cloudUpdatedAt && bgIsOwnEcho(cloudUpdatedAt)) {
         return;
     }
+
+    // Re-confirm the active user before merging — ensures we never apply
+    // account A's cloud doc to local storage if the user signed out / signed
+    // in as B between fetch and apply, and lets us tag the seeded cache with
+    // the correct uid.
+    const activeUser = await getFirebaseUser();
+    if (!activeUser?.uid) {
+        invalidateBgCloudDocCache();
+        return;
+    }
+    if (_bgCloudDocCacheUid && _bgCloudDocCacheUid !== activeUser.uid) {
+        invalidateBgCloudDocCache();
+    }
+    _bgCloudDocCache = cloudDoc;
+    _bgCloudDocCacheTime = Date.now();
+    _bgCloudDocCacheUid = activeUser.uid;
 
     try {
         const local = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
@@ -960,6 +1185,19 @@ async function flushPendingProgressSync() {
 
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace !== 'local') return;
+
+    // Auth-change cache invalidation. Catches popup-driven sign-in / sign-out
+    // / account-swap inside the SW's TTL window — without this, opening the
+    // popup as user B after user A's session would let the SW serve A's
+    // cached doc to B's first GET_CLOUD_DOC. Runs before the sync-debounce
+    // logic below so we don't queue a sync against the wrong cache state.
+    if (Object.prototype.hasOwnProperty.call(changes, 'firebase_user')) {
+        const newUid = changes.firebase_user?.newValue?.uid || null;
+        const oldUid = changes.firebase_user?.oldValue?.uid || null;
+        if (newUid !== oldUid) {
+            invalidateBgCloudDocCache();
+        }
+    }
 
     if (syncInProgress) return;
 
@@ -1291,16 +1529,38 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         // the SW's next storage.onChanged-driven sync skips the Firestore read.
         // Saves ~1 read per popup-side save. Also persisted to disk so an SW
         // kill mid-session doesn't lose the seed.
-        if (message.doc && typeof message.doc === 'object') {
-            _bgCloudDocCache = message.doc;
-            _bgCloudDocCacheTime = Date.now();
-            bgStorageSet({
-                [_BG_CLOUD_CACHE_KEY]: { doc: message.doc, cachedAt: _bgCloudDocCacheTime }
-            }).catch(() => {});
-        } else {
-            invalidateBgCloudDocCache();
-        }
-        sendResponse({ ok: true });
+        //
+        // The uid from the sender must match the currently-stored
+        // firebase_user. Without this guard a stale message from a previous
+        // sign-in (e.g. in-flight when the user signs out) could re-seed the
+        // cache with the wrong account's doc.
+        (async () => {
+            try {
+                const senderUid = typeof message.uid === 'string' ? message.uid : null;
+                const activeUser = await getFirebaseUser();
+                const activeUid = activeUser?.uid || null;
+                if (
+                    !senderUid ||
+                    !activeUid ||
+                    senderUid !== activeUid ||
+                    !message.doc ||
+                    typeof message.doc !== 'object'
+                ) {
+                    invalidateBgCloudDocCache();
+                    sendResponse({ ok: false, reason: 'uid_mismatch_or_no_doc' });
+                    return;
+                }
+                _bgCloudDocCache = message.doc;
+                _bgCloudDocCacheTime = Date.now();
+                _bgCloudDocCacheUid = activeUid;
+                bgStorageSet({
+                    [_BG_CLOUD_CACHE_KEY]: { uid: activeUid, doc: message.doc, cachedAt: _bgCloudDocCacheTime }
+                }).catch(() => {});
+                sendResponse({ ok: true });
+            } catch (e) {
+                sendResponse({ ok: false, error: e?.message || String(e) });
+            }
+        })();
         return true;
     }
 
@@ -1582,6 +1842,25 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
     if (alarm.name === PROGRESS_SYNC_ALARM) {
         if (syncDebounceTimeout || syncInProgress) return;
+        syncProgressOnly();
+        return;
+    }
+
+    if (alarm.name === FULL_SYNC_RETRY_ALARM) {
+        if (syncInProgress) {
+            // A regular sync is already running — let it finish; if it
+            // fails it will arm a fresh retry alarm of its own.
+            return;
+        }
+        // Re-arm the debounce path so we coalesce with any change that
+        // arrived while we were waiting for the alarm to fire.
+        markSyncPending();
+        syncToFirebase();
+        return;
+    }
+
+    if (alarm.name === PROGRESS_SYNC_RETRY_ALARM) {
+        if (progressSyncInProgress) return;
         syncProgressOnly();
         return;
     }

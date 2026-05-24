@@ -60,6 +60,19 @@ const FirebaseSync = {
     pendingPlaybackSave: null,
     isSavingPlayback: false,
 
+    // Warm idToken cache. cleanup() runs from beforeunload / pagehide where
+    // any awaited storage round-trip is unreliable — Chrome may close the
+    // popup before the await resumes. By keeping the latest idToken (and its
+    // expiresAt) in memory, cleanup() can build the PATCH body and fire the
+    // keepalive fetch synchronously, with no awaits between event arrival and
+    // the fetch() call. A timer refreshes the cache before expiry so the
+    // window of "warm token unusable" is tiny.
+    _warmIdToken: null,
+    _warmIdTokenExpiresAt: 0,
+    _warmTokenRefreshTimer: null,
+    WARM_TOKEN_REFRESH_INTERVAL_MS: 45 * 60 * 1000,
+    WARM_TOKEN_MIN_LIFETIME_MS: 5 * 60 * 1000, // refresh if <5 min remaining
+
     cloneAny(data) {
         if (data === null || typeof data === 'undefined') return null;
         try {
@@ -130,6 +143,50 @@ const FirebaseSync = {
             cachedAt: Date.now(),
             data: this.cloneAny(data)
         };
+    },
+
+    /**
+     * Refresh the warm idToken cache. Reads firebase_tokens from storage and
+     * — if the token is expiring within WARM_TOKEN_MIN_LIFETIME_MS — calls
+     * FirebaseLib.getIdToken() so the lib can run its own refresh single-flight.
+     * Failures are non-fatal: cleanup() falls back to the slower
+     * FirebaseLib.setDocument path if no warm token is cached.
+     */
+    async _refreshWarmToken() {
+        try {
+            const stored = await chrome.storage.local.get(['firebase_tokens']);
+            const tokens = stored?.firebase_tokens;
+            if (!tokens?.idToken || !tokens.expiresAt) {
+                this._warmIdToken = null;
+                this._warmIdTokenExpiresAt = 0;
+                return;
+            }
+            const expiresIn = tokens.expiresAt - Date.now();
+            if (expiresIn < this.WARM_TOKEN_MIN_LIFETIME_MS) {
+                // Trigger the lib's refresh flow + re-read the new tokens.
+                try { await FirebaseLib.getIdToken(); } catch { /* ignore */ }
+                const after = await chrome.storage.local.get(['firebase_tokens']);
+                const t2 = after?.firebase_tokens;
+                if (t2?.idToken && t2.expiresAt) {
+                    this._warmIdToken = t2.idToken;
+                    this._warmIdTokenExpiresAt = t2.expiresAt;
+                }
+                return;
+            }
+            this._warmIdToken = tokens.idToken;
+            this._warmIdTokenExpiresAt = tokens.expiresAt;
+        } catch { /* best-effort */ }
+    },
+
+    /**
+     * Start the warm-token refresh timer. Idempotent.
+     */
+    _startWarmTokenTimer() {
+        if (this._warmTokenRefreshTimer) return;
+        this._warmTokenRefreshTimer = setInterval(
+            () => { this._refreshWarmToken(); },
+            this.WARM_TOKEN_REFRESH_INTERVAL_MS
+        );
     },
 
     /**
@@ -363,9 +420,16 @@ const FirebaseSync = {
                 this.currentUser = user;
                 if (!user || prevUid !== user.uid) {
                     this.clearCachedUserDocument();
+                    this._warmIdToken = null;
+                    this._warmIdTokenExpiresAt = 0;
                 }
                 if (user) {
                     PopupLogger.log('Firebase', `User signed in: ${user.email}`);
+                    // Pre-warm the idToken so cleanup() at popup close can fire
+                    // its PATCH synchronously (no await between unload event
+                    // and fetch). Periodic refresh keeps the cache valid.
+                    this._refreshWarmToken();
+                    this._startWarmTokenTimer();
                     if (onUserSignedIn) onUserSignedIn(user);
                 } else {
                     PopupLogger.log('Firebase', 'No user');
@@ -527,17 +591,73 @@ const FirebaseSync = {
                     throw new Error('Invalid videoProgress for cloud save');
                 }
 
+                // Cloud-first per-key merge. Without this, a Firestore PATCH
+                // with `updateMask=animeData` (etc.) replaces the whole map
+                // field as-is, silently dropping any per-key changes another
+                // device pushed since this popup last synced. We pull the
+                // current cloud doc from the SW's cache (zero Firestore reads
+                // on hit) and merge each map field with the pending snapshot
+                // before the PATCH. On SW miss / unreachable the merge is a
+                // no-op and we fall back to the previous behaviour (write
+                // local-only) — the next BG poll will reconcile.
+                let cloudDoc = null;
+                try {
+                    const swResp = await new Promise((resolve) => {
+                        try {
+                            chrome.runtime.sendMessage({ type: 'GET_CLOUD_DOC' }, (resp) => {
+                                if (chrome.runtime.lastError) { resolve(null); return; }
+                                resolve(resp || null);
+                            });
+                        } catch { resolve(null); }
+                    });
+                    if (swResp?.success && swResp.doc) cloudDoc = swResp.doc;
+                } catch { /* SW unreachable — proceed without merge */ }
+
+                const Util = (window.AnimeTracker && window.AnimeTracker.MergeUtils) || {};
+
+                const localAnime = dataToSave.animeData || {};
+                const localProgress = dataToSave.videoProgress || {};
+                const localDeleted = dataToSave.deletedAnime || {};
+                const localGroup = dataToSave.groupCoverImages || {};
+                const localGoals = dataToSave.goalSettings || {};
+                const localBadges = dataToSave.badgeUnlocks || {};
+
+                const mergedAnime = (cloudDoc?.animeData && Util.mergeAnimeData)
+                    ? Util.mergeAnimeData(localAnime, cloudDoc.animeData)
+                    : localAnime;
+                let mergedDeleted = (cloudDoc?.deletedAnime && Util.mergeDeletedAnime)
+                    ? Util.mergeDeletedAnime(localDeleted, cloudDoc.deletedAnime)
+                    : localDeleted;
+                if (Util.pruneStaleDeletedAnime) {
+                    mergedDeleted = Util.pruneStaleDeletedAnime(mergedAnime, mergedDeleted);
+                }
+                if (Util.applyDeletedAnime) {
+                    Util.applyDeletedAnime(mergedAnime, mergedDeleted);
+                }
+                const mergedProgress = (cloudDoc?.videoProgress && Util.mergeVideoProgress)
+                    ? Util.mergeVideoProgress(localProgress, cloudDoc.videoProgress)
+                    : localProgress;
+                const mergedGroup = (cloudDoc?.groupCoverImages && Util.mergeGroupCoverImages)
+                    ? Util.mergeGroupCoverImages(localGroup, cloudDoc.groupCoverImages)
+                    : localGroup;
+                const mergedGoals = (cloudDoc?.goalSettings && Util.mergeGoalSettings)
+                    ? Util.mergeGoalSettings(localGoals, cloudDoc.goalSettings)
+                    : localGoals;
+                const mergedBadges = (cloudDoc?.badgeUnlocks && Util.mergeBadgeUnlocks)
+                    ? Util.mergeBadgeUnlocks(localBadges, cloudDoc.badgeUnlocks)
+                    : localBadges;
+
                 const { data: cachedDoc } = this.getCachedUserDocument(this.currentUser.uid);
                 const shouldWriteEmail = !cachedDoc
                     || cachedDoc.email !== this.currentUser.email;
 
                 const savedDoc = {
-                    animeData: dataToSave.animeData || {},
-                    videoProgress: dataToSave.videoProgress || {},
-                    deletedAnime: dataToSave.deletedAnime || {},
-                    groupCoverImages: dataToSave.groupCoverImages || {},
-                    goalSettings: dataToSave.goalSettings || {},
-                    badgeUnlocks: dataToSave.badgeUnlocks || {},
+                    animeData: mergedAnime,
+                    videoProgress: mergedProgress,
+                    deletedAnime: mergedDeleted,
+                    groupCoverImages: mergedGroup,
+                    goalSettings: mergedGoals,
+                    badgeUnlocks: mergedBadges,
                     lastUpdated: new Date().toISOString(),
                     email: this.currentUser.email
                 };
@@ -554,7 +674,7 @@ const FirebaseSync = {
                     // follow-up storage-listener sync doesn't burn a Firestore
                     // read fetching what we already have. Falls back to plain
                     // invalidate if the SW doesn't recognise the new message.
-                    chrome.runtime.sendMessage({ type: 'UPDATE_BG_CLOUD_DOC_CACHE', doc: savedDoc }, () => {
+                    chrome.runtime.sendMessage({ type: 'UPDATE_BG_CLOUD_DOC_CACHE', uid: this.currentUser.uid, doc: savedDoc }, () => {
                         void chrome.runtime.lastError;
                     });
                 } catch { /* best-effort */ }
@@ -1013,6 +1133,13 @@ const FirebaseSync = {
     /**
      * Cleanup on popup close — fire-and-forget with keepalive fetch
      * so the request survives popup unload.
+     *
+     * The fast path uses the warm idToken cache (refreshed every 45 min via
+     * _startWarmTokenTimer + on every onAuthStateChanged) so we can build the
+     * PATCH body and call fetch() synchronously inside the unload handler.
+     * Without that, FirebaseLib.setDocument awaits getIdToken() → a storage
+     * round-trip that Chrome regularly cuts short on popup close, leaving
+     * the user's last save unsaved.
      */
     cleanup() {
         if (this.saveToCloudTimeout) {
@@ -1026,25 +1153,73 @@ const FirebaseSync = {
             clearTimeout(this.playbackSaveTimeout);
             this.playbackSaveTimeout = null;
         }
+
+        const projectId = (window.firebaseConfig && window.firebaseConfig.projectId) || '';
+        const codec = (window.AnimeTrackerFirestoreCodec) || null;
+        const haveWarmToken = this._warmIdToken
+            && this._warmIdTokenExpiresAt > Date.now() + 5000
+            && projectId
+            && codec;
+
+        // Helper: build URL + fire keepalive PATCH synchronously.
+        const fireKeepalive = (uid, data, fields) => {
+            try {
+                const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${uid}`;
+                const mask = fields.map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&');
+                const body = JSON.stringify({ fields: codec.encodeFields(data) });
+                if (body.length >= 63000) return false;
+                fetch(`${url}?${mask}`, {
+                    method: 'PATCH',
+                    headers: {
+                        Authorization: `Bearer ${this._warmIdToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body,
+                    keepalive: true
+                }).catch(() => { /* unload — can't surface anyway */ });
+                return true;
+            } catch (e) {
+                PopupLogger.error('Sync', 'Keepalive PATCH compose failed:', e);
+                return false;
+            }
+        };
+
         if (this.pendingPlaybackSave && this.currentUser) {
             const playbackToSave = this.pendingPlaybackSave;
             this.pendingPlaybackSave = null;
-            FirebaseLib.setDocument('users', this.currentUser.uid, {
-                playbackSettings: playbackToSave
-            }, {
-                keepalive: true,
-                fields: ['playbackSettings']
-            }).catch((err) => {
-                PopupLogger.error('Sync', 'Playback save on unload failed:', err);
-            });
+
+            let sent = false;
+            if (haveWarmToken) {
+                sent = fireKeepalive(
+                    this.currentUser.uid,
+                    { playbackSettings: playbackToSave },
+                    ['playbackSettings']
+                );
+            }
+            if (!sent) {
+                // Fallback (slower; may not survive on some browsers).
+                FirebaseLib.setDocument('users', this.currentUser.uid, {
+                    playbackSettings: playbackToSave
+                }, {
+                    keepalive: true,
+                    fields: ['playbackSettings']
+                }).catch((err) => {
+                    PopupLogger.error('Sync', 'Playback save on unload failed:', err);
+                });
+            }
         }
 
         if (this.pendingSave && this.currentUser) {
             const dataToSave = this.pendingSave;
             this.pendingSave = null;
 
-            // Use keepalive so the request outlives the popup
-            FirebaseLib.setDocument('users', this.currentUser.uid, {
+            // Note: we intentionally skip the cloud-first per-key merge here
+            // (the path used by performCloudSave) — at unload, awaiting a
+            // GET_CLOUD_DOC round-trip would defeat the whole point. A best-
+            // effort local-only PATCH is the right tradeoff: it's the path
+            // already taken by the previous keepalive save, plus a real
+            // synchronous fire that Chrome won't cut short.
+            const payload = {
                 animeData:        dataToSave.animeData || {},
                 videoProgress:    dataToSave.videoProgress || {},
                 deletedAnime:     dataToSave.deletedAnime || {},
@@ -1053,12 +1228,21 @@ const FirebaseSync = {
                 badgeUnlocks:     dataToSave.badgeUnlocks || {},
                 lastUpdated:      new Date().toISOString(),
                 email:            this.currentUser.email
-            }, {
-                keepalive: true,
-                fields: ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'goalSettings', 'badgeUnlocks', 'lastUpdated', 'email']
-            }).catch(err => {
-                PopupLogger.error('Sync', 'Save on unload failed:', err);
-            });
+            };
+            const fields = ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'goalSettings', 'badgeUnlocks', 'lastUpdated', 'email'];
+
+            let sent = false;
+            if (haveWarmToken) {
+                sent = fireKeepalive(this.currentUser.uid, payload, fields);
+            }
+            if (!sent) {
+                FirebaseLib.setDocument('users', this.currentUser.uid, payload, {
+                    keepalive: true,
+                    fields
+                }).catch(err => {
+                    PopupLogger.error('Sync', 'Save on unload failed:', err);
+                });
+            }
         }
     }
 };

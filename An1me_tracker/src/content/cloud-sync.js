@@ -31,6 +31,29 @@
     let teardownSyncTriggered = false;
     let cloudPollingTimer = null;
 
+    // Returns a multiplier for periodic-sync intervals. Stretches them when
+    // the user is on a slow / metered connection so we don't hammer mobile
+    // data plans with a 3-min poll on EDGE. The factor is applied as a
+    // tick-time gate inside the interval handler — the timer itself keeps
+    // running so we re-evaluate the network state every base period (the
+    // user's connection may change while the page is open).
+    //
+    // Browsers without the Network Information API (Safari, Firefox until
+    // recently) fall back to factor 1 — same as before.
+    function _networkExtensionFactor() {
+        try {
+            const conn = navigator.connection
+                || navigator.mozConnection
+                || navigator.webkitConnection;
+            if (!conn) return 1;
+            if (conn.saveData) return 3;
+            const eff = conn.effectiveType;
+            if (eff === 'slow-2g' || eff === '2g') return 4;
+            if (eff === '3g') return 2;
+            return 1;
+        } catch { return 1; }
+    }
+
     let csSyncPausedUntil = 0;
     function csPauseSync(ms = 4000) {
         csSyncPausedUntil = Math.max(csSyncPausedUntil, Date.now() + ms);
@@ -112,6 +135,10 @@
         stopCloudPolling();
         currentToken = null;
         currentUser = null;
+        // Drop any cached cloud doc — must not survive across an account
+        // change that follows a token failure (would otherwise leak data
+        // from the previous account into the next one's first read).
+        invalidateCloudDocCache();
     }
 
     let _refreshInflight = null;
@@ -190,6 +217,7 @@
 
     let _cloudDocCache = null;
     let _cloudDocCacheTime = 0;
+    let _cloudDocCacheUid = null;
     const _CLOUD_DOC_TTL = 120000;
 
     const _CS_RECENT_OWN_WRITES_KEY = '_csRecentOwnWrites';
@@ -257,6 +285,7 @@
     function invalidateCloudDocCache() {
         _cloudDocCache = null;
         _cloudDocCacheTime = 0;
+        _cloudDocCacheUid = null;
     }
 
     function notifyBgInvalidateCloudDoc() {
@@ -269,8 +298,19 @@
 
     async function getCloudDocCached(token, user) {
         const now = Date.now();
-        if (_cloudDocCache && (now - _cloudDocCacheTime) < _CLOUD_DOC_TTL) {
+        // uid guard — never serve another user's cached doc, even if the
+        // in-memory copy is still inside the TTL window. Without this, a
+        // signed-out → signed-in-as-other flow inside the TTL window could
+        // leak account A's library into account B's merge path.
+        if (
+            _cloudDocCache &&
+            _cloudDocCacheUid === user.uid &&
+            (now - _cloudDocCacheTime) < _CLOUD_DOC_TTL
+        ) {
             return _cloudDocCache;
+        }
+        if (_cloudDocCache && _cloudDocCacheUid !== user.uid) {
+            invalidateCloudDocCache();
         }
         const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         try {
@@ -279,6 +319,7 @@
             const doc = fromFSDoc(await r.json());
             _cloudDocCache = doc;
             _cloudDocCacheTime = Date.now();
+            _cloudDocCacheUid = user.uid;
             return doc;
         } catch (e) {
             Logger?.warn(`Cloud fetch failed: ${e.message}`);
@@ -301,8 +342,17 @@
                 }
 
                 const cloudDoc = fromFSDoc(await response.json());
+                // Bind the cache to the uid the response was fetched for —
+                // and re-confirm against the currently-stored firebase_user
+                // so an account swap mid-poll doesn't tag the cache wrong.
+                const activeNow = await getUser();
+                if (!activeNow?.uid || activeNow.uid !== user.uid) {
+                    invalidateCloudDocCache();
+                    return null;
+                }
                 _cloudDocCache = cloudDoc;
                 _cloudDocCacheTime = Date.now();
+                _cloudDocCacheUid = user.uid;
                 if (cloudDoc) {
                     await applyCloudUpdate(cloudDoc);
                 }
@@ -750,7 +800,12 @@
         if (periodicPushTimer) return;
         periodicPushTimer = setInterval(async () => {
             if (csIsSyncPaused()) return;
-            if (Date.now() - lastPushAt < PERIODIC_PUSH_INTERVAL * 0.8) return;
+            // Slow / metered connection — stretch the tick gate so 2g and
+            // saveData users don't pay for a push every 5 min when nothing
+            // important is happening.
+            const factor = _networkExtensionFactor();
+            const minGap = PERIODIC_PUSH_INTERVAL * 0.8 * factor;
+            if (Date.now() - lastPushAt < minGap) return;
 
             const snap = await _currentLocalProgressSnapshot(isOrionMode);
             if (snap && _idleSnapshotsEqual(snap, _lastIdleSnapshot)) {
@@ -808,8 +863,19 @@
             Logger?.debug(`Ignoring own-echo cloud update (${cloudUpdatedAt})`);
             return;
         }
+        // Re-confirm the active user before applying — guards against an
+        // account swap that happened between fetch and apply.
+        const activeUser = await getUser();
+        if (!activeUser?.uid) {
+            invalidateCloudDocCache();
+            return;
+        }
+        if (_cloudDocCacheUid && _cloudDocCacheUid !== activeUser.uid) {
+            invalidateCloudDocCache();
+        }
         _cloudDocCache = cloudDoc;
         _cloudDocCacheTime = Date.now();
+        _cloudDocCacheUid = activeUser.uid;
         try {
             const local = await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
 
@@ -864,6 +930,14 @@
 
         const tick = async () => {
             try {
+                // Skip this tick if the network is metered/slow and we already
+                // polled within an extended window. The base interval still
+                // fires at CLOUD_POLL_INTERVAL_MS so the user sees fresh data
+                // promptly when their connection improves.
+                const factor = _networkExtensionFactor();
+                if (factor > 1 && (Date.now() - lastCloudPollAt) < CLOUD_POLL_INTERVAL_MS * factor) {
+                    return;
+                }
                 const token = await getValidToken();
                 const user = currentUser || await getUser();
                 if (!token || !user) return;
@@ -990,7 +1064,10 @@
 
         currentUser = await getUser();
         if (!currentUser) {
-            Logger?.debug('No user, skipping sync');
+            // Late sign-in is handled by the storage.onChanged listener
+            // wired up below — that re-runs init() the moment a
+            // firebase_user appears, without requiring a page reload.
+            Logger?.debug('No user, deferring init until firebase_user appears');
             return;
         }
 
@@ -1047,6 +1124,39 @@
         window.addEventListener('pagehide', orionTeardown, { passive: true });
     }
 
+    // Always-on auth-change watcher. Runs regardless of init state so that:
+    //   1. A late sign-in (no firebase_user at script-load) triggers a
+    //      deferred init() — otherwise the content script stays sync-disabled
+    //      until the user reloads the page.
+    //   2. A uid swap (sign-out → sign-in as different account) invalidates
+    //      the cache eagerly so we don't merge account A's cloud doc into
+    //      account B's local store within the cache TTL window.
+    try {
+        chrome.storage.onChanged.addListener((changes, namespace) => {
+            if (namespace !== 'local') return;
+            if (!Object.prototype.hasOwnProperty.call(changes, 'firebase_user')) return;
+            const newUser = changes.firebase_user?.newValue || null;
+            const oldUid = changes.firebase_user?.oldValue?.uid || null;
+            const newUid = newUser?.uid || null;
+            if (newUid !== oldUid) {
+                invalidateCloudDocCache();
+                // Reset cached auth state so we don't issue requests under
+                // the previous account's token after a swap or sign-out.
+                currentToken = null;
+                currentUser = newUser;
+                if (!newUser) {
+                    // Sign-out: stop polling immediately. The next tick of
+                    // the auth-change handler (re-sign-in) will re-init.
+                    stopCloudPolling();
+                }
+            }
+            if (!initialized && newUser) {
+                Logger?.info('Late sign-in detected — running deferred init()');
+                init().catch((e) => Logger?.warn(`Deferred init failed: ${e?.message || e}`));
+            }
+        });
+    } catch { /* chrome.storage.onChanged unavailable — non-fatal */ }
+
     setTimeout(init, 2000);
 
     window.AnimeTrackerContent = window.AnimeTrackerContent || {};
@@ -1058,7 +1168,12 @@
                 if (!user || !token) return false;
                 const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
                 const pushedAt = new Date().toISOString();
-                const body = JSON.stringify({
+
+                // Try the full payload first. Chrome enforces a per-request
+                // ~64KB ceiling on `keepalive: true` fetches, so big libraries
+                // hit the cap and the previous code silently returned false —
+                // losing the unload save entirely.
+                const fullBody = JSON.stringify({
                     fields: toFSFields({
                         animeData: payload.animeData || {},
                         videoProgress: payload.videoProgress || {},
@@ -1068,15 +1183,46 @@
                         email: user.email
                     })
                 });
-                if (body.length >= 63000) return false;
-                const mask = ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'lastUpdated', 'email']
+                if (fullBody.length < 63000) {
+                    const fullMask = ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'lastUpdated', 'email']
+                        .map(f => `updateMask.fieldPaths=${f}`).join('&');
+                    fetch(`${url}?${fullMask}`, {
+                        method: 'PATCH',
+                        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                        body: fullBody,
+                        keepalive: true
+                    }).then((res) => { if (res.ok) notifyBgInvalidateCloudDoc(); }).catch(() => { });
+                    return true;
+                }
+
+                // Body too big for keepalive — push videoProgress alone.
+                // Progress is the field that actually changes per-watch and
+                // is what we most want to preserve at unload. animeData /
+                // deletedAnime / groupCoverImages will catch up via the
+                // next BG poll once the user navigates back.
+                const progressBody = JSON.stringify({
+                    fields: toFSFields({
+                        videoProgress: payload.videoProgress || {},
+                        lastUpdated: pushedAt
+                    })
+                });
+                if (progressBody.length >= 63000) {
+                    // Still too big — videoProgress alone exceeds 63KB. Rare
+                    // (would need ~500+ active episodes). Give up: better to
+                    // surface than to fire a non-keepalive request that the
+                    // browser will abort on unload.
+                    Logger?.warn('Keepalive body too large — even videoProgress-only exceeds 63KB');
+                    return false;
+                }
+                const progressMask = ['videoProgress', 'lastUpdated']
                     .map(f => `updateMask.fieldPaths=${f}`).join('&');
-                fetch(`${url}?${mask}`, {
+                fetch(`${url}?${progressMask}`, {
                     method: 'PATCH',
                     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                    body,
+                    body: progressBody,
                     keepalive: true
                 }).then((res) => { if (res.ok) notifyBgInvalidateCloudDoc(); }).catch(() => { });
+                Logger?.info('Keepalive split: progress-only PATCH (full body > 63KB)');
                 return true;
             } catch {
                 return false;

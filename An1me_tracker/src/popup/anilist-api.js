@@ -86,13 +86,26 @@
         }
     }
 
+    // Detect environments without a working chrome.identity.launchWebAuthFlow
+    // (Orion / Safari / Firefox / mobile). On these, we can't run the OAuth
+    // flow — the user must connect on desktop, then auth syncs via Firebase.
+    function isMobileLikeEnv() {
+        const ua = navigator.userAgent || '';
+        if (/Orion|Firefox|FxiOS/i.test(ua)) return true;
+        if (/Android|iPhone|iPad|iPod|Mobile|CriOS|EdgiOS/i.test(ua)) return true;
+        if (/AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg/i.test(ua)) return true;
+        if (!chrome?.identity?.launchWebAuthFlow) return true;
+        let redirectUrl = '';
+        try { redirectUrl = chrome.identity.getRedirectURL?.() || ''; }
+        catch { return true; }
+        if (!/^https:\/\/[a-z0-9]+\.chromiumapp\.org/.test(redirectUrl)) return true;
+        return false;
+    }
+
     async function connect() {
         if (!ANILIST_CLIENT_ID) throw new Error('no_client_id');
-        // Canonical AniList implicit-grant URL — no `redirect_uri` param; the
-        // implicit flow uses the client's registered redirect URL. Run
-        // launchWebAuthFlow directly here (the standard pattern). The side
-        // panel stays open through the flow; the toolbar popup does not, so
-        // connecting must be done from the side panel.
+        if (isMobileLikeEnv()) throw new Error('mobile_unsupported');
+
         const authUrl = `${AUTH_URL}?client_id=${encodeURIComponent(ANILIST_CLIENT_ID)}&response_type=token`;
 
         const responseUrl = await new Promise((resolve, reject) => {
@@ -609,6 +622,15 @@
 
         // ─── LOGGED-OUT STATE — welcoming, centered hierarchy ───────────
         const redirectUri = escapeHtml(getRedirectUri());
+        const onMobile = isMobileLikeEnv();
+        const connectBlock = onMobile
+            ? `<div class="anilist-status" data-kind="err" style="display:block;">
+                   Sign in on desktop first — the AniList login will sync to this device automatically.
+               </div>`
+            : `<button class="anilist-btn anilist-btn--connect" id="anilistConnectBtn" type="button">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="13 2 4 14 12 14 11 22 20 10 12 10 13 2"/></svg>
+                    <span>Connect AniList</span>
+               </button>`;
         return `
             <div class="anilist-empty">
                 <div class="anilist-empty-hero">
@@ -624,12 +646,9 @@
                         <p class="anilist-empty-desc">Keep your watch progress in sync automatically.</p>
                     </div>
                 </div>
-                <button class="anilist-btn anilist-btn--connect" id="anilistConnectBtn" type="button">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="13 2 4 14 12 14 11 22 20 10 12 10 13 2"/></svg>
-                    <span>Connect AniList</span>
-                </button>
+                ${connectBlock}
                 ${statusArea}
-                <details class="anilist-collapsible anilist-collapsible--inline">
+                ${onMobile ? '' : `<details class="anilist-collapsible anilist-collapsible--inline">
                     <summary><span class="anilist-collapsible-arrow"></span>How does this work?</summary>
                     <div class="anilist-collapsible-body">
                         <p class="anilist-collapsible-text">Connect opens AniList sign-in in a new tab. Use the side panel — the toolbar popup closes during sign-in.</p>
@@ -639,7 +658,7 @@
                             <button class="anilist-btn anilist-btn--ghost anilist-url-copy" id="anilistRedirectCopy" type="button">Copy</button>
                         </div>
                     </div>
-                </details>
+                </details>`}
             </div>
             <div class="anilist-divider"></div>
             <div class="anilist-sub">Import without connecting</div>
@@ -702,8 +721,18 @@
         if (!isConnected()) return;
 
         if (st && st.state === 'running') {
+            // SW died mid-run if no real progress for 3 min (advancedAt only
+            // updates on actual forward motion, not on heartbeats).
+            const staleMs = 3 * 60 * 1000;
+            const lastAdvanced = st.advancedAt || st.updatedAt;
+            if (lastAdvanced && (Date.now() - lastAdvanced) > staleMs) {
+                setSyncing(false);
+                setStatus('Sync stalled - click Sync now to retry', 'err');
+                return;
+            }
             setSyncing(true);
-            setProgress(st.done || 0, st.total || 1, 'Syncing to AniList');
+            const label = st.currentTitle ? `Syncing · ${st.currentTitle}` : 'Syncing to AniList';
+            setProgress(st.done || 0, st.total || 1, label);
             return;
         }
 
@@ -751,6 +780,7 @@
             const msg = String(e?.message || '');
             renderCard();
             if (msg === 'no_client_id') setStatus('Set ANILIST_CLIENT_ID first', 'err');
+            else if (msg === 'mobile_unsupported') setStatus('Connect from desktop — login will sync to mobile via Firebase', 'err');
             else if (/cancel|closed|user_cancelled/i.test(msg)) setStatus('Sign-in cancelled', 'err');
             else setStatus(`Connect failed: ${msg}`, 'err');
         } finally {
@@ -770,16 +800,33 @@
         setStatus('Disconnected from AniList');
     }
 
-    // Triggers the SERVICE WORKER to push — runs in the background, so it
-    // keeps going even if the popup closes. The card mirrors progress via
-    // the `anilist_sync_status` storage key.
+    // Triggers the SW to push — keeps going if the popup closes. Card mirrors
+    // progress via the `anilist_sync_status` storage key.
     function doSyncNow() {
         if (!isConnected()) { setStatus('Connect AniList first', 'err'); return; }
         setSyncing(true);
         setProgress(0, 1, 'Starting AniList sync');
+        let responded = false;
+        const swTimeout = setTimeout(() => {
+            if (!responded) {
+                setSyncing(false);
+                setStatus('Sync failed — extension reloading, try again', 'err');
+            }
+        }, 5000);
         try {
-            chrome.runtime.sendMessage({ type: 'ANILIST_SYNC_NOW' }, () => { void chrome.runtime.lastError; });
-        } catch { /* extension context invalidated — ignore */ }
+            chrome.runtime.sendMessage({ type: 'ANILIST_SYNC_NOW' }, (resp) => {
+                responded = true;
+                clearTimeout(swTimeout);
+                if (chrome.runtime.lastError || !resp) {
+                    setSyncing(false);
+                    setStatus('Sync failed — extension reloading, try again', 'err');
+                }
+            });
+        } catch {
+            clearTimeout(swTimeout);
+            setSyncing(false);
+            setStatus('Sync failed — extension context invalidated', 'err');
+        }
     }
 
     async function doImport() {
@@ -913,6 +960,14 @@
                 }
             });
         } catch { /* ignore */ }
+
+        // Re-evaluate stale running state every 30s — storage.onChanged
+        // never fires when the SW dies mid-run.
+        setInterval(() => {
+            if (_syncStatus && _syncStatus.state === 'running') {
+                applySyncStatus(_syncStatus);
+            }
+        }, 30000);
     })();
 
     window.AnimeTracker = window.AnimeTracker || {};

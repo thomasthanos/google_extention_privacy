@@ -747,3 +747,47 @@ const ProgressTracker = {
 
 window.AnimeTrackerContent = window.AnimeTrackerContent || {};
 window.AnimeTrackerContent.ProgressTracker = ProgressTracker;
+
+// External-write cache invalidation. _vpCache (5 s) and _adCache (15 s) speed
+// up the hot save path by deduping consecutive reads, but a cache that
+// outlives a cloud-driven `videoProgress` / `animeData` write would let the
+// next save overwrite the freshly-merged map with a stale snapshot —
+// silently undoing progress that just arrived from another device. We hook
+// chrome.storage.onChanged and:
+//   • If the new value matches what the cache already holds (own-write
+//     case — we cached it just before the storage round-trip echoed back),
+//     keep the cache so the dedup still works.
+//   • Otherwise drop the cache so the next save reads fresh from storage.
+//
+// Equality is delegated to the shared MergeUtils helpers so we get the same
+// "ignore fetch metadata" semantics the sync layer uses.
+try {
+    chrome.storage.onChanged.addListener((changes, namespace) => {
+        if (namespace !== 'local') return;
+        const Util = (window.AnimeTrackerContent && window.AnimeTrackerContent.MergeUtils)
+            || globalThis.AnimeTrackerMergeUtils
+            || {};
+
+        if (changes.videoProgress && ProgressTracker._vpCache) {
+            const newVP = changes.videoProgress.newValue || {};
+            const same = typeof Util.areProgressMapsEqual === 'function'
+                ? Util.areProgressMapsEqual(newVP, ProgressTracker._vpCache)
+                : false;
+            if (!same) {
+                ProgressTracker._vpCache = null;
+                ProgressTracker._vpCacheTime = 0;
+            }
+        }
+
+        if (changes.animeData && ProgressTracker._adCache) {
+            const newAD = changes.animeData.newValue || {};
+            const same = typeof Util.areAnimeDataMapsEqual === 'function'
+                ? Util.areAnimeDataMapsEqual(newAD, ProgressTracker._adCache)
+                : false;
+            if (!same) {
+                ProgressTracker._adCache = null;
+                ProgressTracker._adCacheTime = 0;
+            }
+        }
+    });
+} catch { /* chrome.storage.onChanged unavailable — non-fatal */ }

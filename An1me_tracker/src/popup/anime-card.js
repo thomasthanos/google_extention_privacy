@@ -238,8 +238,8 @@ const AnimeCardRenderer = {
                 : (isCardComplete
                     ? 'meta-badge-complete'
                     : (_isCaughtUpAiring ? 'meta-badge-airing' : (totalWatchedEpisodes > 0 ? 'meta-badge-watching' : 'meta-badge-notstarted'))));
-        const statusBadgeIcon = isDropped ? '⏸' : (isOnHold ? '⏸' : (isCardComplete ? '✓' : (_isCaughtUpAiring ? '⊙' : '⊙')));
-        const statusBadge = `<span class="meta-badge ${statusBadgeClass}">${statusBadgeIcon} ${statusTextCard}</span>`;
+        const statusBadgeIcon = isDropped ? '⏸' : (isOnHold ? '⏸' : (isCardComplete ? '✓' : (_isCaughtUpAiring ? '' : '⊙')));
+        const statusBadge = `<span class="meta-badge ${statusBadgeClass}">${statusBadgeIcon ? `${statusBadgeIcon} ` : ''}${statusTextCard}</span>`;
 
         const anilistStatus = AnilistService?.getStatus(slug);
         const airingBadge = anilistStatus === 'RELEASING' && !isDropped && !isOnHold && !_isCaughtUpAiring
