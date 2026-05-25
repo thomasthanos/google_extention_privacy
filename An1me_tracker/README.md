@@ -2,7 +2,7 @@
 
 Chrome extension (MV3) for `an1me.to` that tracks anime watch progress automatically, syncs across devices via Firestore (REST), and provides a rich library / stats / goals popup.
 
-Current version: `6.4.5`.
+Current version: `6.6.4`.
 
 ## Core Features
 

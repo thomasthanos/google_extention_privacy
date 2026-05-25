@@ -4800,6 +4800,35 @@
             PopupLogger.warn('Cleanup', 'Auto-cleanup failed:', e);
         }
 
+        // One-shot slug migration — auto-recovers from the legacy slugify
+        // bug (Fate/stay → fatestay-night, HUNTER×HUNTER → hunterhunter)
+        // and from AniList-romaji ↔ an1me.to slug mismatches (FMA
+        // Brotherhood, Demon Slayer movies, etc.). Probes the site to
+        // find the correct slug, then renames `animeData` + sidecar
+        // storage with CRDT-merged collisions.
+        //
+        // Self-throttled (30-min global gap, daily per-slug cooldown), so
+        // calling on every popup open is cheap. Fire-and-forget — never
+        // blocks popup boot.
+        try {
+            const SlugMigration = window.AnimeTrackerSlugMigration;
+            if (SlugMigration && typeof SlugMigration.migrate === 'function') {
+                SlugMigration.migrate().then((result) => {
+                    if (result && result.renamed > 0) {
+                        PopupLogger.log('SlugMigration',
+                            `Auto-recovered ${result.renamed} bad slug(s)`);
+                    } else if (result && result.tried > 0) {
+                        PopupLogger.debug('SlugMigration',
+                            `Probed ${result.tried} suspect slug(s), none recoverable`);
+                    }
+                }).catch((e) => {
+                    PopupLogger.debug('SlugMigration', 'failed:', e?.message || e);
+                });
+            }
+        } catch (e) {
+            PopupLogger.debug('SlugMigration', 'Unable to start:', e?.message || e);
+        }
+
         FirebaseSync.init({
             onUserSignedIn: async (user) => {
                 showMainApp(user);

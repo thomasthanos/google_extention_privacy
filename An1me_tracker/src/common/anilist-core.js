@@ -35,7 +35,14 @@
 
     function slugify(title) {
         return String(title || '').toLowerCase().trim()
-            .replace(/[^\w\s-]/g, '')
+            // Replace any non-word/space/dash with a SPACE first so that
+            // characters like `/`, `×`, `:`, `(` act as word separators
+            // instead of silently disappearing. Without this:
+            //   `Fate/stay night`  → `fatestay-night`     (wrong, no `/` left a gap)
+            //   `HUNTER×HUNTER`    → `hunterhunter`       (wrong, `×` had no surrounding spaces)
+            // With the space-substitution, these collapse to the correct
+            // `fate-stay-night` / `hunter-hunter` slugs an1me.to actually uses.
+            .replace(/[^\w\s-]/g, ' ')
             .replace(/[\s_]+/g, '-')
             .replace(/-+/g, '-')
             .replace(/^-+|-+$/g, '');

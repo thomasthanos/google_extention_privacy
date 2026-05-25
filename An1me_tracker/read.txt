@@ -1,0 +1,137 @@
+v6.6.4 — 2026-05-25
+====================
+
+WHAT CHANGED
+------------
+
+1) Sign-out persistence bug FIXED (mobile + desktop)
+   Root cause: refresh-token failure on flaky/cold-boot networks would
+   wipe the session even when the failure was transient (e.g. mobile
+   browser woke the SW before network was reachable).
+   Fix: classify failures as PERMANENT vs TRANSIENT. Only permanent
+   (revoked refresh token, disabled account) signs out. Transient
+   keeps existing token if still valid; otherwise keeps session for
+   the next retry. Applied in 3 places:
+     - src/popup/firebase-lib.js   (popup init + getIdToken)
+     - background.js               (BG getFirebaseToken)
+     - src/content/cloud-sync.js   (CS getValidToken)
+
+2) Idle Firebase reads cut to ~zero
+   - background.js pollCloudData → skips the Firestore read when the
+     SW cache is still fresh (within _BG_CLOUD_TTL=5min). Previously
+     every consumer-connected wake burned a read.
+   - background.js syncProgressOnly + syncToFirebase already seed the
+     cache (from v6.6.3); kept.
+   - src/content/cloud-sync.js: 4 PATCH success paths
+     (pushProgressDirect, pushFullDirect, 2× keepalive-on-unload)
+     now SEED the BG cache via UPDATE_BG_CLOUD_DOC_PARTIAL instead of
+     invalidating. New BG handler overlays partial fields; uid-verified.
+
+3) Idle Firebase writes cut to zero
+   - src/popup/firebase-sync.js performCloudSave: new idempotency gate
+     compares mergedAnime/Progress/Deleted/Group/Goals/Badges vs the
+     cached cloud doc. If all match AND email is already synced → skip
+     the PATCH. Logs "idempotent-skip" (throttled 5s).
+
+4) New BG message protocol additions
+   - UPDATE_BG_CLOUD_DOC_PARTIAL { uid, partial } → overlay onto cache
+
+NET EFFECT
+----------
+Opening popup with no changes across devices: 0R + 0W against Firestore.
+Extension reload on mobile: session preserved (no sign-out).
+
+FILES TOUCHED
+-------------
+- manifest.json                  6.6.3 → 6.6.4
+- README.md                      version bump
+- background.js                  fetchCloudData single-flight (kept),
+                                 pollCloudData fresh-cache short-circuit,
+                                 refresh classifier + getFirebaseToken
+                                 transient-tolerance, UPDATE_BG_CLOUD_DOC
+                                 _PARTIAL handler
+- src/popup/firebase-lib.js      refreshToken throws typed errors
+                                 (.permanent), init + getIdToken honor it
+- src/popup/firebase-sync.js     performCloudSave idempotency gate
+- src/content/cloud-sync.js      refreshToken returns {idToken,permanent},
+                                 getValidToken transient-tolerance,
+                                 notifyBgSeedCloudDoc helper, all 4
+                                 success paths use seed not invalidate
+
+HOW TO ROLL BACK
+----------------
+- Cleanest: git revert <v6.6.4 commit>
+- Selective:
+  • Sign-out fix only       → in firebase-lib.js init() + getIdToken
+                               restore original `await signOut()` paths
+                               (search for `error?.permanent`).
+                               Same for background.js getFirebaseToken
+                               and cloud-sync.js getValidToken.
+  • Idle read/write fix only → revert pollCloudData, performCloudSave,
+                               and notifyBgSeedCloudDoc → notifyBgInvalidate
+                               in cloud-sync.js.
+
+VERIFICATION
+------------
+node --check on every modified JS file: clean.
+
+═══════════════════════════════════════════════════════════════════
+
+v6.6.3 — 2026-05-25
+====================
+
+WHAT CHANGED
+------------
+
+1) AniList auth cross-device sync (NEW)
+   Desktop OAuth token → pushed to Firestore field `users/<uid>.anilistAuth`
+   Mobile/Orion/Safari → pulls token via loadAndSyncData reconcile
+   Single-writer: only popup pushes. BG only reads + applies on poll.
+   Last-write-wins via `updatedAt` ISO timestamp.
+
+2) Firebase read/write leak fixes
+   - fetchCloudData → uid-keyed single-flight (no more parallel reads
+     when pollCloudData + GET_CLOUD_DOC race on cold SW boot)
+   - syncProgressOnly + syncToFirebase → seed cache after PATCH instead
+     of invalidating it. Saves 1 read per sync cycle.
+
+FILES TOUCHED
+-------------
+- manifest.json                  6.6.2 → 6.6.3
+- README.md                      version bump
+- background.js                  applyCloudAnilistAuth, single-flight,
+                                 cache seeds, UPDATE_BG_ANILIST_AUTH msg
+- src/popup/firebase-sync.js     applyCloudAnilistAuth + pushAnilistAuthToCloud
+                                 + reconcile in loadAndSyncData
+- src/popup/anilist-api.js       pushAuthToCloud helper, mobile UI rework,
+                                 _firebaseSignedIn flag, warn CSS
+
+NEW FIRESTORE FIELD
+-------------------
+users/<uid>.anilistAuth = {
+  accessToken, expiresAt, viewer, username, updatedAt
+}
+Field-mask PATCH only — no other doc fields affected.
+
+NEW chrome.storage.local KEYS: none (reuses anilist_auth + anilist_username)
+
+NEW MESSAGE PROTOCOL
+--------------------
+popup → BG: { type: 'UPDATE_BG_ANILIST_AUTH', anilistAuth: {...} }
+
+HOW TO ROLL BACK
+----------------
+- Cleanest: git revert <v6.6.3 commit>
+- Selective rollback by feature:
+  • AniList sync only       → remove pushAuthToCloud calls in
+                               anilist-api.js (doConnect/doDisconnect/doImport)
+                               + restore old mobile message in renderCardBody
+  • Cache seeds only        → in syncProgressOnly + syncToFirebase, replace
+                               the if/else seed block with plain
+                               invalidateBgCloudDocCache()
+  • Single-flight only      → unwrap fetchCloudData (delete the
+                               _fetchInFlightUid wrapper, keep inner body)
+
+VERIFICATION
+------------
+node --check on every JS file in project: clean.

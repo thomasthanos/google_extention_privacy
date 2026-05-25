@@ -455,12 +455,31 @@ async function getFirebaseToken() {
         const tokens = stored.firebase_tokens;
         if (!tokens?.idToken) return null;
         if (tokens.expiresAt < Date.now() + 120000) {
-            const refreshed = await refreshFirebaseToken(tokens.refreshToken);
-            if (!refreshed) {
-                await signOutDueToTokenFailure();
+            const result = await refreshFirebaseToken(tokens.refreshToken);
+            if (!result || !result.tokens) {
+                // Refresh failed. Distinguish permanent vs transient — only
+                // permanent failures (revoked refresh token, disabled account)
+                // should sign the user out. Transient failures (network blip
+                // during cold boot, server 5xx, rate limit) on mobile/Orion
+                // were the root cause of the "every reload signs me out" bug.
+                if (result?.permanent) {
+                    console.warn(`[BG] Refresh token rejected (permanent: ${result.error || '?'}) — signing out`);
+                    await signOutDueToTokenFailure();
+                    return null;
+                }
+                // Transient. If existing idToken is still valid (>30s left),
+                // use it — better than signing the user out for a network blip.
+                const stillValid = tokens.expiresAt && tokens.expiresAt > Date.now() + 30000;
+                if (stillValid) {
+                    console.warn(`[BG] Token refresh transiently failed (${result?.error || 'unknown'}); using existing token (${Math.round((tokens.expiresAt - Date.now()) / 1000)}s left)`);
+                    return tokens.idToken;
+                }
+                // No usable token AND error is transient — return null but
+                // keep session intact so the next call can retry.
+                console.warn(`[BG] Token refresh transiently failed and existing token expired; will retry on next call`);
                 return null;
             }
-            return refreshed.idToken;
+            return result.tokens.idToken;
         }
         return tokens.idToken;
     } catch (e) {
@@ -470,12 +489,37 @@ async function getFirebaseToken() {
 }
 
 let _bgRefreshInflight = null;
+
+// Permanent error codes from securetoken.googleapis.com — only these should
+// trigger a sign-out. Mirrors PERMANENT_REFRESH_ERRORS in popup firebase-lib.js.
+const _BG_PERMANENT_REFRESH_ERRORS = [
+    'INVALID_REFRESH_TOKEN',
+    'TOKEN_EXPIRED',
+    'USER_DISABLED',
+    'USER_NOT_FOUND',
+    'INVALID_GRANT',
+    'invalid_grant',
+    'CREDENTIAL_TOO_OLD_LOGIN_AGAIN',
+    'MISSING_REFRESH_TOKEN',
+];
+
+function _bgClassifyRefreshError(httpStatus, errorBody) {
+    if (httpStatus === 401 || httpStatus === 403) return true;
+    if (httpStatus === 400 && errorBody) {
+        for (const code of _BG_PERMANENT_REFRESH_ERRORS) {
+            if (errorBody.includes(code)) return true;
+        }
+    }
+    return false;
+}
+
 async function refreshFirebaseToken(refreshToken) {
-    if (!refreshToken) return null;
+    if (!refreshToken) return { tokens: null, permanent: true, error: 'no_refresh_token' };
     if (_bgRefreshInflight) return _bgRefreshInflight;
     const p = (async () => {
+        let response;
         try {
-            const response = await fetchWithTimeout(
+            response = await fetchWithTimeout(
                 `https://securetoken.googleapis.com/v1/token?key=${FIREBASE_API_KEY}`,
                 {
                     method: 'POST',
@@ -483,21 +527,41 @@ async function refreshFirebaseToken(refreshToken) {
                     body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: refreshToken })
                 }
             );
-            if (!response.ok) return null;
-            const data = await response.json().catch(() => null);
-            if (!data || data.error) return null;
-            const tokens = {
-                idToken: data.id_token,
-                refreshToken: data.refresh_token,
-                expiresAt: Date.now() + parseInt(data.expires_in) * 1000
-            };
-            await bgStorageSet({ firebase_tokens: tokens });
-            dlog('[BG] Token refreshed');
-            return tokens;
-        } catch (e) {
-            console.error('[BG] Token refresh failed:', e);
-            return null;
+        } catch (networkErr) {
+            // fetch threw → network/abort/DNS — always transient.
+            console.warn('[BG] Token refresh network error:', networkErr?.message || networkErr);
+            return { tokens: null, permanent: false, error: `network: ${networkErr?.message || networkErr}` };
         }
+        if (!response.ok) {
+            const body = await response.text().catch(() => '');
+            const permanent = _bgClassifyRefreshError(response.status, body);
+            console.warn(`[BG] Token refresh HTTP ${response.status} (${permanent ? 'permanent' : 'transient'}): ${body.slice(0, 200)}`);
+            return { tokens: null, permanent, error: `HTTP ${response.status}` };
+        }
+        let data;
+        try { data = await response.json(); } catch { data = null; }
+        if (!data) {
+            console.warn('[BG] Token refresh returned empty/invalid body — treating as transient');
+            return { tokens: null, permanent: false, error: 'empty_body' };
+        }
+        if (data.error) {
+            const msg = data.error?.message || 'unknown';
+            const permanent = _bgClassifyRefreshError(400, msg);
+            console.warn(`[BG] Token refresh error (${permanent ? 'permanent' : 'transient'}): ${msg}`);
+            return { tokens: null, permanent, error: msg };
+        }
+        if (!data.id_token || !data.refresh_token || !data.expires_in) {
+            console.warn('[BG] Token refresh missing fields — treating as transient');
+            return { tokens: null, permanent: false, error: 'missing_fields' };
+        }
+        const tokens = {
+            idToken: data.id_token,
+            refreshToken: data.refresh_token,
+            expiresAt: Date.now() + parseInt(data.expires_in) * 1000
+        };
+        await bgStorageSet({ firebase_tokens: tokens });
+        dlog('[BG] Token refreshed');
+        return { tokens, permanent: false, error: null };
     })();
     _bgRefreshInflight = p;
     p.finally(() => { if (_bgRefreshInflight === p) _bgRefreshInflight = null; });
@@ -515,32 +579,62 @@ const _fsCodec = self.AnimeTrackerFirestoreCodec || {};
 const jsonToFirestoreFields = _fsCodec.encodeFields || (() => { throw new Error('[BG] Firestore codec not loaded'); });
 const fromFSDoc = _fsCodec.decodeDoc || (() => null);
 
+// Single-flight in-flight tracker for concurrent fetchCloudData callers.
+// Without this, a cold SW boot where addStreamConsumer triggers
+// pollCloudData and the popup simultaneously sends GET_CLOUD_DOC results in
+// TWO Firestore reads in parallel for the same uid — both sides race,
+// neither sees the other's in-flight promise. Keying by uid keeps an
+// account-swap from leaking one user's fetch promise into another's path.
+let _fetchInFlightUid = null;
+let _fetchInFlightPromise = null;
+
 async function fetchCloudData(user, token) {
-    try {
-        const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
-        const response = await fetchWithTimeout(url, { headers: { 'Authorization': `Bearer ${token}` } });
-        if (!response.ok) {
-            // Log the actual status so we can diagnose silent fetch failures
-            // (a 401 from a stale SW token, 403 from rules denial, 404 for
-            // genuinely-missing doc, etc.). Previously every non-OK was
-            // collapsed into a silent null and the popup couldn't tell why.
-            const body = await response.text().catch(() => '');
-            console.warn(`[BG] fetchCloudData HTTP ${response.status} for users/${user.uid.slice(0, 8)}…: ${body.slice(0, 160)}`);
-            // Annotate the cache with the failure status so the SW message
-            // handler can surface it to the popup.
-            const err = new Error(`HTTP ${response.status}`);
-            err.status = response.status;
-            err.body = body;
-            throw err;
+    // Reuse an existing in-flight read if one is already running for the
+    // same user. Both pollCloudData (uncached path) and fetchCloudDataCached
+    // (on cache miss) call into here, so the dedup happens at the lowest
+    // level — any future caller automatically inherits the dedup too.
+    if (_fetchInFlightUid === user.uid && _fetchInFlightPromise) {
+        return _fetchInFlightPromise;
+    }
+
+    const fetchPromise = (async () => {
+        try {
+            const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
+            const response = await fetchWithTimeout(url, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (!response.ok) {
+                // Log the actual status so we can diagnose silent fetch failures
+                // (a 401 from a stale SW token, 403 from rules denial, 404 for
+                // genuinely-missing doc, etc.). Previously every non-OK was
+                // collapsed into a silent null and the popup couldn't tell why.
+                const body = await response.text().catch(() => '');
+                console.warn(`[BG] fetchCloudData HTTP ${response.status} for users/${user.uid.slice(0, 8)}…: ${body.slice(0, 160)}`);
+                // Annotate the cache with the failure status so the SW message
+                // handler can surface it to the popup.
+                const err = new Error(`HTTP ${response.status}`);
+                err.status = response.status;
+                err.body = body;
+                throw err;
+            }
+            return fromFSDoc(await response.json());
+        } catch (e) {
+            console.warn('[BG] Could not fetch cloud data:', e?.message || e);
+            // Re-throw status errors so callers can distinguish them from
+            // network errors. Network/timeout errors still resolve to null
+            // (no `e.status`) so the existing fallback paths still work.
+            if (e?.status) throw e;
+            return null;
         }
-        return fromFSDoc(await response.json());
-    } catch (e) {
-        console.warn('[BG] Could not fetch cloud data:', e?.message || e);
-        // Re-throw status errors so callers can distinguish them from
-        // network errors. Network/timeout errors still resolve to null
-        // (no `e.status`) so the existing fallback paths still work.
-        if (e?.status) throw e;
-        return null;
+    })();
+
+    _fetchInFlightUid = user.uid;
+    _fetchInFlightPromise = fetchPromise;
+    try {
+        return await fetchPromise;
+    } finally {
+        if (_fetchInFlightPromise === fetchPromise) {
+            _fetchInFlightUid = null;
+            _fetchInFlightPromise = null;
+        }
     }
 }
 
@@ -552,9 +646,34 @@ async function pollCloudData(reason = 'consumer-connected') {
             await hydrateBgPollState();
             if ((Date.now() - _lastCloudPollAt) < CLOUD_CONSUMER_POLL_MIN_GAP_MS) return null;
 
+            // Short-circuit: if our in-memory / persisted SW cache is still
+            // fresh (was populated within the last poll interval), skip the
+            // network read entirely. Without this, every consumer-connected
+            // wake on mobile (where SW gets killed often) burns a Firestore
+            // read just to retrieve the same doc the cache already has.
+            // The cache TTL is the real freshness window; the 3-min poll
+            // gap was just a safety net.
+            await hydrateBgCloudDocCache();
             const user = await getFirebaseUser();
             const token = await getFirebaseToken();
             if (!user || !token) return null;
+
+            const cacheFresh =
+                _bgCloudDocCache &&
+                _bgCloudDocCacheUid === user.uid &&
+                (Date.now() - _bgCloudDocCacheTime) < _BG_CLOUD_TTL;
+            if (cacheFresh) {
+                // Bump _lastCloudPollAt anyway so the 3-min gate honors this
+                // attempt — otherwise back-to-back consumer reconnects would
+                // re-enter and eventually hit the network when cache expires
+                // even if local data is unchanged.
+                _lastCloudPollAt = Date.now();
+                persistBgPollState({ cloudPollAt: _lastCloudPollAt });
+                dlog(`[BG-RT] Poll skipped (${reason}) — cache still fresh (${Math.round((Date.now() - _bgCloudDocCacheTime) / 1000)}s old)`);
+                // Re-apply silently so any local state that drifted catches up.
+                if (_bgCloudDocCache) await applyCloudUpdate(_bgCloudDocCache);
+                return _bgCloudDocCache;
+            }
 
             const pollAt = Date.now();
             _lastCloudPollAt = pollAt;
@@ -753,7 +872,29 @@ async function syncProgressOnly() {
 
         if (response.ok) {
             lastPushedProgressBG = structuredClone(mergedVP);
-            invalidateBgCloudDocCache();
+            // Seed (rather than invalidate) the cloud-doc cache with the
+            // values we just pushed. The PATCH is field-masked, so the cloud
+            // doc after this write equals: <prior cloud doc> with the masked
+            // fields replaced. If we have a prior cache snapshot for this
+            // uid, we can compute that exact post-write state locally and
+            // skip the next read entirely. Without this seed, the *next*
+            // sync (or popup-driven GET_CLOUD_DOC) burns a Firestore read
+            // just to learn what we already know.
+            if (_bgCloudDocCache && _bgCloudDocCacheUid === user.uid) {
+                _bgCloudDocCache = {
+                    ..._bgCloudDocCache,
+                    videoProgress: mergedVP,
+                    lastUpdated: pushedAt
+                };
+                _bgCloudDocCacheTime = Date.now();
+                bgStorageSet({
+                    [_BG_CLOUD_CACHE_KEY]: { uid: user.uid, doc: _bgCloudDocCache, cachedAt: _bgCloudDocCacheTime }
+                }).catch(() => {});
+            } else {
+                // No baseline to seed from — fall back to invalidate so the
+                // next read is forced to refetch (correct, just less efficient).
+                invalidateBgCloudDocCache();
+            }
             bgRememberOwnWrite(pushedAt);
             _lastProgressSyncAt = Date.now();
             persistBgPollState({ progressSyncAt: _lastProgressSyncAt });
@@ -900,7 +1041,23 @@ async function syncToFirebase() {
         });
 
         if (response.ok) {
-            invalidateBgCloudDocCache();
+            // Seed the cache with the post-write state. The PATCH masked
+            // fieldList, so reconstruct the doc by overlaying payloadFields
+            // onto the prior cached doc. Falls back to invalidate when no
+            // baseline exists. See comment in syncProgressOnly for the
+            // rationale — net effect: −1 Firestore read per sync cycle.
+            if (_bgCloudDocCache && _bgCloudDocCacheUid === user.uid) {
+                _bgCloudDocCache = {
+                    ..._bgCloudDocCache,
+                    ...payloadFields
+                };
+                _bgCloudDocCacheTime = Date.now();
+                bgStorageSet({
+                    [_BG_CLOUD_CACHE_KEY]: { uid: user.uid, doc: _bgCloudDocCache, cachedAt: _bgCloudDocCacheTime }
+                }).catch(() => {});
+            } else {
+                invalidateBgCloudDocCache();
+            }
             bgRememberOwnWrite(pushedAt);
             clearSyncPending();
             clearSyncRetry('full');
@@ -1096,6 +1253,10 @@ async function _doApplyCloudUpdate(cloudDoc) {
         if (cloudDoc.playbackSettings) {
             await applyCloudPlaybackSettings(cloudDoc.playbackSettings);
         }
+
+        if (cloudDoc.anilistAuth) {
+            await applyCloudAnilistAuth(cloudDoc.anilistAuth);
+        }
     } catch (e) {
         console.warn('[BG-RT] Apply update failed:', e.message);
     }
@@ -1162,6 +1323,102 @@ async function applyCloudPlaybackSettings(cloudPlayback) {
         return true;
     } catch (e) {
         console.warn('[BG-RT] Apply playback settings failed:', e.message);
+        return false;
+    }
+}
+
+// AniList OAuth token synced via cloudDoc.anilistAuth. The desktop pushes
+// after a successful connect()/disconnect(); mobile (where chrome.identity
+// .launchWebAuthFlow doesn't work) pulls and writes to chrome.storage.local
+// so AniList push-sync can run on mobile too. Last-write-wins via `updatedAt`.
+//
+// Cloud shape:
+//   {
+//     accessToken: '...',  // null when desktop disconnected
+//     expiresAt: <ms epoch> | 0,
+//     viewer: { id, name, avatar } | null,
+//     username: 'anilist-username' | null,  // optional (anilist_username key)
+//     updatedAt: '<ISO>'
+//   }
+//
+// Local shape (chrome.storage.local):
+//   anilist_auth: { accessToken, expiresAt, viewer, updatedAt }
+//   anilist_username: 'name'
+const BG_ANILIST_AUTH_KEY = 'anilist_auth';
+const BG_ANILIST_USERNAME_KEY = 'anilist_username';
+
+async function applyCloudAnilistAuth(cloudAnilist) {
+    if (!cloudAnilist || typeof cloudAnilist !== 'object') return false;
+    const cloudUpdatedAt = cloudAnilist.updatedAt || null;
+    if (!cloudUpdatedAt) return false;
+
+    try {
+        const stored = await bgStorageGet([BG_ANILIST_AUTH_KEY, BG_ANILIST_USERNAME_KEY]);
+        const localAuth = stored[BG_ANILIST_AUTH_KEY] || null;
+        const localUpdatedAt = localAuth?.updatedAt || null;
+
+        // Cloud must be strictly newer to win. Ties keep local — protects
+        // against an in-flight local connect() being clobbered by an older
+        // cloud snapshot delivered seconds later by a stale poll.
+        if (localUpdatedAt && Date.parse(localUpdatedAt) >= Date.parse(cloudUpdatedAt)) {
+            return false;
+        }
+
+        const writes = {};
+        let touched = false;
+
+        // Token: write only when cloud has a non-empty access token AND the
+        // cloud expiresAt hasn't passed (no point applying an expired token —
+        // it'd just trigger an immediate `reconnect` 401 in anilist-sync.js).
+        const cloudAccess = typeof cloudAnilist.accessToken === 'string' && cloudAnilist.accessToken
+            ? cloudAnilist.accessToken
+            : null;
+        const cloudExpiresAt = Number.isFinite(cloudAnilist.expiresAt) ? cloudAnilist.expiresAt : 0;
+        const cloudHasValidToken = cloudAccess && (!cloudExpiresAt || cloudExpiresAt > Date.now());
+
+        if (cloudHasValidToken) {
+            writes[BG_ANILIST_AUTH_KEY] = {
+                accessToken: cloudAccess,
+                expiresAt: cloudExpiresAt,
+                viewer: cloudAnilist.viewer && typeof cloudAnilist.viewer === 'object'
+                    ? cloudAnilist.viewer
+                    : null,
+                updatedAt: cloudUpdatedAt
+            };
+            touched = true;
+        } else if (localAuth) {
+            // Cloud says "disconnected" (or expired) and is newer than local —
+            // mirror the disconnect locally so push-sync stops trying to use
+            // a token that was revoked from the desktop.
+            writes[BG_ANILIST_AUTH_KEY] = null;
+            touched = true;
+        }
+
+        if (typeof cloudAnilist.username === 'string' && cloudAnilist.username) {
+            if (stored[BG_ANILIST_USERNAME_KEY] !== cloudAnilist.username) {
+                writes[BG_ANILIST_USERNAME_KEY] = cloudAnilist.username;
+                touched = true;
+            }
+        }
+
+        if (!touched) return false;
+
+        // chrome.storage.local.set with `null` value persists the null;
+        // remove the key explicitly when we want to clear it so isConnected()
+        // checks (which read `s[AUTH_KEY] || null`) behave correctly.
+        const setKeys = {};
+        const removeKeys = [];
+        for (const [k, v] of Object.entries(writes)) {
+            if (v === null) removeKeys.push(k);
+            else setKeys[k] = v;
+        }
+        if (Object.keys(setKeys).length > 0) await bgStorageSet(setKeys);
+        if (removeKeys.length > 0) await bgStorageRemove(removeKeys);
+
+        dlog('[BG-RT] ← Cloud AniList auth applied');
+        return true;
+    } catch (e) {
+        console.warn('[BG-RT] Apply AniList auth failed:', e.message);
         return false;
     }
 }
@@ -1575,6 +1832,63 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             }
         }
         sendResponse({ ok: true });
+        return true;
+    }
+
+    if (message.type === 'UPDATE_BG_ANILIST_AUTH') {
+        // Popup just pushed anilistAuth to Firestore — patch the SW cache
+        // so the next poll doesn't burn a Firestore read fetching what we
+        // already wrote. Mirrors the playbackSettings seed handler above.
+        if (message.anilistAuth && typeof message.anilistAuth === 'object') {
+            if (_bgCloudDocCache && typeof _bgCloudDocCache === 'object') {
+                _bgCloudDocCache = { ..._bgCloudDocCache, anilistAuth: message.anilistAuth };
+                _bgCloudDocCacheTime = Date.now();
+            }
+        }
+        sendResponse({ ok: true });
+        return true;
+    }
+
+    if (message.type === 'UPDATE_BG_CLOUD_DOC_PARTIAL') {
+        // Content-script just wrote a subset of fields to Firestore (e.g.
+        // videoProgress + lastUpdated only). Overlay those onto the SW
+        // cache instead of invalidating, so the next consumer-connected
+        // poll / GET_CLOUD_DOC doesn't burn a Firestore read for the
+        // exact data we already know about.
+        //
+        // uid must match the active user (same guard as the popup-side
+        // UPDATE_BG_CLOUD_DOC_CACHE handler above). Empty/missing uid or
+        // mismatched senders fall through to invalidate so cache integrity
+        // is never compromised by stale cross-user messages.
+        (async () => {
+            try {
+                const senderUid = typeof message.uid === 'string' ? message.uid : null;
+                const partial = (message.partial && typeof message.partial === 'object') ? message.partial : null;
+                const activeUser = await getFirebaseUser();
+                const activeUid = activeUser?.uid || null;
+                if (!senderUid || !activeUid || senderUid !== activeUid || !partial) {
+                    invalidateBgCloudDocCache();
+                    sendResponse({ ok: false, reason: 'uid_mismatch_or_no_partial' });
+                    return;
+                }
+                if (_bgCloudDocCache && _bgCloudDocCacheUid === activeUid) {
+                    _bgCloudDocCache = { ..._bgCloudDocCache, ...partial };
+                    _bgCloudDocCacheTime = Date.now();
+                    bgStorageSet({
+                        [_BG_CLOUD_CACHE_KEY]: { uid: activeUid, doc: _bgCloudDocCache, cachedAt: _bgCloudDocCacheTime }
+                    }).catch(() => {});
+                    sendResponse({ ok: true, mode: 'overlay' });
+                } else {
+                    // No baseline cache — content-script writes alone aren't
+                    // enough to construct a complete user doc (missing
+                    // goalSettings, badgeUnlocks, etc.). Fall back to
+                    // invalidate; the next read will populate the cache.
+                    sendResponse({ ok: true, mode: 'no-baseline-skip' });
+                }
+            } catch (e) {
+                sendResponse({ ok: false, error: e?.message || String(e) });
+            }
+        })();
         return true;
     }
 

@@ -338,6 +338,187 @@ const FirebaseSync = {
         return true;
     },
 
+    /**
+     * Apply cloud AniList auth to local storage if the cloud copy is newer
+     * than what we have locally. Returns true if local was updated.
+     *
+     * Cloud shape (sibling to playbackSettings on the user doc):
+     *   anilistAuth: {
+     *     accessToken: '...' | null,    // null when desktop disconnected
+     *     expiresAt:  <ms epoch> | 0,
+     *     viewer:     { id, name, avatar } | null,
+     *     username:   'anilist-handle' | null,  // optional mirror of anilist_username
+     *     updatedAt:  '<ISO>'            // last-write-wins
+     *   }
+     *
+     * Mirrored in BG (background.js applyCloudAnilistAuth) so a wake-on-poll
+     * also propagates without going through the popup. Both implementations
+     * keep the SAME last-write-wins semantics: cloud must be strictly newer
+     * to win; ties stay with local (protects an in-flight local connect()).
+     */
+    async applyCloudAnilistAuth(cloudAnilist) {
+        if (!cloudAnilist || typeof cloudAnilist !== 'object') return false;
+        const cloudUpdatedAt = cloudAnilist.updatedAt || null;
+        if (!cloudUpdatedAt) return false;
+
+        const stored = await window.AnimeTracker.Storage.get(['anilist_auth', 'anilist_username']);
+        const localAuth = stored.anilist_auth || null;
+        const localUpdatedAt = localAuth?.updatedAt || null;
+
+        if (localUpdatedAt && Date.parse(localUpdatedAt) >= Date.parse(cloudUpdatedAt)) {
+            return false;
+        }
+
+        const cloudAccess = typeof cloudAnilist.accessToken === 'string' && cloudAnilist.accessToken
+            ? cloudAnilist.accessToken
+            : null;
+        const cloudExpiresAt = Number.isFinite(cloudAnilist.expiresAt) ? cloudAnilist.expiresAt : 0;
+        // Skip applying tokens that are already expired (or about to expire
+        // in the next 60 s) — they'd just trigger an immediate `reconnect`
+        // 401 in anilist-sync.js. Treat that case the same as cloud-cleared.
+        const cloudHasValidToken = cloudAccess && (!cloudExpiresAt || cloudExpiresAt > Date.now() + 60000);
+
+        let touched = false;
+        const setKeys = {};
+        const removeKeys = [];
+
+        if (cloudHasValidToken) {
+            const newAuth = {
+                accessToken: cloudAccess,
+                expiresAt: cloudExpiresAt,
+                viewer: cloudAnilist.viewer && typeof cloudAnilist.viewer === 'object'
+                    ? cloudAnilist.viewer
+                    : null,
+                updatedAt: cloudUpdatedAt
+            };
+            // Skip the local write when the existing local token is byte-for-byte
+            // identical and just has an older stamp (idempotency — avoids waking
+            // anilist-sync.js's storage.onChanged listener for a no-op).
+            const isIdentical = localAuth
+                && localAuth.accessToken === newAuth.accessToken
+                && localAuth.expiresAt === newAuth.expiresAt
+                && JSON.stringify(localAuth.viewer || null) === JSON.stringify(newAuth.viewer || null);
+            if (!isIdentical) {
+                setKeys.anilist_auth = newAuth;
+                touched = true;
+            } else if (localUpdatedAt !== cloudUpdatedAt) {
+                // Same payload, just bump the stamp so we don't keep re-comparing.
+                setKeys.anilist_auth = newAuth;
+                touched = true;
+            }
+        } else if (localAuth) {
+            // Cloud says "disconnected" and is newer than local → mirror locally.
+            removeKeys.push('anilist_auth');
+            touched = true;
+        }
+
+        if (typeof cloudAnilist.username === 'string' && cloudAnilist.username) {
+            if (stored.anilist_username !== cloudAnilist.username) {
+                setKeys.anilist_username = cloudAnilist.username;
+                touched = true;
+            }
+        }
+
+        if (!touched) return false;
+
+        if (Object.keys(setKeys).length > 0) {
+            await window.AnimeTracker.Storage.set(setKeys);
+        }
+        if (removeKeys.length > 0) {
+            await window.AnimeTracker.Storage.remove(removeKeys);
+        }
+        PopupLogger.log('Sync', `AniList auth applied from cloud (cloud.updatedAt=${cloudUpdatedAt}, valid=${cloudHasValidToken ? '1' : '0'})`);
+        return true;
+    },
+
+    /**
+     * Push the local AniList auth state up to Firestore. Called from the
+     * popup's connect()/disconnect() paths in anilist-api.js — single
+     * writer model (BG never pushes anilistAuth, only reads).
+     *
+     * `auth` shape:
+     *   { accessToken, expiresAt, viewer } | null   (null = clear)
+     *
+     * Optional `username` (string) is also pushed so a public-list import
+     * on the desktop seeds the username for the mobile UI placeholder.
+     *
+     * Idempotent: skips the PATCH when the cached cloud doc already has
+     * the same payload + updatedAt.
+     */
+    async pushAnilistAuthToCloud(auth, username = null) {
+        if (!this.currentUser) return;
+        const updatedAt = new Date().toISOString();
+
+        // Build the canonical cloud shape. Always include `updatedAt` so
+        // the read side has a timestamp to compare against. Token-cleared
+        // (disconnect) is represented as accessToken: null + expiresAt: 0
+        // so we never lose the timestamp marker that proves a disconnect
+        // happened (otherwise a stale device might re-push an old token
+        // after disconnect and silently re-enable sync).
+        const payload = {
+            accessToken: (auth && typeof auth.accessToken === 'string') ? auth.accessToken : null,
+            expiresAt: (auth && Number.isFinite(auth.expiresAt)) ? auth.expiresAt : 0,
+            viewer: (auth && auth.viewer && typeof auth.viewer === 'object') ? auth.viewer : null,
+            username: typeof username === 'string' && username ? username : null,
+            updatedAt
+        };
+
+        try {
+            // Stamp the local auth too so the next reconcile sees the same
+            // updatedAt and won't trigger a redundant cloud→local apply.
+            // Done BEFORE the network PATCH so an unload mid-flight still
+            // leaves a coherent local state.
+            if (payload.accessToken) {
+                const existing = (await window.AnimeTracker.Storage.get(['anilist_auth'])).anilist_auth || {};
+                await window.AnimeTracker.Storage.set({
+                    anilist_auth: {
+                        ...existing,
+                        accessToken: payload.accessToken,
+                        expiresAt: payload.expiresAt,
+                        viewer: payload.viewer,
+                        updatedAt
+                    }
+                });
+            }
+
+            const { data: cached } = this.getCachedUserDocument(this.currentUser.uid);
+            const cachedAnilist = cached?.anilistAuth || null;
+            const sameToken = cachedAnilist
+                && cachedAnilist.accessToken === payload.accessToken
+                && cachedAnilist.expiresAt === payload.expiresAt
+                && cachedAnilist.username === payload.username
+                && JSON.stringify(cachedAnilist.viewer || null) === JSON.stringify(payload.viewer || null);
+            if (sameToken) {
+                // Cache says cloud already has this exact value — skip the PATCH.
+                // Still bump the local stamp above so we don't re-enter this
+                // path on the next reconcile.
+                return false;
+            }
+
+            await FirebaseLib.setDocument('users', this.currentUser.uid, {
+                anilistAuth: payload
+            }, { fields: ['anilistAuth'] });
+
+            // Seed the local + SW caches so the SW's next storage.onChanged
+            // sync doesn't burn a Firestore read fetching what we just wrote.
+            if (cached) {
+                this.setCachedUserDocument(this.currentUser.uid, { ...cached, anilistAuth: payload });
+            }
+            try {
+                chrome.runtime.sendMessage(
+                    { type: 'UPDATE_BG_ANILIST_AUTH', anilistAuth: payload },
+                    () => { void chrome.runtime.lastError; }
+                );
+            } catch { /* best-effort */ }
+            PopupLogger.log('Firebase',
+                `AniList auth pushed to cloud (token=${payload.accessToken ? 'set' : 'cleared'}, viewer=${payload.viewer?.name || 'none'})`);
+            return true;
+        } catch (e) {
+            PopupLogger.warn('Firebase', `Push AniList auth failed: ${e?.message || e}`);
+            throw e;
+        }
+    },
+
     async hydrateSyncData(data) {
         const payload = this.cloneSyncData(data);
         const missingKeys = ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'goalSettings', 'badgeUnlocks']
@@ -650,6 +831,34 @@ const FirebaseSync = {
                 const { data: cachedDoc } = this.getCachedUserDocument(this.currentUser.uid);
                 const shouldWriteEmail = !cachedDoc
                     || cachedDoc.email !== this.currentUser.email;
+
+                // Idempotency gate — skip the PATCH entirely when every
+                // payload field already matches the cached cloud doc. Without
+                // this, calling saveToCloud after a no-op merge (e.g. a popup
+                // open where nothing actually changed across devices) burns a
+                // full-doc write per popup open. The compare uses the same
+                // equality helpers as the loadAndSyncData needsCloudWrite gate,
+                // so the two paths agree on what counts as "changed".
+                if (cachedDoc && !shouldWriteEmail) {
+                    const Util = (window.AnimeTracker && window.AnimeTracker.MergeUtils) || {};
+                    const animeEq  = Util.areAnimeDataMapsEqual    ? Util.areAnimeDataMapsEqual(mergedAnime,  cachedDoc.animeData  || {}) : false;
+                    const progEq   = areProgressMapsEqual          ? areProgressMapsEqual(mergedProgress,    cachedDoc.videoProgress || {}) : false;
+                    const delEq    = shallowEqualDeletedAnime      ? shallowEqualDeletedAnime(mergedDeleted, cachedDoc.deletedAnime || {}) : false;
+                    const groupEq  = shallowEqualObjectMap         ? shallowEqualObjectMap(mergedGroup,      cachedDoc.groupCoverImages || {}) : false;
+                    const goalsEq  = shallowEqualObjectMap         ? shallowEqualObjectMap(mergedGoals,      cachedDoc.goalSettings || {}) : false;
+                    const badgeEq  = shallowEqualObjectMap         ? shallowEqualObjectMap(mergedBadges,     cachedDoc.badgeUnlocks || {}) : false;
+                    if (animeEq && progEq && delEq && groupEq && goalsEq && badgeEq) {
+                        PopupLogger.throttled('Firebase',
+                            `idempotent-skip:${this.currentUser.uid}`, 5000,
+                            `Cloud save skipped — already in sync · ${this.summarizeSyncDataString({ animeData: mergedAnime, videoProgress: mergedProgress, deletedAnime: mergedDeleted, groupCoverImages: mergedGroup, goalSettings: mergedGoals, badgeUnlocks: mergedBadges })}`);
+                        this.cloudSaveRetryCount = 0;
+                        if (elements?.syncStatus) {
+                            elements.syncStatus.classList.add('synced');
+                            elements.syncText.textContent = 'Cloud Synced';
+                        }
+                        return;
+                    }
+                }
 
                 const savedDoc = {
                     animeData: mergedAnime,
@@ -1079,6 +1288,37 @@ const FirebaseSync = {
                 }
             } catch (e) {
                 PopupLogger.warn('Sync', 'Playback settings reconcile skipped:', e?.message || e);
+            }
+
+            // ── AniList auth reconciliation ──────────────────────────────
+            // If the cloud has a desktop-pushed token and ours is older /
+            // missing, adopt it. If our local has a newer token (e.g. fresh
+            // connect just before sign-in), push it up. Mobile devices where
+            // chrome.identity.launchWebAuthFlow doesn't work get the token
+            // for free this way.
+            try {
+                const cloudAnilist = cloudData?.anilistAuth || null;
+                const applied = await this.applyCloudAnilistAuth(cloudAnilist);
+                if (!applied) {
+                    // Only consider pushing local up when cloud is OLDER than
+                    // local, NOT just when cloud is missing entirely. Without
+                    // this guard, a brand-new user with no AniList connection
+                    // would push an empty record (token=null, expiresAt=0)
+                    // up on every sign-in — burning a write per device.
+                    const stored = await window.AnimeTracker.Storage.get(['anilist_auth', 'anilist_username']);
+                    const localAuth = stored.anilist_auth || null;
+                    const localStamp = localAuth?.updatedAt || null;
+                    const cloudStamp = cloudAnilist?.updatedAt || null;
+                    const localNewer = localStamp && (!cloudStamp || Date.parse(localStamp) > Date.parse(cloudStamp));
+                    // Only push when local has a real token AND is newer than
+                    // cloud (or cloud has no record at all). Don't push the
+                    // token-cleared state from a device that never had one.
+                    if (localNewer && localAuth && localAuth.accessToken) {
+                        await this.pushAnilistAuthToCloud(localAuth, stored.anilist_username || null);
+                    }
+                }
+            } catch (e) {
+                PopupLogger.warn('Sync', 'AniList auth reconcile skipped:', e?.message || e);
             }
 
             if (elements?.syncStatus) {

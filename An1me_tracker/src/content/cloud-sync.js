@@ -142,11 +142,36 @@
     }
 
     let _refreshInflight = null;
+
+    // Permanent refresh-error codes — only these trigger sign-out.
+    // Mirrors PERMANENT_REFRESH_ERRORS in popup firebase-lib.js + BG.
+    const _CS_PERMANENT_REFRESH_ERRORS = [
+        'INVALID_REFRESH_TOKEN',
+        'TOKEN_EXPIRED',
+        'USER_DISABLED',
+        'USER_NOT_FOUND',
+        'INVALID_GRANT',
+        'invalid_grant',
+        'CREDENTIAL_TOO_OLD_LOGIN_AGAIN',
+        'MISSING_REFRESH_TOKEN',
+    ];
+
+    function _csClassifyRefreshError(httpStatus, errorBody) {
+        if (httpStatus === 401 || httpStatus === 403) return true;
+        if (httpStatus === 400 && errorBody) {
+            for (const code of _CS_PERMANENT_REFRESH_ERRORS) {
+                if (errorBody.includes(code)) return true;
+            }
+        }
+        return false;
+    }
+
     async function refreshToken(rt) {
         if (_refreshInflight) return _refreshInflight;
         _refreshInflight = (async () => {
+            let res;
             try {
-                const res = await fetchWithTimeout(
+                res = await fetchWithTimeout(
                     `https://securetoken.googleapis.com/v1/token?key=${FIREBASE_API_KEY}`,
                     {
                         method: 'POST',
@@ -154,19 +179,35 @@
                         body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: rt })
                     }
                 );
-                if (!res.ok) return null;
-                const data = await res.json().catch(() => null);
-                if (!data || data.error) return null;
-                const tokens = {
-                    idToken: data.id_token,
-                    refreshToken: data.refresh_token,
-                    expiresAt: Date.now() + parseInt(data.expires_in) * 1000
-                };
-                try { await chrome.storage.local.set({ firebase_tokens: tokens }); } catch (e) {
-                    Logger?.warn(`Failed to persist refreshed token: ${e.message}`);
-                }
-                return tokens.idToken;
-            } catch { return null; }
+            } catch (networkErr) {
+                // Network error = transient.
+                return { idToken: null, permanent: false, error: `network: ${networkErr?.message || networkErr}` };
+            }
+            if (!res.ok) {
+                const body = await res.text().catch(() => '');
+                const permanent = _csClassifyRefreshError(res.status, body);
+                return { idToken: null, permanent, error: `HTTP ${res.status}` };
+            }
+            let data;
+            try { data = await res.json(); } catch { data = null; }
+            if (!data) return { idToken: null, permanent: false, error: 'empty_body' };
+            if (data.error) {
+                const msg = data.error?.message || 'unknown';
+                const permanent = _csClassifyRefreshError(400, msg);
+                return { idToken: null, permanent, error: msg };
+            }
+            if (!data.id_token || !data.refresh_token || !data.expires_in) {
+                return { idToken: null, permanent: false, error: 'missing_fields' };
+            }
+            const tokens = {
+                idToken: data.id_token,
+                refreshToken: data.refresh_token,
+                expiresAt: Date.now() + parseInt(data.expires_in) * 1000
+            };
+            try { await chrome.storage.local.set({ firebase_tokens: tokens }); } catch (e) {
+                Logger?.warn(`Failed to persist refreshed token: ${e.message}`);
+            }
+            return { idToken: tokens.idToken, permanent: false, error: null };
         })();
         const p = _refreshInflight;
         p.finally(() => { if (_refreshInflight === p) _refreshInflight = null; });
@@ -179,12 +220,21 @@
             const t = s.firebase_tokens;
             if (!t?.idToken) return null;
             if (t.expiresAt < Date.now() + 120000) {
-                const newIdToken = await refreshToken(t.refreshToken);
-                if (!newIdToken) {
+                const result = await refreshToken(t.refreshToken);
+                if (result?.idToken) return result.idToken;
+                // Refresh failed. Permanent → sign out. Transient → fall back
+                // to existing token if still valid; otherwise return null but
+                // keep session for next attempt.
+                if (result?.permanent) {
                     await signOutDueToTokenFailure();
                     return null;
                 }
-                return newIdToken;
+                if (t.expiresAt > Date.now() + 30000) {
+                    Logger?.warn?.(`Token refresh transient failure (${result?.error}); using existing token`);
+                    return t.idToken;
+                }
+                Logger?.warn?.(`Token refresh transient failure (${result?.error}) and existing token expired; keeping session`);
+                return null;
             }
             return t.idToken;
         } catch { return null; }
@@ -293,6 +343,28 @@
             chrome.runtime.sendMessage({ type: 'INVALIDATE_BG_CLOUD_DOC_CACHE' }, () => {
                 void chrome.runtime.lastError;
             });
+        } catch { /* best-effort */ }
+    }
+
+    // Seed (rather than invalidate) the BG cloud-doc cache with the partial
+    // we just PATCHed to Firestore. Net effect: −1 Firestore read per CS
+    // write cycle (the next consumer-connected poll / GET_CLOUD_DOC sees a
+    // cache hit instead of paying for a full re-fetch).
+    //
+    // `partial` is the exact subset of fields we just sent (e.g.
+    // { videoProgress, lastUpdated } for progress push, or the full bundle
+    // for full push). uid is required so the BG handler can verify the
+    // active user before overlaying onto its cache.
+    function notifyBgSeedCloudDoc(uid, partial) {
+        if (!uid || !partial) {
+            // Defensive — fall back to invalidate so cache state stays correct.
+            return notifyBgInvalidateCloudDoc();
+        }
+        try {
+            chrome.runtime.sendMessage(
+                { type: 'UPDATE_BG_CLOUD_DOC_PARTIAL', uid, partial },
+                () => { void chrome.runtime.lastError; }
+            );
         } catch { /* best-effort */ }
     }
 
@@ -550,7 +622,8 @@
                 lastPushedProgress = snapshotForCompare(mergedVP);
                 lastPushAt = Date.now();
                 invalidateCloudDocCache();
-                notifyBgInvalidateCloudDoc();
+                // Seed BG cache (saves 1 Firestore read on next consumer wake).
+                notifyBgSeedCloudDoc(user.uid, { videoProgress: mergedVP, lastUpdated: pushedAt });
                 rememberOwnWrite(pushedAt);
                 Logger?.info('videoProgress pushed (merged)');
             } else {
@@ -698,7 +771,14 @@
                 lastPushedFull = snapshotForCompare(mergedBundle);
                 lastPushAt = Date.now();
                 invalidateCloudDocCache();
-                notifyBgInvalidateCloudDoc();
+                notifyBgSeedCloudDoc(user.uid, {
+                    animeData: mergedAnime,
+                    videoProgress: mergedProgress,
+                    deletedAnime: mergedDeleted,
+                    groupCoverImages: mergedGroupCovers,
+                    lastUpdated: pushedAt,
+                    email: user.email
+                });
                 rememberOwnWrite(pushedAt);
                 Logger?.info('Full push to Firestore complete');
             } else {
@@ -1191,7 +1271,18 @@
                         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                         body: fullBody,
                         keepalive: true
-                    }).then((res) => { if (res.ok) notifyBgInvalidateCloudDoc(); }).catch(() => { });
+                    }).then((res) => {
+                        if (res.ok) {
+                            notifyBgSeedCloudDoc(user.uid, {
+                                animeData: payload.animeData || {},
+                                videoProgress: payload.videoProgress || {},
+                                deletedAnime: payload.deletedAnime || {},
+                                groupCoverImages: payload.groupCoverImages || {},
+                                lastUpdated: pushedAt,
+                                email: user.email
+                            });
+                        }
+                    }).catch(() => { });
                     return true;
                 }
 
@@ -1221,7 +1312,14 @@
                     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                     body: progressBody,
                     keepalive: true
-                }).then((res) => { if (res.ok) notifyBgInvalidateCloudDoc(); }).catch(() => { });
+                }).then((res) => {
+                    if (res.ok) {
+                        notifyBgSeedCloudDoc(user.uid, {
+                            videoProgress: payload.videoProgress || {},
+                            lastUpdated: pushedAt
+                        });
+                    }
+                }).catch(() => { });
                 Logger?.info('Keepalive split: progress-only PATCH (full body > 63KB)');
                 return true;
             } catch {

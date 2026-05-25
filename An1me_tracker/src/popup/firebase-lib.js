@@ -63,9 +63,36 @@ const FirebaseLib = (function () {
                         await refreshToken(tokens.refreshToken);
                         PopupLogger.log('Firebase', 'Token refreshed successfully');
                     } catch (e) {
-                        PopupLogger.warn('Firebase', 'Token refresh failed, signing out:', e.message);
-                        await signOut();
-                        return null;
+                        // Only sign out when the refresh token itself is dead
+                        // (revoked, account disabled, etc.). Transient failures
+                        // — network blips on cold boot, server 5xx, rate limits
+                        // — must NOT wipe the session: that's the bug where
+                        // every extension reload on flaky mobile networks
+                        // logged the user out. Fall through to "use existing
+                        // token if not yet expired" instead.
+                        if (e?.permanent) {
+                            PopupLogger.warn('Firebase', `Refresh token rejected (permanent: ${e.message}) — signing out`);
+                            await signOut();
+                            return null;
+                        }
+
+                        const stillValid = tokens.expiresAt && tokens.expiresAt > Date.now() + 30000;
+                        if (stillValid) {
+                            PopupLogger.warn('Firebase',
+                                `Token refresh transiently failed (${e.message}). Using existing token (expires ${new Date(tokens.expiresAt).toLocaleTimeString()}); will retry on next call.`);
+                            // Fall through — we keep the user signed in.
+                        } else {
+                            // Transient failure AND no usable token left.
+                            // Don't sign out (refresh token may still be good)
+                            // — return null so the caller knows we're not
+                            // ready, but preserve the session for the next
+                            // attempt (e.g. when network is reachable again).
+                            PopupLogger.warn('Firebase',
+                                `Token refresh transiently failed (${e.message}) and existing token is expired. Keeping session for retry.`);
+                            currentUser = stored[STORAGE_KEYS.USER];
+                            notifyAuthStateListeners(currentUser);
+                            return currentUser;
+                        }
                     }
                 }
 
@@ -188,47 +215,111 @@ const FirebaseLib = (function () {
 
     let _popupRefreshInflight = null;
 
+    // Classification of refresh-token failures. ONLY permanent failures
+    // (revoked refresh token, disabled account, etc.) should trigger a
+    // sign-out. Transient failures (network blip during cold boot, server
+    // 5xx, rate limit) must keep the existing session intact — otherwise
+    // every flaky mobile cold-start wipes the user's login, which is the
+    // most disruptive bug on Orion / Safari extensions where the browser
+    // starts the SW before the network is fully reachable.
+    //
+    // Identity Toolkit / Secure Token error codes that mean "this refresh
+    // token will never work again":
+    const PERMANENT_REFRESH_ERRORS = new Set([
+        'INVALID_REFRESH_TOKEN',
+        'TOKEN_EXPIRED',
+        'USER_DISABLED',
+        'USER_NOT_FOUND',
+        'INVALID_GRANT',
+        'invalid_grant',
+        'CREDENTIAL_TOO_OLD_LOGIN_AGAIN',
+        'MISSING_REFRESH_TOKEN',
+    ]);
+
+    function _classifyRefreshError(httpStatus, errorBody) {
+        // HTTP 400 with one of the permanent codes → permanent.
+        // HTTP 401 / 403 from securetoken.googleapis.com is also permanent.
+        // Everything else (network error, 5xx, 408, 429, timeouts) is transient.
+        if (httpStatus === 401 || httpStatus === 403) return true;
+        if (httpStatus === 400 && errorBody) {
+            for (const code of PERMANENT_REFRESH_ERRORS) {
+                if (errorBody.includes(code)) return true;
+            }
+        }
+        return false;
+    }
+
     async function refreshToken(refreshTokenValue) {
         if (_popupRefreshInflight) return _popupRefreshInflight;
 
         const inflight = (async () => {
             try {
                 if (!refreshTokenValue || typeof refreshTokenValue !== 'string') {
-                    throw new Error('Invalid refresh token');
+                    const err = new Error('Invalid refresh token');
+                    err.permanent = true;
+                    throw err;
                 }
 
-                const response = await fetchWithTimeout(
-                    `https://securetoken.googleapis.com/v1/token?key=${API_KEY}`,
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            grant_type: 'refresh_token',
-                            refresh_token: refreshTokenValue
-                        })
-                    }
-                );
+                let response;
+                try {
+                    response = await fetchWithTimeout(
+                        `https://securetoken.googleapis.com/v1/token?key=${API_KEY}`,
+                        {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                grant_type: 'refresh_token',
+                                refresh_token: refreshTokenValue
+                            })
+                        }
+                    );
+                } catch (networkErr) {
+                    // fetch threw → network failure / abort / DNS / etc.
+                    // These are ALWAYS transient. Mark explicitly so the
+                    // caller can keep the existing tokens around.
+                    const err = new Error(`Network error during token refresh: ${networkErr?.message || networkErr}`);
+                    err.permanent = false;
+                    err.transient = true;
+                    throw err;
+                }
 
                 if (!response.ok) {
-                    await response.text();
-                    PopupLogger.error('Firebase', 'Token refresh HTTP error:', response.status);
-                    throw new Error(`HTTP error: ${response.status}`);
+                    const body = await response.text().catch(() => '');
+                    PopupLogger.error('Firebase', `Token refresh HTTP ${response.status}: ${body.slice(0, 200)}`);
+                    const err = new Error(`HTTP ${response.status}`);
+                    err.status = response.status;
+                    err.body = body;
+                    err.permanent = _classifyRefreshError(response.status, body);
+                    err.transient = !err.permanent;
+                    throw err;
                 }
 
                 const data = await response.json().catch(() => null);
 
                 if (!data) {
-                    throw new Error('Empty/invalid token refresh response');
+                    const err = new Error('Empty/invalid token refresh response');
+                    err.transient = true;
+                    err.permanent = false;
+                    throw err;
                 }
 
                 if (data.error) {
-                    throw new Error(data.error?.message || 'Token refresh failed');
+                    const msg = data.error?.message || 'Token refresh failed';
+                    const err = new Error(msg);
+                    err.permanent = _classifyRefreshError(400, msg);
+                    err.transient = !err.permanent;
+                    throw err;
                 }
 
                 if (!data.id_token || !data.refresh_token || !data.expires_in) {
                     const missing = ['id_token', 'refresh_token', 'expires_in'].filter(k => !data[k]);
                     PopupLogger.error('Firebase', 'Invalid token refresh response, missing fields:', missing);
-                    throw new Error('Invalid token refresh response');
+                    const err = new Error('Invalid token refresh response');
+                    // Server returned 200 but body is malformed — treat as transient
+                    // so we don't wipe the session for a server bug.
+                    err.transient = true;
+                    err.permanent = false;
+                    throw err;
                 }
 
                 const tokens = {
@@ -241,7 +332,13 @@ const FirebaseLib = (function () {
                 PopupLogger.log('Firebase', `Token refreshed, expires at ${new Date(tokens.expiresAt).toLocaleTimeString()}`);
                 return tokens;
             } catch (error) {
-                PopupLogger.error('Firebase', 'Token refresh error:', error);
+                if (!error.permanent && !error.transient) {
+                    // Unclassified error — default to transient (safer than wiping session).
+                    error.transient = true;
+                    error.permanent = false;
+                }
+                PopupLogger.error('Firebase',
+                    `Token refresh ${error.permanent ? 'PERMANENT' : 'transient'} error:`, error.message);
                 throw error;
             }
         })();
@@ -284,13 +381,21 @@ const FirebaseLib = (function () {
                 const newTokens = await refreshToken(tokens.refreshToken);
                 return newTokens.idToken;
             } catch (error) {
-                PopupLogger.error('Firebase', 'Failed to refresh token:', error);
-                if (isExpired) {
+                PopupLogger.error('Firebase', `Refresh failed (${error?.permanent ? 'permanent' : 'transient'}):`, error.message);
+                // Permanent failure (revoked refresh token) → sign out, can't recover.
+                if (error?.permanent) {
                     await signOut();
                     return null;
                 }
-                PopupLogger.warn('Firebase', 'Using existing token despite refresh failure');
-                return tokens.idToken;
+                // Transient failure (network/server). Use the existing token
+                // if it's still valid; otherwise return null so caller falls
+                // back gracefully without wiping the session.
+                if (!isExpired) {
+                    PopupLogger.warn('Firebase', 'Using existing token despite transient refresh failure');
+                    return tokens.idToken;
+                }
+                PopupLogger.warn('Firebase', 'Token expired and refresh transiently failed — keeping session, returning null for this call');
+                return null;
             }
         }
 
