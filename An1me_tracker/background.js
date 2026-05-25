@@ -45,6 +45,8 @@ const shallowEqualDeletedAnime = sharedMergeUtils.shallowEqualDeletedAnime || mi
 const shallowEqualObjectMap = sharedMergeUtils.shallowEqualObjectMap || missingMergeUtil('shallowEqualObjectMap');
 const isLikelyMovieSlug = sharedMergeUtils.isLikelyMovieSlug || missingMergeUtil('isLikelyMovieSlug');
 const isPlaceholderDuration = sharedMergeUtils.isPlaceholderDuration || missingMergeUtil('isPlaceholderDuration');
+const stripAutoRepairedEpisodesFromMap = sharedMergeUtils.stripAutoRepairedEpisodesFromMap
+    || ((m) => m); // legacy fallback — better to no-op than crash if util missing
 
 const BG_DEBUG = false;
 const dlog = (...a) => { if (BG_DEBUG) console.log(...a); };
@@ -969,7 +971,7 @@ async function syncToFirebase() {
 
         let mergedAnime = cloudDoc?.animeData
             ? mergeAnimeData(localAnime, cloudDoc.animeData)
-            : { ...localAnime };
+            : stripAutoRepairedEpisodesFromMap({ ...localAnime });
 
         mergedDeleted = pruneStaleDeletedAnime(mergedAnime, mergedDeleted);
         applyDeletedAnime(mergedAnime, mergedDeleted);

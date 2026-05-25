@@ -1,3 +1,57 @@
+v6.6.6 — 2026-05-25
+====================
+
+WHAT CHANGED
+------------
+
+1) Episode-count flap FIXED (3432↔3440 oscillation, 52d↔53d watch-time)
+   Root cause: legacy `autoRepaired:true` episodes lived in some devices'
+   chrome.storage.local.animeData. The popup's loadAndSyncData stripped
+   them via removeAutoRepairedEpisodes, but the BG syncToFirebase /
+   _doApplyCloudUpdate paths did NOT — so the BG kept re-merging the
+   un-stripped local copy with the smaller cloud doc and pushing the
+   8 episodes back. Popup then stripped again. Endless flap.
+
+   Fix in src/common/merge-utils.js: drop autoRepaired:true episodes
+   inside mergeAnimeData itself (the choke point all sync paths go
+   through). Also handle single-sided entries (where only cloud or
+   only local has the slug) via the new stripAutoRepairedEpisodesFromMap
+   helper, exported on AnimeTrackerMergeUtils.
+
+   Plus: applied the helper in the no-cloud-doc fallback paths of
+   BG syncToFirebase + popup performCloudSave + content-script
+   pushFullDirect, so even the very first sign-in push doesn't seed
+   cloud with autoRepaired flags.
+
+   After this update, autoRepaired episodes get permanently cleaned
+   from both local AND cloud after a single merge cycle. Total
+   episode count and watch-time will converge to the lower (correct)
+   value across all devices and stop flapping.
+
+FILES TOUCHED
+-------------
+- manifest.json                  6.6.5 → 6.6.6
+- README.md                      version bump
+- src/common/merge-utils.js      autoRepaired strip in mergeAnimeData +
+                                 new exported stripAutoRepairedEpisodesFromMap
+- background.js                  applies stripAutoRepairedEpisodesFromMap in
+                                 syncToFirebase no-cloud-doc fallback
+- src/popup/firebase-sync.js     same in performCloudSave fallback
+- src/content/cloud-sync.js      same in pushFullDirect fallback
+
+HOW TO ROLL BACK
+----------------
+Revert `if (episode.autoRepaired === true) continue;` line in
+mergeAnimeData and the single-sided strip block. Removes the export
+of stripAutoRepairedEpisodesFromMap. Callers fall back to the legacy
+`{ ...localAnime }` spread (no strip).
+
+VERIFICATION
+------------
+node --check on every modified JS file: clean.
+
+═══════════════════════════════════════════════════════════════════
+
 v6.6.5 — 2026-05-25
 ====================
 

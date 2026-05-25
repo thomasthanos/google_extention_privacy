@@ -258,7 +258,8 @@
         areAnimeDataMapsEqual,
         areProgressMapsEqual,
         shallowEqualDeletedAnime,
-        shallowEqualObjectMap
+        shallowEqualObjectMap,
+        stripAutoRepairedEpisodesFromMap
     } = (window.AnimeTrackerContent.MergeUtils || globalThis.AnimeTrackerMergeUtils);
 
     let lastPushedProgress = null;
@@ -698,7 +699,9 @@
 
             let mergedAnime = cloudData?.animeData
                 ? mergeAnimeData(local.animeData || {}, cloudData.animeData)
-                : { ...(local.animeData || {}) };
+                : (stripAutoRepairedEpisodesFromMap
+                    ? stripAutoRepairedEpisodesFromMap({ ...(local.animeData || {}) })
+                    : { ...(local.animeData || {}) });
 
             mergedDeleted = pruneStaleDeletedAnime(mergedAnime, mergedDeleted);
             applyDeletedAnime(mergedAnime, mergedDeleted);

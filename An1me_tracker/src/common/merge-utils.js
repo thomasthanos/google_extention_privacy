@@ -418,10 +418,30 @@
     function mergeAnimeData(localData, cloudData) {
         const merged = { ...(cloudData || {}), ...(localData || {}) };
 
+        // Helper: strip legacy autoRepaired episodes from a single entry
+        // and recompute totalWatchTime. Mutation-free — returns a new entry
+        // when changes are applied so callers' references stay clean. Same
+        // strip rule as the per-episode iterator below; centralised so the
+        // single-sided fast-path also cleans the data.
+        const stripAutoRepaired = (entry) => {
+            if (!entry || !Array.isArray(entry.episodes)) return entry;
+            const filtered = entry.episodes.filter(ep => !(ep && ep.autoRepaired === true));
+            if (filtered.length === entry.episodes.length) return entry;
+            const totalWatchTime = filtered.reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
+            return { ...entry, episodes: filtered, totalWatchTime };
+        };
+
         for (const slug of Object.keys(merged)) {
             const cloudAnime = cloudData?.[slug];
             const localAnime = localData?.[slug];
-            if (!cloudAnime || !localAnime) continue;
+            if (!cloudAnime || !localAnime) {
+                // Single-sided entry — no two-side merge needed, but still
+                // run the legacy-flag strip so an autoRepaired episode that
+                // exists only on one device's local doesn't survive into
+                // the next push and resurrect on the other device.
+                merged[slug] = stripAutoRepaired(merged[slug]);
+                continue;
+            }
 
             const episodesByNumber = new Map();
             for (let episode of [
@@ -429,6 +449,20 @@
                 ...(Array.isArray(localAnime.episodes) ? localAnime.episodes : [])
             ]) {
                 if (!episode || typeof episode.number !== 'number' || isNaN(episode.number)) continue;
+
+                // Drop legacy `autoRepaired:true` episodes at the merge layer.
+                // These were inserted by an older auto-repair code path that
+                // no longer exists; the popup-side `removeAutoRepairedEpisodes`
+                // strips them, but the BG sync path (syncToFirebase / _doApply
+                // CloudUpdate) does NOT — which produced the classic flap:
+                // mobile popup pulls + strips → push N entries to cloud →
+                // desktop BG re-merges its own un-stripped local with the
+                // smaller cloud doc → union has the entries again → push to
+                // cloud. Total bounces back and forth between two values.
+                // Stripping here makes every consumer of mergeAnimeData see
+                // the same result, so the data converges to "no autoRepaired"
+                // permanently after a single merge cycle.
+                if (episode.autoRepaired === true) continue;
 
                 // AniList-imported episodes never carry a real watch date —
                 // older importer versions stamped them with the import time,
@@ -607,6 +641,32 @@
         return result;
     }
 
+    // Top-level helper: strip legacy autoRepaired:true episodes from every
+    // entry of an animeData map. Returns a new map (does NOT mutate). Used
+    // by sync paths whose fallback (no cloud doc yet) skips mergeAnimeData
+    // and would otherwise push the un-stripped local copy back to cloud,
+    // re-introducing the very episodes the popup just removed → flap.
+    function stripAutoRepairedEpisodesFromMap(animeData) {
+        if (!animeData || typeof animeData !== 'object') return animeData;
+        const out = {};
+        let changed = false;
+        for (const [slug, entry] of Object.entries(animeData)) {
+            if (!entry || !Array.isArray(entry.episodes)) {
+                out[slug] = entry;
+                continue;
+            }
+            const filtered = entry.episodes.filter(ep => !(ep && ep.autoRepaired === true));
+            if (filtered.length === entry.episodes.length) {
+                out[slug] = entry;
+                continue;
+            }
+            const totalWatchTime = filtered.reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
+            out[slug] = { ...entry, episodes: filtered, totalWatchTime };
+            changed = true;
+        }
+        return changed ? out : animeData;
+    }
+
     const root = typeof globalThis !== 'undefined' ? globalThis : self;
     root.AnimeTrackerMergeUtils = {
         mergeVideoProgress,
@@ -624,6 +684,7 @@
         shallowEqualObjectMap,
         isLikelyMovieSlug,
         isPlaceholderDuration,
+        stripAutoRepairedEpisodesFromMap,
         PLACEHOLDER_DURATION_VALUES
     };
 })();

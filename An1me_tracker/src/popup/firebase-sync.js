@@ -805,7 +805,9 @@ const FirebaseSync = {
 
                 const mergedAnime = (cloudDoc?.animeData && Util.mergeAnimeData)
                     ? Util.mergeAnimeData(localAnime, cloudDoc.animeData)
-                    : localAnime;
+                    : (Util.stripAutoRepairedEpisodesFromMap
+                        ? Util.stripAutoRepairedEpisodesFromMap(localAnime)
+                        : localAnime);
                 let mergedDeleted = (cloudDoc?.deletedAnime && Util.mergeDeletedAnime)
                     ? Util.mergeDeletedAnime(localDeleted, cloudDoc.deletedAnime)
                     : localDeleted;
