@@ -1,3 +1,50 @@
+v6.6.5 — 2026-05-25
+====================
+
+WHAT CHANGED
+------------
+
+1) AniList legacy auto-push gate (FIX)
+   v6.6.3-6.6.4 only pushed local→cloud when local had an `updatedAt`
+   stamp. But existing desktop installs had `anilist_auth` set BEFORE
+   the sync feature shipped → no stamp → never auto-pushed. Mobile
+   never saw the token in cloud and kept showing "sign in on desktop".
+   Fix in src/popup/firebase-sync.js loadAndSyncData reconcile:
+   push when (a) cloud has no token (regardless of stamps) OR
+   (b) both stamped + local stamp newer.
+
+2) Mobile boot safety net (NEW)
+   Fixes the window where desktop pushes the token but mobile's SW
+   serves a stale cached doc / waits out the 3-min poll gate. When
+   mobile-like browser + signed in + AniList disconnected:
+   - Popup sends WAKE_AND_POLL_CLOUD_FORCE on boot
+   - BG bypasses the 3-min gate AND the cache freshness check
+   - One forced Firestore read, then applyCloudUpdate writes the
+     token locally → AniList card flips to connected on its own
+   Fires at most once per popup session, only when needed.
+
+3) New BG message: WAKE_AND_POLL_CLOUD_FORCE
+   - pollCloudData now accepts { force: true } to bypass both gates.
+   - Existing WAKE_AND_POLL_CLOUD (from content scripts) unchanged.
+
+FILES TOUCHED
+-------------
+- manifest.json                  6.6.4 → 6.6.5
+- README.md                      version bump
+- background.js                  pollCloudData force option +
+                                 WAKE_AND_POLL_CLOUD_FORCE handler
+- src/popup/firebase-sync.js     legacy push gate fix + diagnostic log
+- src/popup/anilist-api.js       mobile boot safety net
+
+USAGE NOTES
+-----------
+- Desktop user must open the popup ONCE after updating to v6.6.5+
+  so the auto-push fires and seeds the cloud.
+- Mobile user opens popup → safety net fires → connected state shows
+  within seconds (not 5 minutes).
+
+═══════════════════════════════════════════════════════════════════
+
 v6.6.4 — 2026-05-25
 ====================
 

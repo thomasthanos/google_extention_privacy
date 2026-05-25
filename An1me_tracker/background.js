@@ -638,13 +638,13 @@ async function fetchCloudData(user, token) {
     }
 }
 
-async function pollCloudData(reason = 'consumer-connected') {
+async function pollCloudData(reason = 'consumer-connected', { force = false } = {}) {
     if (_cloudPollInFlight) return _cloudPollInFlight;
 
     _cloudPollInFlight = (async () => {
         try {
             await hydrateBgPollState();
-            if ((Date.now() - _lastCloudPollAt) < CLOUD_CONSUMER_POLL_MIN_GAP_MS) return null;
+            if (!force && (Date.now() - _lastCloudPollAt) < CLOUD_CONSUMER_POLL_MIN_GAP_MS) return null;
 
             // Short-circuit: if our in-memory / persisted SW cache is still
             // fresh (was populated within the last poll interval), skip the
@@ -659,6 +659,7 @@ async function pollCloudData(reason = 'consumer-connected') {
             if (!user || !token) return null;
 
             const cacheFresh =
+                !force &&
                 _bgCloudDocCache &&
                 _bgCloudDocCacheUid === user.uid &&
                 (Date.now() - _bgCloudDocCacheTime) < _BG_CLOUD_TTL;
@@ -1746,6 +1747,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         // so calling this on every page navigation is cheap.
         sendResponse({ received: true });
         pollCloudData('content-page-open').catch(() => {});
+        return true;
+    }
+
+    if (message.type === 'WAKE_AND_POLL_CLOUD_FORCE') {
+        // Like WAKE_AND_POLL_CLOUD but bypasses both the 3-min gate and the
+        // SW-cache freshness check. Costs 1 Firestore read but guarantees
+        // freshness — used by the popup's mobile boot path when AniList
+        // shows disconnected and we suspect the SW cache predates the
+        // desktop-push window. Caller is rate-limited at the popup side
+        // (fires at most once per popup session and only when needed).
+        sendResponse({ received: true });
+        pollCloudData('force-refresh', { force: true }).catch(() => {});
         return true;
     }
 

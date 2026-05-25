@@ -1101,6 +1101,28 @@
 
         injectCard();
 
+        // Mobile sign-in safety net: when we're on a mobile-like browser,
+        // signed into the tracker, but have no local AniList token yet,
+        // ask the SW to bypass its caches and do a fresh Firestore read.
+        // Fixes the window where the desktop just pushed a token but the
+        // mobile SW still serves a 4-min-old cached doc that predates the
+        // push, plus the 3-min poll gate that would otherwise block a
+        // reactive refresh. Fires at most once per popup session and only
+        // when needed (i.e. signed-in on tracker AND not connected to
+        // AniList AND on a browser where OAuth doesn't work).
+        try {
+            if (isMobileLikeEnv() && _firebaseSignedIn && !isConnected()) {
+                chrome.runtime.sendMessage(
+                    { type: 'WAKE_AND_POLL_CLOUD_FORCE' },
+                    () => { void chrome.runtime.lastError; }
+                );
+                // The poll's applyCloudUpdate will applyCloudAnilistAuth →
+                // chrome.storage.local.set('anilist_auth') → our onChanged
+                // listener fires loadAuth() + renderCard(). No further
+                // action needed here — UI will flip to connected on its own.
+            }
+        } catch { /* best-effort */ }
+
         try {
             chrome.storage.onChanged.addListener((changes, namespace) => {
                 if (namespace !== 'local') return;

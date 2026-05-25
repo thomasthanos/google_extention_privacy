@@ -1292,29 +1292,47 @@ const FirebaseSync = {
 
             // ── AniList auth reconciliation ──────────────────────────────
             // If the cloud has a desktop-pushed token and ours is older /
-            // missing, adopt it. If our local has a newer token (e.g. fresh
-            // connect just before sign-in), push it up. Mobile devices where
-            // chrome.identity.launchWebAuthFlow doesn't work get the token
-            // for free this way.
+            // missing, adopt it. If our local has a newer token (or cloud
+            // has nothing yet — e.g. legacy desktop where the token was set
+            // before v6.6.3 added cross-device sync), push it up. Mobile
+            // devices where chrome.identity.launchWebAuthFlow doesn't work
+            // get the token for free this way.
             try {
                 const cloudAnilist = cloudData?.anilistAuth || null;
                 const applied = await this.applyCloudAnilistAuth(cloudAnilist);
                 if (!applied) {
-                    // Only consider pushing local up when cloud is OLDER than
-                    // local, NOT just when cloud is missing entirely. Without
-                    // this guard, a brand-new user with no AniList connection
-                    // would push an empty record (token=null, expiresAt=0)
-                    // up on every sign-in — burning a write per device.
                     const stored = await window.AnimeTracker.Storage.get(['anilist_auth', 'anilist_username']);
                     const localAuth = stored.anilist_auth || null;
                     const localStamp = localAuth?.updatedAt || null;
                     const cloudStamp = cloudAnilist?.updatedAt || null;
-                    const localNewer = localStamp && (!cloudStamp || Date.parse(localStamp) > Date.parse(cloudStamp));
-                    // Only push when local has a real token AND is newer than
-                    // cloud (or cloud has no record at all). Don't push the
-                    // token-cleared state from a device that never had one.
-                    if (localNewer && localAuth && localAuth.accessToken) {
+                    const hasLocalToken = !!(localAuth && localAuth.accessToken
+                        && (!localAuth.expiresAt || localAuth.expiresAt > Date.now()));
+                    const cloudHasToken = !!(cloudAnilist && cloudAnilist.accessToken);
+
+                    // Push local up when:
+                    //   (a) local has a valid token AND cloud has none — covers
+                    //       the legacy case where the desktop's anilist_auth
+                    //       was set before this sync feature shipped (no
+                    //       updatedAt stamp at all), OR
+                    //   (b) both have a stamp and local's is strictly newer.
+                    // Don't push when cloud has a token and local has no
+                    // stamp — cloud was set explicitly by a newer client and
+                    // wins by default.
+                    const shouldPush = hasLocalToken && (
+                        !cloudHasToken
+                        || (localStamp && cloudStamp && Date.parse(localStamp) > Date.parse(cloudStamp))
+                    );
+
+                    if (shouldPush) {
+                        PopupLogger.log('Sync',
+                            `AniList auth: pushing local→cloud (reason=${cloudHasToken ? 'local-newer' : 'cloud-empty'}, viewer=${localAuth?.viewer?.name || 'unknown'})`);
                         await this.pushAnilistAuthToCloud(localAuth, stored.anilist_username || null);
+                    } else if (hasLocalToken && cloudHasToken && !localStamp) {
+                        // Diagnostic: helps the user see in devtools why we're
+                        // not pushing (e.g. "I clicked Connect on desktop but
+                        // it never synced!" — answer: cloud already has it).
+                        PopupLogger.debug('Sync',
+                            'AniList auth: cloud already has a token, keeping cloud (local has no stamp).');
                     }
                 }
             } catch (e) {
