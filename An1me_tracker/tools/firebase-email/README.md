@@ -35,6 +35,16 @@ The update script below now sets the built-in Firebase handler automatically.
 Links in emails already sent keep their old URL, so request a new reset email
 after changing this setting.
 
+A branded custom reset handler is available in `../../auth-site/`. After it
+has been deployed to Cloudflare Pages and `https://thomast.uk/reset` is live,
+update the template while keeping its custom URL:
+
+```powershell
+$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\path\to\an1me-firebase-sa.json"
+$env:FIREBASE_EMAIL_ACTION_URL = "https://thomast.uk/reset"
+node tools/firebase-email/update-template.mjs
+```
+
 ## Prerequisites
 
 ### 1. Configure an SMTP provider in Firebase Console

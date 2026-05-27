@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="el">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0c101a">
+    <meta name="color-scheme" content="dark">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <title>Επαναφορά κωδικού | An1me Tracker</title>
+    <link rel="stylesheet" href="assets/styles.css">
+    <script src="assets/app.js" defer></script>
+</head>
+<body>
+    <div class="ambient ambient-left" aria-hidden="true"></div>
+    <div class="ambient ambient-right" aria-hidden="true"></div>
+
+    <main class="shell">
+        <header class="brand" aria-label="An1me Tracker">
+            <span class="brand-mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24" role="presentation">
+                    <path d="M7 4.5 19 12 7 19.5V4.5Z"></path>
+                </svg>
+            </span>
+            <span class="brand-name">AN1ME TRACKER</span>
+        </header>
+
+        <section class="reset-card" aria-labelledby="page-title">
+            <div class="security-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" role="presentation">
+                    <path d="M7.25 10V8a4.75 4.75 0 0 1 9.5 0v2"></path>
+                    <rect x="4.5" y="10" width="15" height="10.5" rx="3"></rect>
+                    <path d="M12 14.2v2.7"></path>
+                </svg>
+            </div>
+
+            <p class="eyebrow">ΑΣΦΑΛΗΣ ΛΟΓΑΡΙΑΣΜΟΣ</p>
+            <h1 id="page-title">Επαναφορά κωδικού</h1>
+
+            <section id="loading-view" class="status-view" aria-live="polite">
+                <span class="spinner" aria-hidden="true"></span>
+                <p>Ελέγχουμε τον σύνδεσμο επαναφοράς...</p>
+            </section>
+
+            <section id="form-view" class="view" hidden>
+                <p class="intro">
+                    Δημιούργησε νέο κωδικό για τον λογαριασμό
+                    <strong id="account-email">σου</strong>.
+                </p>
+
+                <form id="reset-form" novalidate>
+                    <label class="field-label" for="new-password">Νέος κωδικός</label>
+                    <div class="password-field">
+                        <input
+                            id="new-password"
+                            name="new-password"
+                            type="password"
+                            minlength="6"
+                            autocomplete="new-password"
+                            placeholder="Τουλάχιστον 6 χαρακτήρες"
+                            required
+                        >
+                        <button class="reveal" type="button" data-target="new-password" aria-label="Εμφάνιση κωδικού">
+                            <span class="show-label">Δείξε</span>
+                        </button>
+                    </div>
+
+                    <div class="strength" aria-live="polite">
+                        <div class="strength-track" aria-hidden="true">
+                            <span id="strength-bar"></span>
+                        </div>
+                        <span id="strength-text">Χρησιμοποίησε γράμματα, αριθμούς και σύμβολα</span>
+                    </div>
+
+                    <label class="field-label" for="confirm-password">Επιβεβαίωση κωδικού</label>
+                    <div class="password-field">
+                        <input
+                            id="confirm-password"
+                            name="confirm-password"
+                            type="password"
+                            autocomplete="new-password"
+                            placeholder="Ξαναγράψε τον νέο κωδικό"
+                            required
+                        >
+                        <button class="reveal" type="button" data-target="confirm-password" aria-label="Εμφάνιση κωδικού">
+                            <span class="show-label">Δείξε</span>
+                        </button>
+                    </div>
+
+                    <p id="form-error" class="inline-error" role="alert" hidden></p>
+
+                    <button id="submit-button" class="primary-button" type="submit">
+                        <span class="button-text">Αλλαγή κωδικού</span>
+                        <span class="button-spinner" aria-hidden="true"></span>
+                    </button>
+                </form>
+            </section>
+
+            <section id="success-view" class="view message-view" aria-live="polite" hidden>
+                <div class="result-icon success" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.5 3.5 7.5-8"></path></svg>
+                </div>
+                <h2>Ο κωδικός άλλαξε</h2>
+                <p>Μπορείς τώρα να επιστρέψεις στο An1me Tracker και να συνδεθείς με τον νέο κωδικό.</p>
+                <div class="success-pill">Ο λογαριασμός σου είναι έτοιμος</div>
+            </section>
+
+            <section id="error-view" class="view message-view" aria-live="assertive" hidden>
+                <div class="result-icon error" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 7.5v5.7"></path>
+                        <path d="M12 16.8h.01"></path>
+                        <circle cx="12" cy="12" r="9"></circle>
+                    </svg>
+                </div>
+                <h2 id="error-title">Ο σύνδεσμος δεν λειτουργεί</h2>
+                <p id="error-message">Ζήτησε νέο email επαναφοράς κωδικού από το extension.</p>
+            </section>
+
+            <aside class="safety-note">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 3.5 19 6v5.3c0 4.4-2.9 7.6-7 9.2-4.1-1.6-7-4.8-7-9.2V6l7-2.5Z"></path>
+                    <path d="m9.2 11.8 2 2 3.9-4"></path>
+                </svg>
+                <p>
+                    <strong>Ασφάλεια</strong>
+                    Δεν θα σου ζητήσουμε ποτέ τον παλιό κωδικό σου.
+                </p>
+            </aside>
+        </section>
+
+        <footer class="footer">
+            <p>&copy; 2026 An1me Tracker</p>
+            <p>Ασφαλής επαναφορά μέσω Firebase Authentication</p>
+        </footer>
+    </main>
+
+    <noscript>
+        <div class="noscript">Για να αλλάξεις κωδικό, ενεργοποίησε τη JavaScript και άνοιξε ξανά τον σύνδεσμο.</div>
+    </noscript>
+</body>
+</html>
