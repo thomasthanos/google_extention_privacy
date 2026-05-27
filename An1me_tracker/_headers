@@ -1,0 +1,12 @@
+/reset
+  Content-Type: text/html; charset=utf-8
+  Cache-Control: no-store
+  Content-Security-Policy: default-src 'self'; connect-src https://identitytoolkit.googleapis.com; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
+
+/reset.html
+  Content-Type: text/html; charset=utf-8
+  Cache-Control: no-store
+  Content-Security-Policy: default-src 'self'; connect-src https://identitytoolkit.googleapis.com; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
+
+/reset-assets/*
+  Cache-Control: public, max-age=31536000, immutable

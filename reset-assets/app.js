@@ -24,6 +24,7 @@
     const strengthText = document.getElementById('strength-text');
     const errorTitle = document.getElementById('error-title');
     const errorMessage = document.getElementById('error-message');
+    const logo3d = document.getElementById('logo3d');
 
     function showView(name) {
         Object.entries(views).forEach(([key, node]) => {
@@ -197,15 +198,32 @@
     });
     confirmInput.addEventListener('input', () => setFormError(''));
 
+    // Eye-toggle: swap class, CSS swaps the SVG
     document.querySelectorAll('.reveal').forEach((button) => {
         button.addEventListener('click', () => {
             const input = document.getElementById(button.dataset.target);
-            const showing = input.type === 'text';
-            input.type = showing ? 'password' : 'text';
-            button.querySelector('.show-label').textContent = showing ? 'Δείξε' : 'Κρύψε';
-            button.setAttribute('aria-label', showing ? 'Εμφάνιση κωδικού' : 'Απόκρυψη κωδικού');
+            const willShow = input.type === 'password';
+            input.type = willShow ? 'text' : 'password';
+            button.classList.toggle('is-visible', willShow);
+            button.setAttribute('aria-label', willShow ? 'Απόκρυψη κωδικού' : 'Εμφάνιση κωδικού');
         });
     });
+
+    // 3D logo parallax tilt — desktop only, respects reduced-motion
+    const fine = window.matchMedia('(pointer: fine)').matches;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (logo3d && fine && !reduced) {
+        const rect = () => logo3d.getBoundingClientRect();
+        logo3d.addEventListener('pointermove', (e) => {
+            const r = rect();
+            const x = ((e.clientX - r.left) / r.width - 0.5) * 2;
+            const y = ((e.clientY - r.top) / r.height - 0.5) * 2;
+            logo3d.style.transform = `rotateY(${x * 14}deg) rotateX(${-y * 14}deg)`;
+        });
+        logo3d.addEventListener('pointerleave', () => {
+            logo3d.style.transform = '';
+        });
+    }
 
     verifyLink();
 })();

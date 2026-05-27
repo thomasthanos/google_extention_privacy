@@ -3,42 +3,107 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#0c101a">
+    <meta name="theme-color" content="#0a0e1a">
     <meta name="color-scheme" content="dark">
     <meta name="referrer" content="no-referrer">
     <meta name="robots" content="noindex, nofollow, noarchive">
     <title>Επαναφορά κωδικού | An1me Tracker</title>
-    <link rel="icon" type="image/png" sizes="32x32" href="/An1me_tracker/src/icons/icon32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/An1me_tracker/src/icons/icon16.png">
+
+    <!-- Inline SVG favicon (self-contained: works regardless of host path) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%2339bcff'/><stop offset='1' stop-color='%238d4aff'/></linearGradient></defs><rect width='64' height='64' rx='14' fill='%230a0e1a'/><path d='M14 18h36v8H38v24h-12V26H14z' fill='url(%23g)'/><circle cx='44' cy='22' r='2.4' fill='%2339bcff'/></svg>">
+    <link rel="alternate icon" type="image/png" sizes="32x32" href="/An1me_tracker/src/icons/icon32.png">
+    <link rel="alternate icon" type="image/png" sizes="16x16" href="/An1me_tracker/src/icons/icon16.png">
     <link rel="apple-touch-icon" sizes="128x128" href="/An1me_tracker/src/icons/icon128.png">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Shippori+Mincho:wght@500;700&display=swap">
+
     <link rel="stylesheet" href="/reset-assets/styles.css">
     <script src="/reset-assets/app.js" defer></script>
 </head>
 <body>
-    <div class="ambient ambient-left" aria-hidden="true"></div>
-    <div class="ambient ambient-right" aria-hidden="true"></div>
+    <!-- Reusable SVG sprite -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs>
+            <linearGradient id="grad-primary" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#39bcff"/>
+                <stop offset="1" stop-color="#8d4aff"/>
+            </linearGradient>
+            <linearGradient id="grad-bevel" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#ffffff" stop-opacity=".35"/>
+                <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+            </linearGradient>
+            <linearGradient id="grad-side" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stop-color="#1a2547"/>
+                <stop offset="1" stop-color="#0a0e1a"/>
+            </linearGradient>
+            <linearGradient id="grad-sakura" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#ec4899"/>
+                <stop offset="1" stop-color="#8d4aff"/>
+            </linearGradient>
+
+            <symbol id="i-shield" viewBox="0 0 24 24">
+                <path d="M12 3 4 6v6.2c0 4.4 3.2 7.7 8 9.3 4.8-1.6 8-4.9 8-9.3V6l-8-3Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                <path d="m9 12.2 2.2 2.2L15.5 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </symbol>
+            <symbol id="i-eye" viewBox="0 0 24 24">
+                <path d="M2.5 12S5.8 5.5 12 5.5 21.5 12 21.5 12 18.2 18.5 12 18.5 2.5 12 2.5 12Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/>
+            </symbol>
+            <symbol id="i-eye-off" viewBox="0 0 24 24">
+                <path d="M3.5 4.5 20.5 19.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                <path d="M9.6 9.7a3 3 0 0 0 4.2 4.2M6.4 7.2C4.1 8.8 2.5 12 2.5 12S5.8 18.5 12 18.5c1.6 0 3-.3 4.2-.8M19 16c1.6-1.6 2.5-4 2.5-4S18.2 5.5 12 5.5c-.9 0-1.7.1-2.5.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            </symbol>
+            <symbol id="i-seal-check" viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".35"/>
+                <circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                <path d="m17 24.5 4.5 4.5L32 18.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </symbol>
+            <symbol id="i-seal-x" viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".35"/>
+                <circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                <path d="M18.5 18.5 29.5 29.5M29.5 18.5 18.5 29.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            </symbol>
+        </defs>
+    </svg>
+
+    <!-- Ambient kanji watermark -->
+    <div class="kanji-stamp" aria-hidden="true">記</div>
+    <div class="ambient ambient-blue" aria-hidden="true"></div>
+    <div class="ambient ambient-purple" aria-hidden="true"></div>
 
     <main class="shell">
         <header class="brand" aria-label="An1me Tracker">
-            <span class="brand-mark" aria-hidden="true">
-                <svg viewBox="0 0 24 24" role="presentation">
-                    <path d="M7 4.5 19 12 7 19.5V4.5Z"></path>
+            <!-- 3D layered T-mark logo -->
+            <span class="logo3d" id="logo3d" aria-hidden="true">
+                <svg viewBox="0 0 80 80">
+                    <!-- back side / depth -->
+                    <rect x="10" y="14" width="60" height="60" rx="16" fill="url(#grad-side)"/>
+                    <!-- front face -->
+                    <rect x="6" y="8" width="60" height="60" rx="16" fill="#0e1426" stroke="url(#grad-primary)" stroke-width="1.2"/>
+                    <!-- T letter -->
+                    <path d="M18 22h36v9H42v27H30V31H18z" fill="url(#grad-primary)"/>
+                    <!-- eye accent dot -->
+                    <circle cx="48" cy="27" r="2.6" fill="#39bcff"/>
+                    <!-- top bevel highlight -->
+                    <rect x="6" y="8" width="60" height="18" rx="16" fill="url(#grad-bevel)"/>
                 </svg>
             </span>
-            <span class="brand-name">AN1ME TRACKER</span>
+            <span class="brand-name">AN1ME&nbsp;TRACKER</span>
         </header>
 
         <section class="reset-card" aria-labelledby="page-title">
+            <!-- Tategaki vertical eyebrow -->
+            <span class="tategaki" aria-hidden="true">安 全 ・ S E C U R E</span>
+
             <div class="security-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" role="presentation">
-                    <path d="M7.25 10V8a4.75 4.75 0 0 1 9.5 0v2"></path>
-                    <rect x="4.5" y="10" width="15" height="10.5" rx="3"></rect>
-                    <path d="M12 14.2v2.7"></path>
-                </svg>
+                <svg viewBox="0 0 24 24"><use href="#i-shield"/></svg>
             </div>
 
             <p class="eyebrow">ΑΣΦΑΛΗΣ ΛΟΓΑΡΙΑΣΜΟΣ</p>
-            <h1 id="page-title">Επαναφορά κωδικού</h1>
+            <h1 id="page-title">Επαναφορά<br>κωδικού</h1>
+            <span class="hinomaru-rule" aria-hidden="true"></span>
 
             <section id="loading-view" class="status-view" aria-live="polite">
                 <span class="spinner" aria-hidden="true"></span>
@@ -64,13 +129,15 @@
                             required
                         >
                         <button class="reveal" type="button" data-target="new-password" aria-label="Εμφάνιση κωδικού">
-                            <span class="show-label">Δείξε</span>
+                            <svg class="i-show" viewBox="0 0 24 24"><use href="#i-eye"/></svg>
+                            <svg class="i-hide" viewBox="0 0 24 24"><use href="#i-eye-off"/></svg>
                         </button>
                     </div>
 
                     <div class="strength" aria-live="polite">
                         <div class="strength-track" aria-hidden="true">
-                            <span id="strength-bar"></span>
+                            <span class="seg"></span><span class="seg"></span><span class="seg"></span>
+                            <span id="strength-bar" hidden></span>
                         </div>
                         <span id="strength-text">Χρησιμοποίησε γράμματα, αριθμούς και σύμβολα</span>
                     </div>
@@ -86,7 +153,8 @@
                             required
                         >
                         <button class="reveal" type="button" data-target="confirm-password" aria-label="Εμφάνιση κωδικού">
-                            <span class="show-label">Δείξε</span>
+                            <svg class="i-show" viewBox="0 0 24 24"><use href="#i-eye"/></svg>
+                            <svg class="i-hide" viewBox="0 0 24 24"><use href="#i-eye-off"/></svg>
                         </button>
                     </div>
 
@@ -101,7 +169,7 @@
 
             <section id="success-view" class="view message-view" aria-live="polite" hidden>
                 <div class="result-icon success" aria-hidden="true">
-                    <svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.5 3.5 7.5-8"></path></svg>
+                    <svg viewBox="0 0 48 48"><use href="#i-seal-check"/></svg>
                 </div>
                 <h2>Ο κωδικός άλλαξε</h2>
                 <p>Μπορείς τώρα να επιστρέψεις στο An1me Tracker και να συνδεθείς με τον νέο κωδικό.</p>
@@ -110,31 +178,20 @@
 
             <section id="error-view" class="view message-view" aria-live="assertive" hidden>
                 <div class="result-icon error" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M12 7.5v5.7"></path>
-                        <path d="M12 16.8h.01"></path>
-                        <circle cx="12" cy="12" r="9"></circle>
-                    </svg>
+                    <svg viewBox="0 0 48 48"><use href="#i-seal-x"/></svg>
                 </div>
                 <h2 id="error-title">Ο σύνδεσμος δεν λειτουργεί</h2>
                 <p id="error-message">Ζήτησε νέο email επαναφοράς κωδικού από το extension.</p>
             </section>
 
             <aside class="safety-note">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M12 3.5 19 6v5.3c0 4.4-2.9 7.6-7 9.2-4.1-1.6-7-4.8-7-9.2V6l7-2.5Z"></path>
-                    <path d="m9.2 11.8 2 2 3.9-4"></path>
-                </svg>
-                <p>
-                    <strong>Ασφάλεια</strong>
-                    Δεν θα σου ζητήσουμε ποτέ τον παλιό κωδικό σου.
-                </p>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-shield"/></svg>
+                <p><strong>Ασφάλεια</strong>Δεν θα σου ζητήσουμε ποτέ τον παλιό κωδικό σου.</p>
             </aside>
         </section>
 
         <footer class="footer">
-            <p>&copy; 2026 An1me Tracker</p>
-            <p>Ασφαλής επαναφορά μέσω Firebase Authentication</p>
+            <p>&copy; 2026 An1me Tracker · Firebase Authentication</p>
         </footer>
     </main>
 
