@@ -13,8 +13,27 @@ template up to Firebase. Run it once after each template edit.
 | File | Purpose |
 |---|---|
 | `password-reset.html` | The HTML template itself. Edit this freely. Uses Firebase placeholders `%LINK%`, `%EMAIL%`, `%APP_NAME%`. |
-| `update-template.mjs` | Node script that authenticates with a service account and PATCHes the template into Identity Toolkit. |
+| `update-template.mjs` | Node script that PATCHes the template and restores a working Firebase-hosted action URL. |
 | `README.md` | This file. |
+
+## Required action URL
+
+The reset email's `%LINK%` does not set its own destination. Firebase expands
+it from **Authentication -> Templates -> Password reset -> Action URL**.
+
+Unless you have deployed a custom password-reset web handler, set that URL to
+Firebase's built-in hosted handler:
+
+```text
+https://anime-tracker-64d86.firebaseapp.com/__/auth/action
+```
+
+Do not set it to a sender domain such as `https://thomast.uk` unless that
+domain actually hosts a reset handler. A custom handler must read `mode` and
+`oobCode`, validate the code, collect a new password, and confirm the reset.
+The update script below now sets the built-in Firebase handler automatically.
+Links in emails already sent keep their old URL, so request a new reset email
+after changing this setting.
 
 ## Prerequisites
 
@@ -79,8 +98,8 @@ Subject        : Επαναφορά κωδικού πρόσβασης για %AP
 
 1/2 · Acquiring access token via service-account JWT...
      ✓ token acquired
-2/2 · PATCHing notification.sendEmail.resetPasswordTemplate...
-     ✓ template updated
+2/2 · PATCHing notification.sendEmail reset template + callbackUri...
+     ✓ template and action handler updated
 
 Done. Send yourself a password-reset email to verify ...
 ```
@@ -112,6 +131,7 @@ The script reads these env vars if you want to tweak without editing code:
 | `FIREBASE_EMAIL_LOCAL_PART` | `noreply` | Local-part of From: address |
 | `FIREBASE_EMAIL_REPLY_TO` | *(empty)* | Reply-To address |
 | `FIREBASE_EMAIL_TEMPLATE` | `./password-reset.html` | Path to the HTML file |
+| `FIREBASE_EMAIL_ACTION_URL` | `https://<project-id>.firebaseapp.com/__/auth/action` | Override only after deploying a custom email action handler |
 
 ## Future templates
 

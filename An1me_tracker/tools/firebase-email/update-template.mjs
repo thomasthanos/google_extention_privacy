@@ -33,6 +33,8 @@
  *   FIREBASE_EMAIL_LOCAL_PART    Local-part of From: address (default: noreply)
  *   FIREBASE_EMAIL_REPLY_TO      Reply-To address (default: empty)
  *   FIREBASE_EMAIL_TEMPLATE      Path to HTML file (default: ./password-reset.html)
+ *   FIREBASE_EMAIL_ACTION_URL    Hosted action handler URL
+ *                                (default: project's Firebase hosted handler)
  */
 
 import { readFile } from 'node:fs/promises';
@@ -74,11 +76,14 @@ async function main() {
     }
 
     const html = await readFile(TEMPLATE_PATH, 'utf8');
+    const actionUrl = process.env.FIREBASE_EMAIL_ACTION_URL
+        || `https://${sa.project_id}.firebaseapp.com/__/auth/action`;
     log(`Loaded template (${html.length} bytes) from ${TEMPLATE_PATH}`);
     log(`Project        : ${sa.project_id}`);
     log(`Sender display : ${SENDER_DISPLAY_NAME}`);
     log(`Sender local   : ${SENDER_LOCAL_PART}@<your-verified-domain>`);
     log(`Reply-to       : ${REPLY_TO || '(none)'}`);
+    log(`Action handler : ${actionUrl}`);
     log(`Subject        : ${SUBJECT}`);
     log('');
 
@@ -86,9 +91,9 @@ async function main() {
     const accessToken = await getAccessToken(sa);
     log('     ✓ token acquired');
 
-    log('2/2 · PATCHing notification.sendEmail.resetPasswordTemplate...');
-    await patchTemplate(sa.project_id, accessToken, html);
-    log('     ✓ template updated');
+    log('2/2 · PATCHing notification.sendEmail reset template + callbackUri...');
+    await patchTemplate(sa.project_id, accessToken, html, actionUrl);
+    log('     ✓ template and action handler updated');
 
     log('');
     log('Done. Send yourself a password-reset email to verify (extension popup → Forgot password?).');
@@ -143,9 +148,10 @@ async function getAccessToken(sa) {
     return data.access_token;
 }
 
-// ── PATCH the resetPasswordTemplate field ───────────────────────────────
-async function patchTemplate(projectId, accessToken, html) {
+// ── PATCH the resetPasswordTemplate fields + hosted action URL ──────────
+async function patchTemplate(projectId, accessToken, html, actionUrl) {
     const updateMask = [
+        'notification.sendEmail.callbackUri',
         'notification.sendEmail.resetPasswordTemplate.subject',
         'notification.sendEmail.resetPasswordTemplate.senderDisplayName',
         'notification.sendEmail.resetPasswordTemplate.senderLocalPart',
@@ -160,6 +166,7 @@ async function patchTemplate(projectId, accessToken, html) {
     const payload = JSON.stringify({
         notification: {
             sendEmail: {
+                callbackUri: actionUrl,
                 resetPasswordTemplate: {
                     subject:           SUBJECT,
                     senderDisplayName: SENDER_DISPLAY_NAME,
