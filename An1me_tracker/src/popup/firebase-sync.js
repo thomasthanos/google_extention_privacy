@@ -48,7 +48,22 @@ const FirebaseSync = {
     currentSavePromise: null,
     cloudSaveRetryCount: 0,
     userDocumentCache: null,
-    USER_DOCUMENT_CACHE_TTL_MS: 5 * 60 * 1000,
+    // Task 6: bumped from 5 → 10 min to align with the SW's _BG_CLOUD_TTL.
+    // The lastUpdated short-circuit (below) keeps stale data visible only
+    // when the cloud doc genuinely hasn't changed — a normal cross-device
+    // write triggers a full re-fetch immediately because lastUpdated diverged.
+    USER_DOCUMENT_CACHE_TTL_MS: 10 * 60 * 1000,
+    // Task 6 telemetry: counts cache outcomes so the demo criterion
+    // ("9 cache-hits out of 10 popup opens") is verifiable from console.
+    cacheStats: { fresh: 0, revalidated: 0, fullFetch: 0 },
+    // Task 8: chrome.storage.session key used to persist the popup's user-doc
+    // cache across popup-close/reopen within the same browser session.
+    // session storage is auto-wiped on browser restart and on extension
+    // reload, so this is correct: reuse within session, fresh fetch after
+    // restart. Permission "storage" already covers session (no manifest
+    // change required).
+    SESSION_CACHE_KEY: '_userDocumentCacheV1',
+    _sessionHydratePromise: null,
     // Last result of loadAndSyncData — captured for diagnostics so the popup
     // can show the user a clear "what just happened" message instead of a
     // generic "Cloud Synced" badge that hides empty-init / 404 / auth errors.
@@ -112,10 +127,12 @@ const FirebaseSync = {
     clearCachedUserDocument(uid = null) {
         if (!uid) {
             this.userDocumentCache = null;
+            this._dropSessionCache();
             return;
         }
         if (this.userDocumentCache?.uid === uid) {
             this.userDocumentCache = null;
+            this._dropSessionCache();
         }
     },
 
@@ -126,14 +143,88 @@ const FirebaseSync = {
         }
 
         if ((Date.now() - cache.cachedAt) > this.USER_DOCUMENT_CACHE_TTL_MS) {
-            this.userDocumentCache = null;
-            return { hit: false, data: null };
+            // Task 6: don't drop the entry yet — it may be revalidatable
+            // via a tiny lastUpdated mask GET. Caller checks staleness via
+            // getStaleCachedUserDocument(); a true cache miss only happens
+            // when the entry is missing or belongs to a different uid.
+            return { hit: false, data: null, stale: true };
         }
 
         return {
             hit: true,
             data: this.cloneAny(cache.data)
         };
+    },
+
+    /**
+     * Task 6: read-only accessor for an entry that has fallen outside the
+     * 10-minute TTL window but still belongs to the active uid. Used by
+     * the lastUpdated short-circuit to decide whether to issue a tiny
+     * mask GET (instead of a full doc fetch).
+     */
+    getStaleCachedUserDocument(uid) {
+        const cache = this.userDocumentCache;
+        if (!uid || !cache || cache.uid !== uid) return null;
+        return {
+            data: this.cloneAny(cache.data),
+            cachedAt: cache.cachedAt,
+            lastUpdated: cache.data?.lastUpdated || null
+        };
+    },
+
+    /**
+     * Refresh cachedAt without copying the doc — used when the lastUpdated
+     * revalidation confirms the cached doc is still current. Cheap.
+     */
+    bumpCachedAt(uid) {
+        if (!this.userDocumentCache || this.userDocumentCache.uid !== uid) return;
+        this.userDocumentCache.cachedAt = Date.now();
+        this._persistSessionCache().catch(() => {});
+    },
+
+    /**
+     * Task 6 feature flag check. Defaults true. Flip via
+     * chrome.storage.local._featureFlags.CACHE_SHORT_CIRCUIT_ENABLED = false
+     * for emergency rollback.
+     */
+    async isCacheShortCircuitEnabled() {
+        try {
+            const stored = await new Promise((res) =>
+                chrome.storage.local.get(['_featureFlags'], (r) => { void chrome.runtime.lastError; res(r || {}); }));
+            const flags = stored._featureFlags;
+            if (!flags || typeof flags !== 'object') return true;
+            return flags.CACHE_SHORT_CIRCUIT_ENABLED !== false;
+        } catch { return true; }
+    },
+
+    /**
+     * Validate the popup's cached cloud doc with a tiny mask GET on
+     * `lastUpdated`. Returns:
+     *   { match: true,  cloudLastUpdated }  — cache is current; reuse it
+     *   { match: false, cloudLastUpdated }  — cache is stale; full GET needed
+     *   { match: null,  reason }            — couldn't validate (auth error,
+     *                                          missing field, etc.) → caller
+     *                                          must do a full GET
+     *
+     * Costs ~140 bytes vs the full library doc (often 100s of KB).
+     */
+    async _validateCacheViaLastUpdated(uid, cachedLastUpdated) {
+        if (!uid || !cachedLastUpdated) return { match: null, reason: 'no-baseline' };
+        try {
+            const probe = await FirebaseLib.getDocument('users', uid, { mask: ['lastUpdated'] });
+            // 404 → no cloud doc → cache definitely stale.
+            if (!probe) return { match: false, cloudLastUpdated: null };
+            const cloudLastUpdated = probe.lastUpdated || null;
+            // Treat absent `lastUpdated` field as "cannot validate" — fall
+            // back to full GET (legacy docs from before lastUpdated existed).
+            if (!cloudLastUpdated) return { match: null, reason: 'cloud-missing-lastUpdated' };
+            return { match: cloudLastUpdated === cachedLastUpdated, cloudLastUpdated };
+        } catch (e) {
+            // Auth errors propagate up — let the existing 401/403 path handle
+            // them (Task 10). Other errors fall back to full GET.
+            if (e?.status === 401 || e?.status === 403) throw e;
+            return { match: null, reason: e?.message || 'probe-failed' };
+        }
     },
 
     setCachedUserDocument(uid, data) {
@@ -143,6 +234,69 @@ const FirebaseSync = {
             cachedAt: Date.now(),
             data: this.cloneAny(data)
         };
+        // Task 8: persist to session storage so popup-close/reopen reuses
+        // the cache without forcing a re-fetch. Best-effort.
+        this._persistSessionCache().catch(() => {});
+    },
+
+    /**
+     * Task 8: hydrate userDocumentCache from chrome.storage.session if a
+     * fresh-enough entry exists for the active uid. Idempotent — safe to
+     * call multiple times. Wired into init() so the very first
+     * loadAndSyncData of a session benefits from a previous popup's cache.
+     */
+    async hydrateSessionCache(uid) {
+        if (!uid) return;
+        if (this.userDocumentCache?.uid === uid) return;        // already hot
+        if (this._sessionHydratePromise) return this._sessionHydratePromise;
+        const sessionApi = chrome?.storage?.session;
+        if (!sessionApi) return;        // older Chromium / not supported
+        this._sessionHydratePromise = (async () => {
+            try {
+                const stored = await new Promise((res) =>
+                    sessionApi.get([this.SESSION_CACHE_KEY], (r) => { void chrome.runtime.lastError; res(r || {}); }));
+                const entry = stored[this.SESSION_CACHE_KEY];
+                if (
+                    entry &&
+                    entry.uid === uid &&
+                    entry.cachedAt &&
+                    (Date.now() - entry.cachedAt) < this.USER_DOCUMENT_CACHE_TTL_MS &&
+                    entry.data
+                ) {
+                    this.userDocumentCache = {
+                        uid,
+                        cachedAt: entry.cachedAt,
+                        data: entry.data
+                    };
+                    PopupLogger.debug('Sync', `session-cache hydrated (${Math.round((Date.now() - entry.cachedAt) / 1000)}s old)`);
+                } else if (entry && entry.uid !== uid) {
+                    // Account swap inside the same browser session — drop.
+                    this._dropSessionCache();
+                }
+            } catch { /* best-effort */ }
+            finally { this._sessionHydratePromise = null; }
+        })();
+        return this._sessionHydratePromise;
+    },
+
+    async _persistSessionCache() {
+        const sessionApi = chrome?.storage?.session;
+        if (!sessionApi) return;
+        const c = this.userDocumentCache;
+        if (!c) return;
+        const payload = { [this.SESSION_CACHE_KEY]: { uid: c.uid, cachedAt: c.cachedAt, data: c.data } };
+        return new Promise((res) => {
+            try { sessionApi.set(payload, () => { void chrome.runtime.lastError; res(); }); }
+            catch { res(); }
+        });
+    },
+
+    _dropSessionCache() {
+        const sessionApi = chrome?.storage?.session;
+        if (!sessionApi) return;
+        try {
+            sessionApi.remove([this.SESSION_CACHE_KEY], () => { void chrome.runtime.lastError; });
+        } catch { /* ignore */ }
     },
 
     /**
@@ -606,6 +760,10 @@ const FirebaseSync = {
                 }
                 if (user) {
                     PopupLogger.log('Firebase', `User signed in: ${user.email}`);
+                    // Task 8: hydrate user-doc cache from session storage so
+                    // a popup re-open within the same browser session reuses
+                    // the previous popup's fetch — zero Firestore reads.
+                    this.hydrateSessionCache(user.uid).catch(() => {});
                     // Pre-warm the idToken so cleanup() at popup close can fire
                     // its PATCH synchronously (no await between unload event
                     // and fetch). Periodic refresh keeps the cache valid.
@@ -956,6 +1114,13 @@ const FirebaseSync = {
         }
 
         try {
+            // Task 8: ensure session-cache hydration completed before the
+            // very first cache check. onAuthStateChanged kicks off
+            // hydrateSessionCache async; awaiting here serializes the first
+            // loadAndSyncData call against it without slowing later calls
+            // (the promise resolves nearly instantly thereafter).
+            try { await this.hydrateSessionCache(this.currentUser.uid); } catch {}
+
             // Fetch cloud document once — reuse for both the pre-upload VP merge and
             // the authoritative data merge, eliminating the second GET.
             let cloudData = null;
@@ -963,8 +1128,43 @@ const FirebaseSync = {
 
             if (cacheHit) {
                 cloudData = cachedCloudData;
-                PopupLogger.debug('Sync', 'Using cached cloud user document');
+                this.cacheStats.fresh++;
+                PopupLogger.debug('Sync', `cache-hit-fresh (${this.cacheStats.fresh}/${this.cacheStats.fresh + this.cacheStats.revalidated + this.cacheStats.fullFetch})`);
             } else {
+                // Task 6: lastUpdated short-circuit. When we have a stale
+                // cache entry for this uid (TTL expired but doc still in
+                // memory), issue a tiny mask GET on `lastUpdated`. If it
+                // matches the cached value, the cloud doc hasn't changed —
+                // bump cachedAt and reuse the cached library. If it differs
+                // OR the field is missing, fall through to the existing
+                // SW/direct GET path. Behind CACHE_SHORT_CIRCUIT_ENABLED
+                // feature flag (defaults true).
+                const stale = this.getStaleCachedUserDocument(this.currentUser.uid);
+                let shortCircuited = false;
+                if (stale && stale.lastUpdated && await this.isCacheShortCircuitEnabled()) {
+                    try {
+                        const probe = await this._validateCacheViaLastUpdated(this.currentUser.uid, stale.lastUpdated);
+                        if (probe.match === true) {
+                            cloudData = stale.data;
+                            this.bumpCachedAt(this.currentUser.uid);
+                            this.cacheStats.revalidated++;
+                            shortCircuited = true;
+                            PopupLogger.log('Sync', `cache-hit-revalidated (lastUpdated match · ~140-byte read · ${this.cacheStats.revalidated} so far)`);
+                        } else if (probe.match === false) {
+                            // Drop stale entry so the full-GET path doesn't
+                            // accidentally re-use it later.
+                            this.clearCachedUserDocument(this.currentUser.uid);
+                            PopupLogger.debug('Sync', 'cache invalidated by lastUpdated mismatch');
+                        }
+                    } catch (e) {
+                        // Auth error from probe → propagate; the existing
+                        // 401/403 path below will surface AUTH_REJECTED.
+                        if (e?.status === 401 || e?.status === 403) throw e;
+                        PopupLogger.debug('Sync', `lastUpdated probe failed: ${e?.message || e}`);
+                    }
+                }
+
+                if (!shortCircuited) {
                 // Ask the background SW first — it keeps a 5-min cloud-doc cache
                 // that the SSE stream warms in real time. Serves identical data
                 // to a direct GET on cache hit, but costs zero Firestore reads.
@@ -1015,6 +1215,8 @@ const FirebaseSync = {
                         try {
                             cloudData = await FirebaseLib.getDocument('users', this.currentUser.uid);
                             this.setCachedUserDocument(this.currentUser.uid, cloudData);
+                            this.cacheStats.fullFetch++;
+                            PopupLogger.debug('Sync', `cache-miss-fetch (${this.cacheStats.fullFetch} full fetches so far)`);
                             break;
                         } catch (e) {
                             // Auth errors (401/403) — token rejected by
@@ -1042,6 +1244,7 @@ const FirebaseSync = {
                         }
                     }
                 }
+                }       // end if (!shortCircuited) — Task 6
             }
 
             const readLocalSyncData = () => Storage.get([

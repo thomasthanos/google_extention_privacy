@@ -47,6 +47,16 @@ const FirebaseLib = (function () {
             }
         } catch { }
 
+        // Task 2: idempotent v1→v2 token-schema migration. Adds version,
+        // lastAuthCheck, needsReauth, and the Task-4 backoff counters to any
+        // legacy token blob WITHOUT touching idToken/refreshToken/expiresAt.
+        // Behind the AUTH_HARDENING_ENABLED feature flag (defaults on).
+        try {
+            await window.AnimeTrackerAuthTokens?.migrateTokensIfNeeded?.();
+        } catch (e) {
+            PopupLogger.warn('Firebase', `Token migration skipped: ${e?.message}`);
+        }
+
         try {
             const stored = await chrome.storage.local.get([STORAGE_KEYS.USER, STORAGE_KEYS.TOKENS]);
             if (stored[STORAGE_KEYS.USER] && stored[STORAGE_KEYS.TOKENS]) {
@@ -59,6 +69,19 @@ const FirebaseLib = (function () {
                 }
 
                 if (!tokens.expiresAt || tokens.expiresAt < Date.now() + 300000) {
+                    // Task 4: when needsReauth is set, the state machine has
+                    // exhausted its budget and is waiting for the user to
+                    // sign in interactively. Don't kick off another refresh
+                    // (we'd just bump the alarm) — surface the user with
+                    // the flag still set so the popup can render its
+                    // "Reconnect" banner.
+                    if (tokens.needsReauth) {
+                        PopupLogger.warn('Firebase',
+                            'needsReauth is set — skipping auto-refresh, surfacing reconnect prompt');
+                        currentUser = stored[STORAGE_KEYS.USER];
+                        notifyAuthStateListeners(currentUser);
+                        return currentUser;
+                    }
                     try {
                         await refreshToken(tokens.refreshToken);
                         PopupLogger.log('Firebase', 'Token refreshed successfully');
@@ -215,38 +238,81 @@ const FirebaseLib = (function () {
 
     let _popupRefreshInflight = null;
 
-    // Classification of refresh-token failures. ONLY permanent failures
-    // (revoked refresh token, disabled account, etc.) should trigger a
-    // sign-out. Transient failures (network blip during cold boot, server
-    // 5xx, rate limit) must keep the existing session intact — otherwise
-    // every flaky mobile cold-start wipes the user's login, which is the
-    // most disruptive bug on Orion / Safari extensions where the browser
-    // starts the SW before the network is fully reachable.
-    //
-    // Identity Toolkit / Secure Token error codes that mean "this refresh
-    // token will never work again":
-    const PERMANENT_REFRESH_ERRORS = new Set([
-        'INVALID_REFRESH_TOKEN',
-        'TOKEN_EXPIRED',
-        'USER_DISABLED',
-        'USER_NOT_FOUND',
-        'INVALID_GRANT',
-        'invalid_grant',
-        'CREDENTIAL_TOO_OLD_LOGIN_AGAIN',
-        'MISSING_REFRESH_TOKEN',
-    ]);
+    // Task 4: state-machine constants (mirror BG side). Backoff in minutes.
+    // Popup-side alarm is best-effort: if the popup is closed when it fires,
+    // chrome.alarms still wakes the SW which has its own auth-refresh-retry-bg
+    // alarm — so retries continue regardless of popup lifecycle.
+    const AUTH_REFRESH_RETRY_ALARM = 'auth-refresh-retry';
+    const AUTH_REFRESH_BACKOFF_MIN = [1, 5, 15, 60, 360];
+    const MAX_AUTH_REFRESH_ATTEMPTS = AUTH_REFRESH_BACKOFF_MIN.length;
+    const AUTH_OFFLINE_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 
-    function _classifyRefreshError(httpStatus, errorBody) {
-        // HTTP 400 with one of the permanent codes → permanent.
-        // HTTP 401 / 403 from securetoken.googleapis.com is also permanent.
-        // Everything else (network error, 5xx, 408, 429, timeouts) is transient.
-        if (httpStatus === 401 || httpStatus === 403) return true;
-        if (httpStatus === 400 && errorBody) {
-            for (const code of PERMANENT_REFRESH_ERRORS) {
-                if (errorBody.includes(code)) return true;
-            }
+    /**
+     * Called from the transient catch in refreshToken. Bumps the attempt
+     * counter on the tokens record, sets needsReauth=true once exhausted,
+     * and arms the popup-side backoff alarm. Tokens are NEVER cleared here.
+     */
+    async function _popupOnRefreshTransient(reason) {
+        const helper = (typeof window !== 'undefined') ? window.AnimeTrackerAuthTokens : null;
+        if (!helper) return;
+        const updated = await helper.markAuthRefreshTransientFailure();
+        if (!updated) return;
+        const attempts = Number(updated.authRefreshAttempts) || 0;
+        const lastOk = Number(updated.lastAuthCheck) || 0;
+        const offlineFor = lastOk ? (Date.now() - lastOk) : 0;
+        const exceededAttempts = attempts >= MAX_AUTH_REFRESH_ATTEMPTS;
+        const exceededGrace = lastOk > 0 && offlineFor > AUTH_OFFLINE_GRACE_MS;
+
+        if (exceededAttempts || exceededGrace) {
+            await helper.setNeedsReauth(true);
+            PopupLogger.warn('Firebase',
+                `needsReauth=true · attempts=${attempts}, offlineFor=${Math.round(offlineFor / 86400000)}d, reason=${reason}`);
+            try { chrome.alarms?.clear?.(AUTH_REFRESH_RETRY_ALARM); } catch {}
+            // Notify any listeners (popup main.js wires a banner via this).
+            try { notifyAuthStateListeners(currentUser); } catch {}
+            return;
         }
-        return false;
+        const idx = Math.min(attempts - 1, AUTH_REFRESH_BACKOFF_MIN.length - 1);
+        const delayMin = AUTH_REFRESH_BACKOFF_MIN[idx];
+        try {
+            chrome.alarms?.create?.(AUTH_REFRESH_RETRY_ALARM, { delayInMinutes: delayMin });
+            PopupLogger.warn('Firebase',
+                `Auth refresh retry scheduled in ${delayMin} min (attempt ${attempts}/${MAX_AUTH_REFRESH_ATTEMPTS}, reason: ${reason})`);
+        } catch (e) {
+            PopupLogger.warn('Firebase', `Could not arm auth-refresh-retry alarm: ${e?.message}`);
+        }
+    }
+
+    /**
+     * Returns true when tokens.needsReauth is set. Popup uses this to
+     * surface the reconnect banner without reading storage repeatedly.
+     */
+    async function isReauthNeeded() {
+        const helper = (typeof window !== 'undefined') ? window.AnimeTrackerAuthTokens : null;
+        if (!helper) return false;
+        const t = await helper.readTokens();
+        return !!(t && t.needsReauth);
+    }
+
+    // Task 3: Classification of refresh-token failures lives in the shared
+    // module src/common/auth-classifier.js (loaded BEFORE this file via
+    // popup.html). Single source of truth across popup / SW / content.
+    //
+    // POLICY (from Task 1): HTTP 401 / 403 are TRANSIENT, not permanent.
+    // ONLY HTTP 400 + a recognised permanent code (INVALID_REFRESH_TOKEN,
+    // TOKEN_EXPIRED, USER_DISABLED, USER_NOT_FOUND, INVALID_GRANT,
+    // CREDENTIAL_TOO_OLD_LOGIN_AGAIN, MISSING_REFRESH_TOKEN) signs the user
+    // out. Anything else (network, 5xx, 401, 403, malformed body) keeps the
+    // session alive and is retried via Task-4 alarm-driven backoff.
+    function _classifyRefreshError(httpStatus, errorBody) {
+        const cl = (typeof window !== 'undefined' && window.AnimeTrackerAuthClassifier);
+        if (!cl) {
+            // Hard fail-safe: classifier didn't load. Treat ALL failures as
+            // transient — better to keep a stale session and surface a
+            // "reconnect" UI than to silently sign someone out.
+            return false;
+        }
+        return cl.classify(httpStatus, errorBody).permanent;
     }
 
     async function refreshToken(refreshTokenValue) {
@@ -328,7 +394,21 @@ const FirebaseLib = (function () {
                     expiresAt: Date.now() + (parseInt(data.expires_in) * 1000)
                 };
 
-                await chrome.storage.local.set({ [STORAGE_KEYS.TOKENS]: tokens });
+                // Task 4: persist new credentials, then bookkeep success
+                // (reset attempts, bump lastAuthCheck, clear needsReauth).
+                // markAuthCheckOk reads via auth-tokens helper, so write
+                // first then call it.
+                const tokensHelper = window.AnimeTrackerAuthTokens;
+                if (tokensHelper) {
+                    await chrome.storage.local.set({
+                        [STORAGE_KEYS.TOKENS]: { ...tokens, version: 2 }
+                    });
+                    await tokensHelper.markAuthCheckOk();
+                } else {
+                    await chrome.storage.local.set({ [STORAGE_KEYS.TOKENS]: tokens });
+                }
+                // Successful refresh — clear popup-side retry alarm.
+                try { chrome.alarms?.clear?.(AUTH_REFRESH_RETRY_ALARM); } catch {}
                 PopupLogger.log('Firebase', `Token refreshed, expires at ${new Date(tokens.expiresAt).toLocaleTimeString()}`);
                 return tokens;
             } catch (error) {
@@ -336,6 +416,13 @@ const FirebaseLib = (function () {
                     // Unclassified error — default to transient (safer than wiping session).
                     error.transient = true;
                     error.permanent = false;
+                }
+                // Task 4: on transient failure, bookkeep + arm popup retry
+                // alarm. Permanent failures fall through to the throw — caller
+                // (init / getIdToken) decides whether to sign out.
+                if (error.transient) {
+                    try { await _popupOnRefreshTransient(error?.message || 'unknown'); }
+                    catch (e2) { PopupLogger.warn('Firebase', `Backoff bookkeeping failed: ${e2?.message}`); }
                 }
                 PopupLogger.error('Firebase',
                     `Token refresh ${error.permanent ? 'PERMANENT' : 'transient'} error:`, error.message);
@@ -364,6 +451,15 @@ const FirebaseLib = (function () {
             PopupLogger.error('Firebase', 'Invalid tokens structure, missing fields:', missing);
             await signOut();
             return null;
+        }
+
+        // Task 4: while needsReauth is set, don't auto-refresh — the alarm
+        // chain has already given up. Use the existing idToken if it's still
+        // valid (>30s), otherwise return null so callers either show the
+        // reconnect banner or fall back to local-only data.
+        if (tokens.needsReauth) {
+            const stillValid = tokens.expiresAt > Date.now() + 30000;
+            return stillValid ? tokens.idToken : null;
         }
 
         const now = Date.now();
@@ -405,6 +501,13 @@ const FirebaseLib = (function () {
     async function signOut() {
         await chrome.storage.local.remove([STORAGE_KEYS.USER, STORAGE_KEYS.TOKENS]);
         currentUser = null;
+        // Task 9: popup-side cleanup. Cancel local retry alarm and notify
+        // the SW so it cancels its own. The SW handler is best-effort —
+        // failure here doesn't block the sign-out flow.
+        try { chrome.alarms?.clear?.(AUTH_REFRESH_RETRY_ALARM); } catch {}
+        try {
+            chrome.runtime.sendMessage({ type: 'SIGNED_OUT' }, () => { void chrome.runtime.lastError; });
+        } catch { /* SW unreachable — alarms still cleared inside SW on next boot via boot-state hydrate */ }
         notifyAuthStateListeners(null);
     }
 
@@ -420,14 +523,28 @@ const FirebaseLib = (function () {
         authStateListeners.forEach(callback => callback(user));
     }
 
-    async function getDocument(collection, docId, retryCount = 0) {
+    async function getDocument(collection, docId, optionsOrRetry = 0) {
+        // Backward-compat: legacy callers pass a numeric retryCount as the
+        // 3rd arg. New callers pass an options object: { mask: ['field1'], retryCount: 0 }.
+        const opts = (typeof optionsOrRetry === 'object' && optionsOrRetry !== null)
+            ? optionsOrRetry
+            : { retryCount: optionsOrRetry || 0 };
+        const retryCount = Number(opts.retryCount) || 0;
+        const mask = Array.isArray(opts.mask) ? opts.mask.filter(Boolean) : null;
+
         const idToken = await getIdToken();
         if (!idToken) {
             (window.PopupLogger || console).warn?.('Firebase', `getDocument(${collection}/${docId}) — no idToken available`);
             return null;
         }
 
-        const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collection}/${docId}`;
+        let url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collection}/${docId}`;
+        if (mask && mask.length > 0) {
+            // Task 6: tiny field-mask GET (e.g. ['lastUpdated']). Used to
+            // revalidate the popup's cached cloud doc with a ~140-byte read
+            // instead of fetching the entire library on every popup open.
+            url += '?' + mask.map((f) => `mask.fieldPaths=${encodeURIComponent(f)}`).join('&');
+        }
 
         try {
             const response = await fetchWithTimeout(url, {
@@ -444,7 +561,7 @@ const FirebaseLib = (function () {
                     const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
                     (window.PopupLogger || console).warn?.('Firebase', `Server error ${response.status}, retrying in ${delay}ms...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
-                    return getDocument(collection, docId, retryCount + 1);
+                    return getDocument(collection, docId, { ...opts, retryCount: retryCount + 1 });
                 }
 
                 // 401/403: surface as a real error so loadAndSyncData can
@@ -466,7 +583,7 @@ const FirebaseLib = (function () {
                 const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
                 (window.PopupLogger || console).warn?.('Firebase', 'Network error, retrying in', delay, 'ms...');
                 await new Promise(resolve => setTimeout(resolve, delay));
-                return getDocument(collection, docId, retryCount + 1);
+                return getDocument(collection, docId, { ...opts, retryCount: retryCount + 1 });
             }
 
             // Network errors (TypeError after retries exhausted) → return null
@@ -702,14 +819,60 @@ const FirebaseLib = (function () {
         return true;
     }
 
+    /**
+     * Task 12: map an Identity Toolkit error code to a user-friendly,
+     * privacy-preserving message. Used by sendPasswordReset and surfaced
+     * to other reset / sign-in flows that want consistent phrasing.
+     *
+     * EMAIL_NOT_FOUND is enumeration-resistant: we never tell the user
+     * "no such email" because that would let an attacker test which
+     * addresses are registered. Instead we show the same "if an account
+     * exists, we sent a link" message as a successful reset.
+     */
+    function mapIdentityToolkitError(code) {
+        const upper = String(code || '').split(':')[0].trim().toUpperCase().replace(/\s+/g, '_');
+        switch (upper) {
+            case 'EMAIL_NOT_FOUND':
+                return {
+                    friendly: 'If an account exists for that email, a reset link has been sent.',
+                    suppressError: true                     // surface as success-shaped UX
+                };
+            case 'INVALID_EMAIL':
+                return { friendly: "That email address doesn't look right.", suppressError: false };
+            case 'TOO_MANY_ATTEMPTS_TRY_LATER':
+                return { friendly: 'Too many attempts — please try again in a few minutes.', suppressError: false };
+            case 'USER_DISABLED':
+                return { friendly: 'This account has been disabled. Contact support.', suppressError: false };
+            case 'OPERATION_NOT_ALLOWED':
+                return { friendly: 'Email/password sign-in is not enabled for this app. Please contact support.', suppressError: false };
+            default:
+                return { friendly: "Couldn't send the reset email. Please try again.", suppressError: false };
+        }
+    }
+
     async function sendPasswordReset(email) {
         if (!email) throw new Error('MISSING_EMAIL');
-        await _identityToolkitPost('accounts:sendOobCode', {
-            requestType: 'PASSWORD_RESET',
-            email
-        });
-        PopupLogger.log('Firebase', `Password reset request accepted for ${email}`);
-        return true;
+        try {
+            await _identityToolkitPost('accounts:sendOobCode', {
+                requestType: 'PASSWORD_RESET',
+                email
+            });
+            PopupLogger.log('Firebase', `Password reset request accepted for ${email}`);
+            return { ok: true, message: 'If an account exists for that email, a reset link has been sent.' };
+        } catch (err) {
+            const map = mapIdentityToolkitError(err?.message);
+            // Enumeration-resistant: surface the success-shaped message to
+            // the UI for EMAIL_NOT_FOUND so attackers can't probe which
+            // emails are registered.
+            if (map.suppressError) {
+                PopupLogger.log('Firebase', `Password reset (treating as success): ${err?.message}`);
+                return { ok: true, message: map.friendly };
+            }
+            const friendlyErr = new Error(map.friendly);
+            friendlyErr.code = String(err?.message || '').split(':')[0].trim().toUpperCase().replace(/\s+/g, '_');
+            friendlyErr.original = err;
+            throw friendlyErr;
+        }
     }
 
     /**
@@ -750,6 +913,21 @@ const FirebaseLib = (function () {
         }
     }
 
+    // Task 4: popup-side alarm listener for auth-refresh-retry. Best-effort —
+    // the SW alarm runs independently, so this is purely an "if popup is
+    // open at the right time, take a stab at re-refreshing" optimisation.
+    try {
+        chrome.alarms?.onAlarm?.addListener(async (alarm) => {
+            if (alarm?.name !== AUTH_REFRESH_RETRY_ALARM) return;
+            try {
+                const helper = window.AnimeTrackerAuthTokens;
+                const t = helper ? await helper.readTokens() : null;
+                if (!t || !t.refreshToken || t.needsReauth) return;
+                await refreshToken(t.refreshToken).catch(() => {});
+            } catch { /* swallow — SW path also retries */ }
+        });
+    } catch { /* alarms unavailable — SW path covers retries */ }
+
     return {
         init,
         signInWithGoogle,
@@ -761,7 +939,13 @@ const FirebaseLib = (function () {
         signOut,
         onAuthStateChanged,
         getDocument,
-        setDocument
+        setDocument,
+        // Task 4 additions:
+        getIdToken,
+        isReauthNeeded,
+        // Task 12: callers (settings → reset password UI, sign-in form) can
+        // use this for consistent friendly phrasing across all flows.
+        mapIdentityToolkitError
     };
 })();
 

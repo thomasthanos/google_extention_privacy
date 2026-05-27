@@ -1639,7 +1639,21 @@
     async function recoverFromQuotaPressure(context = 'sync') {
         const { Storage, ProgressManager } = AT;
 
+        // Task 11: storage.local quota in MV3 is 10 MB (10 485 760). Aim
+        // for ≤70% post-recovery so a single subsequent write doesn't
+        // immediately blow the budget again.
+        const QUOTA_BYTES = 10 * 1024 * 1024;
+        const TARGET_BYTES = Math.round(QUOTA_BYTES * 0.70);
+
+        const measureBytes = () => new Promise((res) => {
+            try { chrome.storage.local.getBytesInUse(null, (b) => { void chrome.runtime.lastError; res(Number(b) || 0); }); }
+            catch { res(0); }
+        });
+
         try {
+            let bytesBefore = await measureBytes();
+            PopupLogger.warn('Storage', `[${context}] quota recovery start (bytes=${bytesBefore})`);
+
             const all = await new Promise((resolve, reject) => {
                 chrome.storage.local.get(null, (result) => {
                     if (chrome.runtime.lastError) {
@@ -1650,6 +1664,9 @@
                 });
             });
 
+            // Pass 1 — drop scraper caches outright. This recovers the most
+            // bytes for the least user-visible disruption (animeinfo_/
+            // episodeTypes_ are re-fetched on demand).
             const cacheKeys = Object.keys(all).filter((key) =>
                 key.startsWith('animeinfo_') || key.startsWith('episodeTypes_')
             );
@@ -1657,17 +1674,21 @@
                 await Storage.remove(cacheKeys);
             }
 
+            // Pass 2 — clean tracked progress (cheap entries) and prune
+            // deleted-anime tombstones outside the 10-day window.
             const localAnimeData = all.animeData || {};
             const localVideoProgress = all.videoProgress || {};
             const localDeletedAnime = all.deletedAnime || {};
-
             const { cleaned } = ProgressManager.cleanTrackedProgress(localAnimeData, localVideoProgress, localDeletedAnime);
             const sortedProgress = Object.entries(cleaned).sort((a, b) => {
                 const aTs = new Date(a[1]?.savedAt || a[1]?.watchedAt || 0).getTime() || 0;
                 const bTs = new Date(b[1]?.savedAt || b[1]?.watchedAt || 0).getTime() || 0;
                 return bTs - aTs;
             });
-            const trimmedProgress = Object.fromEntries(sortedProgress.slice(0, 2000));
+
+            // Initial cap: 2000 entries. Subsequent passes halve.
+            let capCurrent = Math.min(2000, sortedProgress.length);
+            let trimmedProgress = Object.fromEntries(sortedProgress.slice(0, capCurrent));
             const trimmedDeletedAnime = pruneDeletedAnimeForQuota(localDeletedAnime);
 
             await Storage.set({
@@ -1675,8 +1696,30 @@
                 deletedAnime: trimmedDeletedAnime
             });
 
-            PopupLogger.warn('Storage', `[${context}] quota recovery succeeded: removed ${cacheKeys.length} cache keys`);
-            return true;
+            let bytesNow = await measureBytes();
+            let pass = 1;
+            const maxPasses = 3;
+
+            // Iterative: while still over target AND not at min cap, halve
+            // the videoProgress cap and re-trim. We don't touch animeData
+            // (that's user library; deleting entries silently would be
+            // worse than the quota error). Stops at floor of 250.
+            while (bytesNow > TARGET_BYTES && pass < maxPasses && capCurrent > 250) {
+                pass += 1;
+                capCurrent = Math.max(250, Math.floor(capCurrent / 2));
+                trimmedProgress = Object.fromEntries(sortedProgress.slice(0, capCurrent));
+                await Storage.set({ videoProgress: trimmedProgress });
+                bytesNow = await measureBytes();
+                PopupLogger.warn('Storage',
+                    `[${context}] pass ${pass}: cap=${capCurrent} bytes=${bytesNow}`);
+            }
+
+            const ok = bytesNow <= TARGET_BYTES;
+            PopupLogger.warn('Storage',
+                `[${context}] quota recovery ${ok ? 'succeeded' : 'partial'}: ` +
+                `removed ${cacheKeys.length} cache keys, progress capped at ${capCurrent}, ` +
+                `bytes ${bytesBefore} → ${bytesNow}`);
+            return ok;
         } catch (recoveryError) {
             PopupLogger.error('Storage', `[${context}] quota recovery failed:`, recoveryError);
             return false;
@@ -4773,6 +4816,31 @@
             PopupLogger.debug('Init', 'popupAlive port connect failed:', e?.message || e);
         }
 
+        // Task 10: AUTH_REJECTED listener. The SW broadcasts this for
+        // Firestore 401/403 it couldn't quietly recover from. Surface as a
+        // toast so the user knows something is wrong (and what to do).
+        try {
+            chrome.runtime.onMessage.addListener((msg) => {
+                if (msg?.type !== 'AUTH_REJECTED') return;
+                const status = Number(msg.status) || 0;
+                if (status === 403) {
+                    showToast({
+                        title: 'Permission denied',
+                        body: 'Cloud sync was refused by Firebase. If you recently changed accounts, sign out and back in. Otherwise this may be a Firestore rules issue.',
+                        type: 'error',
+                        duration: 9000
+                    });
+                } else if (status === 401) {
+                    showToast({
+                        title: 'Session expired',
+                        body: 'Please sign in again to resume cloud sync. Your local data is safe.',
+                        type: 'warn',
+                        duration: 9000
+                    });
+                }
+            });
+        } catch { /* messaging not available — non-fatal */ }
+
         FillerFetchUI.init();
 
         try {
@@ -4876,10 +4944,29 @@
         FirebaseSync.init({
             onUserSignedIn: async (user) => {
                 showMainApp(user);
+
+                // Task 4: surface a non-destructive "Reconnect" banner when
+                // tokens.needsReauth has been set (state machine exhausted
+                // its retries). Tokens are still in storage; sign-in flow
+                // will clear the flag automatically on success.
+                try {
+                    const needs = await window.FirebaseLib?.isReauthNeeded?.();
+                    if (needs) {
+                        showToast({
+                            title: 'Reconnect to sync',
+                            body: 'We could not reach Firebase recently. Sign in again to resume cloud sync — your data is safe locally.',
+                            type: 'warn',
+                            duration: 9000
+                        });
+                    }
+                } catch { /* non-fatal — banner is best-effort */ }
+
                 // Wake background SW if asleep (e.g. Orion on mobile) —
                 // send a lightweight ping instead of SYNC_TO_FIREBASE to avoid
                 // a duplicate full sync (popup handles sync via loadAndSyncData).
-                try { chrome.runtime.sendMessage({ type: 'GET_VERSION' }); } catch {}
+                try {
+                    chrome.runtime.sendMessage({ type: 'GET_VERSION' }, () => { void chrome.runtime.lastError; });
+                } catch {}
                 await refreshPopupCloudData(true);
                 startPopupCloudRefresh();
 

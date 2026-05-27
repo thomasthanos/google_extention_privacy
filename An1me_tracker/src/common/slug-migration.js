@@ -28,12 +28,32 @@
     'use strict';
 
     const STATE_KEY = '_slugMigrationStateV1';
-    const RUN_GAP_MS = 30 * 60 * 1000;          // re-run at most every 30 min
+    // Task 13: bumped from 30 min → 7 days. The per-slug PER_SLUG_COOLDOWN_MS
+    // (24 h) still controls when an individual notFound slug can be re-probed,
+    // but the global RUN_GAP_MS prevents the whole migration pass from running
+    // again for a week after a successful pass — eliminates the network spam
+    // ("hits an1me.to/anime/<malformed>" on every popup open) that bothered
+    // users with no recoverable bad slugs in their library.
+    const RUN_GAP_MS = 7 * 24 * 3600 * 1000;
     const PER_SLUG_COOLDOWN_MS = 24 * 3600 * 1000; // re-probe a single slug at most daily
     const PROBE_TIMEOUT_MS = 8000;
     const PROBE_GAP_MS = 700;                   // pacing between probes
     const SEARCH_PROBE_GAP_MS = 1500;           // longer between WP searches
     const MAX_RENAMES_PER_RUN = 25;             // safety cap
+
+    // Task 13: skip slugs that obviously won't have an alternate name on
+    // an1me.to. These are movie/special endings that historically caused
+    // probe-storms (e.g. `chainsaw-man-movie-reze-hen-movie` → 404 storm).
+    const SKIP_PATTERNS = [
+        /-(?:movie|special|ova|ona|recap|pv|music|short)(?:-|$)/i,
+        /-hen-movie$/i
+    ];
+    function shouldSkipSlugForMigration(slug) {
+        for (const re of SKIP_PATTERNS) {
+            if (re.test(slug)) return true;
+        }
+        return false;
+    }
 
     function fallbackSlugify(title) {
         // Same shape as the post-fix slugify in anilist-core.js. Used only
@@ -315,6 +335,11 @@
             if (!cache || !cache.notFound) continue;
             const triedAt = (state.perSlug[slug] && state.perSlug[slug].triedAt) || 0;
             if (!force && (Date.now() - triedAt < PER_SLUG_COOLDOWN_MS)) continue;
+            // Task 13: skip slugs whose shape strongly implies they're a
+            // movie/special/recap with no recoverable alternate name. Saves
+            // the probe storm on libraries with lots of those (e.g.
+            // `chainsaw-man-movie-reze-hen-movie` → 404).
+            if (shouldSkipSlugForMigration(slug)) continue;
             suspects.push(slug);
         }
 

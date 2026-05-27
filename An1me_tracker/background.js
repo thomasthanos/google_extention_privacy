@@ -3,6 +3,8 @@
 // loaded by the popup and content scripts via their respective entry points).
 importScripts(
     'src/common/firebase-config.js',
+    'src/common/auth-classifier.js',
+    'src/common/auth-tokens.js',
     'src/background/aniskip.js',
     'src/background/filler-discovery.js',
     'src/background/an1me-scraper.js',
@@ -215,6 +217,134 @@ function pruneDeletedAnime(deletedAnime) {
         if (deletedAt > 0 && deletedAt < cutoff) {
             delete deletedAnime[slug];
         }
+    }
+}
+
+// ─── Task 11: Iterative quota recovery + nightly cleanup alarm (BG) ──────
+const DAILY_CLEANUP_ALARM = 'dailyCleanup';
+const DAILY_CLEANUP_USAGE_THRESHOLD = 0.70;     // run when bytes > 70% quota
+const DAILY_CLEANUP_TARGET = 0.70;              // recover until ≤ 70% quota
+const QUOTA_BYTES_BG = 10 * 1024 * 1024;        // matches MV3 chrome.storage.local quota
+
+function bgMeasureBytes() {
+    return new Promise((res) => {
+        try { chrome.storage.local.getBytesInUse(null, (b) => { void chrome.runtime.lastError; res(Number(b) || 0); }); }
+        catch { res(0); }
+    });
+}
+
+/**
+ * Mirror of popup recoverFromQuotaPressure for SW-driven cleanup. Drops
+ * scraper caches first (cheapest), then iteratively trims videoProgress
+ * if still over target. Up to 3 passes.
+ */
+async function bgIterativeQuotaRecovery(reason = 'daily-alarm') {
+    try {
+        const bytesBefore = await bgMeasureBytes();
+        const target = Math.round(QUOTA_BYTES_BG * DAILY_CLEANUP_TARGET);
+        if (bytesBefore <= target) {
+            dlog(`[Cleanup] skip (${bytesBefore} ≤ ${target} bytes; reason=${reason})`);
+            return { ok: true, bytesBefore, bytesAfter: bytesBefore, passes: 0 };
+        }
+        const all = await new Promise((resolve, reject) => {
+            chrome.storage.local.get(null, (result) => {
+                if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+                else resolve(result || {});
+            });
+        });
+
+        const cacheKeys = Object.keys(all).filter((k) =>
+            k.startsWith('animeinfo_') || k.startsWith('episodeTypes_')
+        );
+        if (cacheKeys.length > 0) await bgStorageRemove(cacheKeys);
+
+        const localAnime = all.animeData || {};
+        const localProgress = all.videoProgress || {};
+        const localDeleted = all.deletedAnime || {};
+        const cleaned = cleanTrackedProgressBg(localAnime, localProgress, localDeleted);
+        const sorted = Object.entries(cleaned).sort((a, b) => {
+            const aTs = new Date(a[1]?.savedAt || a[1]?.watchedAt || 0).getTime() || 0;
+            const bTs = new Date(b[1]?.savedAt || b[1]?.watchedAt || 0).getTime() || 0;
+            return bTs - aTs;
+        });
+        let cap = Math.min(2000, sorted.length);
+        let trimmed = Object.fromEntries(sorted.slice(0, cap));
+        // Tombstones older than 30d are safe to drop server-side; keep ≤1500.
+        const dCleaned = {};
+        const dCutoff = Date.now() - 10 * 24 * 60 * 60 * 1000;
+        const dEntries = Object.entries(localDeleted).sort((a, b) => {
+            const aTs = new Date(a[1]?.deletedAt || 0).getTime() || 0;
+            const bTs = new Date(b[1]?.deletedAt || 0).getTime() || 0;
+            return bTs - aTs;
+        });
+        let dKept = 0;
+        for (const [slug, info] of dEntries) {
+            const ts = new Date(info?.deletedAt || 0).getTime() || 0;
+            if (ts > 0 && ts < dCutoff) continue;
+            dCleaned[slug] = info;
+            dKept += 1;
+            if (dKept >= 1500) break;
+        }
+        await bgStorageSet({ videoProgress: trimmed, deletedAnime: dCleaned });
+
+        let bytesNow = await bgMeasureBytes();
+        let pass = 1;
+        const maxPasses = 3;
+        while (bytesNow > target && pass < maxPasses && cap > 250) {
+            pass += 1;
+            cap = Math.max(250, Math.floor(cap / 2));
+            trimmed = Object.fromEntries(sorted.slice(0, cap));
+            await bgStorageSet({ videoProgress: trimmed });
+            bytesNow = await bgMeasureBytes();
+        }
+
+        const ok = bytesNow <= target;
+        console.log(
+            `[Cleanup] daily prune: removed ${cacheKeys.length} cache entries, ` +
+            `progress capped at ${cap} (was ${(bytesBefore / 1024 / 1024).toFixed(1)} MB → ` +
+            `${(bytesNow / 1024 / 1024).toFixed(1)} MB) · reason=${reason} · passes=${pass}`
+        );
+        return { ok, bytesBefore, bytesAfter: bytesNow, passes: pass };
+    } catch (e) {
+        console.warn('[Cleanup] daily prune failed:', e?.message || e);
+        return { ok: false, error: e?.message };
+    }
+}
+
+/**
+ * Pick a per-device random execution time inside the 03:00–05:00 local
+ * window, then schedule a periodic alarm. Persisting the jitter to
+ * storage prevents re-rolling the random hour on every SW reboot, which
+ * would defeat the stampede-avoidance goal.
+ */
+async function ensureDailyCleanupAlarmScheduled() {
+    try {
+        const KEY = '_dailyCleanupNextAt';
+        const stored = await bgStorageGet([KEY]);
+        let nextAt = Number(stored[KEY]) || 0;
+        const now = Date.now();
+        if (!nextAt || nextAt < now) {
+            // Pick a target between 03:00:00 and 05:00:00 *tomorrow* local.
+            const next = new Date();
+            next.setDate(next.getDate() + 1);
+            next.setHours(3 + Math.floor(Math.random() * 2));            // 3 or 4
+            next.setMinutes(Math.floor(Math.random() * 60));
+            next.setSeconds(Math.floor(Math.random() * 60));
+            next.setMilliseconds(0);
+            nextAt = next.getTime();
+            await bgStorageSet({ [KEY]: nextAt });
+        }
+        try {
+            chrome.alarms.create(DAILY_CLEANUP_ALARM, {
+                when: nextAt,
+                periodInMinutes: 1440           // 24 h
+            });
+            dlog(`[Cleanup] daily alarm scheduled for ${new Date(nextAt).toLocaleString()}`);
+        } catch (e) {
+            console.warn('[Cleanup] could not schedule alarm:', e?.message || e);
+        }
+    } catch (e) {
+        console.warn('[Cleanup] scheduling check failed:', e?.message || e);
     }
 }
 
@@ -463,6 +593,57 @@ async function signOutDueToTokenFailure() {
     // same uid) doesn't serve a stale snapshot from before the token failure,
     // and a sign-in as a different account can never receive account A's doc.
     invalidateBgCloudDocCache();
+    // Task 9: cancel auth + sync alarms so a signed-out browser doesn't
+    // keep waking the SW for retries that have nothing to push.
+    clearAuthAndSyncAlarms().catch((e) => console.warn('[BG] alarm cleanup on sign-out failed:', e?.message || e));
+}
+
+/**
+ * Task 9: Cancel all auth-state and sync-driven alarms. Called from
+ * signOutDueToTokenFailure (BG path) and from the popup-driven SIGNED_OUT
+ * runtime message (popup path).
+ *
+ * CLEARED:
+ *   • auth-refresh-retry          (popup-side; harmless to clear from BG)
+ *   • auth-refresh-retry-bg       (BG-side refresh state machine)
+ *   • progressSyncDebounce        (5-min debounced progress push)
+ *   • fullSyncRetry               (Task-prior backoff retry)
+ *   • progressSyncRetry           (Task-prior backoff retry)
+ *   • dailyCleanup                (Task 11 — added later)
+ *
+ * NOT CLEARED (intentional):
+ *   • metadataRepairAlarm   — local repair pass should finish even after
+ *                              sign-out; data is still in chrome.storage.local.
+ *   • SMART_NOTIF_ALARM     — notification toggle is independent of auth.
+ */
+async function clearAuthAndSyncAlarms() {
+    const names = [
+        'auth-refresh-retry',
+        AUTH_REFRESH_RETRY_BG_ALARM,
+        PROGRESS_SYNC_ALARM,
+        FULL_SYNC_RETRY_ALARM,
+        PROGRESS_SYNC_RETRY_ALARM,
+        'dailyCleanup'                         // forward declaration for Task 11
+    ];
+    for (const n of names) {
+        try { await chrome.alarms.clear(n); } catch { /* ignore */ }
+    }
+    dlog('[BG] Cleared auth + sync alarms (sign-out)');
+}
+
+/**
+ * Task 10: Broadcast a 401/403 to any open popup so it can render a
+ * "permission denied" toast. Best-effort — no popup open is the common
+ * case, runtime.lastError is swallowed.
+ */
+function _broadcastAuthRejected(status, body) {
+    try {
+        chrome.runtime.sendMessage({
+            type: 'AUTH_REJECTED',
+            status,
+            body: typeof body === 'string' ? body.slice(0, 240) : ''
+        }, () => { void chrome.runtime.lastError; });
+    } catch { /* popup not open or messaging unavailable — non-fatal */ }
 }
 
 async function getFirebaseToken() {
@@ -470,6 +651,19 @@ async function getFirebaseToken() {
         const stored = await bgStorageGet(['firebase_tokens']);
         const tokens = stored.firebase_tokens;
         if (!tokens?.idToken) return null;
+
+        // Task 4: when the state machine has flipped needsReauth, the user
+        // has explicitly been asked to sign in again. Don't burn refresh
+        // attempts (which are still failing) or invoke the alarm cycle —
+        // wait for an interactive sign-in. If the existing idToken is still
+        // valid for >30s we use it (best-effort: lets reads succeed while
+        // the banner is shown); otherwise return null and let callers decide.
+        if (tokens.needsReauth) {
+            const stillValid = tokens.expiresAt && tokens.expiresAt > Date.now() + 30000;
+            if (stillValid) return tokens.idToken;
+            return null;
+        }
+
         if (tokens.expiresAt < Date.now() + 120000) {
             const result = await refreshFirebaseToken(tokens.refreshToken);
             if (!result || !result.tokens) {
@@ -485,6 +679,7 @@ async function getFirebaseToken() {
                 }
                 // Transient. If existing idToken is still valid (>30s left),
                 // use it — better than signing the user out for a network blip.
+                // Backoff-driven retry is already armed via _bgOnRefreshTransient.
                 const stillValid = tokens.expiresAt && tokens.expiresAt > Date.now() + 30000;
                 if (stillValid) {
                     console.warn(`[BG] Token refresh transiently failed (${result?.error || 'unknown'}); using existing token (${Math.round((tokens.expiresAt - Date.now()) / 1000)}s left)`);
@@ -492,7 +687,7 @@ async function getFirebaseToken() {
                 }
                 // No usable token AND error is transient — return null but
                 // keep session intact so the next call can retry.
-                console.warn(`[BG] Token refresh transiently failed and existing token expired; will retry on next call`);
+                console.warn(`[BG] Token refresh transiently failed and existing token expired; will retry on next call/alarm`);
                 return null;
             }
             return result.tokens.idToken;
@@ -506,27 +701,20 @@ async function getFirebaseToken() {
 
 let _bgRefreshInflight = null;
 
-// Permanent error codes from securetoken.googleapis.com — only these should
-// trigger a sign-out. Mirrors PERMANENT_REFRESH_ERRORS in popup firebase-lib.js.
-const _BG_PERMANENT_REFRESH_ERRORS = [
-    'INVALID_REFRESH_TOKEN',
-    'TOKEN_EXPIRED',
-    'USER_DISABLED',
-    'USER_NOT_FOUND',
-    'INVALID_GRANT',
-    'invalid_grant',
-    'CREDENTIAL_TOO_OLD_LOGIN_AGAIN',
-    'MISSING_REFRESH_TOKEN',
-];
-
+// Task 3: Classification of refresh-token failures lives in the shared
+// module src/common/auth-classifier.js (loaded via importScripts at the
+// top of this file). Single source of truth across popup / SW / content.
+//
+// POLICY (from Task 1): HTTP 401 / 403 are TRANSIENT, not permanent.
+// ONLY HTTP 400 + a recognised permanent code signs the user out.
 function _bgClassifyRefreshError(httpStatus, errorBody) {
-    if (httpStatus === 401 || httpStatus === 403) return true;
-    if (httpStatus === 400 && errorBody) {
-        for (const code of _BG_PERMANENT_REFRESH_ERRORS) {
-            if (errorBody.includes(code)) return true;
-        }
+    const cl = self.AnimeTrackerAuthClassifier;
+    if (!cl) {
+        // Fail-safe: treat as transient when the classifier hasn't loaded.
+        // Better to retry than to silently sign someone out.
+        return false;
     }
-    return false;
+    return cl.classify(httpStatus, errorBody).permanent;
 }
 
 async function refreshFirebaseToken(refreshToken) {
@@ -546,28 +734,33 @@ async function refreshFirebaseToken(refreshToken) {
         } catch (networkErr) {
             // fetch threw → network/abort/DNS — always transient.
             console.warn('[BG] Token refresh network error:', networkErr?.message || networkErr);
+            await _bgOnRefreshTransient(`network: ${networkErr?.message || networkErr}`);
             return { tokens: null, permanent: false, error: `network: ${networkErr?.message || networkErr}` };
         }
         if (!response.ok) {
             const body = await response.text().catch(() => '');
             const permanent = _bgClassifyRefreshError(response.status, body);
             console.warn(`[BG] Token refresh HTTP ${response.status} (${permanent ? 'permanent' : 'transient'}): ${body.slice(0, 200)}`);
+            if (!permanent) await _bgOnRefreshTransient(`HTTP ${response.status}`);
             return { tokens: null, permanent, error: `HTTP ${response.status}` };
         }
         let data;
         try { data = await response.json(); } catch { data = null; }
         if (!data) {
             console.warn('[BG] Token refresh returned empty/invalid body — treating as transient');
+            await _bgOnRefreshTransient('empty_body');
             return { tokens: null, permanent: false, error: 'empty_body' };
         }
         if (data.error) {
             const msg = data.error?.message || 'unknown';
             const permanent = _bgClassifyRefreshError(400, msg);
             console.warn(`[BG] Token refresh error (${permanent ? 'permanent' : 'transient'}): ${msg}`);
+            if (!permanent) await _bgOnRefreshTransient(msg);
             return { tokens: null, permanent, error: msg };
         }
         if (!data.id_token || !data.refresh_token || !data.expires_in) {
             console.warn('[BG] Token refresh missing fields — treating as transient');
+            await _bgOnRefreshTransient('missing_fields');
             return { tokens: null, permanent: false, error: 'missing_fields' };
         }
         const tokens = {
@@ -575,13 +768,108 @@ async function refreshFirebaseToken(refreshToken) {
             refreshToken: data.refresh_token,
             expiresAt: Date.now() + parseInt(data.expires_in) * 1000
         };
-        await bgStorageSet({ firebase_tokens: tokens });
+        // Task 4: stamp v2 schema fields on success. writeTokens preserves
+        // any existing fields (lastAuthCheck, needsReauth) — markAuthCheckOk
+        // explicitly clears the backoff state. Falls back to plain set when
+        // the helper isn't loaded so we don't regress.
+        const tokensHelper = self.AnimeTrackerAuthTokens;
+        if (tokensHelper) {
+            // First persist the new credential triple, THEN flip the success
+            // markers. Two writes are intentional — markAuthCheckOk reads the
+            // current tokens via readTokens() so it must see the new fields.
+            await bgStorageSet({ firebase_tokens: { ...tokens, version: 2 } });
+            await tokensHelper.markAuthCheckOk();
+        } else {
+            await bgStorageSet({ firebase_tokens: tokens });
+        }
+        // Successful refresh — clear any pending retry alarm.
+        try { chrome.alarms.clear(AUTH_REFRESH_RETRY_BG_ALARM).catch(() => {}); } catch {}
         dlog('[BG] Token refreshed');
         return { tokens, permanent: false, error: null };
     })();
     _bgRefreshInflight = p;
     p.finally(() => { if (_bgRefreshInflight === p) _bgRefreshInflight = null; });
     return p;
+}
+
+// ─── Task 4: Resilient refresh state machine (BG side) ────────────────────
+// Alarm-driven exponential backoff [1, 5, 15, 60, 360] minutes after a
+// transient refresh failure. After MAX_AUTH_REFRESH_ATTEMPTS consecutive
+// transient failures, OR after AUTH_OFFLINE_GRACE_MS since the last
+// successful refresh, we set tokens.needsReauth=true and stop retrying —
+// but tokens are NOT cleared. The popup picks up the flag and surfaces a
+// "Reconnect" banner. Permanent failures still call signOutDueToTokenFailure
+// directly; the state machine is for transient failures only.
+const AUTH_REFRESH_RETRY_BG_ALARM = 'auth-refresh-retry-bg';
+const AUTH_REFRESH_BACKOFF_MIN = [1, 5, 15, 60, 360];   // 1m, 5m, 15m, 1h, 6h
+const MAX_AUTH_REFRESH_ATTEMPTS = AUTH_REFRESH_BACKOFF_MIN.length;
+const AUTH_OFFLINE_GRACE_MS = 7 * 24 * 60 * 60 * 1000;  // 7 days
+
+/**
+ * Called from each transient-failure branch in refreshFirebaseToken.
+ * Bumps the attempt counter, arms the next retry alarm, and flips
+ * needsReauth=true once the budget is exhausted.
+ */
+async function _bgOnRefreshTransient(reason) {
+    const helper = self.AnimeTrackerAuthTokens;
+    if (!helper) return;       // pre-Task-2 boot path — nothing to record
+    try {
+        const updated = await helper.markAuthRefreshTransientFailure();
+        if (!updated) return;  // no tokens stored
+        const attempts = Number(updated.authRefreshAttempts) || 0;
+        const lastOk = Number(updated.lastAuthCheck) || 0;
+        const offlineFor = lastOk ? (Date.now() - lastOk) : 0;
+        const exceededAttempts = attempts >= MAX_AUTH_REFRESH_ATTEMPTS;
+        const exceededGrace = lastOk > 0 && offlineFor > AUTH_OFFLINE_GRACE_MS;
+
+        if (exceededAttempts || exceededGrace) {
+            await helper.setNeedsReauth(true);
+            console.warn(`[BG] Auth: needsReauth=true (attempts=${attempts}, offlineFor=${Math.round(offlineFor / 86400000)}d, reason=${reason})`);
+            // Stop retrying; user must sign in to clear the flag.
+            try { chrome.alarms.clear(AUTH_REFRESH_RETRY_BG_ALARM).catch(() => {}); } catch {}
+            return;
+        }
+
+        // Arm next retry. Index is 1-based attempts → 0-based array.
+        const idx = Math.min(attempts - 1, AUTH_REFRESH_BACKOFF_MIN.length - 1);
+        const delayMin = AUTH_REFRESH_BACKOFF_MIN[idx];
+        try {
+            chrome.alarms.create(AUTH_REFRESH_RETRY_BG_ALARM, { delayInMinutes: delayMin });
+            console.warn(`[BG] Auth refresh retry scheduled in ${delayMin} min (attempt ${attempts}/${MAX_AUTH_REFRESH_ATTEMPTS}, reason: ${reason})`);
+        } catch (e) {
+            console.warn('[BG] Could not arm auth-refresh-retry-bg alarm:', e?.message || e);
+        }
+    } catch (e) {
+        console.warn('[BG] _bgOnRefreshTransient bookkeeping failed:', e?.message || e);
+    }
+}
+
+/**
+ * Alarm handler — called from chrome.alarms.onAlarm when the backoff
+ * timer fires. Re-attempts a refresh against the stored refreshToken; on
+ * success the alarm is cleared and the success path resets counters.
+ * On further failure, refreshFirebaseToken's own logic re-arms the alarm
+ * with the next backoff step (or sets needsReauth when exhausted).
+ */
+async function _bgAuthRefreshRetryTick() {
+    try {
+        const helper = self.AnimeTrackerAuthTokens;
+        const tokens = helper ? await helper.readTokens() : null;
+        if (!tokens || !tokens.refreshToken) {
+            // No session to refresh — drop the alarm.
+            try { chrome.alarms.clear(AUTH_REFRESH_RETRY_BG_ALARM).catch(() => {}); } catch {}
+            return;
+        }
+        if (tokens.needsReauth) {
+            // User has been told to reconnect; don't burn alarms while we
+            // wait for an interactive sign-in.
+            try { chrome.alarms.clear(AUTH_REFRESH_RETRY_BG_ALARM).catch(() => {}); } catch {}
+            return;
+        }
+        await refreshFirebaseToken(tokens.refreshToken);
+    } catch (e) {
+        console.warn('[BG] Auth retry tick failed:', e?.message || e);
+    }
 }
 
 async function getFirebaseUser() {
@@ -727,7 +1015,7 @@ async function pollCloudData(reason = 'consumer-connected', { force = false } = 
 let _bgCloudDocCache = null;
 let _bgCloudDocCacheTime = 0;
 let _bgCloudDocCacheUid = null;
-const _BG_CLOUD_TTL = 5 * 60 * 1000;
+const _BG_CLOUD_TTL = 10 * 60 * 1000;          // Task 6/7 — aligned with popup USER_DOCUMENT_CACHE_TTL_MS
 const _BG_CLOUD_CACHE_KEY = '_bgCloudDocCachePersisted';
 
 // Hydrate on SW boot — restores cache from disk if still fresh AND the
@@ -772,19 +1060,101 @@ function invalidateBgCloudDocCache() {
     bgStorageSet({ [_BG_CLOUD_CACHE_KEY]: null }).catch(() => {});
 }
 
+// ─── Task 7: BG-side cache short-circuit (mirrors popup Task 6) ───────────
+// On a stale cache hit (same uid, but older than _BG_CLOUD_TTL), issue a
+// tiny mask GET on `lastUpdated`. If it equals the cached value the doc
+// hasn't changed; reuse the cached entry and bump cachedAt. Otherwise fall
+// through to a full fetch. Behind the CACHE_SHORT_CIRCUIT_ENABLED feature
+// flag (defaults true).
+async function _isCacheShortCircuitEnabledBg() {
+    try {
+        const stored = await bgStorageGet(['_featureFlags']);
+        const flags = stored._featureFlags;
+        if (!flags || typeof flags !== 'object') return true;
+        return flags.CACHE_SHORT_CIRCUIT_ENABLED !== false;
+    } catch { return true; }
+}
+
+const _bgCacheStats = { fresh: 0, revalidated: 0, fullFetch: 0 };
+
+/**
+ * Issue a `?mask.fieldPaths=lastUpdated` GET against the user's Firestore
+ * doc. Returns the cloud `lastUpdated` value, null if the doc is missing,
+ * or undefined when the probe couldn't complete (caller should fall back
+ * to a full fetch). Throws on auth errors so the existing 401/403 handler
+ * catches them.
+ */
+async function _revalidateCloudDocViaLastUpdated(user, token, cachedLastUpdated) {
+    if (!user || !token || !cachedLastUpdated) return undefined;
+    const url = `${FIRESTORE_BASE}/documents/users/${user.uid}?mask.fieldPaths=lastUpdated`;
+    let response;
+    try {
+        response = await fetchWithTimeout(url, { headers: { 'Authorization': `Bearer ${token}` } });
+    } catch (e) {
+        // Network error → fall back to full fetch.
+        return undefined;
+    }
+    if (response.status === 404) return null;
+    if (response.status === 401 || response.status === 403) {
+        const body = await response.text().catch(() => '');
+        const err = new Error(`HTTP ${response.status}`);
+        err.status = response.status;
+        err.body = body;
+        throw err;
+    }
+    if (!response.ok) return undefined;
+    let json;
+    try { json = await response.json(); } catch { return undefined; }
+    const decoded = fromFSDoc(json);
+    return decoded?.lastUpdated || null;
+}
+
 async function fetchCloudDataCached(user, token) {
     await hydrateBgCloudDocCache();
     const now = Date.now();
     // uid guard — never serve another user's cached doc, even if the in-memory
     // copy is still inside the TTL window. A signed-out → signed-in-as-other
-    // flow inside 5 minutes would otherwise return account A's library to
+    // flow inside 10 minutes would otherwise return account A's library to
     // account B's PATCH path.
     if (_bgCloudDocCache && _bgCloudDocCacheUid === user.uid && (now - _bgCloudDocCacheTime) < _BG_CLOUD_TTL) {
+        _bgCacheStats.fresh++;
         return _bgCloudDocCache;
     }
     if (_bgCloudDocCache && _bgCloudDocCacheUid !== user.uid) {
         invalidateBgCloudDocCache();
     }
+
+    // Task 7: lastUpdated short-circuit. When we have a stale cache for
+    // this uid, attempt a mask GET first. Match → reuse cache (no full
+    // fetch). Mismatch / null cloudLastUpdated / probe-failed → fall
+    // through to the existing full fetch.
+    if (
+        _bgCloudDocCache &&
+        _bgCloudDocCacheUid === user.uid &&
+        _bgCloudDocCache.lastUpdated &&
+        await _isCacheShortCircuitEnabledBg()
+    ) {
+        try {
+            const cloudLastUpdated = await _revalidateCloudDocViaLastUpdated(user, token, _bgCloudDocCache.lastUpdated);
+            if (cloudLastUpdated && cloudLastUpdated === _bgCloudDocCache.lastUpdated) {
+                _bgCloudDocCacheTime = Date.now();
+                bgStorageSet({
+                    [_BG_CLOUD_CACHE_KEY]: { uid: user.uid, doc: _bgCloudDocCache, cachedAt: _bgCloudDocCacheTime }
+                }).catch(() => {});
+                _bgCacheStats.revalidated++;
+                dlog(`[BG] Poll skipped — lastUpdated unchanged (revalidated ${_bgCacheStats.revalidated} times)`);
+                return _bgCloudDocCache;
+            }
+            // cloudLastUpdated null → 404 → drop cache. Mismatch → drop, do full fetch.
+            if (cloudLastUpdated !== undefined) {
+                invalidateBgCloudDocCache();
+            }
+        } catch (e) {
+            if (e?.status === 401 || e?.status === 403) throw e;
+            // Other probe failures: fall through to full fetch silently.
+        }
+    }
+
     let doc = null;
     try {
         doc = await fetchCloudData(user, token);
@@ -801,6 +1171,7 @@ async function fetchCloudDataCached(user, token) {
         _bgCloudDocCache = doc;
         _bgCloudDocCacheTime = Date.now();
         _bgCloudDocCacheUid = user.uid;
+        _bgCacheStats.fullFetch++;
         // Persist asynchronously so the next SW boot can serve from disk.
         bgStorageSet({
             [_BG_CLOUD_CACHE_KEY]: { uid: user.uid, doc, cachedAt: _bgCloudDocCacheTime }
@@ -919,20 +1290,37 @@ async function syncProgressOnly() {
             clearSyncRetry('progress');
         } else {
             const status = response.status;
-            console.warn('[BG] Progress sync failed:', status);
+            const errorBody = await response.text().catch(() => '');
+            console.warn('[BG] Progress sync failed:', status, errorBody.slice(0, 160));
             if (status === 401) {
+                // Task 10: 401 — try once with a fresh token. If the second
+                // 401 carries a permanent code in its body (classifier
+                // confirms), THEN sign out. Otherwise it's transient (mobile
+                // clock skew, captive portal, rate limit) — keep retrying
+                // via alarm-driven backoff. Tokens stay in storage.
                 if (_progressSyncRetryAuthAttempted) {
-                    console.error('[BG] Progress sync still 401 after token refresh — signing out');
-                    await signOutDueToTokenFailure();
-                    clearSyncRetry('progress');
+                    const cl = self.AnimeTrackerAuthClassifier;
+                    const cls = cl ? cl.classify(401, errorBody) : { permanent: false };
+                    if (cls.permanent) {
+                        console.error('[BG] Progress sync 401 with permanent code — signing out');
+                        await signOutDueToTokenFailure();
+                        clearSyncRetry('progress');
+                    } else {
+                        console.warn('[BG] Progress sync still 401 after refresh — keeping session, alarm backoff');
+                        armSyncRetry('progress', '401-still-after-refresh');
+                    }
                 } else {
                     _progressSyncRetryAuthAttempted = true;
                     await _invalidateCachedTokenExpiry();
                     armSyncRetry('progress', '401-needs-refresh');
                 }
             } else if (status === 403) {
+                // Task 10: 403 = rules deny / account lacks permission. Don't
+                // sign out, don't loop indefinitely. Surface to popup so the
+                // user sees a clear "permission denied" toast.
+                _broadcastAuthRejected(403, errorBody);
                 if (_progressSyncRetryAttempts >= SYNC_RETRY_BACKOFF_MIN.length) {
-                    console.error('[BG] Progress sync 403 — giving up after max retries');
+                    console.error('[BG] Progress sync 403 — giving up after max retries (check Firestore rules)');
                     clearSyncRetry('progress');
                 } else {
                     armSyncRetry('progress', '403');
@@ -1082,27 +1470,38 @@ async function syncToFirebase() {
             clearSyncRetry('full');
         } else {
             const status = response.status;
-            console.error('[BG] Sync failed:', status);
+            const errorBody = await response.text().catch(() => '');
+            console.error('[BG] Sync failed:', status, errorBody.slice(0, 160));
             // Keep the change in pendingSyncFlush so the retry attempt has
             // something to write — clearSyncPending only on terminal success.
             markSyncPending();
 
             if (status === 401) {
-                // Token rejected. Force a refresh on next attempt and retry
-                // soon. If we already retried once with a fresh token, fall
-                // through to sign-out instead of looping.
+                // Task 10: 401 = token rejected. First time → force refresh
+                // + retry. Second time → only sign out if classifier
+                // confirms permanent (body contains a permanent code).
+                // Otherwise treat as transient and keep alarm-driven backoff.
                 if (_fullSyncRetryAuthAttempted) {
-                    console.error('[BG] Sync still 401 after token refresh — signing out');
-                    await signOutDueToTokenFailure();
-                    clearSyncRetry('full');
+                    const cl = self.AnimeTrackerAuthClassifier;
+                    const cls = cl ? cl.classify(401, errorBody) : { permanent: false };
+                    if (cls.permanent) {
+                        console.error('[BG] Sync 401 with permanent code — signing out');
+                        await signOutDueToTokenFailure();
+                        clearSyncRetry('full');
+                    } else {
+                        console.warn('[BG] Sync still 401 after refresh — keeping session, alarm backoff');
+                        armSyncRetry('full', '401-still-after-refresh');
+                    }
                 } else {
                     _fullSyncRetryAuthAttempted = true;
                     await _invalidateCachedTokenExpiry();
                     armSyncRetry('full', '401-needs-refresh');
                 }
             } else if (status === 403) {
-                // Permissions/rules issue — long backoff, won't fix itself
-                // by retrying fast. Cap attempts so we don't spam.
+                // Task 10: 403 = rules deny / account lacks permission.
+                // Surface to popup as a clear "permission denied" toast,
+                // don't sign out, cap retries so we don't spam Firestore.
+                _broadcastAuthRejected(403, errorBody);
                 if (_fullSyncRetryAttempts >= SYNC_RETRY_BACKOFF_MIN.length) {
                     console.error('[BG] Sync 403 — giving up after max retries (check Firestore rules)');
                     clearSyncRetry('full');
@@ -1813,6 +2212,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return true;
     }
 
+    if (message.type === 'SIGNED_OUT') {
+        // Task 9: popup signaled FirebaseLib.signOut(). Clear cached cloud
+        // doc and cancel auth + sync alarms (metadata-repair survives so
+        // local data still gets refreshed).
+        invalidateBgCloudDocCache();
+        clearAuthAndSyncAlarms()
+            .then(() => sendResponse({ ok: true }))
+            .catch((e) => sendResponse({ ok: false, error: e?.message }));
+        return true;
+    }
+
     if (message.type === 'UPDATE_BG_CLOUD_DOC_CACHE') {
         // Popup just wrote `doc` to Firestore — seed the SW cache with it so
         // the SW's next storage.onChanged-driven sync skips the Firestore read.
@@ -2080,6 +2490,49 @@ chrome.runtime.onInstalled.addListener((details) => {
         dlog(`%c🎬 Anime Tracker v${chrome.runtime.getManifest().version}`, style);
         migrateFromSyncToLocal();
 
+        // Task 5: silent post-update auth refresh. Runs BEFORE the metadata-
+        // repair flag flip so a successful refresh resets the lastAuthCheck
+        // counter ahead of any subsequent activity. Failure modes:
+        //   • Permanent (refresh token revoked / account disabled / etc.) →
+        //     setNeedsReauth(true). Tokens are NOT cleared — the popup
+        //     surfaces a "Reconnect" banner and the existing email is kept
+        //     for the sign-in form.
+        //   • Transient (network blip, 5xx, timeout) → _bgOnRefreshTransient
+        //     bookkeeps the failure and arms the auth-refresh-retry-bg alarm
+        //     (Task 4).
+        //   • Success → markAuthCheckOk resets the backoff counters.
+        // Tokens are NEVER wiped here — that's the regression we're fixing.
+        (async () => {
+            try {
+                const helper = self.AnimeTrackerAuthTokens;
+                if (!helper) return;     // Task-2 module not loaded; skip.
+                await helper.migrateTokensIfNeeded();
+                const t = await helper.readTokens();
+                if (!t || !t.refreshToken) {
+                    dlog('[BG] Post-update refresh: no session to validate');
+                    return;
+                }
+                if (t.needsReauth) {
+                    dlog('[BG] Post-update refresh: session already in needsReauth state — skipping');
+                    return;
+                }
+                const result = await refreshFirebaseToken(t.refreshToken);
+                if (result?.tokens) {
+                    console.log('[BG] Post-update silent refresh: ok');
+                } else if (result?.permanent) {
+                    // Permanent — set needsReauth (don't sign out / wipe tokens).
+                    await helper.setNeedsReauth(true);
+                    console.warn(`[BG] Post-update silent refresh: permanent (${result?.error || '?'}) — needsReauth set, tokens preserved`);
+                } else {
+                    // Transient — _bgOnRefreshTransient already armed the
+                    // retry alarm via refreshFirebaseToken. Nothing to do.
+                    console.warn(`[BG] Post-update silent refresh: transient (${result?.error || '?'}) — retry alarm armed`);
+                }
+            } catch (e) {
+                console.warn('[BG] Post-update silent refresh failed:', e?.message || e);
+            }
+        })();
+
         // Post-update fetch: stamp a flag so (a) the SW kicks off the
         // metadata-repair pass on boot via maybeStartPendingMetadataRepair(),
         // and (b) the next popup open surfaces the auto-fetch UI + toast.
@@ -2210,6 +2663,24 @@ chrome.alarms.onAlarm.addListener((alarm) => {
         syncProgressOnly();
         return;
     }
+
+    if (alarm.name === AUTH_REFRESH_RETRY_BG_ALARM) {
+        // Task 4: backoff-driven retry for transient refresh failures.
+        // _bgAuthRefreshRetryTick is self-guarded against missing/invalid
+        // sessions and against the needsReauth state (where the alarm is
+        // cleared rather than retried).
+        _bgAuthRefreshRetryTick();
+        return;
+    }
+
+    if (alarm.name === DAILY_CLEANUP_ALARM) {
+        // Task 11: nightly preventative cleanup. Runs only when storage is
+        // > 70% full to avoid burning cycles on small libraries.
+        bgIterativeQuotaRecovery('daily-alarm').catch((e) => {
+            console.warn('[Cleanup] alarm tick failed:', e?.message || e);
+        });
+        return;
+    }
 });
 
 maybeStartPendingMetadataRepair().catch((error) => {
@@ -2222,6 +2693,19 @@ hydrateBgPollState();
 // Best-effort migration of legacy per-key caches into bundled maps. Idempotent
 // (guarded by a flag in storage). Runs in background — no awaiting needed.
 migratePerKeyCachesOnce();
+// Task 11: ensure the nightly cleanup alarm is scheduled. Idempotent —
+// reuses the persisted next-fire timestamp on subsequent boots so the
+// jitter is per-device-stable rather than re-rolled.
+ensureDailyCleanupAlarmScheduled();
+// Task 2: token-schema migration on SW boot. Idempotent; safe when no
+// session is stored. Behind AUTH_HARDENING_ENABLED feature flag.
+(async () => {
+    try {
+        await self.AnimeTrackerAuthTokens?.migrateTokensIfNeeded?.();
+    } catch (e) {
+        console.warn('[BG] Token migration skipped:', e?.message || e);
+    }
+})();
 
 // Recover from SW kills: if a previous incarnation scheduled a sync via
 // setTimeout but was terminated before it fired, the PENDING_SYNC_KEY stamp

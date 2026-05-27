@@ -90,6 +90,8 @@
         "src/content/merge-utils.js",
         "src/common/firebase-config.js",
         "src/common/firestore-codec.js",
+        "src/common/auth-classifier.js",
+        "src/common/auth-tokens.js",
         "src/content/cloud-sync.js"
       ],
       "run_at": "document_idle",

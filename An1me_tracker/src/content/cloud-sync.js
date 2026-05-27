@@ -155,27 +155,17 @@
 
     let _refreshInflight = null;
 
-    // Permanent refresh-error codes — only these trigger sign-out.
-    // Mirrors PERMANENT_REFRESH_ERRORS in popup firebase-lib.js + BG.
-    const _CS_PERMANENT_REFRESH_ERRORS = [
-        'INVALID_REFRESH_TOKEN',
-        'TOKEN_EXPIRED',
-        'USER_DISABLED',
-        'USER_NOT_FOUND',
-        'INVALID_GRANT',
-        'invalid_grant',
-        'CREDENTIAL_TOO_OLD_LOGIN_AGAIN',
-        'MISSING_REFRESH_TOKEN',
-    ];
-
+    // Task 3: Classification of refresh-token failures lives in the shared
+    // module src/common/auth-classifier.js (loaded via the manifest
+    // content_scripts list, BEFORE this file). Single source of truth
+    // across popup / SW / content.
+    //
+    // POLICY (from Task 1): HTTP 401 / 403 are TRANSIENT, not permanent.
+    // ONLY HTTP 400 + a recognised permanent code signs the user out.
     function _csClassifyRefreshError(httpStatus, errorBody) {
-        if (httpStatus === 401 || httpStatus === 403) return true;
-        if (httpStatus === 400 && errorBody) {
-            for (const code of _CS_PERMANENT_REFRESH_ERRORS) {
-                if (errorBody.includes(code)) return true;
-            }
-        }
-        return false;
+        const cl = globalThis.AnimeTrackerAuthClassifier;
+        if (!cl) return false;        // fail-safe → transient
+        return cl.classify(httpStatus, errorBody).permanent;
     }
 
     async function refreshToken(rt) {
@@ -1161,6 +1151,15 @@
 
     async function init() {
         if (initialized) return;
+
+        // Task 2: idempotent token-schema migration. Runs once per content
+        // script mount; safe when no session is stored. Behind the
+        // AUTH_HARDENING_ENABLED feature flag.
+        try {
+            await globalThis.AnimeTrackerAuthTokens?.migrateTokensIfNeeded?.();
+        } catch (e) {
+            Logger?.warn(`Token migration skipped: ${e?.message}`);
+        }
 
         // Restore echo-tracking state from storage before any sync work —
         // otherwise a freshly-mounted content script (page reload) loses

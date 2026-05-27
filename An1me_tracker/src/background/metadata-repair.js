@@ -525,10 +525,35 @@ async function startLibraryRepair(options = {}) {
 async function maybeStartPendingMetadataRepair() {
     const stored = await bgStorageGet([PENDING_METADATA_REPAIR_KEY]);
     if (!stored[PENDING_METADATA_REPAIR_KEY]) return false;
+
+    // Task 13: gate repeated full-library passes. The repair flag gets set
+    // on every sign-in + every popup open after sign-in (see popup main.js
+    // onUserSignedIn handler). Without this gate we'd kick off a fresh
+    // pass every time even if one finished a few minutes ago. We honor
+    // the flag-set, but if the last RUN finished < 6h ago AND nothing is
+    // currently in-flight, just clear the flag and skip — the pass would
+    // be a no-op anyway (cache is fresh per the existing TTLs).
+    const META_LAST_RUN_KEY = 'metadataRepairLastRunAt';
+    const META_REPAIR_GATE_MS = 6 * 60 * 60 * 1000;     // 6 hours
+    try {
+        const gateRead = await bgStorageGet([META_LAST_RUN_KEY]);
+        const lastRun = Number(gateRead[META_LAST_RUN_KEY]) || 0;
+        const existingState = await getMetadataRepairState();
+        const isIdle = !existingState || existingState.status !== 'running';
+        if (isIdle && lastRun > 0 && (Date.now() - lastRun) < META_REPAIR_GATE_MS) {
+            // Recent run — skip. Clear the pending flag so the next storage
+            // change doesn't keep retriggering this branch.
+            await bgStorageSet({ [PENDING_METADATA_REPAIR_KEY]: false });
+            return false;
+        }
+    } catch { /* fall through — better to over-repair than under */ }
+
     await startLibraryRepair({
         forceInfoRefresh: false,
         forceFillerRefresh: false
     });
+    // Stamp lastRunAt so the next pending flip within 6h is a no-op.
+    try { await bgStorageSet({ [META_LAST_RUN_KEY]: Date.now() }); } catch { /* best-effort */ }
     return true;
 }
 
