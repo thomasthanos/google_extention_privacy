@@ -708,7 +708,7 @@ const FirebaseLib = (function () {
             requestType: 'PASSWORD_RESET',
             email
         });
-        PopupLogger.log('Firebase', `Password reset email sent to ${email}`);
+        PopupLogger.log('Firebase', `Password reset request accepted for ${email}`);
         return true;
     }
 

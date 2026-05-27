@@ -3371,11 +3371,10 @@
 
         try {
             await FirebaseSync.sendPasswordReset(email);
-            PopupLogger.log('Firebase', `Password reset email sent to ${email}`);
-            // Inline success — survives until the user types again. A 3s
-            // toast was easy to miss; this is impossible to miss.
+            PopupLogger.log('Firebase', `Password reset request accepted for ${email}`);
+            // Firebase deliberately does not disclose whether this email exists.
             setEmailFormError(
-                `Reset email sent to ${email}. Check your inbox (and spam folder).`,
+                `If an account exists for ${email}, a reset email will arrive shortly. Check your inbox and spam folder.`,
                 { success: true }
             );
         } catch (err) {
