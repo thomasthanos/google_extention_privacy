@@ -132,6 +132,12 @@
                 iconKey: 'skipMark', title: 'Skiptime Contributor',
                 subtitle: state.skiptimeHelper ? 'Capture intro/outro on an1me.to/watch' : 'Floating panel for intro/outro contributions',
                 enabled: state.skiptimeHelper
+            }),
+            renderToggleItem({
+                id: 'settingsAuto4kServer', subtitleId: 'settingsAuto4kServerSubtitle',
+                iconKey: 'sparkles', title: 'Auto-Pick 4k Server',
+                subtitle: state.auto4kServer ? 'Auto-switch to 4k server when available' : '4k auto-pick is off',
+                enabled: state.auto4kServer
             })
         ].join('');
 
@@ -258,7 +264,8 @@
             copyGuard: settings.copyGuard !== false,
             smartNotif: settings.smartNotif === true,
             autoSkipFiller: settings.autoSkipFiller === true,
-            skiptimeHelper: settings.skiptimeHelper === true
+            skiptimeHelper: settings.skiptimeHelper === true,
+            auto4kServer: settings.auto4kServer !== false
         };
 
         // Full HTML render only on first call. Subsequent calls just patch the
@@ -347,6 +354,8 @@
             state.autoSkipFiller ? 'Filler episodes will be auto-skipped' : 'Skip filler, jump to next canon ep');
         updateToggle('settingsSkiptime', state.skiptimeHelper,
             state.skiptimeHelper ? 'Capture intro/outro on an1me.to/watch' : 'Floating panel for intro/outro contributions');
+        updateToggle('settingsAuto4kServer', state.auto4kServer,
+            state.auto4kServer ? 'Auto-switch to 4k server when available' : '4k auto-pick is off');
     }
 
     // ─── Aria-live region for toggle announcements ───────────────────

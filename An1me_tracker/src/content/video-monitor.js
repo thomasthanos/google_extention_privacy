@@ -4,6 +4,18 @@ const VideoMonitor = {
     progressSaveInterval: null,
     cleanupFunctions: [],
     retryCount: 0,
+    silentResumeFor: null,
+
+    armSilentResume(uniqueId) {
+        this.silentResumeFor = uniqueId || null;
+    },
+
+    rebindAfterServerSwitch(animeInfo, eventHandlers) {
+        const { Logger } = window.AnimeTrackerContent;
+        Logger.debug('VideoMonitor: rebinding after server switch');
+        this.cleanup();
+        this.startWatching(animeInfo, eventHandlers);
+    },
 
     addCleanup(fn) {
         this.cleanupFunctions.push(fn);
@@ -164,7 +176,38 @@ const VideoMonitor = {
         });
 
         if (animeInfo) {
-            // Window-level guard so the prompt is shown at most once per
+            const armedFor = this.silentResumeFor;
+            if (armedFor && armedFor === animeInfo.uniqueId) {
+                this.silentResumeFor = null;
+                const saved = await ProgressTracker.getSavedProgress(animeInfo.uniqueId);
+                if (saved && saved.currentTime > CONFIG.MIN_PROGRESS_TO_SAVE) {
+                    let attempt = 0;
+                    const MAX = 30;
+                    const seek = () => {
+                        if (!this.videoElement || this.videoElement !== video) return;
+                        if (video.readyState >= 2 && video.duration > 0) {
+                            const target = Math.min(saved.currentTime, Math.max(0, video.duration - 1));
+                            if (Math.abs((video.currentTime || 0) - target) < 5) {
+                                Logger.debug(`Server switch: new video already at ~${Math.round(target)}s, skipping seek`);
+                                return;
+                            }
+                            try {
+                                video.currentTime = target;
+                                video.play().catch(() => {});
+                                Logger.success(`Server switch: silently resumed @ ${Math.round(target)}s`);
+                            } catch (err) {
+                                Logger.warn('Silent resume seek failed:', err);
+                            }
+                        } else if (attempt++ < MAX) {
+                            setTimeout(seek, 500);
+                        } else {
+                            Logger.debug('Silent resume gave up (video never became ready)');
+                        }
+                    };
+                    setTimeout(seek, 300);
+                }
+            } else {
+                // Window-level guard so the prompt is shown at most once per
             // (uniqueId, page-load), even if setupVideoMonitoring runs more
             // than once (SPA re-init, multiple finders racing). Each instance
             // also has its own resumePromptShown closure flag to short-circuit
@@ -274,6 +317,7 @@ const VideoMonitor = {
                     try { chrome.storage.onChanged.removeListener(onProgressArrive); } catch {}
                     if (resumeWaitTimer) { clearTimeout(resumeWaitTimer); resumeWaitTimer = null; }
                 });
+            }
             }
         }
 

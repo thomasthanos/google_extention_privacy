@@ -256,6 +256,7 @@
     // lives in src/content/skiptime-helper.js and listens for chrome.storage
     // changes on this key to mount/unmount itself live.
     const SKIPTIME_HELPER_KEY = 'skiptimeHelperEnabled';
+    const AUTO_4K_SERVER_KEY = 'auto4kServerEnabled';
     // Tracks per-account "user has set a password via the Set-Password modal"
     // so the Danger zone button can switch to a "Password set ✓" state once
     // the link succeeds. Stored as `{ uid, setAt }` — the uid guard means
@@ -309,6 +310,17 @@
                 on: 'Capture intro/outro on an1me.to/watch',
                 off: 'Floating panel for intro/outro contributions'
             }
+        },
+        auto4kServer: {
+            btnId: 'settingsAuto4kServer',
+            subtitleId: 'settingsAuto4kServerSubtitle',
+            storageKey: AUTO_4K_SERVER_KEY,
+            defaultsTo: true,
+            interpret: (raw) => raw !== false,
+            copy: {
+                on: 'Auto-switch to 4k server when available',
+                off: '4k auto-pick is off'
+            }
         }
     };
 
@@ -346,10 +358,12 @@
     const renderSmartNotifSetting = (enabled) => renderToggle('smartNotif', enabled);
     const renderAutoSkipFillerSetting = (enabled) => renderToggle('autoSkipFiller', enabled);
     const renderSkiptimeHelperSetting = (enabled) => renderToggle('skiptime', enabled);
+    const renderAuto4kServerSetting = (enabled) => renderToggle('auto4kServer', enabled);
     const loadCopyGuardSetting = () => loadToggleSetting('copyGuard');
     const loadSmartNotifSetting = () => loadToggleSetting('smartNotif');
     const loadAutoSkipFillerSetting = () => loadToggleSetting('autoSkipFiller');
     const loadSkiptimeHelperSetting = () => loadToggleSetting('skiptime');
+    const loadAuto4kServerSetting = () => loadToggleSetting('auto4kServer');
 
     function setSettingsDataToolsExpanded(expanded) {
         const dataTools = document.getElementById('settingsDataTools');
@@ -4096,6 +4110,15 @@
                 );
                 return;
             }
+            if (e.target.closest('#settingsAuto4kServer')) {
+                e.stopPropagation();
+                await handleToggle(
+                    { btnId: 'settingsAuto4kServer', storageKey: AUTO_4K_SERVER_KEY },
+                    renderAuto4kServerSetting,
+                    { read: (btn) => btn.dataset.enabled !== 'false' }
+                );
+                return;
+            }
 
             const dataToolsToggle = e.target.closest('#settingsDataToolsToggle');
             if (dataToolsToggle) {
@@ -4606,6 +4629,9 @@
             if (changes[SKIPTIME_HELPER_KEY]) {
                 renderSkiptimeHelperSetting(changes[SKIPTIME_HELPER_KEY].newValue === true);
             }
+            if (changes[AUTO_4K_SERVER_KEY]) {
+                renderAuto4kServerSetting(changes[AUTO_4K_SERVER_KEY].newValue !== false);
+            }
             if (changes.videoProgress) {
                 videoProgress = changes.videoProgress.newValue || {};
                 if (!isOwn) isExternalUpdate = true;
@@ -4864,7 +4890,8 @@
             loadCopyGuardSetting(),
             loadSmartNotifSetting(),
             loadAutoSkipFillerSetting(),
-            loadSkiptimeHelperSetting()
+            loadSkiptimeHelperSetting(),
+            loadAuto4kServerSetting()
         ]);
 
         // Auto-cleanup stale data on every popup open

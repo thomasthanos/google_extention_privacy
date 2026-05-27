@@ -1057,6 +1057,18 @@
 
         VideoMonitor.startWatching(animeInfo, eventHandlers);
 
+        try { setupServerSwitchObserver(); }
+        catch (err) { Logger.warn('setupServerSwitchObserver failed:', err); }
+
+        try {
+            const result = await chrome.storage.local.get(['auto4kServerEnabled']);
+            const enabled = result.auto4kServerEnabled !== false;
+            if (enabled) maybeAutoSelect4kServer();
+        } catch (err) {
+            Logger.warn('Auto-4k setting read failed (defaulting ON):', err);
+            try { maybeAutoSelect4kServer(); } catch {}
+        }
+
         const periodicCheck = setInterval(() => {
             if (trackingState === TrackingState.COMPLETED || !animeInfo) { clearInterval(periodicCheck); return; }
             const videoElement = VideoMonitor.getVideoElement();
@@ -1084,6 +1096,121 @@
     let lastUrl = location.href;
     let navigationDebounceTimeout = null;
     let historyPatched = false;
+
+    let _autoServerClickInFlight = false;
+    const _SERVER_SWITCH_REBIND_DELAY_MS = 700;
+
+    function setupServerSwitchObserver() {
+        const { Logger, ProgressTracker, VideoMonitor } = AT;
+
+        const handleServerClick = (e) => {
+            const span = e.target?.closest?.('.player-selection [data-embed-id]');
+            if (!span) return;
+            if (span.classList.contains('active')) return;
+            if (!animeInfo) return;
+
+            const v = VideoMonitor.getVideoElement?.();
+            if (!_autoServerClickInFlight && v && v.currentTime > 0 && v.duration > 0) {
+                try {
+                    ProgressTracker.saveVideoProgress(
+                        animeInfo.uniqueId,
+                        v.currentTime,
+                        v.duration,
+                        true,
+                        true
+                    );
+                } catch (err) {
+                    Logger.warn('Server switch: urgent save failed:', err);
+                }
+            }
+
+            VideoMonitor.armSilentResume(animeInfo.uniqueId);
+            Logger.info('Server switch detected — re-binding video monitor');
+
+            setTimeout(() => {
+                try { VideoMonitor.rebindAfterServerSwitch(animeInfo, eventHandlers); }
+                catch (err) { Logger.warn('rebindAfterServerSwitch failed:', err); }
+            }, _SERVER_SWITCH_REBIND_DELAY_MS);
+        };
+
+        document.addEventListener('click', handleServerClick, { capture: true, passive: true });
+        VideoMonitor.addCleanup(() => {
+            document.removeEventListener('click', handleServerClick, { capture: true });
+        });
+    }
+
+    function maybeAutoSelect4kServer() {
+        const { Logger } = AT;
+        if (!animeInfo) return;
+
+        window.__atAuto4kClickedFor = window.__atAuto4kClickedFor || new Set();
+        if (window.__atAuto4kClickedFor.has(animeInfo.uniqueId)) return;
+
+        let triggered = false;
+        let pollTimer = null;
+        let mo = null;
+        let killTimer = null;
+
+        const cleanup = () => {
+            if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+            if (mo) { try { mo.disconnect(); } catch {} mo = null; }
+            if (killTimer) { clearTimeout(killTimer); killTimer = null; }
+        };
+
+        const tryClick = () => {
+            if (triggered) return true;
+            const containers = document.querySelectorAll('.player-selection');
+            for (const container of containers) {
+                if (container.offsetParent === null) continue;
+                const activeSpan = container.querySelector('[data-embed-id].active');
+                if (!activeSpan) continue;
+
+                const spans = container.querySelectorAll('[data-embed-id]');
+                let fourK = null;
+                for (const s of spans) {
+                    if (/4k/i.test(s.textContent || '')) { fourK = s; break; }
+                }
+                if (!fourK) continue;
+
+                if (fourK === activeSpan) {
+                    triggered = true;
+                    window.__atAuto4kClickedFor.add(animeInfo.uniqueId);
+                    Logger.debug('Auto-4k: 4k server is already active');
+                    return true;
+                }
+
+                _autoServerClickInFlight = true;
+                try {
+                    fourK.click();
+                    triggered = true;
+                    window.__atAuto4kClickedFor.add(animeInfo.uniqueId);
+                    Logger.info(`Auto-4k: clicked "${(fourK.textContent || '').trim()}"`);
+                } catch (err) {
+                    Logger.warn('Auto-4k click failed:', err);
+                } finally {
+                    setTimeout(() => { _autoServerClickInFlight = false; }, 200);
+                }
+                return true;
+            }
+            return false;
+        };
+
+        if (tryClick()) return;
+
+        pollTimer = setInterval(() => {
+            if (tryClick()) cleanup();
+        }, 500);
+
+        mo = new MutationObserver(() => {
+            if (tryClick()) cleanup();
+        });
+        try { mo.observe(document.body, { childList: true, subtree: true }); }
+        catch {}
+
+        killTimer = setTimeout(cleanup, 30000);
+
+        AT.VideoMonitor.addCleanup(cleanup);
+    }
 
     const setupNavigationObserver = () => {
         const { Logger, ProgressTracker, VideoMonitor } = AT;
