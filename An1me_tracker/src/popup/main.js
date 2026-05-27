@@ -3303,12 +3303,47 @@
         return { email, password };
     }
 
+    function isPlausibleEmailAddress(email) {
+        if (!email || email.length > 254 || /\s/.test(email)) return false;
+
+        const atIndex = email.indexOf('@');
+        if (atIndex <= 0 || atIndex !== email.lastIndexOf('@')) return false;
+
+        const localPart = email.slice(0, atIndex);
+        const domain = email.slice(atIndex + 1);
+        if (
+            localPart.length > 64 ||
+            localPart.startsWith('.') ||
+            localPart.endsWith('.') ||
+            localPart.includes('..')
+        ) {
+            return false;
+        }
+
+        const domainLabels = domain.split('.');
+        if (domainLabels.length < 2) return false;
+        if (domainLabels.some((label) =>
+            !/^[a-z0-9-]+$/i.test(label) ||
+            label.startsWith('-') ||
+            label.endsWith('-')
+        )) {
+            return false;
+        }
+
+        return /^[a-z]{2,63}$/i.test(domainLabels[domainLabels.length - 1]);
+    }
+
     async function handleEmailAuth({ mode }) {
         const { FirebaseSync } = AT;
         const { email, password } = readEmailFormCredentials();
         setEmailFormError('');
 
         if (!email) { setEmailFormError(EMAIL_AUTH_ERRORS.MISSING_EMAIL); return; }
+        if (!isPlausibleEmailAddress(email)) {
+            setEmailFormError(EMAIL_AUTH_ERRORS.INVALID_EMAIL);
+            document.getElementById('authEmailInput')?.focus();
+            return;
+        }
         if (!password) { setEmailFormError(EMAIL_AUTH_ERRORS.MISSING_PASSWORD); return; }
         if (mode === 'signup' && password.length < 6) {
             setEmailFormError(EMAIL_AUTH_ERRORS.WEAK_PASSWORD);
@@ -3353,8 +3388,8 @@
         }
         // Trivial sanity check — keeps us from burning a request on
         // obvious garbage like "asdf" and surfaces feedback instantly.
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            setEmailFormError('That doesn\'t look like a valid email address.');
+        if (!isPlausibleEmailAddress(email)) {
+            setEmailFormError(EMAIL_AUTH_ERRORS.INVALID_EMAIL);
             emailInput?.focus();
             return;
         }
