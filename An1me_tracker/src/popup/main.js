@@ -2777,6 +2777,10 @@
             const now = new Date().toISOString();
             const isMovie = SeasonGrouping.isMovie(slug, { title });
             const defaultDuration = isMovie ? 0 : 1440;
+            const resumedFromHold = !!(
+                animeData[slug]
+                && (animeData[slug].onHoldAt || animeData[slug].listState === 'on_hold')
+            );
             // For existing anime, inherit the median duration from already-tracked
             // real episodes (video-measured) so manually-added episodes don't
             // default to 24min when the anime actually runs 28-32min.
@@ -2809,6 +2813,9 @@
                 animeData[slug].episodes = existingEpisodes;
                 animeData[slug].totalWatchTime = existingEpisodes.reduce((sum, ep) => sum + (ep.duration || 0), 0);
                 animeData[slug].lastWatched = now;
+                if (resumedFromHold) {
+                    setManualListState(animeData[slug], 'active', now);
+                }
             } else {
                 animeData[slug] = {
                     title, slug, episodes,
@@ -2828,6 +2835,9 @@
             if (user) dataToSave.userId = user.uid;
             markInternalSave(dataToSave);
             await Storage.set(dataToSave);
+            if (resumedFromHold) {
+                syncWatchlistFromPopup(slug, 'watching');
+            }
 
             renderAnimeList(elements.searchInput?.value || '');
             updateStats();

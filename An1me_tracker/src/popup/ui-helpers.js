@@ -92,6 +92,16 @@ const UIHelpers = {
         return 'size-small';
     },
 
+    formatProgressPercent(value) {
+        const pct = Math.max(0, Math.min(100, Number(value) || 0));
+        if (pct <= 0 || pct >= 100) return `${Math.round(pct)}%`;
+
+        // Keep visible progress below 100 until it is truly complete, while
+        // retaining useful precision for long-running series.
+        const rounded = Math.min(99.9, Math.round(pct * 10) / 10);
+        return Number.isInteger(rounded) ? `${rounded}%` : `${rounded.toFixed(1)}%`;
+    },
+
     fmtHours(seconds) {
         const h = (Number(seconds) || 0) / 3600;
         if (h === 0) return '0h';

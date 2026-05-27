@@ -127,6 +127,7 @@
                                 : episodeNumber;
                         const partProgress = (watchedInPart / partEpisodeCount) * 100;
                         progressPercent = Math.round(partProgress);
+                        const progressLabel = UIHelpers.formatProgressPercent(partProgress);
                         isComplete = watchedInPart >= partEpisodeCount;
                         hasProgress = watchedInPart > 0;
                         statusClass = isComplete ? 'complete' : (hasProgress ? 'in-progress' : 'not-started');
@@ -136,7 +137,7 @@
                         progressInfoHTML = `
                             <div class="progress-info">
                                 <span>Ep ${partConfig.start}–${partConfig.end} · ${watchedInPart}/${partEpisodeCount}</span>
-                                <span>${progressPercent}%</span>
+                                <span>${progressLabel}</span>
                             </div>
                             <div class="progress-bar size-small">
                                 <div class="progress-fill" style="width: ${partProgress}%"></div>
@@ -202,7 +203,7 @@
                             hasProgress = episodeCount > 0;
                             progressPercent = 0;
                         } else {
-                            isComplete = progressPercent >= 100 && !_sPartial;
+                            isComplete = progressData.progress >= 100 && !_sPartial;
                             if (!isComplete && !_sPartial && anime.episodes?.length > 0) {
                                 const totalEps = FillerService.getTotalEpisodes(slug, anime);
                                 if (totalEps && currentEp >= totalEps) isComplete = true;
@@ -281,8 +282,9 @@
                         const unknownTotalSeason = progressData.total == null;
                         const totalDisplay = unknownTotalSeason ? null : progressData.total;
                         const totalCanonDisplay = unknownTotalSeason ? null : totalCanon;
-                        const canonProgressPercent = unknownTotalSeason ? (isComplete ? 100 : 0)
-                            : hasFillerData ? (totalCanon > 0 ? Math.round((canonWatched / totalCanon) * 100) : 0) : progressPercent;
+                        const canonProgressValue = unknownTotalSeason ? (isComplete ? 100 : 0)
+                            : hasFillerData ? (totalCanon > 0 ? (canonWatched / totalCanon) * 100 : 0) : progressData.progress;
+                        const canonProgressLabel = UIHelpers.formatProgressPercent(canonProgressValue);
                         const canonProgressWidth = unknownTotalSeason ? (isComplete ? 100 : 0)
                             : hasFillerData ? (totalCanon > 0 ? (canonWatched / totalCanon) * 100 : 0) : progressData.progress;
 
@@ -301,7 +303,7 @@
                         progressInfoHTML = `
                         <div class="progress-info">
                             ${progressInfoText}
-                            <span>${canonProgressPercent > 0 ? canonProgressPercent + '%' : ''}</span>
+                            <span>${canonProgressValue > 0 ? canonProgressLabel : ''}</span>
                         </div>
                         <div class="progress-bar size-small">
                             <div class="progress-fill" style="width: ${canonProgressWidth}%"></div>

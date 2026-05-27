@@ -131,11 +131,14 @@ const AnimeCardRenderer = {
         const isAiringPartial = _mainPartial && _mainLatest > 0 && anilistStatusForProgress === 'RELEASING';
         const airingDenominator = isAiringPartial ? _mainLatest : null;
 
-        const canonProgressPercent = unknownTotal ? null
+        const canonProgressValue = unknownTotal ? null
             : airingDenominator
-                ? Math.min(100, Math.round((Math.min(episodeCount, airingDenominator) / airingDenominator) * 100))
-                : hasFillerData ? (totalCanon > 0 ? Math.round((canonWatched / totalCanon) * 100) : 0)
-                    : Math.round(progressData.progress);
+                ? Math.min(100, (Math.min(episodeCount, airingDenominator) / airingDenominator) * 100)
+                : hasFillerData ? (totalCanon > 0 ? (canonWatched / totalCanon) * 100 : 0)
+                    : progressData.progress;
+        const canonProgressLabel = canonProgressValue == null
+            ? ''
+            : UIHelpers.formatProgressPercent(canonProgressValue);
         const canonProgressWidth = unknownTotal ? 0
             : airingDenominator
                 ? Math.min(100, (Math.min(episodeCount, airingDenominator) / airingDenominator) * 100)
@@ -346,7 +349,7 @@ const AnimeCardRenderer = {
                     <div class="progress-container header-progress">
                         <div class="progress-info">
                             ${progressInfoText}
-                            <span>${canonProgressPercent != null ? canonProgressPercent + "%" : ""}</span>
+                            <span>${canonProgressLabel}</span>
                         </div>
                         <div class="progress-bar ${sizeClass}">
                             <div class="progress-fill" style="width: ${canonProgressWidth}%"></div>
