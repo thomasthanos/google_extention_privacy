@@ -1,25 +1,13 @@
-/**
- * Anime Tracker — Watchlist sync (background module)
- *
- * Mirrors local list-state changes (active/completed/dropped/etc.) back to
- * the user's an1me.to watchlist. Tries forwarding through a live tab first
- * (cheaper, no cookie sharing surprises) and falls back to a direct AJAX
- * call with `credentials:'include'` when no live tab is open.
- *
- * Extracted from background.js; depends on `fetchWithTimeout` and `dlog`
- * defined in the main SW script.
- */
+
+
 
 async function syncWatchlistToSite(animeId, type) {
     dlog(`%c WatchlistSync %c ${type} %c anime #${animeId}`, 'background:#6366f1;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'background:#818cf8;color:#fff;padding:2px 6px', 'color:#a5b4fc');
 
     try {
         const tabs = await chrome.tabs.query({ url: 'https://an1me.to/*' });
-        // Pick the first tab that's actually loaded and not discarded.
-        // chrome.tabs.query can return discarded tabs (memory-saver mode in
-        // recent Chrome versions) which CAN'T receive runtime messages —
-        // sendMessage would fire "Receiving end does not exist" and we'd fall
-        // through to direct fetch anyway, but with a noisy console error.
+
+
         const liveTab = (tabs || []).find(t =>
             t && t.id != null && t.discarded !== true && t.status !== 'unloaded'
         );

@@ -1,16 +1,6 @@
-/**
- * Anime Tracker — Continue Watching rail
- *
- * Replaces the homepage `#mainShare` ("Share the Anime Love!") block with a
- * full-width horizontal carousel of in-progress anime. Each card resumes
- * the user's current episode; active series (non-dropped / non-on-hold /
- * non-completed / not "waiting for next ep to air") also surface a small
- * "Next" link when episode N+1 is already available.
- *
- * Self-contained: reads chrome.storage.local directly and does NOT depend
- * on the window.AnimeTrackerContent.* module stack (that stack only loads
- * on /watch/ pages), so this file ships as its own content_scripts entry.
- */
+
+
+
 (function () {
     'use strict';
 
@@ -24,14 +14,13 @@
     const MAX_ITEMS = 20;
     const RENDER_DEBOUNCE_MS = 300;
 
-    // Selectors for the homepage share block we replace.
+
     const SHARE_SELECTORS = ['#mainShare', '.mainShare', '[data-share="main"]'];
 
     let dismissed = false;
     let renderDebounce = null;
-    // Did we successfully take over the `#mainShare` slot? Drives the
-    // late-share watcher: when false, we'll relocate the rail into share's
-    // slot the first time it appears; when true, we just kill duplicates.
+
+
     let mountedViaShare = false;
     let shareWatcher = null;
     let shareWatcherScheduled = false;
@@ -41,7 +30,7 @@
         catch { return false; }
     }
 
-    // ── Data ─────────────────────────────────────────────────────────────
+
     function parseProgressKey(key) {
         const m = /^(.+)__episode-(\d+)$/.exec(key);
         if (!m) return null;
@@ -63,28 +52,14 @@
     }
 
     function resumeUrl(slug, episode, entry) {
-        // `pagePath` is stamped by progress-tracker when the real watch-page
-        // slug differs from the default `${slug}-episode-${N}` shape.
+
+
         const pagePath = (entry && typeof entry.pagePath === 'string') ? entry.pagePath.trim() : '';
         if (pagePath) return WATCH_BASE + pagePath;
         return `${WATCH_BASE}${slug}-episode-${episode}`;
     }
 
-    /**
-     * Decide whether episode N+1 should be linked from this card.
-     *
-     * Excluded states (per the user's spec — "οχι on hold / complete / airing"):
-     *   • on hold / dropped / completed: covered via listState + the explicit
-     *     onHoldAt / droppedAt / completedAt timestamps written by other parts
-     *     of the extension.
-     *   • airing-and-next-not-yet-released: caught by `latestEpisode` (set by
-     *     the scraper to the highest available episode on the site). If
-     *     `latestEpisode` is missing we fall back to `totalEpisodes`, but
-     *     ONLY when there's no `nextEpisodeAt` — that field's presence is a
-     *     strong "still airing, next ep is in the future" signal.
-     *
-     * Returns the next-episode URL or null.
-     */
+
     function computeNextEpisodeUrl(anime, slug, episode) {
         if (!anime) return null;
 
@@ -105,9 +80,8 @@
         if (latestEp >= next) {
             available = true;
         } else if (latestEp === 0 && !hasFutureRelease && totalEp >= next) {
-            // No live "latest episode" signal but the series has a known
-            // total and no pending future release → episode N+1 is part of a
-            // finished run that's already on the site.
+
+
             available = true;
         }
         if (!available) return null;
@@ -137,9 +111,8 @@
             const { slug, episode } = parsed;
 
             const anime = (animeData && animeData[slug]) || null;
-            // Episode already in the tracked library → finished, not "in progress".
-            // AniList history has not been watched on an1me.to; older imports
-            // may still carry a bogus watchedAt stamp. Keep their resume cards.
+
+
             if (Array.isArray(anime && anime.episodes)
                 && anime.episodes.some((ep) => {
                     if (Number(ep && ep.number) !== episode) return false;
@@ -173,7 +146,7 @@
                 nextNumber: episode + 1
             };
 
-            // One card per anime — keep the most recently watched episode.
+
             const existing = bySlug.get(slug);
             if (!existing || savedAt >= existing.savedAt) bySlug.set(slug, item);
         }
@@ -183,13 +156,13 @@
             .slice(0, MAX_ITEMS);
     }
 
-    // ── Rendering ────────────────────────────────────────────────────────
+
     function injectStyles() {
         if (document.getElementById(STYLE_ID)) return;
         const style = document.createElement('style');
         style.id = STYLE_ID;
         style.textContent = `
-            /* Container takes the full slot vacated by #mainShare. */
+
             #${CONTAINER_ID} {
                 box-sizing: border-box; display: block;
                 width: 100%; max-width: 100%;
@@ -267,7 +240,7 @@
                 color: #fff !important; transform: scale(1.05);
             }
 
-            /* Carousel wrapper provides positioning context for edge fades. */
+
             .at-cw-viewport {
                 position: relative;
             }
@@ -329,9 +302,7 @@
             .at-cw-card:hover .at-cw-play { opacity: 1; transform: translate(-50%,-50%) scale(1); }
             .at-cw-card:hover .at-cw-thumb { border-color: rgba(79,195,247,0.4); }
 
-            /* Resume area = cover + meta. Wrapped in <a> so any non-button
-               click on the card resumes; the next-ep button below has its
-               own anchor + e.stopPropagation defense in case of nesting. */
+
             .at-cw-resume {
                 text-decoration: none !important; color: inherit !important;
                 display: block;
@@ -443,20 +414,13 @@
             }
             @media (max-width: 767px) {
                 #${CONTAINER_ID} {
-                    /* Breathing space from the screen edges so the rail
-                       doesn't visually slam into the viewport sides on
-                       phones (where the host page often has zero gutter). */
+
                     width: calc(100% - 24px);
                     margin-inline: 12px;
                     padding: 9px;
                     border-radius: 12px;
                 }
-                /* Header title: shrink so the full
-                   "Continue Watching from an1me-extention" string fits on
-                   one line next to the count badge + close button on a
-                   typical 360px phone viewport. min-width:0 lets the flex
-                   item shrink; nowrap + ellipsis is the safety net for
-                   ultra-narrow screens (≤320px). */
+
                 .at-cw-head-title {
                     font-size: 10px;
                     letter-spacing: .15px;
@@ -469,13 +433,10 @@
                     text-overflow: ellipsis;
                     min-width: 0;
                 }
-                /* Mobile cards: landscape thumb so each card reads as a
-                   wide rectangle instead of a tall poster pillar. */
+
                 .at-cw-card { width: 120px; }
                 .at-cw-thumb { aspect-ratio: 16 / 9; }
-                /* Anchor the cropped poster near the top — faces sit there
-                   in most cover art, so the landscape crop still looks
-                   intentional. */
+
                 .at-cw-img { object-position: center 22%; }
                 .at-cw-initial { font-size: 22px; }
                 .at-cw-nav { display: none; }
@@ -496,7 +457,7 @@
         const card = document.createElement('div');
         card.className = 'at-cw-card';
 
-        // Resume anchor wraps thumb + meta — clicking anywhere there resumes.
+
         const resume = document.createElement('a');
         resume.className = 'at-cw-resume';
         resume.href = item.url;
@@ -516,7 +477,7 @@
             img.loading = 'lazy';
             img.decoding = 'async';
             img.alt = '';
-            // Drop the <img> on load failure so the gradient + initial show through.
+
             img.addEventListener('error', () => img.remove(), { once: true });
             img.src = item.cover;
             thumb.appendChild(img);
@@ -548,8 +509,7 @@
         resume.append(thumb, meta);
         card.appendChild(resume);
 
-        // Actions: explicit Resume button + optional Next button. Both live
-        // OUTSIDE the resume anchor so the Next click never bubbles to it.
+
         const actions = document.createElement('div');
         actions.className = 'at-cw-actions';
 
@@ -562,16 +522,14 @@
             + '<span>Resume</span>';
         actions.appendChild(resumeBtn);
 
-        // Optional "Next: Ep N+1" — only when computeNextEpisodeUrl returned
-        // a URL (active series + next episode is actually on the site).
+
         if (item.nextUrl) {
             const next = document.createElement('a');
             next.className = 'at-cw-btn at-cw-btn-next';
             next.href = item.nextUrl;
             next.title = `Skip to episode ${item.nextNumber}`;
-            // Defensive — if the browser ever renders this nested inside the
-            // resume anchor (shouldn't, but iframes / Shadow DOM hosts can be
-            // weird), intercept the bubble so the next-ep nav wins.
+
+
             next.addEventListener('click', (e) => { e.stopPropagation(); }, { passive: true });
             next.innerHTML =
                 `<span>Next · Ep ${item.nextNumber}</span>` +
@@ -607,7 +565,7 @@
         const spacer = document.createElement('div');
         spacer.className = 'at-cw-head-spacer';
 
-        // Chevron nav — shown only when the track actually overflows.
+
         const nav = document.createElement('div');
         nav.className = 'at-cw-nav';
         const prevBtn = document.createElement('button');
@@ -642,8 +600,7 @@
         track.className = 'at-cw-track';
         for (const item of items) track.appendChild(buildCard(item));
 
-        // Vertical wheel → horizontal scroll, but yield to the page when the
-        // rail can't scroll or is already at the edge in that direction.
+
         track.addEventListener('wheel', (e) => {
             if (!e.deltaY || track.scrollWidth <= track.clientWidth) return;
             const atStart = track.scrollLeft <= 0;
@@ -683,13 +640,12 @@
         nextBtn.addEventListener('click', () => scrollByCards(1));
         track.addEventListener('scroll', updateNavState, { passive: true });
 
-        // Recompute on resize. ResizeObserver covers container reflows
-        // without leaking globally-listened resize events.
+
         if (typeof ResizeObserver !== 'undefined') {
             const ro = new ResizeObserver(updateNavState);
             ro.observe(track);
         }
-        // First pass after mount.
+
         setTimeout(updateNavState, 0);
 
         viewport.appendChild(track);
@@ -697,7 +653,7 @@
         return section;
     }
 
-    // ── Mount ────────────────────────────────────────────────────────────
+
     function findShareAnchor() {
         for (const sel of SHARE_SELECTORS) {
             const node = document.querySelector(sel);
@@ -715,10 +671,7 @@
         return null;
     }
 
-    /**
-     * Fallback hero anchor — used only when #mainShare is not present.
-     * Drops the rail directly after the homepage hero/slider.
-     */
+
     function findHeroAnchor(container) {
         const heroSelectors = [
             '.hero', '#hero',
@@ -737,7 +690,7 @@
     }
 
     function mountSection(section) {
-        // Preferred: take the place of the #mainShare block.
+
         const shareNode = findShareAnchor();
         if (shareNode) {
             const parent = shareNode.parentNode;
@@ -748,8 +701,7 @@
             return true;
         }
 
-        // Fallback path (no share block on this page) — keep the old
-        // behaviour so the widget still mounts somewhere sensible.
+
         mountedViaShare = false;
         const container = findContentContainer();
         if (container) {
@@ -765,7 +717,7 @@
                 isRowish = (cs.display === 'flex' || cs.display === 'inline-flex')
                     ? !/column/.test(cs.flexDirection || '')
                     : (cs.display === 'grid' || cs.display === 'inline-grid');
-            } catch { /* getComputedStyle can throw on detached nodes */ }
+            } catch {                                                    }
 
             if (isRowish && container.parentNode) {
                 container.parentNode.insertBefore(section, container);
@@ -782,27 +734,13 @@
     }
 
     function suppressShareIfPresent() {
-        // If the site SPA re-rendered #mainShare after our initial mount,
-        // remove it again so the widget keeps its slot.
+
+
         const shareNode = findShareAnchor();
         if (shareNode) shareNode.remove();
     }
 
-    /**
-     * Watch for `#mainShare` to appear or re-appear in the DOM after we've
-     * mounted. On mobile (and on slow SPAs in general) the share block can
-     * hydrate AFTER document_idle, which means our initial `mountSection`
-     * fell back to the hero/content container and the page's native share
-     * block then renders alongside our rail. This observer fixes both cases:
-     *
-     *   • Fallback-mounted rail + late share → relocate the rail into the
-     *     share slot and remove the share node (single rail, correct spot).
-     *   • Share-mounted rail + duplicate share re-render → just remove the
-     *     duplicate so the rail keeps its slot.
-     *
-     * Stays alive for the lifetime of the page (SPA navigations can
-     * re-render share at any time), but stops on dismiss.
-     */
+
     function startShareWatcher() {
         if (shareWatcher) return;
         if (typeof MutationObserver === 'undefined') return;
@@ -821,12 +759,12 @@
                 if (!shareNode) return;
 
                 if (mountedViaShare) {
-                    // Duplicate share re-render — kill it.
+
                     shareNode.remove();
                     return;
                 }
 
-                // Promote the rail into share's slot.
+
                 const parent = shareNode.parentNode;
                 const next = shareNode.nextSibling;
                 shareNode.remove();
@@ -858,13 +796,13 @@
 
         if (existing) {
             existing.replaceWith(section);
-            // Even when replacing, make sure share didn't reappear elsewhere.
+
             suppressShareIfPresent();
         } else {
             mountSection(section);
         }
 
-        // Keep watching for late-rendered share blocks (mobile / SPA).
+
         startShareWatcher();
     }
 
@@ -874,7 +812,7 @@
             if (chrome.runtime.lastError) return;
             try {
                 render(buildItems(result.videoProgress || {}, result.animeData || {}));
-            } catch { /* never break the host page */ }
+            } catch {                                 }
         });
     }
 
@@ -886,23 +824,20 @@
         }, RENDER_DEBOUNCE_MS);
     }
 
-    // ── Boot ─────────────────────────────────────────────────────────────
-    // Pull the latest cloud doc once so the rail reflects episodes started on
-    // other devices. The SW's `pollCloudData` self-rate-limits (3-min gate +
-    // cache), so this stays cheap even across rapid homepage reloads.
+
     try {
         chrome.runtime.sendMessage({ type: 'WAKE_AND_POLL_CLOUD' }, () => {
             void chrome.runtime.lastError;
         });
-    } catch { /* extension context invalidated — ignore */ }
+    } catch {                                              }
 
-    // Re-render when progress changes locally or arrives via the cloud poll.
+
     try {
         chrome.storage.onChanged.addListener((changes, namespace) => {
             if (namespace !== 'local') return;
             if (changes.videoProgress || changes.animeData) scheduleRender();
         });
-    } catch { /* ignore */ }
+    } catch {              }
 
     loadAndRender();
 })();

@@ -200,7 +200,7 @@
     }
 
     const BADGE_DEFS = [
-        // ─── Volume ────────────────────────────────────────────────────────
+
         { id: 'first_steps', group: 'volume', title: 'First Steps', desc: 'Watch your first episode',
           icon: '🌱', svg: 'sprout', tier: 'bronze',
           progress: (ctx) => ({ current: Math.min(ctx.index.totals.episodes, 1), target: 1 }) },
@@ -220,7 +220,7 @@
           icon: '🏆', svg: 'trophy', tier: 'platinum',
           progress: (ctx) => ({ current: Math.min(ctx.index.totals.episodes, 1000), target: 1000 }) },
 
-        // ─── Time ──────────────────────────────────────────────────────────
+
         { id: 'day_one_24h', group: 'time', title: '24-Hour Club', desc: 'Watch 24 hours total',
           icon: '⏱️', svg: 'clock', tier: 'bronze',
           progress: (ctx) => ({ current: Math.min(ctx.index.totals.seconds, 86400), target: 86400, unit: 'seconds' }) },
@@ -234,7 +234,7 @@
           icon: '🕰️', svg: 'clock', tier: 'platinum',
           progress: (ctx) => ({ current: Math.min(ctx.index.totals.seconds, 1800000), target: 1800000, unit: 'seconds' }) },
 
-        // ─── Series ────────────────────────────────────────────────────────
+
         { id: 'completionist', group: 'series', title: 'Completionist', desc: 'Finish your first series',
           icon: '✅', svg: 'check', tier: 'bronze',
           progress: (ctx) => {
@@ -275,7 +275,7 @@
           icon: '⚔️', svg: 'sword', tier: 'platinum',
           progress: (ctx) => ({ current: Math.min(longestEpisodesInOneSeries(ctx.animeData, { onlyCompleted: true }), 100), target: 100 }) },
 
-        // ─── Cinema ────────────────────────────────────────────────────────
+
         { id: 'movie_night', group: 'cinema', title: 'Movie Night', desc: 'Watch your first anime movie',
           icon: '🍿', svg: 'clapper', tier: 'bronze',
           progress: (ctx) => ({ current: Math.min(countMovies(ctx.animeData), 1), target: 1 }) },
@@ -289,7 +289,7 @@
           icon: '🎞️', svg: 'film', tier: 'platinum',
           progress: (ctx) => ({ current: Math.min(countMovies(ctx.animeData), 25), target: 25 }) },
 
-        // ─── Streaks ───────────────────────────────────────────────────────
+
         { id: 'streak_starter', group: 'streaks', title: 'Streak Starter', desc: '3-day watch streak',
           icon: '📅', svg: 'calendar7', tier: 'bronze',
           progress: (ctx) => ({ current: Math.min(ctx.streak.longestStreak, 3), target: 3 }) },
@@ -315,7 +315,7 @@
           icon: '🌋', svg: 'volcano', tier: 'platinum',
           progress: (ctx) => ({ current: Math.min(ctx.streak.longestStreak, 100), target: 100 }) },
 
-        // ─── Lifestyle ─────────────────────────────────────────────────────
+
         { id: 'night_owl', group: 'lifestyle', title: 'Night Owl', desc: 'Watch between 2am and 5am',
           icon: '🌙', svg: 'moon', tier: 'bronze',
           progress: (ctx) => {
@@ -363,18 +363,12 @@
         { id: 'lifestyle', title: 'Lifestyle', icon: '🌙' }
     ];
 
-    // Memoize the heavy badge progress loop. evaluateBadges() runs through
-    // every BADGE_DEFS entry on every popup render — for a large library
-    // (200+ anime) and ~25 badges this means ~5000 inner iterations per call.
-    // We key on the cached index+hourIndex object identity (these come from
-    // buildWatchIndex/buildHourIndex which are themselves memoized via sig)
-    // plus a JSON snapshot of the relevant existingUnlocks fields, so badge
-    // unlock-time state still flows through.
+
     let _badgeCache = null;
     function evaluateBadges(animeData, index, hourIndex, options) {
         const existingUnlocks = options?.badgeState || {};
-        // Cheap cache key: identity check on index/hourIndex (they're cached
-        // already so identity ≡ data) + lightweight stringify of unlocks.
+
+
         let unlocksKey = '';
         try { unlocksKey = JSON.stringify(existingUnlocks); } catch { unlocksKey = String(Date.now()); }
         if (
@@ -426,11 +420,7 @@
         return result;
     }
 
-    // Cooldown between consecutive auto-applies of a smart suggestion. Was
-    // 18h — too long: a user opening the popup once a day would only see one
-    // adjustment per session, even if their watch pattern shifted noticeably.
-    // 2h is short enough that the target tracks reality on the next popup
-    // open, but still gates against thrashing within a single sitting.
+
     const SMART_GOAL_AUTO_INTERVAL_MS = 2 * 60 * 60 * 1000;
 
     function toMillis(value) {

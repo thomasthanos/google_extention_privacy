@@ -1,13 +1,6 @@
-/**
- * Anime Tracker — In-Progress card renderer
- *
- * Augments `window.AnimeTracker.AnimeCardRenderer` with the "Continue
- * watching" group + its row template. Lives in its own file so the much
- * larger card / season / movie renderers stay focused.
- *
- * Loaded AFTER anime-card.js so the namespace exists; the loader in
- * popup.html enforces that order.
- */
+
+
+
 (function () {
     'use strict';
 

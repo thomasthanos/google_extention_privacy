@@ -1,26 +1,6 @@
-/**
- * Anime Tracker — Settings View
- *
- * Compact full-popup settings panel.
- *
- * Layout:
- *   • Header bar — page title + compact account pill (avatar + name + sign-out icon).
- *   • PREFERENCES label + single card with 4 toggle rows (internal dividers).
- *   • CONNECTIONS label — anilist-api.js auto-injects its card under here.
- *   • DATA label — top row (Fetch & Import + Refresh / Sync) + Backup card.
- *   • Danger zone card (Clear, Set password on desktop only).
- *   • About card (donate).
- *
- * All existing handler IDs are preserved so main.js wiring works unchanged:
- *   #settingsAvatar, #settingsUserName, #settingsUserEmail, #settingsSignOut,
- *   #settingsCopyGuard (+ subtitle), #settingsSmartNotif (+ subtitle),
- *   #settingsAutoSkipFiller (+ subtitle), #settingsSkiptime (+ subtitle),
- *   #settingsRefresh, #settingsExportData, #settingsImportData,
- *   #settingsImportFile, #settingsFetchFillers, #settingsClear,
- *   #settingsSetPassword, #settingsDonate.
- *
- * Render is idempotent — safe to call repeatedly when storage settings change.
- */
+
+
+
 (function () {
     'use strict';
 
@@ -30,7 +10,7 @@
         })[c]);
     }
 
-    // ─── SVG icon registry ───────────────────────────────────────────
+
     const ICONS = {
         signOut:  '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
         heart:    '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
@@ -55,7 +35,6 @@
                      class="settings-icon ${extraClass}" aria-hidden="true" focusable="false">${paths}</svg>`;
     }
 
-    // ─── Header pill ─────────────────────────────────────────────────
 
     function renderHeader(user) {
         const photo = user?.photoURL ? escapeHtml(user.photoURL) : 'src/icons/icon48.png';
@@ -63,9 +42,7 @@
         const email = escapeHtml(user?.email || '');
         const signedIn = !!user;
 
-        // Sign-out icon button is part of the pill on the right; sized as a
-        // tap target but visually subtle. Local-only badge replaces the pill
-        // when the user isn't signed in.
+
         return `
             <header class="settings-header" data-signed-in="${signedIn}">
                 <div class="settings-account-pill" ${signedIn ? '' : 'hidden'}
@@ -84,13 +61,11 @@
         `;
     }
 
-    // ─── Section label helper ────────────────────────────────────────
 
     function sectionLabel(text) {
         return `<div class="settings-section-label">${escapeHtml(text)}</div>`;
     }
 
-    // ─── Preferences (4 toggles in ONE card with internal dividers) ──
 
     function renderToggleItem({ id, subtitleId, iconKey, title, subtitle, enabled }) {
         const en = !!enabled;
@@ -149,13 +124,11 @@
         `;
     }
 
-    // ─── Connections (label only — anilist-api.js injects its card) ──
 
     function renderConnectionsSection() {
         return `${sectionLabel('CONNECTIONS')}`;
     }
 
-    // ─── Data section: top row + Backup card ─────────────────────────
 
     function renderDataSection() {
         return `
@@ -195,7 +168,6 @@
         `;
     }
 
-    // ─── Danger zone ─────────────────────────────────────────────────
 
     function renderDangerCard(user, passwordIsSet, isMobile) {
         const setPasswordBtn = (!user || isMobile) ? '' : (passwordIsSet ? `
@@ -228,7 +200,6 @@
         `;
     }
 
-    // ─── About ───────────────────────────────────────────────────────
 
     function renderAboutCard() {
         return `
@@ -247,7 +218,6 @@
         `;
     }
 
-    // ─── Public API ──────────────────────────────────────────────────
 
     function render(container, params = {}) {
         if (!container) return;
@@ -268,9 +238,7 @@
             auto4kServer: settings.auto4kServer !== false
         };
 
-        // Full HTML render only on first call. Subsequent calls just patch the
-        // mutable account pill + toggle states so click handlers attached in
-        // main.js stay bound to the same DOM nodes.
+
         const alreadyRendered = container.querySelector('.settings-view-inner');
         if (!alreadyRendered) {
             container.innerHTML = `
@@ -286,7 +254,7 @@
             return;
         }
 
-        // ── Account pill partial update ──────────────────────────────
+
         const avatar = container.querySelector('#settingsAvatar');
         const nameEl = container.querySelector('#settingsUserName');
         const emailEl = container.querySelector('#settingsUserEmail');
@@ -312,9 +280,7 @@
         }
         if (headerEl) headerEl.dataset.signedIn = user ? 'true' : 'false';
 
-        // ── Set-password button (Danger zone) partial update ─────────
-        // The button visibility depends on (user + passwordIsSet + isMobile).
-        // Recompute desired state and mutate only when it differs from current.
+
         const dangerCard = container.querySelector('.settings-card--danger .settings-action-grid');
         const existingSetPwBtn = dangerCard?.querySelector('#settingsSetPassword');
         const expectedState = (!user || isMobile) ? 'absent' : (passwordIsSet ? 'set' : 'unset');
@@ -345,7 +311,7 @@
             }
         }
 
-        // ── Toggle subtitle live updates ─────────────────────────────
+
         updateToggle('settingsCopyGuard', state.copyGuard,
             state.copyGuard ? 'Block copy outside allowed text' : 'Copy protection is turned off');
         updateToggle('settingsSmartNotif', state.smartNotif,
@@ -358,7 +324,7 @@
             state.auto4kServer ? 'Auto-switch to 4k server when available' : '4k auto-pick is off');
     }
 
-    // ─── Aria-live region for toggle announcements ───────────────────
+
     function _ensureSettingsLiveRegion() {
         let live = document.getElementById('settingsLiveRegion');
         if (live) return live;
@@ -372,10 +338,7 @@
         return live;
     }
 
-    /**
-     * Live-update a single toggle row without re-rendering the whole view.
-     * Called from main.js when chrome.storage changes.
-     */
+
     function updateToggle(id, enabled, subtitle) {
         const btn = document.getElementById(id);
         if (!btn) return;
@@ -404,10 +367,7 @@
     window.AnimeTracker = window.AnimeTracker || {};
     window.AnimeTracker.SettingsView = { render, updateToggle };
 
-    // ─── Initial render at script-parse time ─────────────────────────
-    // Rendered NOW (not on view-mode click) so all IDs exist in the DOM by
-    // the time main.js's IIFE caches them. main.js re-calls render() later
-    // with the actual user/settings to refresh the visible content.
+
     const initialContainer = document.getElementById('settingsView');
     if (initialContainer) {
         render(initialContainer, { user: null, settings: {} });

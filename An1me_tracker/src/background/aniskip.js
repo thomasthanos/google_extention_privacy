@@ -1,23 +1,6 @@
-/**
- * Anime Tracker — AniSkip + MAL ID resolution (background module)
- *
- * Pulled out of background.js to keep that file focused on auth/sync
- * orchestration. Functions remain at SW global scope (classic-script
- * importScripts semantics) so existing call sites in background.js continue
- * to work unchanged.
- *
- * Storage layout:
- *   - aniSkipOutroBundle:  { "<malId>:<ep>": { outroStart, cachedAt }, ... }
- *   - malIdForSlugBundle:  { "<slug>":       { malId, cachedAt },      ... }
- *   Previously each entry lived in its own chrome.storage key (`aniSkipOutro:*`,
- *   `malIdForSlug:*`); a one-shot migration below collapses them into the
- *   bundled maps and deletes the old keys.
- */
 
-// AniSkip: open community database of intro/outro timings, keyed by MAL ID.
-// Hit serves indefinitely (timestamps don't change once submitted); a "not
-// found" hit is cached for 7 days so we retry occasionally as new entries
-// land.
+
+
 const ANISKIP_OUTRO_KEY_PREFIX = 'aniSkipOutro:';
 const ANISKIP_FOUND_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const ANISKIP_MISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -65,8 +48,7 @@ async function loadSlugMalBundle() {
     return _slugMalBundleLoad;
 }
 
-// Debounced persist — multiple cache writes in quick succession (e.g. content
-// script fetching skip times for several episodes) collapse to one storage.set.
+
 let _aniSkipBundleDirty = false;
 let _aniSkipBundleFlush = null;
 function scheduleAniSkipBundleFlush() {
@@ -174,9 +156,7 @@ async function fetchAniSkipOutroStart(slug, title, episodeNumber, episodeLength)
     }
 }
 
-// One-shot migration of legacy per-key caches (`aniSkipOutro:<malId>:<ep>`,
-// `malIdForSlug:<slug>`) into bundled maps. Idempotent via the flag below.
-// On first SW boot post-deploy this collapses thousands of keys into two.
+
 const PER_KEY_CACHES_MIGRATED_FLAG = '_perKeyCachesMigratedV1';
 async function migratePerKeyCachesOnce() {
     try {
@@ -222,13 +202,12 @@ async function migratePerKeyCachesOnce() {
         if (Object.keys(slugMalMap).length > 0) payload[SLUG_TO_MAL_BUNDLE_KEY] = mergedSlugMal;
         await bgStorageSet(payload);
 
-        // Refresh in-memory mirrors so subsequent calls in this SW invocation
-        // see migrated data without an extra storage round-trip.
+
         _aniSkipBundle = mergedAniSkip;
         _slugMalBundle = mergedSlugMal;
 
         if (toDelete.length > 0) {
-            try { await bgStorageRemove(toDelete); } catch { /* best-effort */ }
+            try { await bgStorageRemove(toDelete); } catch {                   }
             (typeof dlog === 'function' ? dlog : () => {})(
                 `[BG] Migrated ${toDelete.length} per-key cache entries → 2 bundles`
             );

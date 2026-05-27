@@ -1,16 +1,6 @@
-/**
- * Anime Tracker — Firestore REST codec (single source)
- *
- * Encodes/decodes between plain JS objects and Firestore REST JSON value
- * shapes (`{stringValue: ...}`, `{mapValue: {fields: ...}}`, etc.). Replaces
- * the three near-identical copies that previously lived in background.js,
- * src/content/cloud-sync.js, and firebase-lib.js — keeping them in sync by
- * hand was a maintenance burden and a real source of drift (e.g. only one
- * copy handled `timestampValue` on the decode side).
- *
- * Exposed on globalThis.AnimeTrackerFirestoreCodec for use from MV3 service
- * worker (`importScripts`), content scripts (via <script>), and popup.
- */
+
+
+
 (function () {
     'use strict';
 
@@ -44,8 +34,8 @@
 
     function decodeValue(v) {
         if (!v) return null;
-        // Use `in` so a key explicitly set to null (e.g. nullValue) is still
-        // recognized. `!== undefined` works too but `in` is more direct.
+
+
         if ('nullValue' in v) return null;
         if ('booleanValue' in v) return v.booleanValue;
         if ('stringValue' in v) return v.stringValue;

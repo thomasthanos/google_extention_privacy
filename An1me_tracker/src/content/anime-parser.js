@@ -55,10 +55,10 @@ const AnimeParser = {
                 const match = animeSlug.match(pattern);
                 if (match) {
                     const candidate = parseInt(match[2], 10);
-                    // The bare `-NN` fallback is greedy: slugs ending in a
-                    // 4-digit year (e.g. `some-anime-2024`) would otherwise be
-                    // parsed as episode 2024. Reject year-shaped numbers when
-                    // the slug carried no explicit ep/ch/part keyword.
+
+
+
+
                     if (pattern === fallbackPattern && candidate >= 1900 && candidate <= 2099) {
                         continue;
                     }
@@ -324,9 +324,9 @@ const AnimeParser = {
                 if (Number.isFinite(n) && n > maxEpisode) maxEpisode = n;
             }
             if (!Number.isFinite(maxEpisode) || maxEpisode <= 0 || maxEpisode > 9999) return null;
-            // On airing pages the episode nav only tells us what is currently
-            // available, not the final episode count, so don't persist it as
-            // the library total unless the page is clearly marked finished.
+
+
+
             if (releaseStatus !== 'FINISHED') return null;
             return maxEpisode;
         } catch {

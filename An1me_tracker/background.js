@@ -1,6 +1,6 @@
-// Load Firebase config + Firestore codec + merge utils. Single source of
-// truth for API key/project lives in src/common/firebase-config.js (also
-// loaded by the popup and content scripts via their respective entry points).
+
+
+
 importScripts(
     'src/common/firebase-config.js',
     'src/common/auth-classifier.js',
@@ -24,9 +24,9 @@ const CLOUD_CONSUMER_POLL_MIN_GAP_MS = 3 * 60 * 1000;
 
 importScripts('src/common/merge-utils.js', 'src/common/firestore-codec.js');
 
-// AniList background sync — core engine (shared with the popup) + the SW-side
-// driver that pushes progress without the popup being open. anilist-sync.js
-// depends on AniListCore, so the order here matters.
+
+
+
 importScripts('src/common/anilist-core.js', 'src/background/anilist-sync.js');
 
 const sharedMergeUtils = self.AnimeTrackerMergeUtils || {};
@@ -48,7 +48,7 @@ const shallowEqualObjectMap = sharedMergeUtils.shallowEqualObjectMap || missingM
 const isLikelyMovieSlug = sharedMergeUtils.isLikelyMovieSlug || missingMergeUtil('isLikelyMovieSlug');
 const isPlaceholderDuration = sharedMergeUtils.isPlaceholderDuration || missingMergeUtil('isPlaceholderDuration');
 const stripAutoRepairedEpisodesFromMap = sharedMergeUtils.stripAutoRepairedEpisodesFromMap
-    || ((m) => m); // legacy fallback — better to no-op than crash if util missing
+    || ((m) => m);
 
 const BG_DEBUG = false;
 const dlog = (...a) => { if (BG_DEBUG) console.log(...a); };
@@ -57,10 +57,10 @@ const ddebug = (...a) => { if (BG_DEBUG) console.debug(...a); };
 const COMPLETED_PERCENTAGE = 85;
 const DELETED_ANIME_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_PROGRESS_ENTRIES = 200;
-// Keep videoProgress tombstones (`deleted:true`) for this long so cross-device
-// deletions propagate even if the receiving device only syncs days later.
-// Without the grace period, the SW's syncProgressOnly path stripped tombstones
-// ~5 minutes after deletion, leaving the deletion to silently disappear.
+
+
+
+
 const PROGRESS_TOMBSTONE_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 
 function stripFirebaseSilentAnimeMetadata(anime) {
@@ -104,10 +104,10 @@ function areAnimeDataEqualIgnoringFetchMetadata(oldAnime = {}, newAnime = {}) {
     return true;
 }
 
-// Survives SW kills: when a setTimeout(syncToFirebase, ...) is scheduled we
-// stamp this key. If the SW is terminated before the timer fires, the next
-// SW wake-up sees the stamp and flushes a sync immediately so the user's
-// change isn't lost until they happen to reopen the popup.
+
+
+
+
 const PENDING_SYNC_KEY = 'pendingSyncFlush';
 
 function markSyncPending() {
@@ -149,10 +149,10 @@ function cleanTrackedProgressBg(animeData, videoProgress, deletedAnime = {}) {
     for (const [slug, anime] of Object.entries(animeData)) {
         if (anime.episodes) {
             for (const ep of anime.episodes) {
-                // Keep current replay progress while a title is on hold.
+
                 if (anime.onHoldAt || anime.listState === 'on_hold') continue;
-                // AniList history is not a playback event; older imports
-                // may still carry a bogus watchedAt stamp.
+
+
                 if (ep?.durationSource === 'anilist') continue;
                 trackedIds.add(`${slug}__episode-${ep.number}`);
             }
@@ -170,9 +170,9 @@ function cleanTrackedProgressBg(animeData, videoProgress, deletedAnime = {}) {
         if (isTracked) continue;
         if (isCompleted) continue;
         if (progress.deleted) {
-            // Keep recent tombstones so they propagate cross-device. Strip
-            // only ones older than the keep window — those have had plenty
-            // of time to reach every device.
+
+
+
             const deletedAt = progress.deletedAt ? new Date(progress.deletedAt).getTime() : 0;
             if (deletedAt && (now - deletedAt) < PROGRESS_TOMBSTONE_KEEP_MS) {
                 cleaned[id] = progress;
@@ -220,11 +220,11 @@ function pruneDeletedAnime(deletedAnime) {
     }
 }
 
-// ─── Task 11: Iterative quota recovery + nightly cleanup alarm (BG) ──────
+
 const DAILY_CLEANUP_ALARM = 'dailyCleanup';
-const DAILY_CLEANUP_USAGE_THRESHOLD = 0.70;     // run when bytes > 70% quota
-const DAILY_CLEANUP_TARGET = 0.70;              // recover until ≤ 70% quota
-const QUOTA_BYTES_BG = 10 * 1024 * 1024;        // matches MV3 chrome.storage.local quota
+const DAILY_CLEANUP_USAGE_THRESHOLD = 0.70;
+const DAILY_CLEANUP_TARGET = 0.70;
+const QUOTA_BYTES_BG = 10 * 1024 * 1024;
 
 function bgMeasureBytes() {
     return new Promise((res) => {
@@ -233,11 +233,11 @@ function bgMeasureBytes() {
     });
 }
 
-/**
- * Mirror of popup recoverFromQuotaPressure for SW-driven cleanup. Drops
- * scraper caches first (cheapest), then iteratively trims videoProgress
- * if still over target. Up to 3 passes.
- */
+
+
+
+
+
 async function bgIterativeQuotaRecovery(reason = 'daily-alarm') {
     try {
         const bytesBefore = await bgMeasureBytes();
@@ -269,7 +269,7 @@ async function bgIterativeQuotaRecovery(reason = 'daily-alarm') {
         });
         let cap = Math.min(2000, sorted.length);
         let trimmed = Object.fromEntries(sorted.slice(0, cap));
-        // Tombstones older than 30d are safe to drop server-side; keep ≤1500.
+
         const dCleaned = {};
         const dCutoff = Date.now() - 10 * 24 * 60 * 60 * 1000;
         const dEntries = Object.entries(localDeleted).sort((a, b) => {
@@ -311,12 +311,12 @@ async function bgIterativeQuotaRecovery(reason = 'daily-alarm') {
     }
 }
 
-/**
- * Pick a per-device random execution time inside the 03:00–05:00 local
- * window, then schedule a periodic alarm. Persisting the jitter to
- * storage prevents re-rolling the random hour on every SW reboot, which
- * would defeat the stampede-avoidance goal.
- */
+
+
+
+
+
+
 async function ensureDailyCleanupAlarmScheduled() {
     try {
         const KEY = '_dailyCleanupNextAt';
@@ -324,10 +324,10 @@ async function ensureDailyCleanupAlarmScheduled() {
         let nextAt = Number(stored[KEY]) || 0;
         const now = Date.now();
         if (!nextAt || nextAt < now) {
-            // Pick a target between 03:00:00 and 05:00:00 *tomorrow* local.
+
             const next = new Date();
             next.setDate(next.getDate() + 1);
-            next.setHours(3 + Math.floor(Math.random() * 2));            // 3 or 4
+            next.setHours(3 + Math.floor(Math.random() * 2));
             next.setMinutes(Math.floor(Math.random() * 60));
             next.setSeconds(Math.floor(Math.random() * 60));
             next.setMilliseconds(0);
@@ -337,7 +337,7 @@ async function ensureDailyCleanupAlarmScheduled() {
         try {
             chrome.alarms.create(DAILY_CLEANUP_ALARM, {
                 when: nextAt,
-                periodInMinutes: 1440           // 24 h
+                periodInMinutes: 1440
             });
             dlog(`[Cleanup] daily alarm scheduled for ${new Date(nextAt).toLocaleString()}`);
         } catch (e) {
@@ -384,21 +384,21 @@ function bgStorageRemove(keys) {
     });
 }
 
-// 5-min progress-sync debounce. Uses chrome.alarms instead of setTimeout so
-// it survives MV3 service-worker kills (setTimeout >30s is unreliable in MV3).
-// Metadata-repair alarm/constants live in src/background/metadata-repair.js.
+
+
+
 const PROGRESS_SYNC_ALARM = 'progressSyncDebounce';
 
-// Retry alarms for failed Firestore writes. Previously a 5xx / network error
-// from syncToFirebase or syncProgressOnly logged + bailed, leaving
-// `pendingSyncFlush` set but with no scheduled retry — the next change had to
-// come along to wake the SW before another attempt would fire. These alarms
-// run independently so a quiet user (e.g. closed laptop, then reopened with
-// stale state) still gets the change pushed up.
+
+
+
+
+
+
 const FULL_SYNC_RETRY_ALARM = 'fullSyncRetry';
 const PROGRESS_SYNC_RETRY_ALARM = 'progressSyncRetry';
-// Backoff schedule (in minutes) — 1 min → 5 min → 15 min, then capped.
-// chrome.alarms clamps any delay < 1 min to 1 min in released extensions.
+
+
 const SYNC_RETRY_BACKOFF_MIN = [1, 5, 15];
 let _fullSyncRetryAttempts = 0;
 let _progressSyncRetryAttempts = 0;
@@ -445,9 +445,9 @@ function clearSyncRetry(kind) {
     try { chrome.alarms.clear(s.alarmName).catch(() => {}); } catch {}
 }
 
-// Force the next getFirebaseToken() to refresh by zeroing the cached expiry.
-// Used after a 401 response from Firestore so the next attempt picks up a
-// fresh idToken without us reaching into the refresh single-flight directly.
+
+
+
 async function _invalidateCachedTokenExpiry() {
     try {
         const stored = await bgStorageGet(['firebase_tokens']);
@@ -460,8 +460,8 @@ async function _invalidateCachedTokenExpiry() {
     }
 }
 
-// Library metadata repair (state, plan, batch runner, retry helpers) lives
-// in src/background/metadata-repair.js. Loaded via importScripts above.
+
+
 
 let syncInProgress = false;
 let pendingSync = false;
@@ -478,11 +478,11 @@ function isSyncPaused() {
 let _lastCloudPollAt = 0;
 let _cloudPollInFlight = null;
 
-// Persist the last-poll timestamp so cold starts (especially on mobile, where
-// the MV3 service worker is killed aggressively) don't trigger a fresh
-// Firestore read every time a consumer reconnects. Without this, opening the
-// popup on Orion right after the SW is recycled spends a read on every poll
-// even though the cloud doc hasn't changed.
+
+
+
+
+
 const _LAST_POLL_KEY = '_bgLastCloudPollAt';
 const _LAST_PROGRESS_SYNC_KEY = '_bgLastProgressSyncAt';
 const _RECENT_OWN_WRITES_KEY = '_bgRecentOwnWrites';
@@ -499,8 +499,8 @@ function hydrateBgPollState() {
             ]);
             const cloud = Number(stored[_LAST_POLL_KEY]) || 0;
             const progress = Number(stored[_LAST_PROGRESS_SYNC_KEY]) || 0;
-            // Only hydrate values from the past — guards against future-dated
-            // timestamps after a clock change.
+
+
             const now = Date.now();
             if (cloud > 0 && cloud <= now) _lastCloudPollAt = cloud;
             if (progress > 0 && progress <= now) _lastProgressSyncAt = progress;
@@ -522,7 +522,7 @@ function hydrateBgPollState() {
                 if (stalePruned) persistOwnWrites();
             }
         } catch {
-            // Best-effort — fall back to zero (poll on next consumer connect).
+
         }
     })();
     return _bgHydrationPromise;
@@ -561,8 +561,8 @@ function addStreamConsumer(id) {
     }
 
     if (wasEmpty) {
-        // Single consumer woke us up — fetch the cloud doc once so
-        // popup/content land on fresh data without waiting for a debounce.
+
+
         pollCloudData('consumer-connected').catch(() => { });
     }
 }
@@ -576,8 +576,8 @@ function removeStreamConsumer(id) {
     _idleTeardownTimer = setTimeout(() => {
         _idleTeardownTimer = null;
         if (activeStreamConsumers.size > 0) return;
-        // Last consumer left — flush any pending progress write so we don't
-        // leave watch-time unflushed when the user closes the last tab.
+
+
         flushPendingProgressSync().catch(() => {});
     }, IDLE_TEARDOWN_GRACE_MS);
 }
@@ -589,33 +589,33 @@ async function signOutDueToTokenFailure() {
     } catch (e) {
         console.error('[BG] Failed to clear auth storage during sign-out:', e);
     }
-    // Drop the cloud-doc cache eagerly so a subsequent sign-in (even as the
-    // same uid) doesn't serve a stale snapshot from before the token failure,
-    // and a sign-in as a different account can never receive account A's doc.
+
+
+
     invalidateBgCloudDocCache();
-    // Task 9: cancel auth + sync alarms so a signed-out browser doesn't
-    // keep waking the SW for retries that have nothing to push.
+
+
     clearAuthAndSyncAlarms().catch((e) => console.warn('[BG] alarm cleanup on sign-out failed:', e?.message || e));
 }
 
-/**
- * Task 9: Cancel all auth-state and sync-driven alarms. Called from
- * signOutDueToTokenFailure (BG path) and from the popup-driven SIGNED_OUT
- * runtime message (popup path).
- *
- * CLEARED:
- *   • auth-refresh-retry          (popup-side; harmless to clear from BG)
- *   • auth-refresh-retry-bg       (BG-side refresh state machine)
- *   • progressSyncDebounce        (5-min debounced progress push)
- *   • fullSyncRetry               (Task-prior backoff retry)
- *   • progressSyncRetry           (Task-prior backoff retry)
- *   • dailyCleanup                (Task 11 — added later)
- *
- * NOT CLEARED (intentional):
- *   • metadataRepairAlarm   — local repair pass should finish even after
- *                              sign-out; data is still in chrome.storage.local.
- *   • SMART_NOTIF_ALARM     — notification toggle is independent of auth.
- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 async function clearAuthAndSyncAlarms() {
     const names = [
         'auth-refresh-retry',
@@ -623,19 +623,19 @@ async function clearAuthAndSyncAlarms() {
         PROGRESS_SYNC_ALARM,
         FULL_SYNC_RETRY_ALARM,
         PROGRESS_SYNC_RETRY_ALARM,
-        'dailyCleanup'                         // forward declaration for Task 11
+        'dailyCleanup'
     ];
     for (const n of names) {
-        try { await chrome.alarms.clear(n); } catch { /* ignore */ }
+        try { await chrome.alarms.clear(n); } catch {              }
     }
     dlog('[BG] Cleared auth + sync alarms (sign-out)');
 }
 
-/**
- * Task 10: Broadcast a 401/403 to any open popup so it can render a
- * "permission denied" toast. Best-effort — no popup open is the common
- * case, runtime.lastError is swallowed.
- */
+
+
+
+
+
 function _broadcastAuthRejected(status, body) {
     try {
         chrome.runtime.sendMessage({
@@ -643,7 +643,7 @@ function _broadcastAuthRejected(status, body) {
             status,
             body: typeof body === 'string' ? body.slice(0, 240) : ''
         }, () => { void chrome.runtime.lastError; });
-    } catch { /* popup not open or messaging unavailable — non-fatal */ }
+    } catch {                                                           }
 }
 
 async function getFirebaseToken() {
@@ -652,12 +652,12 @@ async function getFirebaseToken() {
         const tokens = stored.firebase_tokens;
         if (!tokens?.idToken) return null;
 
-        // Task 4: when the state machine has flipped needsReauth, the user
-        // has explicitly been asked to sign in again. Don't burn refresh
-        // attempts (which are still failing) or invoke the alarm cycle —
-        // wait for an interactive sign-in. If the existing idToken is still
-        // valid for >30s we use it (best-effort: lets reads succeed while
-        // the banner is shown); otherwise return null and let callers decide.
+
+
+
+
+
+
         if (tokens.needsReauth) {
             const stillValid = tokens.expiresAt && tokens.expiresAt > Date.now() + 30000;
             if (stillValid) return tokens.idToken;
@@ -667,26 +667,26 @@ async function getFirebaseToken() {
         if (tokens.expiresAt < Date.now() + 120000) {
             const result = await refreshFirebaseToken(tokens.refreshToken);
             if (!result || !result.tokens) {
-                // Refresh failed. Distinguish permanent vs transient — only
-                // permanent failures (revoked refresh token, disabled account)
-                // should sign the user out. Transient failures (network blip
-                // during cold boot, server 5xx, rate limit) on mobile/Orion
-                // were the root cause of the "every reload signs me out" bug.
+
+
+
+
+
                 if (result?.permanent) {
                     console.warn(`[BG] Refresh token rejected (permanent: ${result.error || '?'}) — signing out`);
                     await signOutDueToTokenFailure();
                     return null;
                 }
-                // Transient. If existing idToken is still valid (>30s left),
-                // use it — better than signing the user out for a network blip.
-                // Backoff-driven retry is already armed via _bgOnRefreshTransient.
+
+
+
                 const stillValid = tokens.expiresAt && tokens.expiresAt > Date.now() + 30000;
                 if (stillValid) {
                     console.warn(`[BG] Token refresh transiently failed (${result?.error || 'unknown'}); using existing token (${Math.round((tokens.expiresAt - Date.now()) / 1000)}s left)`);
                     return tokens.idToken;
                 }
-                // No usable token AND error is transient — return null but
-                // keep session intact so the next call can retry.
+
+
                 console.warn(`[BG] Token refresh transiently failed and existing token expired; will retry on next call/alarm`);
                 return null;
             }
@@ -701,17 +701,17 @@ async function getFirebaseToken() {
 
 let _bgRefreshInflight = null;
 
-// Task 3: Classification of refresh-token failures lives in the shared
-// module src/common/auth-classifier.js (loaded via importScripts at the
-// top of this file). Single source of truth across popup / SW / content.
-//
-// POLICY (from Task 1): HTTP 401 / 403 are TRANSIENT, not permanent.
-// ONLY HTTP 400 + a recognised permanent code signs the user out.
+
+
+
+
+
+
 function _bgClassifyRefreshError(httpStatus, errorBody) {
     const cl = self.AnimeTrackerAuthClassifier;
     if (!cl) {
-        // Fail-safe: treat as transient when the classifier hasn't loaded.
-        // Better to retry than to silently sign someone out.
+
+
         return false;
     }
     return cl.classify(httpStatus, errorBody).permanent;
@@ -732,7 +732,7 @@ async function refreshFirebaseToken(refreshToken) {
                 }
             );
         } catch (networkErr) {
-            // fetch threw → network/abort/DNS — always transient.
+
             console.warn('[BG] Token refresh network error:', networkErr?.message || networkErr);
             await _bgOnRefreshTransient(`network: ${networkErr?.message || networkErr}`);
             return { tokens: null, permanent: false, error: `network: ${networkErr?.message || networkErr}` };
@@ -768,21 +768,21 @@ async function refreshFirebaseToken(refreshToken) {
             refreshToken: data.refresh_token,
             expiresAt: Date.now() + parseInt(data.expires_in) * 1000
         };
-        // Task 4: stamp v2 schema fields on success. writeTokens preserves
-        // any existing fields (lastAuthCheck, needsReauth) — markAuthCheckOk
-        // explicitly clears the backoff state. Falls back to plain set when
-        // the helper isn't loaded so we don't regress.
+
+
+
+
         const tokensHelper = self.AnimeTrackerAuthTokens;
         if (tokensHelper) {
-            // First persist the new credential triple, THEN flip the success
-            // markers. Two writes are intentional — markAuthCheckOk reads the
-            // current tokens via readTokens() so it must see the new fields.
+
+
+
             await bgStorageSet({ firebase_tokens: { ...tokens, version: 2 } });
             await tokensHelper.markAuthCheckOk();
         } else {
             await bgStorageSet({ firebase_tokens: tokens });
         }
-        // Successful refresh — clear any pending retry alarm.
+
         try { chrome.alarms.clear(AUTH_REFRESH_RETRY_BG_ALARM).catch(() => {}); } catch {}
         dlog('[BG] Token refreshed');
         return { tokens, permanent: false, error: null };
@@ -792,30 +792,30 @@ async function refreshFirebaseToken(refreshToken) {
     return p;
 }
 
-// ─── Task 4: Resilient refresh state machine (BG side) ────────────────────
-// Alarm-driven exponential backoff [1, 5, 15, 60, 360] minutes after a
-// transient refresh failure. After MAX_AUTH_REFRESH_ATTEMPTS consecutive
-// transient failures, OR after AUTH_OFFLINE_GRACE_MS since the last
-// successful refresh, we set tokens.needsReauth=true and stop retrying —
-// but tokens are NOT cleared. The popup picks up the flag and surfaces a
-// "Reconnect" banner. Permanent failures still call signOutDueToTokenFailure
-// directly; the state machine is for transient failures only.
-const AUTH_REFRESH_RETRY_BG_ALARM = 'auth-refresh-retry-bg';
-const AUTH_REFRESH_BACKOFF_MIN = [1, 5, 15, 60, 360];   // 1m, 5m, 15m, 1h, 6h
-const MAX_AUTH_REFRESH_ATTEMPTS = AUTH_REFRESH_BACKOFF_MIN.length;
-const AUTH_OFFLINE_GRACE_MS = 7 * 24 * 60 * 60 * 1000;  // 7 days
 
-/**
- * Called from each transient-failure branch in refreshFirebaseToken.
- * Bumps the attempt counter, arms the next retry alarm, and flips
- * needsReauth=true once the budget is exhausted.
- */
+
+
+
+
+
+
+
+const AUTH_REFRESH_RETRY_BG_ALARM = 'auth-refresh-retry-bg';
+const AUTH_REFRESH_BACKOFF_MIN = [1, 5, 15, 60, 360];
+const MAX_AUTH_REFRESH_ATTEMPTS = AUTH_REFRESH_BACKOFF_MIN.length;
+const AUTH_OFFLINE_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
+
+
+
+
+
+
 async function _bgOnRefreshTransient(reason) {
     const helper = self.AnimeTrackerAuthTokens;
-    if (!helper) return;       // pre-Task-2 boot path — nothing to record
+    if (!helper) return;
     try {
         const updated = await helper.markAuthRefreshTransientFailure();
-        if (!updated) return;  // no tokens stored
+        if (!updated) return;
         const attempts = Number(updated.authRefreshAttempts) || 0;
         const lastOk = Number(updated.lastAuthCheck) || 0;
         const offlineFor = lastOk ? (Date.now() - lastOk) : 0;
@@ -825,12 +825,12 @@ async function _bgOnRefreshTransient(reason) {
         if (exceededAttempts || exceededGrace) {
             await helper.setNeedsReauth(true);
             console.warn(`[BG] Auth: needsReauth=true (attempts=${attempts}, offlineFor=${Math.round(offlineFor / 86400000)}d, reason=${reason})`);
-            // Stop retrying; user must sign in to clear the flag.
+
             try { chrome.alarms.clear(AUTH_REFRESH_RETRY_BG_ALARM).catch(() => {}); } catch {}
             return;
         }
 
-        // Arm next retry. Index is 1-based attempts → 0-based array.
+
         const idx = Math.min(attempts - 1, AUTH_REFRESH_BACKOFF_MIN.length - 1);
         const delayMin = AUTH_REFRESH_BACKOFF_MIN[idx];
         try {
@@ -844,25 +844,25 @@ async function _bgOnRefreshTransient(reason) {
     }
 }
 
-/**
- * Alarm handler — called from chrome.alarms.onAlarm when the backoff
- * timer fires. Re-attempts a refresh against the stored refreshToken; on
- * success the alarm is cleared and the success path resets counters.
- * On further failure, refreshFirebaseToken's own logic re-arms the alarm
- * with the next backoff step (or sets needsReauth when exhausted).
- */
+
+
+
+
+
+
+
 async function _bgAuthRefreshRetryTick() {
     try {
         const helper = self.AnimeTrackerAuthTokens;
         const tokens = helper ? await helper.readTokens() : null;
         if (!tokens || !tokens.refreshToken) {
-            // No session to refresh — drop the alarm.
+
             try { chrome.alarms.clear(AUTH_REFRESH_RETRY_BG_ALARM).catch(() => {}); } catch {}
             return;
         }
         if (tokens.needsReauth) {
-            // User has been told to reconnect; don't burn alarms while we
-            // wait for an interactive sign-in.
+
+
             try { chrome.alarms.clear(AUTH_REFRESH_RETRY_BG_ALARM).catch(() => {}); } catch {}
             return;
         }
@@ -883,20 +883,20 @@ const _fsCodec = self.AnimeTrackerFirestoreCodec || {};
 const jsonToFirestoreFields = _fsCodec.encodeFields || (() => { throw new Error('[BG] Firestore codec not loaded'); });
 const fromFSDoc = _fsCodec.decodeDoc || (() => null);
 
-// Single-flight in-flight tracker for concurrent fetchCloudData callers.
-// Without this, a cold SW boot where addStreamConsumer triggers
-// pollCloudData and the popup simultaneously sends GET_CLOUD_DOC results in
-// TWO Firestore reads in parallel for the same uid — both sides race,
-// neither sees the other's in-flight promise. Keying by uid keeps an
-// account-swap from leaking one user's fetch promise into another's path.
+
+
+
+
+
+
 let _fetchInFlightUid = null;
 let _fetchInFlightPromise = null;
 
 async function fetchCloudData(user, token) {
-    // Reuse an existing in-flight read if one is already running for the
-    // same user. Both pollCloudData (uncached path) and fetchCloudDataCached
-    // (on cache miss) call into here, so the dedup happens at the lowest
-    // level — any future caller automatically inherits the dedup too.
+
+
+
+
     if (_fetchInFlightUid === user.uid && _fetchInFlightPromise) {
         return _fetchInFlightPromise;
     }
@@ -906,18 +906,18 @@ async function fetchCloudData(user, token) {
             const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
             const response = await fetchWithTimeout(url, { headers: { 'Authorization': `Bearer ${token}` } });
             if (response.status === 404) {
-                // A missing user document is the only safe "empty cloud" state.
+
                 return null;
             }
             if (!response.ok) {
-                // Log the actual status so we can diagnose silent fetch failures
-                // (a 401 from a stale SW token, 403 from rules denial, or
-                // server failure). Previously every non-OK was
-                // collapsed into a silent null and the popup couldn't tell why.
+
+
+
+
                 const body = await response.text().catch(() => '');
                 console.warn(`[BG] fetchCloudData HTTP ${response.status} for users/${user.uid.slice(0, 8)}…: ${body.slice(0, 160)}`);
-                // Annotate the cache with the failure status so the SW message
-                // handler can surface it to the popup.
+
+
                 const err = new Error(`HTTP ${response.status}`);
                 err.status = response.status;
                 err.body = body;
@@ -925,8 +925,8 @@ async function fetchCloudData(user, token) {
             }
             return fromFSDoc(await response.json());
         } catch (e) {
-            // Do not turn a failed read into an empty cloud document. A writer
-            // must merge against known state or retry instead of overwriting it.
+
+
             throw e;
         }
     })();
@@ -951,13 +951,13 @@ async function pollCloudData(reason = 'consumer-connected', { force = false } = 
             await hydrateBgPollState();
             if (!force && (Date.now() - _lastCloudPollAt) < CLOUD_CONSUMER_POLL_MIN_GAP_MS) return null;
 
-            // Short-circuit: if our in-memory / persisted SW cache is still
-            // fresh (was populated within the last poll interval), skip the
-            // network read entirely. Without this, every consumer-connected
-            // wake on mobile (where SW gets killed often) burns a Firestore
-            // read just to retrieve the same doc the cache already has.
-            // The cache TTL is the real freshness window; the 3-min poll
-            // gap was just a safety net.
+
+
+
+
+
+
+
             await hydrateBgCloudDocCache();
             const user = await getFirebaseUser();
             const token = await getFirebaseToken();
@@ -969,14 +969,14 @@ async function pollCloudData(reason = 'consumer-connected', { force = false } = 
                 _bgCloudDocCacheUid === user.uid &&
                 (Date.now() - _bgCloudDocCacheTime) < _BG_CLOUD_TTL;
             if (cacheFresh) {
-                // Bump _lastCloudPollAt anyway so the 3-min gate honors this
-                // attempt — otherwise back-to-back consumer reconnects would
-                // re-enter and eventually hit the network when cache expires
-                // even if local data is unchanged.
+
+
+
+
                 _lastCloudPollAt = Date.now();
                 persistBgPollState({ cloudPollAt: _lastCloudPollAt });
                 dlog(`[BG-RT] Poll skipped (${reason}) — cache still fresh (${Math.round((Date.now() - _bgCloudDocCacheTime) / 1000)}s old)`);
-                // Re-apply silently so any local state that drifted catches up.
+
                 if (_bgCloudDocCache) await applyCloudUpdate(_bgCloudDocCache);
                 return _bgCloudDocCache;
             }
@@ -1000,30 +1000,30 @@ async function pollCloudData(reason = 'consumer-connected', { force = false } = 
     return _cloudPollInFlight;
 }
 
-// SW cloud-doc cache. Kept in memory for hot reads, AND persisted to
-// chrome.storage.local under `_bgCloudDocCache` so an SW kill (MV3 idle
-// after ~30s) doesn't lose it. Without persistence, every cold popup open
-// burns a Firestore read; with it, the same library can be served for a
-// full TTL window without touching Firestore.
-//
-// Cache entries are uid-bound — both in memory (`_bgCloudDocCacheUid`) and
-// on disk (persisted entry shape: `{ uid, doc, cachedAt }`). Without this,
-// signing out and signing back in as a different user inside the TTL window
-// could leak account A's library to account B (wrong-account merge / data
-// leak). Every read path verifies uid; auth changes (sign-out, uid swap)
-// invalidate the cache eagerly.
+
+
+
+
+
+
+
+
+
+
+
+
 let _bgCloudDocCache = null;
 let _bgCloudDocCacheTime = 0;
 let _bgCloudDocCacheUid = null;
-const _BG_CLOUD_TTL = 10 * 60 * 1000;          // Task 6/7 — aligned with popup USER_DOCUMENT_CACHE_TTL_MS
+const _BG_CLOUD_TTL = 10 * 60 * 1000;
 const _BG_CLOUD_CACHE_KEY = '_bgCloudDocCachePersisted';
 
-// Hydrate on SW boot — restores cache from disk if still fresh AND the
-// persisted uid matches the currently-stored firebase_user. Legacy entries
-// without `uid` are discarded (safer than guessing whose library it was).
+
+
+
 let _bgCloudCacheHydratePromise = null;
 async function hydrateBgCloudDocCache() {
-    if (_bgCloudDocCache) return;        // already hot
+    if (_bgCloudDocCache) return;
     if (_bgCloudCacheHydratePromise) return _bgCloudCacheHydratePromise;
     _bgCloudCacheHydratePromise = (async () => {
         try {
@@ -1042,11 +1042,11 @@ async function hydrateBgCloudDocCache() {
                 _bgCloudDocCacheTime = entry.cachedAt;
                 _bgCloudDocCacheUid = entry.uid;
             } else if (entry) {
-                // Stale, mismatched, or schema-less — drop it eagerly so a
-                // later wrong-account read can never resurrect it.
+
+
                 bgStorageSet({ [_BG_CLOUD_CACHE_KEY]: null }).catch(() => {});
             }
-        } catch { /* fresh start */ }
+        } catch {                   }
     })();
     return _bgCloudCacheHydratePromise;
 }
@@ -1055,17 +1055,17 @@ function invalidateBgCloudDocCache() {
     _bgCloudDocCache = null;
     _bgCloudDocCacheTime = 0;
     _bgCloudDocCacheUid = null;
-    // Best-effort: drop the persisted copy too. Failures here are non-fatal —
-    // worst case we serve a stale doc until the next successful fetch.
+
+
     bgStorageSet({ [_BG_CLOUD_CACHE_KEY]: null }).catch(() => {});
 }
 
-// ─── Task 7: BG-side cache short-circuit (mirrors popup Task 6) ───────────
-// On a stale cache hit (same uid, but older than _BG_CLOUD_TTL), issue a
-// tiny mask GET on `lastUpdated`. If it equals the cached value the doc
-// hasn't changed; reuse the cached entry and bump cachedAt. Otherwise fall
-// through to a full fetch. Behind the CACHE_SHORT_CIRCUIT_ENABLED feature
-// flag (defaults true).
+
+
+
+
+
+
 async function _isCacheShortCircuitEnabledBg() {
     try {
         const stored = await bgStorageGet(['_featureFlags']);
@@ -1077,13 +1077,13 @@ async function _isCacheShortCircuitEnabledBg() {
 
 const _bgCacheStats = { fresh: 0, revalidated: 0, fullFetch: 0 };
 
-/**
- * Issue a `?mask.fieldPaths=lastUpdated` GET against the user's Firestore
- * doc. Returns the cloud `lastUpdated` value, null if the doc is missing,
- * or undefined when the probe couldn't complete (caller should fall back
- * to a full fetch). Throws on auth errors so the existing 401/403 handler
- * catches them.
- */
+
+
+
+
+
+
+
 async function _revalidateCloudDocViaLastUpdated(user, token, cachedLastUpdated) {
     if (!user || !token || !cachedLastUpdated) return undefined;
     const url = `${FIRESTORE_BASE}/documents/users/${user.uid}?mask.fieldPaths=lastUpdated`;
@@ -1091,7 +1091,7 @@ async function _revalidateCloudDocViaLastUpdated(user, token, cachedLastUpdated)
     try {
         response = await fetchWithTimeout(url, { headers: { 'Authorization': `Bearer ${token}` } });
     } catch (e) {
-        // Network error → fall back to full fetch.
+
         return undefined;
     }
     if (response.status === 404) return null;
@@ -1112,10 +1112,10 @@ async function _revalidateCloudDocViaLastUpdated(user, token, cachedLastUpdated)
 async function fetchCloudDataCached(user, token) {
     await hydrateBgCloudDocCache();
     const now = Date.now();
-    // uid guard — never serve another user's cached doc, even if the in-memory
-    // copy is still inside the TTL window. A signed-out → signed-in-as-other
-    // flow inside 10 minutes would otherwise return account A's library to
-    // account B's PATCH path.
+
+
+
+
     if (_bgCloudDocCache && _bgCloudDocCacheUid === user.uid && (now - _bgCloudDocCacheTime) < _BG_CLOUD_TTL) {
         _bgCacheStats.fresh++;
         return _bgCloudDocCache;
@@ -1124,10 +1124,10 @@ async function fetchCloudDataCached(user, token) {
         invalidateBgCloudDocCache();
     }
 
-    // Task 7: lastUpdated short-circuit. When we have a stale cache for
-    // this uid, attempt a mask GET first. Match → reuse cache (no full
-    // fetch). Mismatch / null cloudLastUpdated / probe-failed → fall
-    // through to the existing full fetch.
+
+
+
+
     if (
         _bgCloudDocCache &&
         _bgCloudDocCacheUid === user.uid &&
@@ -1145,13 +1145,13 @@ async function fetchCloudDataCached(user, token) {
                 dlog(`[BG] Poll skipped — lastUpdated unchanged (revalidated ${_bgCacheStats.revalidated} times)`);
                 return _bgCloudDocCache;
             }
-            // cloudLastUpdated null → 404 → drop cache. Mismatch → drop, do full fetch.
+
             if (cloudLastUpdated !== undefined) {
                 invalidateBgCloudDocCache();
             }
         } catch (e) {
             if (e?.status === 401 || e?.status === 403) throw e;
-            // Other probe failures: fall through to full fetch silently.
+
         }
     }
 
@@ -1159,8 +1159,8 @@ async function fetchCloudDataCached(user, token) {
     try {
         doc = await fetchCloudData(user, token);
     } catch (e) {
-        // Network, timeout, and HTTP errors must not become an empty document.
-        // A real missing document is returned as null from HTTP 404 above.
+
+
         const err = new Error(e?.message || 'Fetch failed');
         err.status = e?.status || null;
         err.isTimeout = !!e?.isTimeout;
@@ -1172,7 +1172,7 @@ async function fetchCloudDataCached(user, token) {
         _bgCloudDocCacheTime = Date.now();
         _bgCloudDocCacheUid = user.uid;
         _bgCacheStats.fullFetch++;
-        // Persist asynchronously so the next SW boot can serve from disk.
+
         bgStorageSet({
             [_BG_CLOUD_CACHE_KEY]: { uid: user.uid, doc, cachedAt: _bgCloudDocCacheTime }
         }).catch(() => {});
@@ -1186,8 +1186,8 @@ let lastPushedProgressBG = null;
 
 let _lastProgressSyncAt = 0;
 
-// Serializes ALL Firestore writes (full sync + progress-only) so two PATCH
-// requests with overlapping field masks can't race and clobber each other.
+
+
 let _firestoreWriteQueue = Promise.resolve();
 function enqueueFirestoreWrite(fn) {
     const next = _firestoreWriteQueue.then(fn, fn);
@@ -1212,37 +1212,37 @@ async function syncProgressOnly() {
 
         localVP = cleanTrackedProgressBg(result.animeData || {}, localVP, result.deletedAnime || {});
 
-        // Cloud-first merge: pull the current Firestore videoProgress (cached
-        // — usually a no-op read) and merge per-key into the local map before
-        // PATCH-ing. Without this, Firestore's updateMask would replace the
-        // whole `videoProgress` map field with our local copy, silently
-        // dropping any per-episode progress another device pushed inside our
-        // 5-min debounce window.
+
+
+
+
+
+
         let mergedVP = localVP;
         try {
             const cloudDoc = await fetchCloudDataCached(user, token);
             if (cloudDoc?.videoProgress) {
                 mergedVP = mergeVideoProgress(localVP, cloudDoc.videoProgress);
-                // Re-clean post-merge — cloud may carry tombstones / now-tracked
-                // episodes whose entries should now be filtered.
+
+
                 mergedVP = cleanTrackedProgressBg(result.animeData || {}, mergedVP, result.deletedAnime || {});
             }
         } catch (e) {
-            // Never replace the cloud progress map after a failed pre-read.
-            // Keep local progress and retry once the cloud state is known.
+
+
             throw e;
         }
 
-        // If the merge produced something different from local, write the
-        // merged map back so the next save observes the unified state and we
-        // don't keep re-merging the same cloud delta forever.
+
+
+
         if (!areProgressMapsEqual(localVP, mergedVP)) {
             pauseSync();
             await bgStorageSet({ videoProgress: mergedVP });
         }
 
-        // After merge, if the result already matches what we last pushed,
-        // skip the network write entirely.
+
+
         if (lastPushedProgressBG && areProgressMapsEqual(mergedVP, lastPushedProgressBG)) return;
 
         const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
@@ -1261,14 +1261,14 @@ async function syncProgressOnly() {
 
         if (response.ok) {
             lastPushedProgressBG = structuredClone(mergedVP);
-            // Seed (rather than invalidate) the cloud-doc cache with the
-            // values we just pushed. The PATCH is field-masked, so the cloud
-            // doc after this write equals: <prior cloud doc> with the masked
-            // fields replaced. If we have a prior cache snapshot for this
-            // uid, we can compute that exact post-write state locally and
-            // skip the next read entirely. Without this seed, the *next*
-            // sync (or popup-driven GET_CLOUD_DOC) burns a Firestore read
-            // just to learn what we already know.
+
+
+
+
+
+
+
+
             if (_bgCloudDocCache && _bgCloudDocCacheUid === user.uid) {
                 _bgCloudDocCache = {
                     ..._bgCloudDocCache,
@@ -1280,8 +1280,8 @@ async function syncProgressOnly() {
                     [_BG_CLOUD_CACHE_KEY]: { uid: user.uid, doc: _bgCloudDocCache, cachedAt: _bgCloudDocCacheTime }
                 }).catch(() => {});
             } else {
-                // No baseline to seed from — fall back to invalidate so the
-                // next read is forced to refetch (correct, just less efficient).
+
+
                 invalidateBgCloudDocCache();
             }
             bgRememberOwnWrite(pushedAt);
@@ -1293,11 +1293,11 @@ async function syncProgressOnly() {
             const errorBody = await response.text().catch(() => '');
             console.warn('[BG] Progress sync failed:', status, errorBody.slice(0, 160));
             if (status === 401) {
-                // Task 10: 401 — try once with a fresh token. If the second
-                // 401 carries a permanent code in its body (classifier
-                // confirms), THEN sign out. Otherwise it's transient (mobile
-                // clock skew, captive portal, rate limit) — keep retrying
-                // via alarm-driven backoff. Tokens stay in storage.
+
+
+
+
+
                 if (_progressSyncRetryAuthAttempted) {
                     const cl = self.AnimeTrackerAuthClassifier;
                     const cls = cl ? cl.classify(401, errorBody) : { permanent: false };
@@ -1315,9 +1315,9 @@ async function syncProgressOnly() {
                     armSyncRetry('progress', '401-needs-refresh');
                 }
             } else if (status === 403) {
-                // Task 10: 403 = rules deny / account lacks permission. Don't
-                // sign out, don't loop indefinitely. Surface to popup so the
-                // user sees a clear "permission denied" toast.
+
+
+
                 _broadcastAuthRejected(403, errorBody);
                 if (_progressSyncRetryAttempts >= SYNC_RETRY_BACKOFF_MIN.length) {
                     console.error('[BG] Progress sync 403 — giving up after max retries (check Firestore rules)');
@@ -1342,9 +1342,9 @@ async function syncProgressOnly() {
         progressSyncInProgress = false;
         if (progressSyncPending) {
             progressSyncPending = false;
-            // chrome.alarms survives SW kill; setTimeout(5000) silently
-            // disappeared if the SW got recycled between the previous sync
-            // finishing and this re-queue firing, losing the pending change.
+
+
+
             chrome.alarms.create(PROGRESS_SYNC_ALARM, { when: Date.now() + 5000 });
         }
     }
@@ -1448,11 +1448,11 @@ async function syncToFirebase() {
         });
 
         if (response.ok) {
-            // Seed the cache with the post-write state. The PATCH masked
-            // fieldList, so reconstruct the doc by overlaying payloadFields
-            // onto the prior cached doc. Falls back to invalidate when no
-            // baseline exists. See comment in syncProgressOnly for the
-            // rationale — net effect: −1 Firestore read per sync cycle.
+
+
+
+
+
             if (_bgCloudDocCache && _bgCloudDocCacheUid === user.uid) {
                 _bgCloudDocCache = {
                     ..._bgCloudDocCache,
@@ -1472,15 +1472,15 @@ async function syncToFirebase() {
             const status = response.status;
             const errorBody = await response.text().catch(() => '');
             console.error('[BG] Sync failed:', status, errorBody.slice(0, 160));
-            // Keep the change in pendingSyncFlush so the retry attempt has
-            // something to write — clearSyncPending only on terminal success.
+
+
             markSyncPending();
 
             if (status === 401) {
-                // Task 10: 401 = token rejected. First time → force refresh
-                // + retry. Second time → only sign out if classifier
-                // confirms permanent (body contains a permanent code).
-                // Otherwise treat as transient and keep alarm-driven backoff.
+
+
+
+
                 if (_fullSyncRetryAuthAttempted) {
                     const cl = self.AnimeTrackerAuthClassifier;
                     const cls = cl ? cl.classify(401, errorBody) : { permanent: false };
@@ -1498,9 +1498,9 @@ async function syncToFirebase() {
                     armSyncRetry('full', '401-needs-refresh');
                 }
             } else if (status === 403) {
-                // Task 10: 403 = rules deny / account lacks permission.
-                // Surface to popup as a clear "permission denied" toast,
-                // don't sign out, cap retries so we don't spam Firestore.
+
+
+
                 _broadcastAuthRejected(403, errorBody);
                 if (_fullSyncRetryAttempts >= SYNC_RETRY_BACKOFF_MIN.length) {
                     console.error('[BG] Sync 403 — giving up after max retries (check Firestore rules)');
@@ -1512,7 +1512,7 @@ async function syncToFirebase() {
                 invalidateBgCloudDocCache();
                 armSyncRetry('full', `5xx (${status})`);
             } else {
-                // 4xx other (400, 404, etc) — probably non-retryable.
+
                 console.error(`[BG] Sync got non-retryable ${status}; dropping pending flag`);
                 clearSyncPending();
                 clearSyncRetry('full');
@@ -1522,7 +1522,7 @@ async function syncToFirebase() {
     } catch (error) {
         const reason = error?.isTimeout ? 'timeout' : 'network';
         console.error(`[BG] Sync ${reason}:`, error?.message || error);
-        // A failed pre-read or write is retried without losing the local change.
+
         markSyncPending();
         armSyncRetry('full', `${reason}: ${error?.message || error}`);
     } finally {
@@ -1545,22 +1545,22 @@ const _MAX_CLOUD_UPDATE_WAITERS = 100;
 async function applyCloudUpdate(cloudDoc) {
     if (!cloudDoc) return;
 
-    // Cache seeding moved into _doApplyCloudUpdate where we can stamp the
-    // active uid alongside the doc — seeding here without a uid risked
-    // letting the cache leak across an account switch that happened between
-    // fetch and apply.
+
+
+
+
 
     _applyCloudUpdateDoc = cloudDoc;
     if (_applyCloudDebounce) clearTimeout(_applyCloudDebounce);
 
     if (_applyCloudUpdateWaiters.length >= _MAX_CLOUD_UPDATE_WAITERS) {
-        // Cap the queue so we don't hold an unbounded list of pending promises
-        // if upstream callers stop awaiting (rare, but a memory-leak guardrail).
-        // We resolve dropped waiters rather than reject because callers usually
-        // `.catch(() => null)` anyway and rejecting them produces noisy
-        // unhandledrejection logs without changing behavior. Log a warning so
-        // pile-ups don't go silently undetected — they almost always indicate
-        // a bug upstream (e.g. consumer loop without backoff).
+
+
+
+
+
+
+
         const overflow = _applyCloudUpdateWaiters.length - _MAX_CLOUD_UPDATE_WAITERS + 1;
         const stale = _applyCloudUpdateWaiters.splice(0, overflow);
         console.warn(`[BG] applyCloudUpdate waiter overflow — dropped ${overflow} pending promises (queue cap ${_MAX_CLOUD_UPDATE_WAITERS})`);
@@ -1615,10 +1615,10 @@ async function _doApplyCloudUpdate(cloudDoc) {
         return;
     }
 
-    // Re-confirm the active user before merging — ensures we never apply
-    // account A's cloud doc to local storage if the user signed out / signed
-    // in as B between fetch and apply, and lets us tag the seeded cache with
-    // the correct uid.
+
+
+
+
     const activeUser = await getFirebaseUser();
     if (!activeUser?.uid) {
         invalidateBgCloudDocCache();
@@ -1681,10 +1681,10 @@ async function _doApplyCloudUpdate(cloudDoc) {
     }
 }
 
-// Playback toggles synced via cloudDoc.playbackSettings. Mirrored from
-// FirebaseSync.applyCloudPlaybackSettings (popup) so the SW can propagate
-// changes seen via pollCloudData → chrome.storage.local without going
-// through the popup. Last-write-wins via `updatedAt` ISO timestamp.
+
+
+
+
 const BG_PLAYBACK_FIELD_MAP = {
     copyGuard: 'copyGuardEnabled',
     smartNotif: 'smartNotificationsEnabled',
@@ -1711,7 +1711,7 @@ async function applyCloudPlaybackSettings(cloudPlayback) {
         for (const [field, storageKey] of Object.entries(BG_PLAYBACK_FIELD_MAP)) {
             const next = !!cloudPlayback[field];
             const current = stored[storageKey];
-            // copyGuard treats undefined-or-true as ON; others treat undefined as OFF.
+
             const currentBool = storageKey === 'copyGuardEnabled'
                 ? (current !== false)
                 : (current === true);
@@ -1728,8 +1728,8 @@ async function applyCloudPlaybackSettings(cloudPlayback) {
 
         await bgStorageSet(writes);
 
-        // Smart notifs has alarm side-effects — schedule/cancel here so a
-        // cloud-driven enable on another device still starts the alarm.
+
+
         if (Object.prototype.hasOwnProperty.call(writes, 'smartNotificationsEnabled')) {
             if (writes.smartNotificationsEnabled) {
                 chrome.alarms.create(SMART_NOTIF_ALARM, { periodInMinutes: SMART_NOTIF_INTERVAL_MINUTES });
@@ -1746,23 +1746,23 @@ async function applyCloudPlaybackSettings(cloudPlayback) {
     }
 }
 
-// AniList OAuth token synced via cloudDoc.anilistAuth. The desktop pushes
-// after a successful connect()/disconnect(); mobile (where chrome.identity
-// .launchWebAuthFlow doesn't work) pulls and writes to chrome.storage.local
-// so AniList push-sync can run on mobile too. Last-write-wins via `updatedAt`.
-//
-// Cloud shape:
-//   {
-//     accessToken: '...',  // null when desktop disconnected
-//     expiresAt: <ms epoch> | 0,
-//     viewer: { id, name, avatar } | null,
-//     username: 'anilist-username' | null,  // optional (anilist_username key)
-//     updatedAt: '<ISO>'
-//   }
-//
-// Local shape (chrome.storage.local):
-//   anilist_auth: { accessToken, expiresAt, viewer, updatedAt }
-//   anilist_username: 'name'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const BG_ANILIST_AUTH_KEY = 'anilist_auth';
 const BG_ANILIST_USERNAME_KEY = 'anilist_username';
 
@@ -1776,9 +1776,9 @@ async function applyCloudAnilistAuth(cloudAnilist) {
         const localAuth = stored[BG_ANILIST_AUTH_KEY] || null;
         const localUpdatedAt = localAuth?.updatedAt || null;
 
-        // Cloud must be strictly newer to win. Ties keep local — protects
-        // against an in-flight local connect() being clobbered by an older
-        // cloud snapshot delivered seconds later by a stale poll.
+
+
+
         if (localUpdatedAt && Date.parse(localUpdatedAt) >= Date.parse(cloudUpdatedAt)) {
             return false;
         }
@@ -1786,9 +1786,9 @@ async function applyCloudAnilistAuth(cloudAnilist) {
         const writes = {};
         let touched = false;
 
-        // Token: write only when cloud has a non-empty access token AND the
-        // cloud expiresAt hasn't passed (no point applying an expired token —
-        // it'd just trigger an immediate `reconnect` 401 in anilist-sync.js).
+
+
+
         const cloudAccess = typeof cloudAnilist.accessToken === 'string' && cloudAnilist.accessToken
             ? cloudAnilist.accessToken
             : null;
@@ -1806,9 +1806,9 @@ async function applyCloudAnilistAuth(cloudAnilist) {
             };
             touched = true;
         } else if (localAuth) {
-            // Cloud says "disconnected" (or expired) and is newer than local —
-            // mirror the disconnect locally so push-sync stops trying to use
-            // a token that was revoked from the desktop.
+
+
+
             writes[BG_ANILIST_AUTH_KEY] = null;
             touched = true;
         }
@@ -1822,9 +1822,9 @@ async function applyCloudAnilistAuth(cloudAnilist) {
 
         if (!touched) return false;
 
-        // chrome.storage.local.set with `null` value persists the null;
-        // remove the key explicitly when we want to clear it so isConnected()
-        // checks (which read `s[AUTH_KEY] || null`) behave correctly.
+
+
+
         const setKeys = {};
         const removeKeys = [];
         for (const [k, v] of Object.entries(writes)) {
@@ -1842,14 +1842,14 @@ async function applyCloudAnilistAuth(cloudAnilist) {
     }
 }
 
-// Realtime Firestore listener removed — Firestore's documents:listen requires
-// gRPC streaming, which the plain `fetch` API in MV3 service workers cannot
-// drive (UNIMPLEMENTED on first byte). All sync goes through pollCloudData()
-// when consumers connect, plus chrome.storage.onChanged-driven write flushes.
 
-// Flush any pending progress-sync alarm immediately. Used when we want to
-// short-circuit the 5-min debounce (e.g. last viewer closing the tab, or
-// receiving an explicit FLUSH request).
+
+
+
+
+
+
+
 async function flushPendingProgressSync() {
     let cleared = false;
     try { cleared = await chrome.alarms.clear(PROGRESS_SYNC_ALARM); } catch {}
@@ -1862,11 +1862,11 @@ async function flushPendingProgressSync() {
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace !== 'local') return;
 
-    // Auth-change cache invalidation. Catches popup-driven sign-in / sign-out
-    // / account-swap inside the SW's TTL window — without this, opening the
-    // popup as user B after user A's session would let the SW serve A's
-    // cached doc to B's first GET_CLOUD_DOC. Runs before the sync-debounce
-    // logic below so we don't queue a sync against the wrong cache state.
+
+
+
+
+
     if (Object.prototype.hasOwnProperty.call(changes, 'firebase_user')) {
         const newUid = changes.firebase_user?.newValue?.uid || null;
         const oldUid = changes.firebase_user?.oldValue?.uid || null;
@@ -1929,9 +1929,9 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         markSyncPending();
         syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 5000);
     } else if (_pendingProgressSync) {
-        // 5-min debounce matches CS periodic push cadence — on natural pauses this
-        // fires so the cloud stays close to local state without over-writing.
-        // Uses chrome.alarms (not setTimeout) so it survives SW kills.
+
+
+
         chrome.alarms.create(PROGRESS_SYNC_ALARM, { delayInMinutes: 5 });
     }
 
@@ -1941,11 +1941,11 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         });
     }
 
-    // The popup sets `pendingBackgroundMetadataRepair: true` on sign-in. If
-    // animeData happens to be identical between local and cloud (e.g. signing
-    // back in on the same device), the `changes.animeData` path above never
-    // fires and the flag would sit unread until the next SW boot. Honor the
-    // flag-flip directly so the silent repair starts within seconds of sign-in.
+
+
+
+
+
     if (changes.pendingBackgroundMetadataRepair?.newValue === true) {
         maybeStartPendingMetadataRepair().catch((error) => {
             console.error('[BG] Failed to start pending repair on flag flip:', error);
@@ -1953,28 +1953,28 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     }
 });
 
-// Filler discovery (KNOWN_FILLER_SLUGS, fillerSlugCache,
-// generateFillerSlugCandidates, discoverFillerSlug) moved to
-// src/background/filler-discovery.js. Loaded via importScripts at the top of this file.
 
-// an1me.to scraper (fetchAnimePageInfo, batchFetchAnimeInfo, slug-candidate
-// helpers) and Filler Discovery (fetchEpisodeTypesFromAnimeFillerList,
-// fetchJikanEpisodes, discoverFillerSlug) moved to src/background/an1me-scraper.js and
-// src/background/filler-discovery.js. Loaded via importScripts at the top of this file.
 
-// AniSkip + MAL-ID resolution + bundle migration now live in src/background/aniskip.js.
-// Loaded via importScripts at the top of this file. Functions remain at SW
-// global scope so existing call sites here continue to work unchanged.
 
-// Smart notifications (SMART_NOTIF_ALARM, checkNewEpisodes), badge
-// notifications (showBadgeNotification, showBatchBadgeNotification) and the
-// chrome.notifications.onClicked listener live in src/background/smart-notifications.js.
-// Loaded via importScripts above.
 
-// Library metadata repair runners (runMetadataRepairBatch, startLibraryRepair,
-// repairAnimeInfoCache, repairEpisodeTypesCache, finalizeMetadataRepair,
-// maybeStartPendingMetadataRepair, resumeMetadataRepairIfNeeded) live in
-// src/background/metadata-repair.js.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 async function migrateFromSyncToLocal() {
     try {
@@ -2108,8 +2108,8 @@ async function persistBeforeUnloadTrack(animeInfo, duration) {
     }
 }
 
-// Watchlist sync (syncWatchlistToSite, directWatchlistFetch) lives in
-// src/background/watchlist-sync.js. Loaded via importScripts above.
+
+
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === 'SYNC_TO_FIREBASE') {
@@ -2139,9 +2139,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     if (message.type === 'SYNC_PROGRESS_ONLY') {
         sendResponse({ received: true });
-        // Wait for hydration before reading _lastProgressSyncAt — otherwise a
-        // freshly-woken SW always sees 0 and skips the min-interval guard,
-        // burning a Firestore write seconds after the previous one.
+
+
+
         (async () => {
             await hydrateBgPollState();
             const sinceLast = Date.now() - _lastProgressSyncAt;
@@ -2158,23 +2158,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
 
     if (message.type === 'WAKE_AND_POLL_CLOUD') {
-        // Fired from any an1me.to content script on page load so freshly
-        // landing on the site picks up watch progress from other devices
-        // without forcing the user to open the popup. `pollCloudData` is
-        // self-rate-limited (60s gate + 5-min cache via fetchCloudDataCached)
-        // so calling this on every page navigation is cheap.
+
+
+
+
+
         sendResponse({ received: true });
         pollCloudData('content-page-open').catch(() => {});
         return true;
     }
 
     if (message.type === 'WAKE_AND_POLL_CLOUD_FORCE') {
-        // Like WAKE_AND_POLL_CLOUD but bypasses both the 3-min gate and the
-        // SW-cache freshness check. Costs 1 Firestore read but guarantees
-        // freshness — used by the popup's mobile boot path when AniList
-        // shows disconnected and we suspect the SW cache predates the
-        // desktop-push window. Caller is rate-limited at the popup side
-        // (fires at most once per popup session and only when needed).
+
+
+
+
+
+
         sendResponse({ received: true });
         pollCloudData('force-refresh', { force: true }).catch(() => {});
         return true;
@@ -2192,10 +2192,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 const doc = await fetchCloudDataCached(user, token);
                 sendResponse({ success: true, doc: doc || null });
             } catch (e) {
-                // Surface the HTTP status (if any) so the popup knows whether
-                // the doc genuinely doesn't exist (404), the token was rejected
-                // (401/403), or it was a transient network error. Without this,
-                // the popup couldn't distinguish "no doc" from "fetch failed".
+
+
+
+
                 sendResponse({
                     success: false,
                     error: e?.message || String(e),
@@ -2213,9 +2213,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
 
     if (message.type === 'SIGNED_OUT') {
-        // Task 9: popup signaled FirebaseLib.signOut(). Clear cached cloud
-        // doc and cancel auth + sync alarms (metadata-repair survives so
-        // local data still gets refreshed).
+
+
+
         invalidateBgCloudDocCache();
         clearAuthAndSyncAlarms()
             .then(() => sendResponse({ ok: true }))
@@ -2224,15 +2224,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
 
     if (message.type === 'UPDATE_BG_CLOUD_DOC_CACHE') {
-        // Popup just wrote `doc` to Firestore — seed the SW cache with it so
-        // the SW's next storage.onChanged-driven sync skips the Firestore read.
-        // Saves ~1 read per popup-side save. Also persisted to disk so an SW
-        // kill mid-session doesn't lose the seed.
-        //
-        // The uid from the sender must match the currently-stored
-        // firebase_user. Without this guard a stale message from a previous
-        // sign-in (e.g. in-flight when the user signs out) could re-seed the
-        // cache with the wrong account's doc.
+
+
+
+
+
+
+
+
+
         (async () => {
             try {
                 const senderUid = typeof message.uid === 'string' ? message.uid : null;
@@ -2264,9 +2264,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
 
     if (message.type === 'UPDATE_BG_PLAYBACK_SETTINGS') {
-        // Popup just pushed playbackSettings to Firestore — patch the SW
-        // cache so a follow-up poll doesn't re-fetch the same value we
-        // already know about.
+
+
+
         if (message.playbackSettings && typeof message.playbackSettings === 'object') {
             if (_bgCloudDocCache && typeof _bgCloudDocCache === 'object') {
                 _bgCloudDocCache = { ..._bgCloudDocCache, playbackSettings: message.playbackSettings };
@@ -2278,9 +2278,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
 
     if (message.type === 'UPDATE_BG_ANILIST_AUTH') {
-        // Popup just pushed anilistAuth to Firestore — patch the SW cache
-        // so the next poll doesn't burn a Firestore read fetching what we
-        // already wrote. Mirrors the playbackSettings seed handler above.
+
+
+
         if (message.anilistAuth && typeof message.anilistAuth === 'object') {
             if (_bgCloudDocCache && typeof _bgCloudDocCache === 'object') {
                 _bgCloudDocCache = { ..._bgCloudDocCache, anilistAuth: message.anilistAuth };
@@ -2292,16 +2292,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
 
     if (message.type === 'UPDATE_BG_CLOUD_DOC_PARTIAL') {
-        // Content-script just wrote a subset of fields to Firestore (e.g.
-        // videoProgress + lastUpdated only). Overlay those onto the SW
-        // cache instead of invalidating, so the next consumer-connected
-        // poll / GET_CLOUD_DOC doesn't burn a Firestore read for the
-        // exact data we already know about.
-        //
-        // uid must match the active user (same guard as the popup-side
-        // UPDATE_BG_CLOUD_DOC_CACHE handler above). Empty/missing uid or
-        // mismatched senders fall through to invalidate so cache integrity
-        // is never compromised by stale cross-user messages.
+
+
+
+
+
+
+
+
+
+
         (async () => {
             try {
                 const senderUid = typeof message.uid === 'string' ? message.uid : null;
@@ -2321,10 +2321,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                     }).catch(() => {});
                     sendResponse({ ok: true, mode: 'overlay' });
                 } else {
-                    // No baseline cache — content-script writes alone aren't
-                    // enough to construct a complete user doc (missing
-                    // goalSettings, badgeUnlocks, etc.). Fall back to
-                    // invalidate; the next read will populate the cache.
+
+
+
+
                     sendResponse({ ok: true, mode: 'no-baseline-skip' });
                 }
             } catch (e) {
@@ -2465,9 +2465,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return true;
     }
 
-    // Unknown message type — return false so modular listeners (anilist-sync,
-    // filler-discovery, etc.) that registered their own onMessage handlers can
-    // handle it without getting a race from a double sendResponse here.
+
+
+
     return false;
 });
 
@@ -2490,22 +2490,22 @@ chrome.runtime.onInstalled.addListener((details) => {
         dlog(`%c🎬 Anime Tracker v${chrome.runtime.getManifest().version}`, style);
         migrateFromSyncToLocal();
 
-        // Task 5: silent post-update auth refresh. Runs BEFORE the metadata-
-        // repair flag flip so a successful refresh resets the lastAuthCheck
-        // counter ahead of any subsequent activity. Failure modes:
-        //   • Permanent (refresh token revoked / account disabled / etc.) →
-        //     setNeedsReauth(true). Tokens are NOT cleared — the popup
-        //     surfaces a "Reconnect" banner and the existing email is kept
-        //     for the sign-in form.
-        //   • Transient (network blip, 5xx, timeout) → _bgOnRefreshTransient
-        //     bookkeeps the failure and arms the auth-refresh-retry-bg alarm
-        //     (Task 4).
-        //   • Success → markAuthCheckOk resets the backoff counters.
-        // Tokens are NEVER wiped here — that's the regression we're fixing.
+
+
+
+
+
+
+
+
+
+
+
+
         (async () => {
             try {
                 const helper = self.AnimeTrackerAuthTokens;
-                if (!helper) return;     // Task-2 module not loaded; skip.
+                if (!helper) return;
                 await helper.migrateTokensIfNeeded();
                 const t = await helper.readTokens();
                 if (!t || !t.refreshToken) {
@@ -2520,12 +2520,12 @@ chrome.runtime.onInstalled.addListener((details) => {
                 if (result?.tokens) {
                     console.log('[BG] Post-update silent refresh: ok');
                 } else if (result?.permanent) {
-                    // Permanent — set needsReauth (don't sign out / wipe tokens).
+
                     await helper.setNeedsReauth(true);
                     console.warn(`[BG] Post-update silent refresh: permanent (${result?.error || '?'}) — needsReauth set, tokens preserved`);
                 } else {
-                    // Transient — _bgOnRefreshTransient already armed the
-                    // retry alarm via refreshFirebaseToken. Nothing to do.
+
+
                     console.warn(`[BG] Post-update silent refresh: transient (${result?.error || '?'}) — retry alarm armed`);
                 }
             } catch (e) {
@@ -2533,18 +2533,18 @@ chrome.runtime.onInstalled.addListener((details) => {
             }
         })();
 
-        // Post-update fetch: stamp a flag so (a) the SW kicks off the
-        // metadata-repair pass on boot via maybeStartPendingMetadataRepair(),
-        // and (b) the next popup open surfaces the auto-fetch UI + toast.
-        // Skip if a previous post-update flag is still unconsumed (user
-        // hasn't opened the popup yet) — don't double-stamp.
+
+
+
+
+
         const fromVersion = details.previousVersion || null;
         const toVersion = chrome.runtime.getManifest().version || null;
 
-        // Keep metadata caches across extension reload/update. The repair pass
-        // is cache-first and fetches only missing/stale entries, so wiping
-        // animeinfo_* / episodeTypes_* here would waste network and Firebase
-        // churn after every manual extension refresh.
+
+
+
+
         bgStorageGet(['postUpdateFetchTriggeredAt']).then((existing) => {
             const payload = {
                 pendingBackgroundMetadataRepair: true
@@ -2556,8 +2556,8 @@ chrome.runtime.onInstalled.addListener((details) => {
             }
             return bgStorageSet(payload);
         }).then(() => {
-            // Kick off the repair immediately so background warming happens
-            // even if the user never opens the popup. Re-entrant-safe.
+
+
             maybeStartPendingMetadataRepair().catch((error) => {
                 console.warn('[BG] Post-update repair start failed:', error);
             });
@@ -2565,14 +2565,14 @@ chrome.runtime.onInstalled.addListener((details) => {
     }
 });
 
-/**
- * Wipe every `animeinfo_*` and `episodeTypes_*` key from chrome.storage.local.
- * Called from the onInstalled.update handler so the metadata-repair pass that
- * follows actually re-scrapes (instead of seeing fresh-cached entries and
- * skipping every item). Uses get(null) to enumerate then a single remove() —
- * avoids paying a per-key remove round-trip on libraries with hundreds of
- * tracked anime.
- */
+
+
+
+
+
+
+
+
 async function clearMetadataCachesOnce() {
     try {
         const all = await new Promise((resolve, reject) => {
@@ -2621,11 +2621,11 @@ chrome.runtime.onConnect.addListener((port) => {
     });
 });
 
-// keepAlive alarm removed — service worker is now woken on demand via the
-// `keepAlive` and `popupAlive` runtime ports (see chrome.runtime.onConnect
-// handler above). Periodic polling/stream restarts no longer need an alarm:
-// the metadata-repair tick reschedules itself via METADATA_REPAIR_ALARM and
-// pollCloudData runs whenever a fresh consumer connects.
+
+
+
+
+
 chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === METADATA_REPAIR_ALARM) {
         runMetadataRepairBatch().catch((error) => {
@@ -2647,12 +2647,12 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
     if (alarm.name === FULL_SYNC_RETRY_ALARM) {
         if (syncInProgress) {
-            // A regular sync is already running — let it finish; if it
-            // fails it will arm a fresh retry alarm of its own.
+
+
             return;
         }
-        // Re-arm the debounce path so we coalesce with any change that
-        // arrived while we were waiting for the alarm to fire.
+
+
         markSyncPending();
         syncToFirebase();
         return;
@@ -2665,17 +2665,17 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     }
 
     if (alarm.name === AUTH_REFRESH_RETRY_BG_ALARM) {
-        // Task 4: backoff-driven retry for transient refresh failures.
-        // _bgAuthRefreshRetryTick is self-guarded against missing/invalid
-        // sessions and against the needsReauth state (where the alarm is
-        // cleared rather than retried).
+
+
+
+
         _bgAuthRefreshRetryTick();
         return;
     }
 
     if (alarm.name === DAILY_CLEANUP_ALARM) {
-        // Task 11: nightly preventative cleanup. Runs only when storage is
-        // > 70% full to avoid burning cycles on small libraries.
+
+
         bgIterativeQuotaRecovery('daily-alarm').catch((e) => {
             console.warn('[Cleanup] alarm tick failed:', e?.message || e);
         });
@@ -2690,15 +2690,15 @@ resumeMetadataRepairIfNeeded().catch((error) => {
     console.error('[BG] Failed to resume metadata repair on boot:', error);
 });
 hydrateBgPollState();
-// Best-effort migration of legacy per-key caches into bundled maps. Idempotent
-// (guarded by a flag in storage). Runs in background — no awaiting needed.
+
+
 migratePerKeyCachesOnce();
-// Task 11: ensure the nightly cleanup alarm is scheduled. Idempotent —
-// reuses the persisted next-fire timestamp on subsequent boots so the
-// jitter is per-device-stable rather than re-rolled.
+
+
+
 ensureDailyCleanupAlarmScheduled();
-// Task 2: token-schema migration on SW boot. Idempotent; safe when no
-// session is stored. Behind AUTH_HARDENING_ENABLED feature flag.
+
+
 (async () => {
     try {
         await self.AnimeTrackerAuthTokens?.migrateTokensIfNeeded?.();
@@ -2707,15 +2707,15 @@ ensureDailyCleanupAlarmScheduled();
     }
 })();
 
-// Recover from SW kills: if a previous incarnation scheduled a sync via
-// setTimeout but was terminated before it fired, the PENDING_SYNC_KEY stamp
-// is still in storage. We always recover when the stamp exists — the previous
-// SW is dead (we're in a fresh boot), so its setTimeout can never fire.
-// syncToFirebase is self-serializing via syncInProgress + pendingSync so a
-// double-call is harmless even in the corner case of a near-instant restart.
-// Earlier version gated on `Date.now() - ts < PENDING_SYNC_STALE_MS` which
-// silently dropped any change whose marker was set within ~8s before the
-// SW died — a real and reproducible data-loss path.
+
+
+
+
+
+
+
+
+
 (async () => {
     try {
         const stored = await bgStorageGet([PENDING_SYNC_KEY]);

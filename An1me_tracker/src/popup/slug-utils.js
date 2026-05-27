@@ -1,7 +1,7 @@
-/**
- * Anime Tracker - Slug Utilities
- * Single source of truth for canonical slug resolution.
- */
+
+
+
+
 
 const SlugUtils = {
     getCanonicalSlug(slug, title = '') {
@@ -9,7 +9,7 @@ const SlugUtils = {
         const safeTitle = String(title || '').toLowerCase();
         const context   = `${safeSlug} ${safeTitle}`;
 
-        // Jujutsu Kaisen
+
         if (safeSlug.startsWith('jujutsu-kaisen') || safeTitle.includes('jujutsu kaisen')) {
             if (/\b0\b|movie/.test(context))
                 return 'jujutsu-kaisen-0';
@@ -47,6 +47,6 @@ const SlugUtils = {
     }
 };
 
-// Export
+
 window.AnimeTracker = window.AnimeTracker || {};
 window.AnimeTracker.SlugUtils = SlugUtils;

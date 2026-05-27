@@ -8,10 +8,10 @@ const ContentConfig = {
     PAUSE_WRITE_THROTTLE_MS: 5000,
     MIN_PROGRESS_TO_SAVE: 5,
     MIN_WATCH_SECONDS_BEFORE_COMPLETE: 120,
-    // Hard floor: even when isNearEnd() exempts the misclick guard, completion
-    // is still blocked if the user accumulated less than this many seconds of
-    // genuine playback. Stops mobile "scrub-to-end" from auto-completing an
-    // episode the user never actually watched.
+
+
+
+
     HARD_MIN_WATCH_SECONDS: 30,
     COMPLETED_PERCENTAGE: 85,
     LOG_LEVEL: 'INFO',
@@ -21,9 +21,9 @@ const ContentConfig = {
     MAX_SAVED_PROGRESS_ENTRIES: 10
 };
 
-// Multi-part anime mappings now live in src/common/multipart-mappings.js
-// (loaded before this file by manifest) — single source of truth across
-// content, popup, and background.
+
+
+
 const _multipart = (typeof window !== 'undefined' && window.AnimeTrackerMultipartMappings) || {};
 const EPISODE_OFFSET_MAPPING = _multipart.EPISODE_OFFSET_MAPPING || {};
 const SLUG_NORMALIZATION = _multipart.SLUG_NORMALIZATION || {};

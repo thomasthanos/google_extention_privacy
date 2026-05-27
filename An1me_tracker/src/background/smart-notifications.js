@@ -1,22 +1,10 @@
-/**
- * Anime Tracker — Smart Notifications + badge notifications (background module)
- *
- * Periodically polls the an1me.to page scraper for each tracked airing anime
- * to detect new episodes; surfaces a system notification when one drops.
- * Also owns the badge / batch-badge unlock notifications and the global
- * onClicked listener that routes notification clicks to the right URL.
- *
- * The alarm registration happens in background.js (onInstalled + onStartup +
- * SET_SMART_NOTIFICATIONS message handler) so the alarm lifecycle stays
- * co-located with the rest of the SW bootstrap.
- */
+
+
 
 const SMART_NOTIF_ALARM = 'smartNotifCheck';
 const SMART_NOTIF_INTERVAL_MINUTES = 60;
-// Cap how many anime we hit per tick to keep an1me.to load polite. The
-// previous cap of 5 meant a user with ~50 airing anime would take up to
-// 10 hours for a full pass. 10/tick × hourly = roughly a full sweep per
-// 5 hours for most users while still rate-limiting via inter-fetch delay.
+
+
 const SMART_NOTIF_MAX_PER_TICK = 10;
 
 async function checkNewEpisodes() {
@@ -30,9 +18,7 @@ async function checkNewEpisodes() {
         const updatedLastCheck = { ...lastCheck };
         let checked = 0;
 
-        // Sort eligible anime by oldest lastCheck timestamp first so we
-        // rotate through the list across ticks instead of always hitting
-        // the same first N entries.
+
         const eligible = Object.entries(animeData)
             .filter(([, anime]) => !anime.droppedAt && !anime.completedAt && !anime.onHoldAt)
             .sort(([a], [b]) => (lastCheck[a] || 0) - (lastCheck[b] || 0));
@@ -66,19 +52,17 @@ async function checkNewEpisodes() {
                         }
                     }
 
-                    // Update cache whenever we have fresh info — even when prevLatest is 0
-                    // (e.g. anime cached before first episode aired). Without this, the
-                    // notification gate stays stuck because prevLatest never advances.
+
                     if (info.latestEpisode !== prevLatest || cached.status !== info.status) {
                         await bgStorageSet({ [cachedKey]: { ...cached, ...info, cachedAt: now } });
                     }
                 }
             } catch {
-                // Swallow scrape errors — lastCheck still advances below so a
-                // persistently failing slug doesn't starve the rest of the queue.
+
+
             }
-            // Always advance lastCheck (success OR fail) so a few failing
-            // titles can't block the rotation: every tick scans a fresh slice.
+
+
             updatedLastCheck[slug] = now;
 
             await new Promise(r => setTimeout(r, 1500));
@@ -93,30 +77,28 @@ async function checkNewEpisodes() {
 chrome.notifications.onClicked.addListener((notifId) => {
     if (notifId.startsWith('new-ep-')) {
         const slug = notifId.replace('new-ep-', '');
-        // Encode slug to avoid breaking the URL if it ever contains odd characters
-        // (slugs are normally URL-safe, but this is defense-in-depth).
+
+
         const encoded = encodeURIComponent(slug);
         chrome.tabs.create({ url: `https://an1me.to/anime/${encoded}/` });
         chrome.notifications.clear(notifId);
         return;
     }
     if (notifId.startsWith('badge-') || notifId === 'badges-batch') {
-        // openPopup() requires a user gesture in some browsers and a
-        // specific window context; if it's unavailable we fall back to
-        // opening the popup HTML in a regular tab so the user always
-        // lands somewhere when they click the notification.
+
+
         const openPopupFallback = () => {
             try {
                 chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
-            } catch { /* swallow — last-resort no-op */ }
+            } catch {                                   }
         };
         try {
             const result = chrome.action?.openPopup?.();
             if (result && typeof result.then === 'function') {
                 result.catch(openPopupFallback);
             } else if (result === undefined) {
-                // Older Chrome returns undefined synchronously when the
-                // popup can't be opened from a service worker.
+
+
                 openPopupFallback();
             }
         } catch {

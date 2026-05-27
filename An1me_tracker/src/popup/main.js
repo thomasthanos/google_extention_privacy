@@ -1,20 +1,20 @@
-/**
- * Anime Tracker - Main Entry Point
- * Orchestrates all modules and handles UI interactions
- */
+
+
+
+
 
 (function () {
     'use strict';
 
-    // Wait for all modules to load
+
     const AT = window.AnimeTracker;
 
-    // State
+
     let animeData = {};
     let videoProgress = {};
     let currentSort = 'date';
-    let currentCategory = 'all'; // 'all', 'series', 'movies'
-    let currentCompactStatus = 'airing'; // 'airing', 'on_hold', 'completed', 'dropped'
+    let currentCategory = 'all';
+    let currentCompactStatus = 'airing';
     let currentCompactStatusOpen = false;
     let goalSettings = null;
     let badgeState = {};
@@ -24,13 +24,13 @@
     const GOAL_SETTINGS_KEY = 'goalSettings';
     const BADGE_STATE_KEY = 'badgeUnlocks';
 
-    // DOM Elements
+
     const elements = {
-        // Auth
+
         authSection: document.getElementById('authSection'),
         mainApp: document.getElementById('mainApp'),
         googleSignIn: document.getElementById('googleSignIn'),
-        // Settings Menu
+
         settingsBtn: document.getElementById('settingsBtn'),
         settingsAvatar: document.getElementById('settingsAvatar'),
         settingsUserName: document.getElementById('settingsUserName'),
@@ -47,7 +47,7 @@
         settingsImportData: document.getElementById('settingsImportData'),
         settingsImportFile: document.getElementById('settingsImportFile'),
         settingsSignOut: document.getElementById('settingsSignOut'),
-        // Main
+
         animeList: document.getElementById('animeList'),
         emptyState: document.getElementById('emptyState'),
         searchInput: document.getElementById('searchInput'),
@@ -74,7 +74,7 @@
         settingsPreferences: document.getElementById('settingsPreferences'),
         settingsPreferencesToggle: document.getElementById('settingsPreferencesToggle'),
         settingsPreferencesContent: document.getElementById('settingsPreferencesContent'),
-        // Add Anime Dialog
+
         addAnimeBtn: document.getElementById('addAnimeBtn'),
         addAnimeDialog: document.getElementById('addAnimeDialog'),
         closeAddAnime: document.getElementById('closeAddAnime'),
@@ -82,17 +82,17 @@
         confirmAddAnime: document.getElementById('confirmAddAnime'),
         animeSlugInput: document.getElementById('animeSlug'),
         episodesWatchedInput: document.getElementById('episodesWatched'),
-        // Edit Title Dialog
+
         editTitleDialog: document.getElementById('editTitleDialog'),
         editTitleInput: document.getElementById('editTitleInput'),
         closeEditTitle: document.getElementById('closeEditTitle'),
         cancelEditTitle: document.getElementById('cancelEditTitle'),
         confirmEditTitle: document.getElementById('confirmEditTitle'),
-        // Category Tabs
+
         categoryTabs: document.getElementById('categoryTabs')
     };
 
-    // State for edit title
+
     let editingSlug = null;
     let loadAndSyncInProgress = false;
     let metadataRepairPromise = null;
@@ -103,10 +103,10 @@
     const ownWriteTokens = new Set();
     const MAINTENANCE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
-    /**
-     * Check whether a named maintenance pass should run (≥24h since last run).
-     * Uses localStorage (sync) so it doesn't add async overhead to popup open.
-     */
+
+
+
+
     function shouldRunMaintenance(name) {
         try {
             const key = `lastMaintenanceRunAt_${name}`;
@@ -115,16 +115,16 @@
             localStorage.setItem(key, String(Date.now()));
             return true;
         } catch {
-            return true; // if storage fails, default to running
+            return true;
         }
     }
     let deferredListRefresh = null;
     let realignCategoryTabs = () => {};
     let categorySwitchTimer = null;
-    // 5min interval — reuses the FirebaseSync user-document cache (TTL also
-    // 5min) and the SW's `_BG_CLOUD_TTL`, so each tick costs at most 1 read
-    // and only when the cache window has rolled over. Was 60s+forceFresh,
-    // which produced ~60 Firestore reads/hour just for an idle open popup.
+
+
+
+
     const POPUP_CLOUD_REFRESH_MS = 5 * 60 * 1000;
     let popupCloudRefreshTimer = null;
 
@@ -179,13 +179,13 @@
         requestAnimationFrame(positionDonateDropdown);
     }
 
-    // Cached markup from the last full anime-list render. When the next render
-    // would produce the same markup (common: storage.onChanged fires for keys
-    // the list doesn't reflect, or for no-op progress updates), we skip the
-    // DOM swap entirely — this preserves scroll position, focus, and in-flight
-    // hover/transition state that an `innerHTML =` wipe would otherwise
-    // destroy. Reset to `null` on category/sort changes that imply a forced
-    // re-render is appropriate.
+
+
+
+
+
+
+
     let _lastRenderedListMarkup = null;
 
     function generateWriteToken() {
@@ -240,30 +240,30 @@
         return elements.searchInput?.value || '';
     }
 
-    // ── Toggle settings registry ─────────────────────────────────────────
-    // Previously each toggle had its own near-identical render/load pair
-    // (~50 lines × 4). Now they share one declarative config — adding a new
-    // toggle is one entry. `loadToggleSetting` reads + renders; `renderToggle`
-    // updates aria-pressed/subtitle. Storage change listeners and click
-    // handlers in initEventListeners drive these the same way.
-    //
-    // `defaultsTo` decides what the toggle reads as when storage is missing.
-    // `interpret` decides how raw storage values map to a boolean — copy-guard
-    // uses inverse-default semantics (anything other than `false` means ON).
+
+
+
+
+
+
+
+
+
+
     const SMART_NOTIF_STORAGE_KEY = 'smartNotificationsEnabled';
     const AUTO_SKIP_FILLER_STORAGE_KEY = 'autoSkipFillers';
-    // Skiptime helper toggle (Playback & Tracking card). The floating panel
-    // lives in src/content/skiptime-helper.js and listens for chrome.storage
-    // changes on this key to mount/unmount itself live.
+
+
+
     const SKIPTIME_HELPER_KEY = 'skiptimeHelperEnabled';
     const AUTO_4K_SERVER_KEY = 'auto4kServerEnabled';
-    // Tracks per-account "user has set a password via the Set-Password modal"
-    // so the Danger zone button can switch to a "Password set ✓" state once
-    // the link succeeds. Stored as `{ uid, setAt }` — the uid guard means
-    // the marker doesn't leak between accounts on a shared browser. This is
-    // a local hint, not the source of truth (which lives on Identity Toolkit's
-    // providerUserInfo); a fresh sign-in on a different device won't have it
-    // until the user sets a password again from there.
+
+
+
+
+
+
+
     const PASSWORD_SET_MARKER_KEY = 'passwordSetMarker';
 
     const TOGGLE_SETTINGS = {
@@ -325,7 +325,7 @@
     };
 
     function renderToggle(toggleId, enabled) {
-        // Settings DOM is rendered lazily by SettingsView, so look up live.
+
         const config = TOGGLE_SETTINGS[toggleId];
         if (!config) return;
         const btn = document.getElementById(config.btnId);
@@ -351,9 +351,9 @@
         }
     }
 
-    // Back-compat aliases: a handful of older callers reach for these by name
-    // (e.g. storage.onChanged → renderCopyGuardSetting). Keep them as thin
-    // wrappers so the diff stays localized to this section.
+
+
+
     const renderCopyGuardSetting = (enabled) => renderToggle('copyGuard', enabled);
     const renderSmartNotifSetting = (enabled) => renderToggle('smartNotif', enabled);
     const renderAutoSkipFillerSetting = (enabled) => renderToggle('autoSkipFiller', enabled);
@@ -489,8 +489,8 @@
         persistDetectedCompletions
     } = AT.StatusService;
 
-    // normalizeMovieDurations + cleanupPhantomMovies live in
-    // src/popup/maintenance.js — pure helpers, independently testable.
+
+
     const { normalizeMovieDurations, cleanupPhantomMovies, scrubAnilistImportDates } = AT.Maintenance;
 
     function showAuthScreen() {
@@ -498,9 +498,9 @@
         elements.mainApp.style.display = 'none';
 
         const hasGoogleAuth = detectHasGoogleAuth();
-        // One-line diagnostic so we can see in the popup console *why* a given
-        // surface ended up on Google vs email — saves a "what does your UA
-        // say?" round-trip when debugging mobile detection issues.
+
+
+
         PopupLogger.log('Auth',
             `hasGoogleAuth=${hasGoogleAuth} · redirect=${(() => {
                 try { return chrome?.identity?.getRedirectURL?.() || '∅'; } catch { return '∅'; }
@@ -509,35 +509,35 @@
         if (authContent) {
             authContent.classList.toggle('auth-mobile', !hasGoogleAuth);
         }
-        // Inverse split: desktop = Google only (hide email form + OR), mobile
-        // = email/password only (Google button is already hidden via the
-        // .auth-mobile class above). Driving these inline keeps the JS as
-        // the single source of truth for "which surface am I on?".
+
+
+
+
         const emailForm = document.getElementById('authEmailForm');
         const orDivider = document.querySelector('.auth-or-divider');
         if (emailForm) emailForm.style.display = hasGoogleAuth ? 'none' : '';
         if (orDivider) orDivider.style.display = hasGoogleAuth ? 'none' : '';
     }
 
-    /**
-     * Detect whether the Chrome OAuth flow can actually run here.
-     *
-     * The tricky part is that Orion (Kagi's WebKit-based browser that runs
-     * both Chrome AND Firefox extensions) spoofs `Chrome/…` in its UA *and*
-     * ships a `chrome.identity.launchWebAuthFlow` stub, so neither signal
-     * alone tells us anything. We bias toward "this is a mobile / alt
-     * browser" whenever any of these is true:
-     *   • UA contains an explicit Orion / Firefox / mobile platform marker
-     *   • `getRedirectURL()` returns anything other than a real
-     *     `<id>.chromiumapp.org` URL (Orion / Firefox return their own
-     *     formats, e.g. `orion-oauth://...`)
-     *   • `chrome.identity.launchWebAuthFlow` simply isn't there
-     * Only when every signal lines up do we treat this as desktop Chrome.
-     *
-     * Used by both showAuthScreen (to pick which auth UI to show) and
-     * renderSettingsView (to hide "Set password for mobile" — that button
-     * makes no sense on mobile itself; you set it FROM desktop).
-     */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     function detectHasGoogleAuth() {
         const ua = navigator.userAgent || '';
         if (/Orion|Firefox|FxiOS/i.test(ua)) return false;
@@ -556,10 +556,10 @@
         elements.mainApp.style.display = 'flex';
         realignCategoryTabs();
 
-        // Settings avatar/name/email live inside #settingsView, which is built
-        // lazily by settings-view.js when the user opens it. Look these up
-        // live: they're null until that first render, and SettingsView itself
-        // re-applies user data from FirebaseSync.getUser() on every render.
+
+
+
+
         const avatar = document.getElementById('settingsAvatar');
         const userName = document.getElementById('settingsUserName');
         const userEmail = document.getElementById('settingsUserEmail');
@@ -586,14 +586,14 @@
         }
     }
 
-    /**
-     * Render anime list
-     */
-    // ── renderAnimeList helpers ──────────────────────────────────────
-    //
-    // Read/restore the "what was expanded?" state so a re-render doesn't
-    // visually collapse everything the user had opened. Driven by stable
-    // dataset slugs on each row.
+
+
+
+
+
+
+
+
     function captureExpansionState(listEl) {
         const expandedCards = new Set();
         listEl.querySelectorAll('.anime-card.expanded').forEach(card => {
@@ -641,13 +641,13 @@
         }
     }
 
-    /**
-     * Group entries by base slug (multi-season / multi-movie clusters),
-     * sort the groups so they keep the order of the supplied `orderMap`,
-     * and render each via AnimeCardRenderer. Single helper avoids the
-     * duplicated `renderGroupedEntries` / `renderCompletedGroupedEntries`
-     * branches the old code had.
-     */
+
+
+
+
+
+
+
     function renderEntryGroupsHtml(entriesToRender, orderMap, visibleProgress) {
         if (!entriesToRender.length) return '';
         const { AnimeCardRenderer, SeasonGrouping } = AT;
@@ -679,13 +679,13 @@
         return html;
     }
 
-    /**
-     * Build the HTML for one of the four compact-status sections
-     * (Airing / On Hold / Completed / Dropped). All four had identical
-     * markup; CSS classes use a lowercase prefix while the toggle ID is
-     * historically camelCase, so we accept both as explicit params to
-     * avoid the old code's div-per-section duplication.
-     */
+
+
+
+
+
+
+
     function renderCompactSectionHtml({ classPrefix, toggleId, label, subLabel, cardsHtml, isOpen }) {
         return `
             <div class="${classPrefix}-list-section">
@@ -707,11 +707,11 @@
         `;
     }
 
-    /**
-     * Partition entries into the five buckets the UI shows. Single pass —
-     * each entry is checked once. Completed entries get a stable lastWatched
-     * sort so the most recently finished bubble to the top.
-     */
+
+
+
+
+
     function partitionEntriesByStatus(sortedEntries) {
         const normal = [];
         const completed = [];
@@ -733,11 +733,11 @@
         return { normal, completed, dropped, airing, onHold };
     }
 
-    /**
-     * Walk videoProgress once and bucket the latest savedAt per slug.
-     * Combined with each anime's lastWatched to give the "date" sort its key.
-     * Replaces an old O(N×M) loop that re-iterated videoProgress per anime.
-     */
+
+
+
+
+
     function buildLatestActivityMap(entries, videoProgress) {
         const progressLatestBySlug = new Map();
         for (const [id, progress] of Object.entries(videoProgress || {})) {
@@ -759,11 +759,11 @@
         return latestMap;
     }
 
-    /**
-     * Build the O(1) slug → entries index that anime-card.js reads via the
-     * non-enumerable `__slugIndex` property. Defined non-enumerable so it
-     * doesn't show up in JSON.stringify or Object.entries snapshots.
-     */
+
+
+
+
+
     function attachSlugIndex(visibleProgress) {
         const slugIndex = {};
         for (const [id, progress] of Object.entries(visibleProgress)) {
@@ -786,7 +786,7 @@
 
         const expansionState = captureExpansionState(elements.animeList);
 
-        // Filter by category
+
         const categoryFilter = (slug, anime) => {
             if (currentCategory === 'all') return true;
             const isMovie = SeasonGrouping.isMovie(slug, anime);
@@ -795,7 +795,7 @@
             return true;
         };
 
-        // Expose current animeData ref so other modules (e.g. anime-card ETA badge) can read it
+
         window.AnimeTracker._animeDataRef = animeData;
 
         const entries = Object.entries(animeData)
@@ -835,7 +835,7 @@
 
         const latestMap = buildLatestActivityMap(entries, videoProgress);
 
-        // Sort all entries according to the active sort mode
+
         const sortedEntries = entries.sort((a, b) => {
             const [, animeA] = a;
             const [, animeB] = b;
@@ -860,9 +860,9 @@
         const onHoldCardsHtml    = renderEntryGroupsHtml(onHoldEntries, completedOrderMap, visibleProgress);
         const inProgressHtml     = AnimeCardRenderer.createInProgressGroup(inProgressAnime);
 
-        // Section panels for the four compact-status lists. Toggle IDs match
-        // the COMPACT_TOGGLE_CHEVRONS table the delegated click handler
-        // dispatches on, so don't rename them without updating that list.
+
+
+
         const completedGroupHtml = completedEntries.length > 0
             ? renderCompactSectionHtml({
                 classPrefix: 'completed',
@@ -939,28 +939,28 @@
 
         const combinedHtml = inProgressHtml + trackedHtml + chipsHtml + activeCompactSectionHtml;
 
-        // Skip the DOM swap entirely when the output hasn't changed since the
-        // last render. storage.onChanged fires for plenty of keys the list
-        // doesn't reflect (metadata caches, episode-type caches, repair state,
-        // own echoes) and for progress writes that save the same currentTime
-        // we already rendered — rebuilding the whole subtree in those cases
-        // flushes scroll position and any hover/transition state for no gain.
+
+
+
+
+
+
         if (combinedHtml === _lastRenderedListMarkup && elements.animeList.firstChild) {
-            // DOM already matches — only refresh the live progress bars on
-            // in-progress cards, since videoProgress can change without
-            // altering the rendered markup (same seconds, different ms).
+
+
+
             if (elements.animeList.querySelector('.ip-card')) {
                 _ipPatch(videoProgress || {});
             }
             return;
         }
 
-        // Disable transitions during render to prevent flicker.
+
         elements.animeList.classList.add('no-transition');
 
-        // Build the new subtree off-DOM and swap it in atomically with
-        // replaceChildren. The old `innerHTML = str` pattern triggered two
-        // mutations (clear + parse-into-live-tree); this is one.
+
+
+
         const range = document.createRange();
         range.selectNodeContents(elements.animeList);
         const fragment = range.createContextualFragment(combinedHtml);
@@ -975,17 +975,17 @@
             _ipPatch(videoProgress || {});
         }
 
-        // Re-enable transitions after layout settles
+
         requestAnimationFrame(() => {
             elements.animeList.classList.remove('no-transition');
         });
     }
 
-    // ─── Export / Import library backup ────────────────────────────────
-    // Pure helpers (buildPayload, parseAndValidate, mergeImported,
-    // triggerDownload) live in src/popup/library-backup.js. These thin
-    // orchestrators wire them to the popup's closure state (animeData,
-    // videoProgress, renderAnimeList, etc.).
+
+
+
+
+
     async function exportLibraryToJson() {
         const { Storage, LibraryBackup } = AT;
         const snapshot = await Storage.get([
@@ -1002,7 +1002,7 @@
         const { Storage, FirebaseSync, LibraryBackup } = AT;
 
         const text = await file.text();
-        const parsed = LibraryBackup.parseAndValidate(text); // throws on bad input
+        const parsed = LibraryBackup.parseAndValidate(text);
         const incomingCount = Object.keys(parsed.animeData).length;
 
         const ok = await showInlineConfirm({
@@ -1023,7 +1023,7 @@
         markInternalSave(merged);
         await Storage.set(merged);
 
-        // Update in-memory copies so the next render is correct without a reload.
+
         animeData = merged.animeData;
         videoProgress = merged.videoProgress;
         if (merged.goalSettings) goalSettings = merged.goalSettings;
@@ -1033,8 +1033,8 @@
         renderAnimeList(elements.searchInput?.value || '');
         await updateStats();
 
-        // Push merged data to cloud if logged in so the import is reflected
-        // across devices, not just this one.
+
+
         const user = FirebaseSync?.getUser?.();
         if (user) {
             try {
@@ -1049,14 +1049,14 @@
         });
     }
 
-    /**
-     * Setup card event listeners
-     */
-    /**
-     * Refresh visual state (chevron rotations) that depends on currently
-     * rendered DOM nodes. Called after each render — the click handlers
-     * themselves are installed exactly once via `installCardEventListeners`.
-     */
+
+
+
+
+
+
+
+
     const COMPACT_TOGGLE_CHEVRONS = [
         ['airingListToggle', 'airing-chevron'],
         ['onHoldListToggle', 'onhold-chevron'],
@@ -1076,14 +1076,14 @@
         }
     }
 
-    /**
-     * Install ALL card-related event listeners ONCE on the list container.
-     * Previously every render walked the DOM with `querySelectorAll` and
-     * attached fresh handlers per matched element — works correctly because
-     * `replaceChildren()` clears them, but burns O(N) handler attachments
-     * per render. A single delegated listener pays O(1) install cost and
-     * O(target chain depth) per click, which is negligible.
-     */
+
+
+
+
+
+
+
+
     function installCardEventListeners() {
         const list = elements.animeList;
         if (!list || list.__cardListenersInstalled) return;
@@ -1091,7 +1091,7 @@
         list.addEventListener('click', (e) => {
             const target = e.target;
 
-            // ── Compact section toggles (airing/onHold/completed/dropped lists)
+
             for (const [toggleId] of COMPACT_TOGGLE_CHEVRONS) {
                 const toggle = target.closest(`#${toggleId}`);
                 if (!toggle || !list.contains(toggle)) continue;
@@ -1105,7 +1105,7 @@
                 return;
             }
 
-            // ── Status chips (Airing / Hold / Completed / Dropped tabs)
+
             const chip = target.closest('[data-compact-status]');
             if (chip && list.contains(chip)) {
                 e.preventDefault();
@@ -1120,7 +1120,7 @@
                 return;
             }
 
-            // ── "Show more fillers" / "Show more episodes" expanders
+
             const moreFillers = target.closest('.show-more-fillers');
             if (moreFillers && list.contains(moreFillers)) {
                 e.stopPropagation();
@@ -1142,7 +1142,7 @@
                 return;
             }
 
-            // ── Per-card edit / delete actions
+
             const editBtn = target.closest('.movie-edit-btn, .anime-edit-title, .season-edit-btn');
             if (editBtn && list.contains(editBtn) && editBtn.dataset.slug) {
                 e.stopPropagation();
@@ -1156,12 +1156,12 @@
                 return;
             }
 
-            // ── Season-item header (skip movie rows which have no collapse)
+
             const seasonHeader = target.closest('.season-item-header');
             if (seasonHeader && list.contains(seasonHeader)) {
-                // The edit/delete buttons inside the header were already
-                // handled by the earlier branch — at this point the click
-                // missed them, so toggle the season item.
+
+
+
                 const seasonItem = seasonHeader.closest('.season-item');
                 if (seasonItem && !seasonItem.classList.contains('season-item-movie')) {
                     e.stopPropagation();
@@ -1170,7 +1170,7 @@
                 return;
             }
 
-            // ── Movie-group + season-group + part-item headers (simple toggles)
+
             const movieGroupHeader = target.closest('.movie-group-header');
             if (movieGroupHeader && list.contains(movieGroupHeader)) {
                 const group = movieGroupHeader.closest('.anime-movie-group');
@@ -1191,8 +1191,8 @@
                 return;
             }
 
-            // ── In-progress / episodes / parts headers — collapse handle
-            //    plus auto-expand parent card if it isn't already open.
+
+
             const collapsibleHeader = target.closest(
                 '.in-progress-header, .episodes-header, .parts-header'
             );
@@ -1205,11 +1205,11 @@
                 return;
             }
 
-            // ── Anime card header — main expand/collapse
+
             const cardHeader = target.closest('.anime-card-header');
             if (cardHeader && list.contains(cardHeader)) {
-                // Skip when click landed on an inner action button — those
-                // have their own handlers above and shouldn't toggle the card.
+
+
                 if (target.closest('.anime-card-actions') ||
                     target.closest('.anime-header-actions') ||
                     target.closest('.anime-fetch-filler')) {
@@ -1224,8 +1224,8 @@
             }
         });
 
-        // Keyboard activation: Enter / Space toggle the anime card itself
-        // when it (not a child button) has focus.
+
+
         list.addEventListener('keydown', (e) => {
             if (e.key !== 'Enter' && e.key !== ' ') return;
             const card = e.target.classList?.contains('anime-card') ? e.target : null;
@@ -1238,16 +1238,16 @@
         list.__cardListenersInstalled = true;
     }
 
-    // Called from renderAnimeList — installs delegated listeners on first
-    // call and only refreshes the chevron visuals on subsequent renders.
+
+
     function setupCardEventListeners() {
         installCardEventListeners();
         refreshCompactChevrons();
     }
 
-    /**
-     * Update stats
-     */
+
+
+
     async function updateStats() {
         const { UIHelpers, SeasonGrouping, Storage } = AT;
         const animeEntries = Object.entries(animeData);
@@ -1264,11 +1264,11 @@
                 (anime.episodes || []).map(ep => Number(ep?.number)).filter(n => Number.isFinite(n) && n > 0)
             );
             totalWatchedEpisodes += uniqueEpisodeNumbers.size;
-            // Only count real watch time. AniList-imported episodes carry a
-            // synthetic duration (24 min × eps) which would otherwise inflate
-            // the global total — keep them in the per-anime totalWatchTime
-            // (used by individual cards) but exclude from the lifetime sum
-            // so it matches what stats engine reports.
+
+
+
+
+
             for (const ep of (anime.episodes || [])) {
                 if (ep?.durationSource === 'anilist') continue;
                 totalWatchTime += Number(ep?.duration) || 0;
@@ -1325,12 +1325,12 @@
         const previousState = badgeState || {};
         const next = { ...previousState };
 
-        // Only badges that aren't yet in `badgeState` are *truly* new for this
-        // user. Without this filter, the first goals-view render of every
-        // popup session — where `lastBadgeSnapshot` starts as [] — diffs every
-        // currently-unlocked badge as "newly unlocked" and re-fires a system
-        // notification for each one (the bug surfaced as the post-logout
-        // achievements toast spam).
+
+
+
+
+
+
         const trulyNew = [];
         for (const badge of newlyUnlocked) {
             if (!previousState[badge.id]) {
@@ -1340,7 +1340,7 @@
         }
 
         if (trulyNew.length === 0) {
-            // Snapshot caught up with persisted state; nothing fresh to notify.
+
             return;
         }
 
@@ -1373,26 +1373,26 @@
         }
     }
 
-    // Suppresses :hover lighting on cards/groups until the user actually
-    // moves the mouse. Called after a click that re-renders the list (status
-    // chip swap, sort change, etc.) — without it, whatever card lands under
-    // the static cursor immediately gets `:hover` styling, which looks like
-    // the click activated some unrelated element.
+
+
+
+
+
     let _hoverSuppressionActive = false;
     function suppressHoverUntilMouseMove() {
         if (_hoverSuppressionActive) return;
         _hoverSuppressionActive = true;
         document.body.classList.add('is-suppressing-hover');
         const startedAt = performance.now();
-        // Minimum window — even an involuntary mousemove tick within ~150ms
-        // of the click should NOT release the suppression, otherwise the
-        // newly-rendered card under the still-near-stationary cursor lights
-        // up for one frame as the user's finger settles on the trackpad.
+
+
+
+
         const MIN_DURATION_MS = 180;
         const release = () => {
             const elapsed = performance.now() - startedAt;
             if (elapsed < MIN_DURATION_MS) {
-                // Re-arm: wait the remaining gap then try again.
+
                 setTimeout(() => {
                     if (_hoverSuppressionActive) cleanup();
                 }, MIN_DURATION_MS - elapsed);
@@ -1407,9 +1407,9 @@
             document.removeEventListener('pointermove', release, true);
             clearTimeout(safetyTimer);
         };
-        // Belt-and-suspenders: if the user never moves the mouse (keyboard /
-        // touch surface) drop the suppression after a beat so cards don't
-        // stay un-hoverable forever.
+
+
+
         const safetyTimer = setTimeout(cleanup, 800);
         document.addEventListener('mousemove', release, true);
         document.addEventListener('pointermove', release, true);
@@ -1433,8 +1433,8 @@
             appRoot.classList.toggle('settings-mode', mode === 'settings');
         }
 
-        // Category tabs are only meaningful when the library is visible —
-        // hide them when any view-mode is active.
+
+
         const isViewMode = !!mode;
         if (elements.categoryTabs) elements.categoryTabs.style.display = isViewMode ? 'none' : '';
 
@@ -1470,12 +1470,12 @@
         }
     }
 
-    /**
-     * Render the Settings view with the current user, version and toggle states.
-     * Safe to call repeatedly — re-renders idempotently. Settings IDs are
-     * stable so any pre-bound handlers continue to work after re-render
-     * (handlers attach via event delegation in `initEventListeners`).
-     */
+
+
+
+
+
+
     async function renderSettingsView() {
         const container = document.getElementById('settingsView');
         const mainContent = document.querySelector('.main-content');
@@ -1492,10 +1492,10 @@
 
         const user = AT?.FirebaseSync?.getUser?.() || null;
 
-        // Read all toggle states from storage so the UI matches reality. We
-        // can avoid this if main.js already has them in memory — but reading
-        // here keeps the view self-sufficient and tolerant of out-of-band
-        // changes (e.g. another popup tab toggled something).
+
+
+
+
         let storedSettings = {};
         let passwordIsSet = false;
         try {
@@ -1513,9 +1513,9 @@
                 skiptimeHelper: stored[SKIPTIME_HELPER_KEY] === true
             };
             const marker = stored[PASSWORD_SET_MARKER_KEY];
-            // Marker is only meaningful for the *current* account — guards
-            // against stale state when the user switches Google identities
-            // on a shared browser.
+
+
+
             passwordIsSet = !!(marker?.uid && user?.uid && marker.uid === user.uid && marker.setAt);
         } catch (e) {
             PopupLogger.warn('Settings', 'Failed to load toggle state for view:', e);
@@ -1573,10 +1573,10 @@
         }
     }
 
-    /**
-     * Helper: check if all anime slugs have cached filler + anilist data.
-     */
-    // ─── Auto-sync tracking ─────────────────────────────────────────────────
+
+
+
+
     let _autoSyncCount = 0;
     function startAutoSync() {
         _autoSyncCount++;
@@ -1589,10 +1589,10 @@
         }
     }
 
-    /**
-     * Wrapper: runs autoFetchMissing with sync status tracking.
-     * Works for any source (FillerService, AnilistService) — no matter who calls it.
-     */
+
+
+
+
     function _truncTitle(t, max) {
         return t && t.length > max ? t.slice(0, max) + '…' : t;
     }
@@ -1615,8 +1615,8 @@
         const allFillersCached = slugs.every(slug =>
             FillerService.isLikelyMovie(slug) || !!FillerService.episodeTypesCache[slug]
         );
-        // A retryable error entry is not considered cached — let AnilistService
-        // decide via its own TTL logic (CACHE_TTL_RETRYABLE = 15 min).
+
+
         const allAnilistCached = slugs.every(slug => {
             const c = AT.AnilistService.cache?.[slug];
             return !!c && !c.retryable;
@@ -1653,9 +1653,9 @@
     async function recoverFromQuotaPressure(context = 'sync') {
         const { Storage, ProgressManager } = AT;
 
-        // Task 11: storage.local quota in MV3 is 10 MB (10 485 760). Aim
-        // for ≤70% post-recovery so a single subsequent write doesn't
-        // immediately blow the budget again.
+
+
+
         const QUOTA_BYTES = 10 * 1024 * 1024;
         const TARGET_BYTES = Math.round(QUOTA_BYTES * 0.70);
 
@@ -1678,9 +1678,9 @@
                 });
             });
 
-            // Pass 1 — drop scraper caches outright. This recovers the most
-            // bytes for the least user-visible disruption (animeinfo_/
-            // episodeTypes_ are re-fetched on demand).
+
+
+
             const cacheKeys = Object.keys(all).filter((key) =>
                 key.startsWith('animeinfo_') || key.startsWith('episodeTypes_')
             );
@@ -1688,8 +1688,8 @@
                 await Storage.remove(cacheKeys);
             }
 
-            // Pass 2 — clean tracked progress (cheap entries) and prune
-            // deleted-anime tombstones outside the 10-day window.
+
+
             const localAnimeData = all.animeData || {};
             const localVideoProgress = all.videoProgress || {};
             const localDeletedAnime = all.deletedAnime || {};
@@ -1700,7 +1700,7 @@
                 return bTs - aTs;
             });
 
-            // Initial cap: 2000 entries. Subsequent passes halve.
+
             let capCurrent = Math.min(2000, sortedProgress.length);
             let trimmedProgress = Object.fromEntries(sortedProgress.slice(0, capCurrent));
             const trimmedDeletedAnime = pruneDeletedAnimeForQuota(localDeletedAnime);
@@ -1714,10 +1714,10 @@
             let pass = 1;
             const maxPasses = 3;
 
-            // Iterative: while still over target AND not at min cap, halve
-            // the videoProgress cap and re-trim. We don't touch animeData
-            // (that's user library; deleting entries silently would be
-            // worse than the quota error). Stops at floor of 250.
+
+
+
+
             while (bytesNow > TARGET_BYTES && pass < maxPasses && capCurrent > 250) {
                 pass += 1;
                 capCurrent = Math.max(250, Math.floor(capCurrent / 2));
@@ -1740,19 +1740,19 @@
         }
     }
 
-    /**
-     * Load local data
-     */
-    /**
-     * Shared post-load pipeline used by both `loadData` (storage source) and
-     * `loadAndSyncData` (cloud source). Performs the full normalize→cleanup→
-     * repair sequence and returns the cleaned data plus a flag describing
-     * whether anything changed (so the caller knows whether to persist).
-     *
-     * Extracted from two near-identical bodies that drifted slightly over
-     * time (different maintenance-key suffixes, different fallback expressions
-     * for `deletedAnime`). Single source means future tweaks land in one place.
-     */
+
+
+
+
+
+
+
+
+
+
+
+
+
     function runMaintenancePipeline(rawData, options = {}) {
         const { ProgressManager, UIHelpers } = AT;
         const { maintenanceSuffix = '', baselineForCleanCount = null } = options;
@@ -1769,9 +1769,9 @@
             normalized.animeData || {}
         );
         const repairedData = ProgressManager.removeDuplicateEpisodes(withoutAutoRepaired.cleanedData);
-        // Scrub old importer timestamps before progress cleanup. Otherwise an
-        // imported episode can look watched for this pass and its freshly saved
-        // resume entry is removed before the scrub has a chance to fix it.
+
+
+
         const anilistDateScrub = scrubAnilistImportDates(repairedData);
         if (anilistDateScrub.changed) {
             try {
@@ -1780,7 +1780,7 @@
                     `Scrubbed bogus watchedAt from ${anilistDateScrub.scrubbedEpisodes} ` +
                     `AniList-imported episodes across ${anilistDateScrub.affectedAnime.length} anime`
                 );
-            } catch { /* logger unavailable */ }
+            } catch {                          }
         }
         const rawProgressForDurations = normalized.videoProgress || {};
         const { cleaned: cleanedProgress, removedCount: progressRemoved } =
@@ -1842,9 +1842,9 @@
         await AT.AnilistService.loadCachedData(animeData);
 
         let changed = repairAiringCompletedEntries(animeData);
-        // Persist `completed` for anime that getStatus() classifies as finished
-        // but carry no completedAt/listState — otherwise the an1me.to watchlist
-        // sync can't see them and they stay stuck under "Watching".
+
+
+
         if (persistDetectedCompletions(animeData)) changed = true;
 
         if (changed) {
@@ -1855,18 +1855,18 @@
     }
 
     async function runAutoFetchIfNeeded() {
-        // Only run when the user is signed in — prevents the popup-side
-        // auto-fetch from racing with the SW's metadata repair that fires
-        // immediately after the pendingBackgroundMetadataRepair flag is set.
+
+
+
         if (!AT.FirebaseSync?.getUser?.()) return;
 
         const { FillerService } = AT;
         const slugsList = Object.keys(animeData);
         const { allFillersCached, allAnilistCached } = checkAllCached(slugsList);
 
-        // Skip the popup-side auto-fetch entirely when the SW is already
-        // running a metadata repair — otherwise both would race to fetch
-        // the same items.
+
+
+
         const repairState = await syncMetadataRepairStateFromStorage();
         const repairRunning = repairState?.status === 'running';
 
@@ -1919,9 +1919,9 @@
         }
     }
 
-    /**
-     * Load and sync with cloud
-     */
+
+
+
     async function loadAndSyncData(options = {}) {
         if (loadAndSyncInProgress) return;
         loadAndSyncInProgress = true;
@@ -1945,9 +1945,9 @@
                 }
             }
 
-            // Fast path: render from local storage immediately so the popup
-            // doesn't show a blank list while waiting for Firebase round-trips.
-            // Especially important on slow mobile networks.
+
+
+
             await loadData({ skipAutoFetch });
 
             const data = await FirebaseSync.loadAndSyncData(elements);
@@ -1984,9 +1984,9 @@
                     return;
                 }
             }
-            // Auth rejected by Firestore (token expired or rules deny access).
-            // Surface clearly and force re-auth — otherwise the user sees
-            // "Cloud Synced" + empty library with no actionable feedback.
+
+
+
             if (error?.code === 'AUTH_REJECTED') {
                 showToast({
                     title: 'Session expired',
@@ -2022,10 +2022,10 @@
         stopPopupCloudRefresh();
         if (document.hidden || !AT?.FirebaseSync?.getUser?.()) return;
 
-        // forceFresh=false — reuse the local user-document cache. The cache
-        // is invalidated automatically when storage.onChanged fires for any
-        // synced key (see initEventListeners), so external updates still land.
-        // Forcing a fresh GET each tick was ~60 reads/hour for nothing.
+
+
+
+
         popupCloudRefreshTimer = setInterval(() => {
             refreshPopupCloudData(false).catch((error) => {
                 PopupLogger.debug('Sync', 'Background popup refresh skipped:', error?.message || error);
@@ -2042,7 +2042,7 @@
             const currentVideoProgress = result.videoProgress || {};
 
             if (currentVideoProgress[uniqueId]) {
-                const GRACE_MS = 5000; // ensures deletedAt > savedAt across devices with clock skew
+                const GRACE_MS = 5000;
                 const savedAt = currentVideoProgress[uniqueId].savedAt
                     ? new Date(currentVideoProgress[uniqueId].savedAt).getTime()
                     : Date.now();
@@ -2080,20 +2080,20 @@
         }
     }
 
-    /**
-     * Delete anime
-     */
-    // Tracks slugs whose delete is currently in flight to block double-click races.
+
+
+
+
     const _deletingSlugs = new Set();
 
-    // showInlineConfirm is wired above from AT.Dialogs.inlineConfirm.
+
 
     async function deleteAnime(slug) {
         const { Storage, FirebaseSync } = AT;
         if (_deletingSlugs.has(slug)) return;
 
-        // Confirm step — protects against accidental double-clicks on the
-        // delete icon. Skipped only when called programmatically via a flag.
+
+
         const animeTitle = animeData[slug]?.title || slug;
         const ok = await showInlineConfirm({
             title: 'Delete this anime?',
@@ -2143,11 +2143,11 @@
                 }
             }
 
-            // Remove from an1me.to watchlist
+
             if (siteAnimeId) {
                 chrome.runtime.sendMessage(
                     { type: 'WATCHLIST_SYNC', animeId: siteAnimeId, watchlistType: 'remove' },
-                    () => { if (chrome.runtime.lastError) { /* ignore */ } }
+                    () => { if (chrome.runtime.lastError) {              } }
                 );
             }
 
@@ -2163,9 +2163,9 @@
         }
     }
 
-    /**
-     * Toggle manual completed status
-     */
+
+
+
     async function toggleAnimeCompleted(slug) {
         const { Storage, FirebaseSync } = AT;
         if (!animeData[slug]) return;
@@ -2200,7 +2200,7 @@
                 }
             }
 
-            // Sync to an1me.to watchlist
+
             syncWatchlistFromPopup(slug, wasCompleted ? 'watching' : 'completed');
 
             renderAnimeList(elements.searchInput?.value || '');
@@ -2210,9 +2210,9 @@
         }
     }
 
-    /**
-     * Toggle dropped status
-     */
+
+
+
     async function toggleAnimeDropped(slug) {
         const { Storage, FirebaseSync } = AT;
         if (!animeData[slug]) return;
@@ -2247,7 +2247,7 @@
                 }
             }
 
-            // Sync to an1me.to watchlist
+
             syncWatchlistFromPopup(slug, wasDropped ? 'watching' : 'dropped');
 
             renderAnimeList(elements.searchInput?.value || '');
@@ -2257,10 +2257,10 @@
         }
     }
 
-    /**
-     * Toggle favorite status. Uses internal `favorite` boolean + `favoritedAt`
-     * timestamp so cloud-merge picks the most recent setting on conflict.
-     */
+
+
+
+
     async function toggleAnimeFavorite(slug) {
         const { Storage, FirebaseSync } = AT;
         if (!animeData[slug]) return;
@@ -2298,9 +2298,9 @@
         }
     }
 
-    /**
-     * Toggle on-hold status
-     */
+
+
+
     async function toggleAnimeOnHold(slug) {
         const { Storage, FirebaseSync } = AT;
         if (!animeData[slug]) return;
@@ -2335,7 +2335,7 @@
                 }
             }
 
-            // Sync to an1me.to watchlist
+
             syncWatchlistFromPopup(slug, wasOnHold ? 'watching' : 'on_hold');
 
             renderAnimeList(elements.searchInput?.value || '');
@@ -2345,9 +2345,9 @@
         }
     }
 
-    /**
-     * Clear all data
-     */
+
+
+
     async function clearAllData() {
         const { Storage, FirebaseSync } = AT;
         const dataToSave = { animeData: {}, videoProgress: {}, groupCoverImages: {}, deletedAnime: {} };
@@ -2398,7 +2398,7 @@
             includeFillersBlock.dataset.checked = 'false';
         }
 
-        // Reset slug status + meta + filler card
+
         _setSlugStatus('idle');
         const slugDetectedHint = document.getElementById('slugDetectedHint');
         if (slugDetectedHint) { slugDetectedHint.style.display = 'none'; slugDetectedHint.textContent = ''; }
@@ -2411,11 +2411,11 @@
         const fillerActionBar = document.getElementById('fillerActionBar');
         if (fillerActionBar) fillerActionBar.style.display = 'none';
 
-        // Reset counter
+
         const counter = document.getElementById('episodesCounter');
         if (counter) counter.style.display = 'none';
 
-        // Reset confirm button state
+
         const confirmBtn = elements.confirmAddAnime;
         if (confirmBtn) {
             confirmBtn.dataset.state = 'idle';
@@ -2434,11 +2434,11 @@
         });
     }
 
-    // State for the Add Anime dialog's live slug-driven features.
-    // Title field was removed — we now derive the title at submit time from
-    // the auto-detected sources (animeinfo cache → AniList → slug fallback)
-    // and cache it here while the dialog is open so re-fetches don't re-do
-    // the lookup on every preview render.
+
+
+
+
+
     let _addDialogDetectedTitle = null;
     let _addDialogKnownTotal = null;
     let _addDialogTotalCanon = null;
@@ -2446,13 +2446,13 @@
     let _addDialogCurrentSlug = null;
 
     function _setSlugStatus(status) {
-        // status: 'idle' | 'loading' | 'ok' | 'fail'
+
         const wrap = document.querySelector('.slug-input-wrap');
         if (wrap) wrap.dataset.status = status;
     }
 
-    // Publish dialog state so episode-parse.js can read knownTotal for
-    // out-of-range validation. Single small bag, updated on every fetch.
+
+
     window.AnimeTracker = window.AnimeTracker || {};
     window.AnimeTracker.__addDialogState = { knownTotal: null };
 
@@ -2473,16 +2473,16 @@
         }
     }
 
-    /**
-     * Called (debounced) whenever the slug input changes.
-     * Fetches filler data + AniList/scraper info; drives all live UI:
-     *   - input status pill (loading/ok/fail)
-     *   - "Detected slug: …" hint
-     *   - Cover thumbnail + AniList/scraper meta
-     *   - Filler badge pills (Canon / Fillers) + collapsible details
-     *   - Title auto-fill
-     *   - Episode quick-action chips
-     */
+
+
+
+
+
+
+
+
+
+
     async function onSlugInputChange(rawSlug) {
         const { FillerService } = AT;
         const slug = extractSlugFromInput(rawSlug);
@@ -2505,7 +2505,7 @@
             return;
         }
 
-        // ── Loading state ────────────────────────────────────────────────
+
         _setSlugStatus('loading');
         if (bar) {
             bar.style.display = 'flex';
@@ -2525,7 +2525,7 @@
 
         if (slug !== _addDialogCurrentSlug) return;
 
-        // ── Resolve totals ───────────────────────────────────────────────
+
         let availableTotal = null;
         let finalTotal = null;
         if (animeInfoFromCache && !animeInfoFromCache.notFound) {
@@ -2558,7 +2558,7 @@
         const hasAnyChip = showAll || showCanon || showSkip;
         const hasAnyInfo = hasFillerData || availableTotal;
 
-        // ── Build merged bar ─────────────────────────────────────────────
+
         if (bar) {
             if (!hasAnyInfo && !hasAnyChip) {
                 bar.style.display = 'none';
@@ -2566,7 +2566,7 @@
                 bar.className = 'filler-action-bar';
                 bar.textContent = '';
 
-                // Left: info badges
+
                 const left = document.createElement('div');
                 left.className = 'fab-left';
 
@@ -2592,27 +2592,27 @@
                         `<svg class="fab-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>`;
                     left.appendChild(b);
 
-                    // Details panel — SIBLING of `left`/`right` so it can take
-                    // the full width of the action-bar when expanded. Putting
-                    // it inside the badge would force the badge to width:100%
-                    // of its parent (.fab-left), pushing .fab-right off-screen.
-                    // The toggle's aria-controls points here so screen readers
-                    // know they're related.
+
+
+
+
+
+
                     const details = document.createElement('div');
                     details.className = 'fab-filler-details';
                     details.id = 'fabFillerDetails';
                     details.hidden = true;
                     details.textContent = fillerStr;
-                    // Stash the details ref on the toggle so the click handler
-                    // can find it via a single property lookup instead of
-                    // walking the DOM.
+
+
+
                     b._detailsEl = details;
                     bar._detailsEl = details;
                 }
 
                 bar.appendChild(left);
 
-                // Right: action chips
+
                 if (hasAnyChip) {
                     const right = document.createElement('div');
                     right.className = 'fab-right';
@@ -2639,11 +2639,11 @@
                     bar.appendChild(right);
                 }
 
-                // Append the filler details row last, AFTER left+right, so
-                // when expanded it lands on its own row at full width
-                // (.filler-action-bar is flex-wrap:wrap and the details
-                // element gets `flex-basis: 100%`). Until then, hidden=true
-                // keeps it out of the layout.
+
+
+
+
+
                 if (bar._detailsEl) {
                     bar.appendChild(bar._detailsEl);
                 }
@@ -2652,7 +2652,7 @@
             }
         }
 
-        // ── Slug meta card ───────────────────────────────────────────────
+
         if (slugMeta) {
             const cover = document.getElementById('slugMetaCover');
             const titleEl = document.getElementById('slugMetaTitle');
@@ -2675,10 +2675,10 @@
                     else { cover.removeAttribute('src'); cover.style.display = 'none'; }
                 }
                 if (titleEl) {
-                    // Show title only when it adds info beyond the slug the user
-                    // already typed. If detectedTitle is missing or basically just
-                    // the slug capitalized (what generateTitleFromSlug would produce),
-                    // hide the row to avoid visual repetition.
+
+
+
+
                     const slugFallback = generateTitleFromSlug(slug);
                     const finalTitle = detectedTitle || slugFallback;
                     const looksRedundant = !detectedTitle
@@ -2705,12 +2705,12 @@
             }
         }
 
-        // ── Status indicator ─────────────────────────────────────────────
+
         const hasUsefulData = (episodeTypes && !episodeTypes.notFound)
             || (animeInfoFromCache && !animeInfoFromCache.notFound);
         _setSlugStatus(hasUsefulData ? 'ok' : (episodeTypes === null && !animeInfoFromCache ? 'idle' : 'fail'));
 
-        // ── Cache title for submit ───────────────────────────────────────
+
         {
             const cachedAnilist = AT.AnilistService.cache?.[slug];
             _addDialogDetectedTitle = animeInfoFromCache?.title
@@ -2735,23 +2735,23 @@
         renderEpisodesPreview: updateEpisodesPreview
     } = AT.EpisodeParse;
 
-    /**
-     * Send watchlist sync to background service worker → an1me.to
-     * Maps extension slug to site anime ID and fires the sync.
-     * If siteAnimeId is missing, fetches it first from the anime page.
-     */
+
+
+
+
+
     function syncWatchlistFromPopup(slug, watchlistType) {
         try {
             const siteId = animeData[slug]?.siteAnimeId;
             if (siteId) {
-                // Have ID — send sync directly
+
                 chrome.runtime.sendMessage(
                     { type: 'WATCHLIST_SYNC', animeId: siteId, watchlistType },
-                    () => { if (chrome.runtime.lastError) { /* ignore */ } }
+                    () => { if (chrome.runtime.lastError) {              } }
                 );
                 PopupLogger.debug('WatchlistSync', `sent ${watchlistType} for #${siteId}`);
             } else {
-                // No siteAnimeId yet — fetch it from the anime page, then sync
+
                 PopupLogger.debug('WatchlistSync', `fetching siteAnimeId for ${slug}...`);
                 chrome.runtime.sendMessage(
                     { type: 'FETCH_ANIME_INFO', slug },
@@ -2759,15 +2759,15 @@
                         if (chrome.runtime.lastError) return;
                         const fetchedId = response?.info?.siteAnimeId;
                         if (fetchedId) {
-                            // Save it locally for next time
+
                             if (animeData[slug]) animeData[slug].siteAnimeId = fetchedId;
-                            // Now sync
+
                             chrome.runtime.sendMessage(
                                 { type: 'WATCHLIST_SYNC', animeId: fetchedId, watchlistType },
-                                () => { if (chrome.runtime.lastError) { /* ignore */ } }
+                                () => { if (chrome.runtime.lastError) {              } }
                             );
                             PopupLogger.debug('WatchlistSync', `fetched #${fetchedId}, sent ${watchlistType}`);
-                            // Persist the siteAnimeId
+
                             AT.Storage.set({ animeData }).catch(() => {});
                         } else {
                             PopupLogger.debug('WatchlistSync', `could not find siteAnimeId for ${slug}`);
@@ -2780,7 +2780,7 @@
         }
     }
 
-    // List-state mutations moved to src/popup/anime-status.js (StatusService).
+
     const {
         setManualListState,
         markTitleEdited,
@@ -2791,9 +2791,9 @@
         const { Storage, FirebaseSync, SeasonGrouping } = AT;
         const slugInput = elements.animeSlugInput.value;
         const slug = extractSlugFromInput(slugInput);
-        // Title resolution (no manual field anymore):
-        //   1. Title detected during slug auto-fetch (animeinfo / AniList cache)
-        //   2. Slug fallback — generated by capitalising slug parts
+
+
+
         const detectedTitle = _addDialogDetectedTitle && _addDialogDetectedTitle.trim();
         const title = detectedTitle || generateTitleFromSlug(slug);
         const episodesRawInput = elements.episodesWatchedInput.value.trim();
@@ -2823,10 +2823,10 @@
         }
         elements.episodesWatchedInput.classList.remove('error');
 
-        // Drive the new icon-based button state (idle → loading → success).
-        // The CSS swaps icons + label via [data-state]; we never touch the
-        // <span class="btn-label"> textContent so the structural <svg> children
-        // survive across state flips.
+
+
+
+
         elements.confirmAddAnime.disabled = true;
         elements.confirmAddAnime.dataset.state = 'loading';
 
@@ -2838,9 +2838,9 @@
                 animeData[slug]
                 && (animeData[slug].onHoldAt || animeData[slug].listState === 'on_hold')
             );
-            // For existing anime, inherit the median duration from already-tracked
-            // real episodes (video-measured) so manually-added episodes don't
-            // default to 24min when the anime actually runs 28-32min.
+
+
+
             let inferredDuration = defaultDuration;
             if (animeData[slug]) {
                 const realDurs = (animeData[slug].episodes || [])
@@ -2848,7 +2848,7 @@
                     .map(ep => Number(ep.duration))
                     .sort((a, b) => a - b);
                 if (realDurs.length > 0) {
-                    inferredDuration = realDurs[Math.floor(realDurs.length / 2)]; // median
+                    inferredDuration = realDurs[Math.floor(realDurs.length / 2)];
                 }
             }
             const episodes = episodeNumbers.map(num => ({ number: num, duration: inferredDuration, watchedAt: now }));
@@ -2861,7 +2861,7 @@
                     if (!existing) {
                         existingEpisodes.push(ep);
                     } else if (existing.durationSource === 'anilist') {
-                        // Promote imported episode to manually-confirmed watched.
+
                         const idx = existingEpisodes.indexOf(existing);
                         existingEpisodes[idx] = { ...existing, watchedAt: now, duration: inferredDuration, durationSource: 'manual' };
                     }
@@ -2879,10 +2879,10 @@
                     totalWatchTime: episodes.reduce((sum, ep) => sum + (ep.duration || 0), 0),
                     lastWatched: now, totalEpisodes: null
                 };
-                // No manual title field anymore — `title` is auto-detected or
-                // generated from slug, so we DO NOT stamp titleUpdatedAt
-                // (which would otherwise mark this entry as user-overridden
-                // and block future metadata-repair from refreshing the title).
+
+
+
+
             }
 
             const deletedResult = await Storage.get(['deletedAnime']);
@@ -2899,21 +2899,21 @@
             renderAnimeList(elements.searchInput?.value || '');
             updateStats();
 
-            // Success state — show a checkmark for ~800ms before closing.
+
             elements.confirmAddAnime.dataset.state = 'success';
             setTimeout(() => {
                 hideAddAnimeDialog();
-                // Reset to idle for next open (showAddAnimeDialog also does this,
-                // but reset here too in case something else re-opens fast).
+
+
                 if (elements.confirmAddAnime) {
                     elements.confirmAddAnime.dataset.state = 'idle';
                     elements.confirmAddAnime.disabled = false;
                 }
             }, 800);
 
-            // Fetch cover image + site metadata (incl. runtime) for the newly added
-            // anime in background. Also triggers when any episode has a placeholder
-            // duration — mostly movies, which seed with duration=0 in the add flow.
+
+
+
             const isPlaceholderDur = window.AnimeTrackerMergeUtils?.isPlaceholderDuration
                 || ((d) => { const v = Number(d) || 0; return v <= 0 || v === 1440 || v === 6000 || v === 7200; });
             const hasPlaceholderDuration = Array.isArray(animeData[slug].episodes)
@@ -2921,7 +2921,7 @@
             if (!animeData[slug].coverImage || hasPlaceholderDuration) {
                 chrome.runtime.sendMessage(
                     { type: 'BATCH_FETCH_ANIME_INFO', slugs: [slug] },
-                    () => { if (chrome.runtime.lastError) { /* ignore */ } }
+                    () => { if (chrome.runtime.lastError) {              } }
                 );
             }
 
@@ -2939,7 +2939,7 @@
         } catch (error) {
             PopupLogger.error('AddAnime', 'Error:', error);
             showToast('Failed to add anime. Please try again.', 'error');
-            // Reset button so user can retry
+
             elements.confirmAddAnime.disabled = false;
             elements.confirmAddAnime.dataset.state = 'idle';
         }
@@ -2953,7 +2953,7 @@
             initialFocus: elements.editTitleInput,
             onCancel: hideEditTitleDialog
         });
-        // Pre-select text so user can replace immediately.
+
         try { elements.editTitleInput.select(); } catch {}
     }
 
@@ -3157,27 +3157,27 @@
         return applyMetadataRepairState(result.metadataRepairState || null, options);
     }
 
-    /**
-     * If the background service worker stamped `postUpdateFetchTriggeredAt`
-     * after an extension update, surface a toast and open the auto-fetch UI
-     * so the freshly-installed version warms its anime metadata caches.
-     *
-     * Always clears the flag — even when there's nothing to fetch — so we
-     * don't re-trigger every popup open. The BG side already kicked off
-     * `pendingBackgroundMetadataRepair`; here we just expose it to the user.
-     */
-    /**
-     * The SW kicks off the post-update metadata repair on `onInstalled.update`
-     * before the popup ever opens, so we DON'T pop a toast or auto-open the
-     * fetch dialog when the user happens to open the popup later — that was
-     * the green "πρασινακι" that interrupted the user. Instead we silently
-     * consume the post-update flag and let the footer sync-status badge
-     * surface any in-flight progress (driven by the storage.onChanged
-     * listener that calls applyMetadataRepairState on every state tick).
-     *
-     * The user can still open the import dialog any time via
-     * Settings → Fetch & Import All.
-     */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     async function maybePromptPostUpdateFetch() {
         const { Storage } = AT;
         try {
@@ -3188,7 +3188,7 @@
             ]);
 
             if (stored.postUpdateFetchTriggeredAt) {
-                // Single-shot — clear so we don't keep checking forever.
+
                 await Storage.remove([
                     'postUpdateFetchTriggeredAt',
                     'postUpdateFetchFromVersion',
@@ -3196,10 +3196,10 @@
                 ]);
             }
 
-            // If a repair is already running in the background, reflect it
-            // in the footer immediately (storage.onChanged would also do
-            // this on the next state tick, but this avoids the gap on
-            // popup-open before the first tick).
+
+
+
+
             if (stored.metadataRepairState?.status === 'running') {
                 await applyMetadataRepairState(stored.metadataRepairState, { autoOpenRunning: true });
             }
@@ -3281,8 +3281,8 @@
                     <span>Signing in...</span>
                 </span>`;
             await FirebaseSync.signInWithGoogle();
-            // Flag is set AFTER successful sign-in, inside onUserSignedIn,
-            // so a cancelled or failed OAuth never leaves a stale flag.
+
+
         } catch (error) {
             const msg = (error.message || '').toLowerCase();
             const isCancelled = msg.includes('did not approve') || msg.includes('cancelled') ||
@@ -3292,7 +3292,7 @@
                 PopupLogger.error('Firebase', 'Sign in error:', error);
                 showAuthToast('Sign in failed. Please try again.', 'error');
             }
-            // Ensure any stale flag from a previous session is cleared.
+
             await chrome.storage.local.set({ pendingBackgroundMetadataRepair: false });
         } finally {
             elements.googleSignIn.disabled = false;
@@ -3300,10 +3300,10 @@
         }
     }
 
-    // ── Email/Password auth ──────────────────────────────────────────────
-    // Maps Identity Toolkit's terse error codes to user-facing strings. Falls
-    // back to the raw message for anything we haven't seen before so we don't
-    // silently swallow a real failure.
+
+
+
+
     const EMAIL_AUTH_ERRORS = {
         EMAIL_NOT_FOUND: 'No account found for this email.',
         INVALID_PASSWORD: 'Wrong password. Try again or reset it.',
@@ -3321,7 +3321,7 @@
 
     function friendlyAuthError(err) {
         const raw = (err?.message || '').trim();
-        // Firebase REST often returns "CODE : extra info" — strip the suffix.
+
         const code = raw.split(':')[0].trim().toUpperCase().replace(/\s+/g, '_');
         return EMAIL_AUTH_ERRORS[code] || raw || 'Sign-in failed.';
     }
@@ -3417,13 +3417,13 @@
             } else {
                 await FirebaseSync.signInWithEmailPassword(email, password);
             }
-            // Flag is set AFTER successful sign-in, inside onUserSignedIn.
-            // Clear the password field on success — we don't want it sitting
-            // in the DOM if the user gets signed out later.
+
+
+
             const pwEl = document.getElementById('authPasswordInput');
             if (pwEl) pwEl.value = '';
         } catch (err) {
-            // Ensure any stale flag from a previous session is cleared.
+
             await chrome.storage.local.set({ pendingBackgroundMetadataRepair: false });
             PopupLogger.error('Firebase', `${mode === 'signup' ? 'Sign-up' : 'Sign-in'} error:`, err);
             setEmailFormError(friendlyAuthError(err));
@@ -3443,17 +3443,17 @@
             emailInput?.focus();
             return;
         }
-        // Trivial sanity check — keeps us from burning a request on
-        // obvious garbage like "asdf" and surfaces feedback instantly.
+
+
         if (!isPlausibleEmailAddress(email)) {
             setEmailFormError(EMAIL_AUTH_ERRORS.INVALID_EMAIL);
             emailInput?.focus();
             return;
         }
 
-        // Drive only the forgot-password button's loading state — the rest
-        // of the form (Sign in / Create account) stays interactive so the
-        // user isn't trapped while we wait for the OOB email round-trip.
+
+
+
         const forgotBtn = document.getElementById('authForgotPasswordBtn');
         const originalText = forgotBtn?.textContent || 'Forgot password?';
         if (forgotBtn) {
@@ -3464,7 +3464,7 @@
         try {
             await FirebaseSync.sendPasswordReset(email);
             PopupLogger.log('Firebase', `Password reset request accepted for ${email}`);
-            // Firebase deliberately does not disclose whether this email exists.
+
             setEmailFormError(
                 `If an account exists for ${email}, a reset email will arrive shortly. Check your inbox and spam folder.`,
                 { success: true }
@@ -3480,33 +3480,33 @@
         }
     }
 
-    // ── Set-password modal (for Google users who want to log in on mobile) ─
-    // Build steps run in this order so the function reads top-down:
-    //   1. tear down any prior overlay (handles double-clicks)
-    //   2. detect "update mode" if the user already linked a password —
-    //      we change the labels but keep the same submit flow (Identity
-    //      Toolkit's accounts:update overwrites whatever password is set)
-    //   3. build DOM with `<form>` so Enter submits naturally
-    //   4. wire show/hide toggle, live strength validation
-    //   5. wire submit + cancel via the shared Dialogs helper
-    //      (gives us focus trap + ESC + focus restore for free)
+
+
+
+
+
+
+
+
+
+
     async function openSetPasswordModal() {
         document.getElementById('setPasswordOverlay')?.remove();
 
         const { FirebaseSync, Dialogs } = AT;
         const user = FirebaseSync.getUser?.() || null;
 
-        // Detect update vs first-time setup so we can swap copy. The local
-        // marker is per-uid so switching accounts on a shared browser still
-        // shows the right state. This is best-effort UX — the actual server
-        // call (accounts:update) overwrites any existing password silently
-        // either way, so even a stale marker can't put us in a wrong state.
+
+
+
+
+
         let isUpdate = false;
         try {
             const stored = await chrome.storage.local.get([PASSWORD_SET_MARKER_KEY]);
             const marker = stored[PASSWORD_SET_MARKER_KEY];
             isUpdate = !!(marker?.uid && user?.uid && marker.uid === user.uid && marker.setAt);
-        } catch { /* marker unreadable; default to first-time copy */ }
+        } catch {                                                     }
 
         const COPY = isUpdate ? {
             title:        'Update password',
@@ -3612,19 +3612,19 @@
             </form>
         `;
 
-        // Inject the mode-specific copy via textContent so user-supplied
-        // strings (the email) can't ever escape into the DOM as HTML.
+
+
         overlay.querySelector('#setPasswordTitle').textContent = COPY.title;
         overlay.querySelector('.set-password-hint-copy').textContent = COPY.hint;
         overlay.querySelector('.set-password-submit-label').textContent = COPY.saveIdle;
 
-        // ── Email pill ───────────────────────────────────────────────────
+
         const pillEl = overlay.querySelector('#setPasswordEmailPill');
         if (pillEl) {
             if (user?.email) {
                 pillEl.textContent = user.email;
             } else {
-                // Defensive: never render an empty pill (looks like a layout bug).
+
                 pillEl.style.display = 'none';
             }
         }
@@ -3642,9 +3642,9 @@
             errEl.style.display = msg ? 'block' : 'none';
         };
 
-        // ── Show / hide password toggle ──────────────────────────────────
-        // Single eye button on the password input; flips type and updates
-        // aria-pressed + aria-label so screen readers track the state.
+
+
+
         overlay.querySelectorAll('.set-password-toggle').forEach((btn) => {
             btn.addEventListener('click', () => {
                 const id = btn.dataset.toggle;
@@ -3655,20 +3655,20 @@
                 btn.setAttribute('aria-pressed', isPassword ? 'true' : 'false');
                 btn.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
                 btn.closest('.set-password-input-wrap')?.classList.toggle('is-revealed', isPassword);
-                // Keep cursor at end of revealed value so the user sees what
-                // they were typing rather than the start of the string.
+
+
                 target.focus();
                 try {
                     const len = target.value.length;
                     target.setSelectionRange(len, len);
-                } catch { /* type=text supports it; fail safe just in case */ }
+                } catch {                                                     }
             });
         });
 
-        // ── Strength meter ───────────────────────────────────────────────
-        // 0=empty 1=weak 2=medium 3=strong. Heuristic: length floor + class
-        // diversity. Not a security guarantee — a hint to nudge users away
-        // from `password` / `123456`. Identity Toolkit enforces ≥6 anyway.
+
+
+
+
         const computeStrength = (pw) => {
             if (!pw) return 0;
             let classes = 0;
@@ -3688,20 +3688,20 @@
             strengthLabel.textContent = STRENGTH_LABELS[lvl] || '';
         };
 
-        // ── Save enablement ──────────────────────────────────────────────
+
         const refreshSubmitState = () => {
             submitBtn.disabled = pwInput.value.length < 6;
         };
         const onAnyChange = () => {
-            // Clear any prior server-side error the moment the user resumes
-            // typing — keeps the UI honest about *current* validity.
+
+
             if (errEl?.textContent) showErr('');
             updateStrength();
             refreshSubmitState();
         };
         pwInput.addEventListener('input', onAnyChange);
 
-        // ── Close + cancel ───────────────────────────────────────────────
+
         const close = () => { Dialogs.close(overlay); setTimeout(() => overlay.remove(), 0); };
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) close();
@@ -3711,7 +3711,7 @@
             }
         });
 
-        // ── Submit ───────────────────────────────────────────────────────
+
         formEl.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (submitBtn.disabled) return;
@@ -3731,11 +3731,11 @@
                 refreshSubmitState();
             };
 
-            // Wraps `setPasswordForCurrentUser` and on `CREDENTIAL_TOO_OLD_LOGIN_AGAIN`
-            // transparently re-signs in with Google to refresh the idToken,
-            // then retries once. Firebase requires a recent sign-in for any
-            // sensitive credential change; this gives the user a single-click
-            // experience instead of forcing a manual sign-out / sign-in cycle.
+
+
+
+
+
             const trySetPasswordWithReauth = async () => {
                 try {
                     await FirebaseSync.setPasswordForCurrentUser(pw);
@@ -3767,12 +3767,12 @@
 
             setLoadingLabel(COPY.saveBusy);
             try {
-                // Update mode only: probe whether the typed value already
-                // matches the current password and bail early — Identity
-                // Toolkit happily accepts an unchanged password, and silently
-                // re-saving the same one is a footgun (user thinks they
-                // changed it; they didn't). For first-time setup there's no
-                // existing password to compare against, so we skip the check.
+
+
+
+
+
+
                 if (isUpdate && user?.email) {
                     setLoadingLabel('Checking…');
                     try {
@@ -3783,19 +3783,19 @@
                             return;
                         }
                     } catch (probeErr) {
-                        // Probe failed for a non-credential reason (network /
-                        // rate limit). Don't block the user — fall through
-                        // to the actual save which will surface the real
-                        // error in context if it persists.
+
+
+
+
                         PopupLogger.warn('Firebase', 'Same-password probe failed:', probeErr?.message);
                     }
                     setLoadingLabel(COPY.saveBusy);
                 }
                 await trySetPasswordWithReauth();
-                // Persist the per-account marker so the Settings danger zone
-                // can flip the button into its "Password set" state. Tying
-                // it to the uid means switching Google accounts on the same
-                // browser doesn't carry the marker over.
+
+
+
+
                 const currentUser = FirebaseSync.getUser?.();
                 if (currentUser?.uid) {
                     try {
@@ -3815,9 +3815,9 @@
                     body:  COPY.successBody,
                     type:  'success'
                 });
-                // If the user is currently looking at Settings, refresh the
-                // Danger zone so the button flips to its "set" state without
-                // requiring a manual close+reopen of the view.
+
+
+
                 if (currentViewMode === 'settings') {
                     renderSettingsView();
                 }
@@ -3829,11 +3829,11 @@
         });
 
         document.body.appendChild(overlay);
-        // Defer until appended so focus actually lands inside the overlay.
-        // Dialogs.open handles ESC, Tab cycling and focus restoration.
+
+
         Dialogs.open(overlay, { initialFocus: pwInput });
     }
-    // Expose so settings-view delegated handler can pop the modal.
+
     window.AnimeTracker = window.AnimeTracker || {};
     window.AnimeTracker.openSetPasswordModal = openSetPasswordModal;
 
@@ -3854,17 +3854,17 @@
         setTimeout(() => toast.remove(), 3000);
     }
 
-    // Non-blocking toast that replaces native alert() in error paths. alert()
-    // freezes the popup and feels broken; this matches the rest of the toast UX.
-    //
-    // Two call signatures, both supported:
-    //   showToast('Simple message', 'success')
-    //   showToast({ title: '…', body: '…', type: 'success', duration: 4000 })
-    //
-    // When a string is passed and contains a sentence-end early on
-    // ("Title. Rest of the body…") it auto-splits into a bold title +
-    // muted body so the toast carries visual hierarchy without the caller
-    // having to think about it.
+
+
+
+
+
+
+
+
+
+
+
     function showToast(messageOrOpts, typeArg) {
         const opts = (messageOrOpts && typeof messageOrOpts === 'object' && !Array.isArray(messageOrOpts))
             ? messageOrOpts
@@ -3872,8 +3872,8 @@
         const type = opts.type === 'success' ? 'success' : 'error';
         const duration = Math.max(1500, Math.min(opts.duration || 4000, 10000));
 
-        // Caller can be explicit with title/body; otherwise we try to split a
-        // single string at the first period followed by ≥5 trailing chars.
+
+
         let title = (opts.title || '').trim();
         let body  = (opts.body  || '').trim();
         if (!title && !body) {
@@ -3883,7 +3883,7 @@
             else   { title = raw; }
         }
 
-        // Tear down a prior toast so spamming actions doesn't stack them.
+
         document.getElementById('atGenericToast')?.remove();
 
         const toast = document.createElement('div');
@@ -3893,8 +3893,8 @@
         toast.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
         toast.style.setProperty('--at-toast-duration', `${duration}ms`);
 
-        // Inline SVGs (no external icons): check-circle for success, alert
-        // triangle for error. Stroke-only at 1.8 so they read crisp at 16px.
+
+
         const iconMarkup = type === 'success'
             ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -3923,7 +3923,7 @@
             </button>
             <span class="at-toast-progress" aria-hidden="true"></span>
         `;
-        // Use textContent so user-supplied strings can't inject HTML.
+
         toast.querySelector('.at-toast-title').textContent = title;
         if (body) toast.querySelector('.at-toast-body').textContent = body;
 
@@ -3931,28 +3931,28 @@
             if (toast._dismissed) return;
             toast._dismissed = true;
             toast.classList.add('at-toast--leaving');
-            setTimeout(() => { try { toast.remove(); } catch { /* no-op */ } }, 180);
+            setTimeout(() => { try { toast.remove(); } catch {             } }, 180);
         };
         toast.querySelector('.at-toast-close').addEventListener('click', dismiss);
 
         document.body.appendChild(toast);
-        // Force a reflow so the slide-in transition fires.
+
         requestAnimationFrame(() => toast.classList.add('at-toast--visible'));
 
         const timerId = setTimeout(dismiss, duration);
-        // If the user hovers, pause the auto-dismiss so they can read it.
+
         toast.addEventListener('mouseenter', () => {
             clearTimeout(timerId);
             toast.classList.add('at-toast--paused');
         });
         toast.addEventListener('mouseleave', () => {
             toast.classList.remove('at-toast--paused');
-            // Restart with a shorter window — they've already read most of it.
+
             setTimeout(dismiss, 1500);
         });
     }
-    // Expose so other popup modules (share-card, etc.) can use the same
-    // toast UX instead of falling back to native alert().
+
+
     window.AnimeTracker = window.AnimeTracker || {};
     window.AnimeTracker.showToast = showToast;
 
@@ -3987,9 +3987,9 @@
         }
 
         if (elements.settingsBtn) {
-            // Settings is now a view-mode (full popup) like Stats/Goals.
-            // Click toggles between settings view and library; click any other
-            // view button to switch directly.
+
+
+
             elements.settingsBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (elements.donateDropdown) elements.donateDropdown.classList.remove('visible');
@@ -4001,8 +4001,8 @@
         }
 
         document.addEventListener('click', (e) => {
-            // Donate sub-popover still works the same way (it's not part of
-            // the settings view; it's a small floating panel).
+
+
             if (elements.donateDropdown &&
                 !elements.donateDropdown.contains(e.target) &&
                 (!getSettingsDonateButton() || !getSettingsDonateButton().contains(e.target))) {
@@ -4014,7 +4014,7 @@
             const donateTrigger = e.target.closest('#settingsDonate');
             if (!donateTrigger) return;
             e.stopPropagation();
-            // Toggle: a second click on the button closes the open dropdown.
+
             if (elements.donateDropdown?.classList.contains('visible')) {
                 closeDonateDropdown();
                 return;
@@ -4037,12 +4037,12 @@
             }
         });
 
-        // ── Settings view delegated handlers ─────────────────────────────
-        // The settings view DOM is built lazily by settings-view.js when the
-        // user opens it, so the buttons don't exist when initEventListeners
-        // runs. Caching them at IIFE-init time gave us null references and
-        // every toggle silently did nothing. Single delegator below survives
-        // every (re-)render and keeps wiring in one place.
+
+
+
+
+
+
         const handleToggle = async (key, renderFn, getNext, onAfterSave) => {
             const btn = document.getElementById(key.btnId);
             if (!btn) return;
@@ -4052,9 +4052,9 @@
             try {
                 await chrome.storage.local.set({ [key.storageKey]: nextEnabled });
                 if (onAfterSave) onAfterSave(nextEnabled);
-                // Mirror the change up to Firestore so other devices pick it
-                // up. Debounced — flipping multiple toggles in a row produces
-                // a single field-masked PATCH.
+
+
+
                 try {
                     await FirebaseSync.queuePlaybackSettingsSave();
                 } catch (syncError) {
@@ -4067,8 +4067,8 @@
         };
 
         document.addEventListener('click', async (e) => {
-            // Walk through known settings buttons. closest() handles clicks on
-            // child nodes (icons, labels) inside each button.
+
+
             if (e.target.closest('#settingsCopyGuard')) {
                 e.stopPropagation();
                 await handleToggle(
@@ -4201,9 +4201,9 @@
             if (e.target.closest('#settingsFetchFillers')) {
                 setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
-                // Cache-first import: the SW reads chrome.storage.local first,
-                // counts fresh entries as cached/skipped, and fetches only
-                // missing or stale metadata/filler data.
+
+
+
                 await fetchAllFillers({
                     autoStart: true,
                     forceInfoRefresh: false,
@@ -4239,16 +4239,16 @@
             });
         }
 
-        // Compact-header signal: when the user scrolls the library, the
-        // header card adds a subtle elevation shadow + the stats row tightens.
-        // Pure CSS does the visuals; this listener just toggles the class on
-        // the closest stable ancestor (`.main-app`) so the rule can target
-        // both header and #statsBar in one pass.
-        //
-        // Hysteresis: turn ON at 12px, turn OFF only when back to 4px.
-        // This prevents rapid toggling (flicker) when the list has barely
-        // enough content to scroll and the user hovers near the threshold.
-        // Debounce: skip frames that arrive within 60ms of each other.
+
+
+
+
+
+
+
+
+
+
         const _mainContentScroll = document.querySelector('.main-content');
         const _mainAppRoot = document.querySelector('.main-app');
         if (_mainContentScroll && _mainAppRoot) {
@@ -4283,8 +4283,8 @@
         }
 
         if (elements.addAnimeBtn) elements.addAnimeBtn.addEventListener('click', showAddAnimeDialog);
-        // Empty-state CTA mirrors the toolbar's `+` button so a brand-new
-        // user has an obvious starting action without searching the header.
+
+
         const emptyStateAddBtn = document.getElementById('emptyStateAddBtn');
         if (emptyStateAddBtn) emptyStateAddBtn.addEventListener('click', showAddAnimeDialog);
         if (elements.closeAddAnime) elements.closeAddAnime.addEventListener('click', hideAddAnimeDialog);
@@ -4298,7 +4298,7 @@
 
         if (elements.animeSlugInput) {
             elements.animeSlugInput.addEventListener('input', () => {
-                // Reset auto-fill flag + meta when user clears the slug
+
                 if (!elements.animeSlugInput.value.trim()) {
                     _addDialogDetectedTitle = null;
                     _addDialogKnownTotal = null;
@@ -4320,7 +4320,7 @@
                 if (elements.episodesWatchedInput && elements.episodesWatchedInput.value) {
                     updateEpisodesPreview(elements.episodesWatchedInput.value);
                 }
-                // Debounced slug-driven fetch (filler + title + meta)
+
                 if (_addDialogSlugDebounce) clearTimeout(_addDialogSlugDebounce);
                 _addDialogSlugDebounce = setTimeout(() => {
                     _addDialogSlugDebounce = null;
@@ -4333,11 +4333,11 @@
             });
         }
 
-        // (Title input listener removed — field no longer exists. Title is
-        // auto-detected from animeinfo / AniList during onSlugInputChange,
-        // cached in _addDialogDetectedTitle, and used at submit time.)
 
-        // Quick action chips inside the Add Anime dialog episodes section
+
+
+
+
         if (elements.addAnimeDialog) {
             elements.addAnimeDialog.addEventListener('click', (e) => {
                 const chip = e.target.closest('.ep-chip');
@@ -4351,7 +4351,7 @@
                         updateEpisodesPreview(elements.episodesWatchedInput.value);
                         elements.episodesWatchedInput.focus();
                     } else if (action === 'canon' && _addDialogKnownTotal) {
-                        // Fill 1-{total} then immediately strip fillers from current range
+
                         const slug = _addDialogCurrentSlug;
                         const all = [];
                         for (let i = 1; i <= _addDialogKnownTotal; i++) all.push(i);
@@ -4376,17 +4376,17 @@
                     return;
                 }
 
-                // Filler badge toggle (shows the filler episode list as a
-                // sibling row inside the same .filler-action-bar — never
-                // nested inside the badge, otherwise width:100% on the
-                // details would force the badge to push siblings off-screen).
+
+
+
+
                 const toggle = e.target.closest('.fab-filler-toggle');
                 if (toggle && elements.addAnimeDialog.contains(toggle)) {
                     e.preventDefault();
                     const expanded = toggle.getAttribute('aria-expanded') === 'true';
                     toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-                    // Prefer the cached ref (faster); fall back to aria-controls
-                    // lookup if the badge was rebuilt without the prop.
+
+
                     let details = toggle._detailsEl;
                     if (!details) {
                         const id = toggle.getAttribute('aria-controls');
@@ -4471,7 +4471,7 @@
         });
 
         if (elements.categoryTabs) {
-            // Create sliding indicator
+
             const slider = document.createElement('div');
             slider.className = 'category-tabs-slider';
             elements.categoryTabs.appendChild(slider);
@@ -4481,9 +4481,9 @@
                 const containerRect = elements.categoryTabs.getBoundingClientRect();
                 const tabRect = activeTab.getBoundingClientRect();
                 if (!containerRect.width || !tabRect.width) return;
-                // Underline is anchored to bottom-left of the tab now (no
-                // container padding to subtract — was 4px in the old pill
-                // design).
+
+
+
                 const offsetX = tabRect.left - containerRect.left;
                 slider.style.width = tabRect.width + 'px';
                 slider.style.transform = `translateX(${offsetX}px)`;
@@ -4491,7 +4491,7 @@
                 elements.categoryTabs.classList.add('slider-ready');
                 if (instant) {
                     slider.style.transition = 'none';
-                    slider.offsetHeight; // force reflow
+                    slider.offsetHeight;
                     slider.style.transition = '';
                 }
             }
@@ -4515,7 +4515,7 @@
                 attempt();
             };
 
-            // Initial position (no animation)
+
             const initialActive = elements.categoryTabs.querySelector('.category-tab.active');
             requestAnimationFrame(() => moveSlider(initialActive, true));
 
@@ -4528,7 +4528,7 @@
                     elements.categoryTabs.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
                     tab.classList.add('active');
 
-                    // Switching a category exits any view mode (stats/goals)
+
                     setViewMode(null);
 
                     requestAnimationFrame(() => moveSlider(tab, false));
@@ -4549,7 +4549,7 @@
             });
         }
 
-        // ─── Header view-mode toggles (Stats / Goals icon buttons) ──────────
+
         const viewStatsBtn = document.getElementById('viewStatsBtn');
         const viewGoalsBtn = document.getElementById('viewGoalsBtn');
 
@@ -4635,10 +4635,10 @@
             if (changes.videoProgress) {
                 videoProgress = changes.videoProgress.newValue || {};
                 if (!isOwn) isExternalUpdate = true;
-                // Instantly patch ip-card bars (no debounce needed)
+
                 if (typeof _ipPatch === 'function') _ipPatch(videoProgress);
-                // Re-render when progress changes move entries between active/completed/deleted
-                // states, or when keys change. Otherwise the lightweight ip-card patch is enough.
+
+
                 if (doesProgressChangeAffectLists(
                     changes.videoProgress.oldValue || {},
                     changes.videoProgress.newValue || {}
@@ -4668,11 +4668,11 @@
                 void applyMetadataRepairState(changes.metadataRepairState.newValue || null, { autoOpenRunning: true });
             }
 
-            // Cache invalidation: when an external writer (SSE → SW → storage,
-            // or another tab) touches one of the Firebase-synced keys, drop
-            // the popup's cached cloud user document so the next sync reads
-            // fresh state instead of serving stale cloud data for up to the
-            // full cache TTL.
+
+
+
+
+
             if (isExternalUpdate && (
                 changes.animeData ||
                 changes.videoProgress ||
@@ -4711,7 +4711,7 @@
                     }
                 }, CONFIG.STORAGE_UPDATE_DEBOUNCE_MS);
             } else if (needsProgressOnly && isExternalUpdate && !handledRepairStateChange && !handledMetadataCacheChange) {
-                // External progress update (cloud sync) — only show sync badge, no re-render
+
                 if (elements.syncStatus && elements.syncText) {
                     elements.syncStatus.classList.add('synced');
                     elements.syncText.textContent = 'Synced ✓';
@@ -4821,9 +4821,9 @@
                     return;
                 }
 
-                // Card expand/collapse and collapsible sections are handled by
-                // setupCardEventListeners() via direct addEventListener — do NOT
-                // duplicate them here in the delegated handler.
+
+
+
             });
         }
     }
@@ -4831,20 +4831,20 @@
     async function init() {
         const { FirebaseSync, Storage, FillerFetchUI } = AT;
 
-        // Tell the SW that the popup is alive so it wakes the SSE stream. The
-        // port auto-disconnects when the popup closes, letting the SW drop
-        // back into idle (0 Firestore reads/writes) if no an1me.to tab is open.
+
+
+
         try {
             const _popupAlivePort = chrome.runtime.connect({ name: 'popupAlive' });
-            // Hold a reference in case of GC heuristics; no-op otherwise.
+
             window.__popupAlivePort = _popupAlivePort;
         } catch (e) {
             PopupLogger.debug('Init', 'popupAlive port connect failed:', e?.message || e);
         }
 
-        // Task 10: AUTH_REJECTED listener. The SW broadcasts this for
-        // Firestore 401/403 it couldn't quietly recover from. Surface as a
-        // toast so the user knows something is wrong (and what to do).
+
+
+
         try {
             chrome.runtime.onMessage.addListener((msg) => {
                 if (msg?.type !== 'AUTH_REJECTED') return;
@@ -4865,7 +4865,7 @@
                     });
                 }
             });
-        } catch { /* messaging not available — non-fatal */ }
+        } catch {                                           }
 
         FillerFetchUI.init();
 
@@ -4894,10 +4894,10 @@
             loadAuto4kServerSetting()
         ]);
 
-        // Auto-cleanup stale data on every popup open
+
         try {
             const { ProgressManager } = AT;
-            // Run cleanup only once per day
+
             const { lastCleanupDate } = await Storage.get(['lastCleanupDate']);
             const today = new Date().toISOString().slice(0, 10);
             if (lastCleanupDate === today) {
@@ -4906,7 +4906,7 @@
                 const raw = await Storage.get(['animeData', 'videoProgress', 'deletedAnime']);
                 let dirty = false;
 
-                // Clean tracked/completed videoProgress entries
+
                 if (raw.videoProgress && raw.animeData) {
                     const { cleaned, removedCount } = ProgressManager.cleanTrackedProgress(raw.animeData, raw.videoProgress, raw.deletedAnime || {});
                     if (removedCount > 0) {
@@ -4939,16 +4939,16 @@
             PopupLogger.warn('Cleanup', 'Auto-cleanup failed:', e);
         }
 
-        // One-shot slug migration — auto-recovers from the legacy slugify
-        // bug (Fate/stay → fatestay-night, HUNTER×HUNTER → hunterhunter)
-        // and from AniList-romaji ↔ an1me.to slug mismatches (FMA
-        // Brotherhood, Demon Slayer movies, etc.). Probes the site to
-        // find the correct slug, then renames `animeData` + sidecar
-        // storage with CRDT-merged collisions.
-        //
-        // Self-throttled (30-min global gap, daily per-slug cooldown), so
-        // calling on every popup open is cheap. Fire-and-forget — never
-        // blocks popup boot.
+
+
+
+
+
+
+
+
+
+
         try {
             const SlugMigration = window.AnimeTrackerSlugMigration;
             if (SlugMigration && typeof SlugMigration.migrate === 'function') {
@@ -4972,10 +4972,10 @@
             onUserSignedIn: async (user) => {
                 showMainApp(user);
 
-                // Task 4: surface a non-destructive "Reconnect" banner when
-                // tokens.needsReauth has been set (state machine exhausted
-                // its retries). Tokens are still in storage; sign-in flow
-                // will clear the flag automatically on success.
+
+
+
+
                 try {
                     const needs = await window.FirebaseLib?.isReauthNeeded?.();
                     if (needs) {
@@ -4986,19 +4986,19 @@
                             duration: 9000
                         });
                     }
-                } catch { /* non-fatal — banner is best-effort */ }
+                } catch {                                         }
 
-                // Wake background SW if asleep (e.g. Orion on mobile) —
-                // send a lightweight ping instead of SYNC_TO_FIREBASE to avoid
-                // a duplicate full sync (popup handles sync via loadAndSyncData).
+
+
+
                 try {
                     chrome.runtime.sendMessage({ type: 'GET_VERSION' }, () => { void chrome.runtime.lastError; });
                 } catch {}
                 await refreshPopupCloudData(true);
                 startPopupCloudRefresh();
 
-                // Sign-in diagnostic — kept as console log only (visible via
-                // Debug Console in Settings → Library if needed). No toast UI.
+
+
                 const syncResult = AT.FirebaseSync.lastSyncResult || null;
                 const providers = user.providers || [];
                 PopupLogger.log('Sync',
@@ -5009,11 +5009,11 @@
                     `providers=[${providers.join(', ')}] ` +
                     `signedInVia=${user.signedInVia || 'google'}`);
 
-                // Set the repair flag NOW — after the cloud library has been
-                // loaded and merged. The SW picks it up via storage.onChanged
-                // and runs the silent metadata repair in background. Setting
-                // it before loadAndSyncData would let the SW start fetching
-                // before the library is ready (the sign-out→sign-in bug).
+
+
+
+
+
                 await chrome.storage.local.set({ pendingBackgroundMetadataRepair: true });
                 await maybePromptPostUpdateFetch();
             },
@@ -5024,15 +5024,15 @@
             onError: () => {
                 showMainApp(null);
                 loadData();
-                // Show the post-update prompt even when auth errored — the
-                // local library still benefits from a metadata refresh.
+
+
                 maybePromptPostUpdateFetch().catch(() => {});
             }
         });
     }
 
-    // ── In-Progress live refresh ──────────────────────────────────────────────
-    // Event-driven only: patch after render and on storage.onChanged updates.
+
+
 
     function _ipPatch(vp) {
         const completedPct = AT.CONFIG?.COMPLETED_PERCENTAGE || 85;
@@ -5083,12 +5083,12 @@
         });
     }
 
-    // _ipPatch is called from the main storage.onChanged listener (initEventListeners)
-    // to avoid registering duplicate listeners. Exposed here for access.
 
-    // ─── Global keyboard shortcuts ───────────────────────────────────────
-    // `/`        → focus the search input (skipped while typing in another field)
-    // `Esc`      → close any open dialog / dropdown / view-mode in priority order
+
+
+
+
+
     document.addEventListener('keydown', (e) => {
         const target = e.target;
         const isTypingTarget = target && (
@@ -5107,7 +5107,7 @@
         }
 
         if (e.key === 'Escape') {
-            // Priority: open dialogs > dropdowns > active view mode.
+
             const openDialog =
                 document.querySelector('.confirm-dialog.visible') ||
                 document.querySelector('.dialog.visible') ||
@@ -5125,7 +5125,7 @@
                 setViewMode(null);
                 return;
             }
-            // If search is non-empty, clear it instead of doing nothing.
+
             if (elements.searchInput && elements.searchInput.value && document.activeElement === elements.searchInput) {
                 elements.searchInput.value = '';
                 elements.searchInput.dispatchEvent(new Event('input', { bubbles: true }));

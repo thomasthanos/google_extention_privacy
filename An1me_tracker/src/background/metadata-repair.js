@@ -1,19 +1,5 @@
-/**
- * Anime Tracker — Library metadata repair (background module)
- *
- * Runs through every tracked anime and re-fetches an1me.to page info +
- * filler classifications, with retry/backoff and persistent state so a
- * service-worker kill mid-batch doesn't reset progress. Designed to make
- * a slow scrape (1 item / few seconds) survive across SW recycle cycles
- * via chrome.alarms scheduling instead of in-memory loops.
- *
- * Extracted from background.js. Depends on:
- *   - bgStorageGet / bgStorageSet (background.js)
- *   - fetchAnimePageInfo (bg/an1me-scraper.js)
- *   - discoverFillerSlug / fetchEpisodeTypesFromAnimeFillerList (bg/filler-discovery.js)
- *   - isLikelyMovieSlug (src/common/merge-utils.js)
- *   - dlog (background.js)
- */
+
+
 
 const METADATA_REPAIR_STATE_KEY = 'metadataRepairState';
 const PENDING_METADATA_REPAIR_KEY = 'pendingBackgroundMetadataRepair';
@@ -22,7 +8,7 @@ const METADATA_REPAIR_INFO_TTL_MS = 24 * 60 * 60 * 1000;
 const METADATA_REPAIR_INFO_TTL_AIRING_MS = 60 * 60 * 1000;
 const METADATA_REPAIR_EPISODE_TYPES_TTL_MS = 24 * 60 * 60 * 1000;
 const METADATA_REPAIR_NOT_FOUND_TTL_MS = 3 * 24 * 60 * 60 * 1000;
-const METADATA_REPAIR_RETRYABLE_TTL_MS = 15 * 60 * 1000;   // retry transient failures after 15 min
+const METADATA_REPAIR_RETRYABLE_TTL_MS = 15 * 60 * 1000;
 const METADATA_REPAIR_ITEMS_PER_TICK = 3;
 const METADATA_REPAIR_INTER_ITEM_DELAY_MS = 250;
 const METADATA_REPAIR_MAX_LOGS = 60;
@@ -95,9 +81,8 @@ function isAnimeInfoCacheFresh(entry) {
     if (!entry || typeof entry !== 'object') return false;
     const age = entry.cachedAt ? Date.now() - entry.cachedAt : Infinity;
     if (entry.notFound) return age < METADATA_REPAIR_NOT_FOUND_TTL_MS;
-    // Retryable errors must be treated as stale much sooner than a normal
-    // healthy cache entry — otherwise transient scraper failures stick around
-    // for the full 24h TTL.
+
+
     if (entry.retryable) return age < METADATA_REPAIR_RETRYABLE_TTL_MS;
     const ttl = entry.status === 'RELEASING'
         ? METADATA_REPAIR_INFO_TTL_AIRING_MS
@@ -526,34 +511,28 @@ async function maybeStartPendingMetadataRepair() {
     const stored = await bgStorageGet([PENDING_METADATA_REPAIR_KEY]);
     if (!stored[PENDING_METADATA_REPAIR_KEY]) return false;
 
-    // Task 13: gate repeated full-library passes. The repair flag gets set
-    // on every sign-in + every popup open after sign-in (see popup main.js
-    // onUserSignedIn handler). Without this gate we'd kick off a fresh
-    // pass every time even if one finished a few minutes ago. We honor
-    // the flag-set, but if the last RUN finished < 6h ago AND nothing is
-    // currently in-flight, just clear the flag and skip — the pass would
-    // be a no-op anyway (cache is fresh per the existing TTLs).
+
     const META_LAST_RUN_KEY = 'metadataRepairLastRunAt';
-    const META_REPAIR_GATE_MS = 6 * 60 * 60 * 1000;     // 6 hours
+    const META_REPAIR_GATE_MS = 6 * 60 * 60 * 1000;
     try {
         const gateRead = await bgStorageGet([META_LAST_RUN_KEY]);
         const lastRun = Number(gateRead[META_LAST_RUN_KEY]) || 0;
         const existingState = await getMetadataRepairState();
         const isIdle = !existingState || existingState.status !== 'running';
         if (isIdle && lastRun > 0 && (Date.now() - lastRun) < META_REPAIR_GATE_MS) {
-            // Recent run — skip. Clear the pending flag so the next storage
-            // change doesn't keep retriggering this branch.
+
+
             await bgStorageSet({ [PENDING_METADATA_REPAIR_KEY]: false });
             return false;
         }
-    } catch { /* fall through — better to over-repair than under */ }
+    } catch {                                                       }
 
     await startLibraryRepair({
         forceInfoRefresh: false,
         forceFillerRefresh: false
     });
-    // Stamp lastRunAt so the next pending flip within 6h is a no-op.
-    try { await bgStorageSet({ [META_LAST_RUN_KEY]: Date.now() }); } catch { /* best-effort */ }
+
+    try { await bgStorageSet({ [META_LAST_RUN_KEY]: Date.now() }); } catch {                   }
     return true;
 }
 

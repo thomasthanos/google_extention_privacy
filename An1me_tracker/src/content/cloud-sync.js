@@ -1,9 +1,9 @@
 (function () {
     'use strict';
 
-    // Shared config — populated by firebase-config.js (loaded earlier in the
-    // content_scripts list). If absent we log loudly and disable sync rather
-    // than silently 401-ing every request.
+
+
+
     const _firebaseConfig = (typeof globalThis !== 'undefined' && globalThis.firebaseConfig)
         || (typeof window !== 'undefined' && window.firebaseConfig)
         || null;
@@ -13,12 +13,12 @@
     const FIREBASE_API_KEY = _firebaseConfig?.apiKey || '';
     const FIREBASE_PROJECT_ID = _firebaseConfig?.projectId || '';
     const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)`;
-    // Orion / Safari fallback polling — kept in sync with the BG service
-    // worker constant (background.js: CLOUD_POLL_INTERVAL_MS). 3 min keeps
-    // cross-device sync responsive without burning Firestore reads.
+
+
+
     const CLOUD_POLL_INTERVAL_MS = 180000;
-    // Keep videoProgress tombstones (`deleted:true`) for this long so cross-device
-    // deletions propagate. Mirrors PROGRESS_TOMBSTONE_KEEP_MS in background.js.
+
+
     const PROGRESS_TOMBSTONE_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 
     const Logger = window.AnimeTrackerContent?.Logger;
@@ -31,15 +31,15 @@
     let teardownSyncTriggered = false;
     let cloudPollingTimer = null;
 
-    // Returns a multiplier for periodic-sync intervals. Stretches them when
-    // the user is on a slow / metered connection so we don't hammer mobile
-    // data plans with a 3-min poll on EDGE. The factor is applied as a
-    // tick-time gate inside the interval handler — the timer itself keeps
-    // running so we re-evaluate the network state every base period (the
-    // user's connection may change while the page is open).
-    //
-    // Browsers without the Network Information API (Safari, Firefox until
-    // recently) fall back to factor 1 — same as before.
+
+
+
+
+
+
+
+
+
     function _networkExtensionFactor() {
         try {
             const conn = navigator.connection
@@ -125,11 +125,11 @@
         }
     }
 
-    // Firestore JSON codec lives in src/common/firestore-codec.js (loaded
-    // before this file via the watch-page content_scripts list). Thin local
-    // aliases keep the existing call sites unchanged. If the shared module
-    // ever fails to load we surface it loudly instead of silently producing
-    // null payloads.
+
+
+
+
+
     const _fsCodec = globalThis.AnimeTrackerFirestoreCodec;
     if (!_fsCodec) {
         console.error('[CS-CloudSync] Firestore codec not loaded — sync disabled');
@@ -147,24 +147,24 @@
         stopCloudPolling();
         currentToken = null;
         currentUser = null;
-        // Drop any cached cloud doc — must not survive across an account
-        // change that follows a token failure (would otherwise leak data
-        // from the previous account into the next one's first read).
+
+
+
         invalidateCloudDocCache();
     }
 
     let _refreshInflight = null;
 
-    // Task 3: Classification of refresh-token failures lives in the shared
-    // module src/common/auth-classifier.js (loaded via the manifest
-    // content_scripts list, BEFORE this file). Single source of truth
-    // across popup / SW / content.
-    //
-    // POLICY (from Task 1): HTTP 401 / 403 are TRANSIENT, not permanent.
-    // ONLY HTTP 400 + a recognised permanent code signs the user out.
+
+
+
+
+
+
+
     function _csClassifyRefreshError(httpStatus, errorBody) {
         const cl = globalThis.AnimeTrackerAuthClassifier;
-        if (!cl) return false;        // fail-safe → transient
+        if (!cl) return false;
         return cl.classify(httpStatus, errorBody).permanent;
     }
 
@@ -182,7 +182,7 @@
                     }
                 );
             } catch (networkErr) {
-                // Network error = transient.
+
                 return { idToken: null, permanent: false, error: `network: ${networkErr?.message || networkErr}` };
             }
             if (!res.ok) {
@@ -224,9 +224,9 @@
             if (t.expiresAt < Date.now() + 120000) {
                 const result = await refreshToken(t.refreshToken);
                 if (result?.idToken) return result.idToken;
-                // Refresh failed. Permanent → sign out. Transient → fall back
-                // to existing token if still valid; otherwise return null but
-                // keep session for next attempt.
+
+
+
                 if (result?.permanent) {
                     await signOutDueToTokenFailure();
                     return null;
@@ -295,7 +295,7 @@
             chrome.storage.local.set({ [_CS_RECENT_OWN_WRITES_KEY]: payload }, () => {
                 void chrome.runtime.lastError;
             });
-        } catch { /* best-effort */ }
+        } catch {                   }
     }
 
     let _csHydrationPromise = null;
@@ -346,21 +346,21 @@
             chrome.runtime.sendMessage({ type: 'INVALIDATE_BG_CLOUD_DOC_CACHE' }, () => {
                 void chrome.runtime.lastError;
             });
-        } catch { /* best-effort */ }
+        } catch {                   }
     }
 
-    // Seed (rather than invalidate) the BG cloud-doc cache with the partial
-    // we just PATCHed to Firestore. Net effect: −1 Firestore read per CS
-    // write cycle (the next consumer-connected poll / GET_CLOUD_DOC sees a
-    // cache hit instead of paying for a full re-fetch).
-    //
-    // `partial` is the exact subset of fields we just sent (e.g.
-    // { videoProgress, lastUpdated } for progress push, or the full bundle
-    // for full push). uid is required so the BG handler can verify the
-    // active user before overlaying onto its cache.
+
+
+
+
+
+
+
+
+
     function notifyBgSeedCloudDoc(uid, partial) {
         if (!uid || !partial) {
-            // Defensive — fall back to invalidate so cache state stays correct.
+
             return notifyBgInvalidateCloudDoc();
         }
         try {
@@ -368,15 +368,15 @@
                 { type: 'UPDATE_BG_CLOUD_DOC_PARTIAL', uid, partial },
                 () => { void chrome.runtime.lastError; }
             );
-        } catch { /* best-effort */ }
+        } catch {                   }
     }
 
     async function getCloudDocCached(token, user) {
         const now = Date.now();
-        // uid guard — never serve another user's cached doc, even if the
-        // in-memory copy is still inside the TTL window. Without this, a
-        // signed-out → signed-in-as-other flow inside the TTL window could
-        // leak account A's library into account B's merge path.
+
+
+
+
         if (
             _cloudDocCache &&
             _cloudDocCacheUid === user.uid &&
@@ -403,8 +403,8 @@
             return doc;
         } catch (e) {
             Logger?.warn(`Cloud fetch failed: ${e.message}`);
-            // A normal direct write cannot safely replace map fields without
-            // first reading cloud state. Leave local data intact and retry.
+
+
             throw e;
         }
     }
@@ -424,9 +424,9 @@
                 }
 
                 const cloudDoc = fromFSDoc(await response.json());
-                // Bind the cache to the uid the response was fetched for —
-                // and re-confirm against the currently-stored firebase_user
-                // so an account swap mid-poll doesn't tag the cache wrong.
+
+
+
                 const activeNow = await getUser();
                 if (!activeNow?.uid || activeNow.uid !== user.uid) {
                     invalidateCloudDocCache();
@@ -457,10 +457,10 @@
         for (const [slug, anime] of Object.entries(animeData)) {
             if (anime?.episodes) {
                 for (const ep of anime.episodes) {
-                    // Keep current replay progress while a title is on hold.
+
                     if (anime.onHoldAt || anime.listState === 'on_hold') continue;
-                    // AniList history is not a playback event; older imports
-                    // may still carry a bogus watchedAt stamp.
+
+
                     if (ep?.durationSource === 'anilist') continue;
                     trackedIds.add(`${slug}__episode-${ep.number}`);
                 }
@@ -472,7 +472,7 @@
             if (id === '__slugIndex') continue;
             if (trackedIds.has(id)) continue;
             if (p?.deleted) {
-                // Keep recent tombstones so they propagate cross-device.
+
                 const deletedAt = p.deletedAt ? new Date(p.deletedAt).getTime() : 0;
                 if (deletedAt && (now - deletedAt) < PROGRESS_TOMBSTONE_KEEP_MS) {
                     out[id] = p;
@@ -494,9 +494,9 @@
             for (const ep of anime.episodes) {
                 const num = Number(ep?.number) || 0;
                 if (num <= 0) continue;
-                // Keep current replay progress while a title is on hold.
+
                 if (anime.onHoldAt || anime.listState === 'on_hold') continue;
-                // Keep resume progress until playback promotes the import.
+
                 if (ep?.durationSource === 'anilist') continue;
                 trackedIds.add(`${slug}__episode-${num}`);
             }
@@ -509,7 +509,7 @@
         for (const [id, progress] of Object.entries(baseProgress)) {
             if (!progress) continue;
             if (progress.deleted) {
-                // Keep recent tombstones so they propagate cross-device.
+
                 const deletedAt = progress.deletedAt ? new Date(progress.deletedAt).getTime() : 0;
                 if (deletedAt && (now - deletedAt) < PROGRESS_TOMBSTONE_KEEP_MS) {
                     cleaned[id] = progress;
@@ -524,11 +524,11 @@
         return cleaned;
     }
 
-    // Cross-function lock: pushProgressDirect and pushFullDirect would
-    // otherwise race because each only checks its own in-progress flag, so
-    // both can fire PATCH requests with overlapping field masks (videoProgress
-    // appears in both) and clobber each other. Keepalive writes (page-unload)
-    // bypass the wait — we accept the small overlap risk to ensure they flush.
+
+
+
+
+
     let _csCloudWriteBusy = false;
     async function _csWaitForCloudWrite() {
         while (_csCloudWriteBusy) {
@@ -536,16 +536,16 @@
         }
     }
 
-    // Holds a deep-cloned snapshot of the last successfully pushed videoProgress
-    // map so we can compare via `areProgressMapsEqual` instead of stringifying
-    // every push. For a heavy library (5000+ progress entries) the old
-    // `JSON.stringify(...) === lastPushedProgress` pattern cost ~10–30ms of
-    // serialization per call; the structural equality check costs ~5ms.
-    // `lastPushedProgress` is declared at module scope above (let).
+
+
+
+
+
+
     function snapshotForCompare(value) {
         try {
             if (typeof structuredClone === 'function') return structuredClone(value);
-        } catch { /* fall through to JSON clone */ }
+        } catch {                                  }
         try { return JSON.parse(JSON.stringify(value)); } catch { return null; }
     }
 
@@ -584,8 +584,8 @@
                 ? (localSnapshot.videoProgress || {})
                 : ((await chrome.storage.local.get(['videoProgress'])).videoProgress || {});
             const latestLocal = filterTrackedFromProgress(latestLocalFull, localAnimeData);
-            // The user kept writing while we were preparing the payload —
-            // schedule a follow-up push so we don't drop the late writes.
+
+
             if (!keepalive && !areProgressMapsEqual(latestLocal, filteredLocalVP)) {
                 progressPushPending = true;
             }
@@ -629,13 +629,13 @@
             });
 
             if (res.ok) {
-                // Keep the snapshot we just pushed for the next equality check.
-                // structuredClone instead of holding the live ref so subsequent
-                // mutations don't corrupt our "what did we last send?" record.
+
+
+
                 lastPushedProgress = snapshotForCompare(mergedVP);
                 lastPushAt = Date.now();
                 invalidateCloudDocCache();
-                // Seed BG cache (saves 1 Firestore read on next consumer wake).
+
                 notifyBgSeedCloudDoc(user.uid, { videoProgress: mergedVP, lastUpdated: pushedAt });
                 rememberOwnWrite(pushedAt);
                 Logger?.info('videoProgress pushed (merged)');
@@ -661,11 +661,11 @@
 
     let fullPushInProgress = false;
     let fullPushPending = false;
-    // Structural snapshot of what we last successfully pushed. Was a single
-    // stringified JSON blob (lazy equality); now four refs against which the
-    // next push compares with the merge-utils equality fns. Cheaper and
-    // doesn't hold a large string in memory for the whole session.
-    let lastPushedFull = null; // { animeData, videoProgress, deletedAnime, groupCoverImages } | null
+
+
+
+
+    let lastPushedFull = null;
 
     function _localPayloadsEqual(a, b) {
         return areAnimeDataMapsEqual(a.animeData || {}, b.animeData || {})
@@ -696,11 +696,11 @@
             const local = keepalive
                 ? localSnapshot
                 : await chrome.storage.local.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
-            // Drift detection between the two reads above — if storage changed
-            // mid-flight, schedule a follow-up push. Was `JSON.stringify(local)
-            // !== JSON.stringify(localSnapshot)` which paid 2× serialization
-            // for the entire local library every push. Per-field structural
-            // equality is dramatically cheaper for big libraries.
+
+
+
+
+
             if (!keepalive && !_localPayloadsEqual(local, localSnapshot)) {
                 fullPushPending = true;
             }
@@ -767,9 +767,9 @@
 
             const useKeepalive = keepalive && body.length < 63000;
 
-            // updateMask scopes the PATCH to the fields we manage from the
-            // content script. Without it, Firestore replaces the document and
-            // wipes popup-only fields (goalSettings, badgeUnlocks).
+
+
+
             const fullMask = ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'lastUpdated', 'email']
                 .map(f => `updateMask.fieldPaths=${f}`).join('&');
 
@@ -781,8 +781,8 @@
             });
 
             if (res.ok) {
-                // Clone the merged bundle so subsequent mutations don't poison
-                // our "what did we last push?" record.
+
+
                 lastPushedFull = snapshotForCompare(mergedBundle);
                 lastPushAt = Date.now();
                 invalidateCloudDocCache();
@@ -859,16 +859,16 @@
         }
     }
 
-    // Periodic push fires every 5 min during active watching. Gives ~4-5 cloud
-    // syncs per 24-min episode — good balance between freshness and write volume.
-    // Keepalive on teardown covers the close path as a final safety net.
+
+
+
     const PERIODIC_PUSH_INTERVAL = 300000;
     let periodicPushTimer = null;
     let lastPushAt = 0;
-    // Last snapshot used by the idle-skip check. Was a JSON.stringify string
-    // (held in memory for the whole session — hundreds of KB for big libs);
-    // now a structured snapshot compared via the merge-utils equality fns,
-    // which is both faster per tick and avoids the long-lived string buffer.
+
+
+
+
     let _lastIdleSnapshot = null;
 
     async function _currentLocalProgressSnapshot(isOrionMode) {
@@ -883,7 +883,7 @@
 
     function _idleSnapshotsEqual(a, b) {
         if (!a || !b) return false;
-        // Orion mode reads all 4 keys; SW mode reads only videoProgress.
+
         if (!areProgressMapsEqual(a.videoProgress || {}, b.videoProgress || {})) return false;
         if (!areAnimeDataMapsEqual(a.animeData || {}, b.animeData || {})) return false;
         if (!shallowEqualDeletedAnime(a.deletedAnime || {}, b.deletedAnime || {})) return false;
@@ -895,9 +895,9 @@
         if (periodicPushTimer) return;
         periodicPushTimer = setInterval(async () => {
             if (csIsSyncPaused()) return;
-            // Slow / metered connection — stretch the tick gate so 2g and
-            // saveData users don't pay for a push every 5 min when nothing
-            // important is happening.
+
+
+
             const factor = _networkExtensionFactor();
             const minGap = PERIODIC_PUSH_INTERVAL * 0.8 * factor;
             if (Date.now() - lastPushAt < minGap) return;
@@ -941,9 +941,9 @@
             return;
         }
 
-        // Direct keepalive fetch from the content script — survives page unload.
-        // Intentionally no wakeBackgroundSW here: that would trigger a duplicate write
-        // via SW's SYNC_PROGRESS_ONLY handler. The direct keepalive fetch is enough.
+
+
+
         pushProgressDirect({ keepalive: true });
     }
 
@@ -958,8 +958,8 @@
             Logger?.debug(`Ignoring own-echo cloud update (${cloudUpdatedAt})`);
             return;
         }
-        // Re-confirm the active user before applying — guards against an
-        // account swap that happened between fetch and apply.
+
+
         const activeUser = await getUser();
         if (!activeUser?.uid) {
             invalidateCloudDocCache();
@@ -1016,19 +1016,19 @@
         }
     }
 
-    // Orion-mode cloud polling. Replaces the old Firestore documents:listen
-    // SSE stream — that path required gRPC and never opened over plain fetch
-    // (UNIMPLEMENTED on first byte). Plain polling on CLOUD_POLL_INTERVAL_MS
-    // is the supported fallback and what the SW already uses.
+
+
+
+
     async function startCloudPolling() {
         if (cloudPollingTimer) return;
 
         const tick = async () => {
             try {
-                // Skip this tick if the network is metered/slow and we already
-                // polled within an extended window. The base interval still
-                // fires at CLOUD_POLL_INTERVAL_MS so the user sees fresh data
-                // promptly when their connection improves.
+
+
+
+
                 const factor = _networkExtensionFactor();
                 if (factor > 1 && (Date.now() - lastCloudPollAt) < CLOUD_POLL_INTERVAL_MS * factor) {
                     return;
@@ -1044,8 +1044,8 @@
             }
         };
 
-        // Fire one immediate poll so the page lands on fresh data without
-        // waiting CLOUD_POLL_INTERVAL_MS.
+
+
         tick();
         cloudPollingTimer = setInterval(tick, CLOUD_POLL_INTERVAL_MS);
     }
@@ -1104,13 +1104,13 @@
                 if (isOrionMode) {
                     scheduleFullPush(1500);
                 } else {
-                    // SW-mode: the BG service worker has its own storage.onChanged
-                    // listener that debounces and writes to Firestore. Just wake it
-                    // up — don't issue a CS-side push, that produced duplicate writes
-                    // (BG debounce 5s vs CS direct 500ms could race within the
-                    // pauseSync window). The fallback `pushFullDirect()` only fires
-                    // if the SW failed to respond, so we don't lose the change in
-                    // the rare SW-dead case.
+
+
+
+
+
+
+
                     wakeBackgroundSW('SYNC_TO_FIREBASE').then((alive) => {
                         if (!alive) pushFullDirect();
                     });
@@ -1122,8 +1122,8 @@
                 if (isOrionMode) {
                     scheduleFullPush(3000);
                 }
-                // SW-mode: BG's storage.onChanged debounce (5min) is the single source of truth
-                // for progress writes. No CS-side push needed — avoids duplicate writes.
+
+
             }
         });
 
@@ -1152,25 +1152,25 @@
     async function init() {
         if (initialized) return;
 
-        // Task 2: idempotent token-schema migration. Runs once per content
-        // script mount; safe when no session is stored. Behind the
-        // AUTH_HARDENING_ENABLED feature flag.
+
+
+
         try {
             await globalThis.AnimeTrackerAuthTokens?.migrateTokensIfNeeded?.();
         } catch (e) {
             Logger?.warn(`Token migration skipped: ${e?.message}`);
         }
 
-        // Restore echo-tracking state from storage before any sync work —
-        // otherwise a freshly-mounted content script (page reload) loses
-        // `_recentOwnWrites` and treats our just-pushed timestamp as foreign.
+
+
+
         await hydrateCsEchoState();
 
         currentUser = await getUser();
         if (!currentUser) {
-            // Late sign-in is handled by the storage.onChanged listener
-            // wired up below — that re-runs init() the moment a
-            // firebase_user appears, without requiring a page reload.
+
+
+
             Logger?.debug('No user, deferring init until firebase_user appears');
             return;
         }
@@ -1181,8 +1181,8 @@
             Logger?.debug('SW available — acting as wake-up agent');
             initialized = true;
             watchStorage(false);
-            // No initial scheduleProgressPush — BG's storage.onChanged debounce handles it.
-            // Warm token cache so teardown keepalive fetch can fire without async lookup.
+
+
             (async () => {
                 try { currentToken = await getValidToken(); } catch { }
             })();
@@ -1228,13 +1228,13 @@
         window.addEventListener('pagehide', orionTeardown, { passive: true });
     }
 
-    // Always-on auth-change watcher. Runs regardless of init state so that:
-    //   1. A late sign-in (no firebase_user at script-load) triggers a
-    //      deferred init() — otherwise the content script stays sync-disabled
-    //      until the user reloads the page.
-    //   2. A uid swap (sign-out → sign-in as different account) invalidates
-    //      the cache eagerly so we don't merge account A's cloud doc into
-    //      account B's local store within the cache TTL window.
+
+
+
+
+
+
+
     try {
         chrome.storage.onChanged.addListener((changes, namespace) => {
             if (namespace !== 'local') return;
@@ -1244,13 +1244,13 @@
             const newUid = newUser?.uid || null;
             if (newUid !== oldUid) {
                 invalidateCloudDocCache();
-                // Reset cached auth state so we don't issue requests under
-                // the previous account's token after a swap or sign-out.
+
+
                 currentToken = null;
                 currentUser = newUser;
                 if (!newUser) {
-                    // Sign-out: stop polling immediately. The next tick of
-                    // the auth-change handler (re-sign-in) will re-init.
+
+
                     stopCloudPolling();
                 }
             }
@@ -1259,7 +1259,7 @@
                 init().catch((e) => Logger?.warn(`Deferred init failed: ${e?.message || e}`));
             }
         });
-    } catch { /* chrome.storage.onChanged unavailable — non-fatal */ }
+    } catch {                                                        }
 
     setTimeout(init, 2000);
 
@@ -1273,10 +1273,10 @@
                 const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
                 const pushedAt = new Date().toISOString();
 
-                // Try the full payload first. Chrome enforces a per-request
-                // ~64KB ceiling on `keepalive: true` fetches, so big libraries
-                // hit the cap and the previous code silently returned false —
-                // losing the unload save entirely.
+
+
+
+
                 const fullBody = JSON.stringify({
                     fields: toFSFields({
                         animeData: payload.animeData || {},
@@ -1310,11 +1310,11 @@
                     return true;
                 }
 
-                // Body too big for keepalive — push videoProgress alone.
-                // Progress is the field that actually changes per-watch and
-                // is what we most want to preserve at unload. animeData /
-                // deletedAnime / groupCoverImages will catch up via the
-                // next BG poll once the user navigates back.
+
+
+
+
+
                 const progressBody = JSON.stringify({
                     fields: toFSFields({
                         videoProgress: payload.videoProgress || {},
@@ -1322,10 +1322,10 @@
                     })
                 });
                 if (progressBody.length >= 63000) {
-                    // Still too big — videoProgress alone exceeds 63KB. Rare
-                    // (would need ~500+ active episodes). Give up: better to
-                    // surface than to fire a non-keepalive request that the
-                    // browser will abort on unload.
+
+
+
+
                     Logger?.warn('Keepalive body too large — even videoProgress-only exceeds 63KB');
                     return false;
                 }

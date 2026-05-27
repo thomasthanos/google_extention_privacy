@@ -1,12 +1,12 @@
 (function () {
     'use strict';
 
-    // ─── Placeholder durations ───────────────────────────────────────────
-    // Legacy default values that historic episodes were saved with before
-    // the video element reported a real duration. We treat any of these
-    // as "unknown / needs refresh" so a real measurement can replace them:
-    //   1440 = 24 min (default episode), 6000 = 100 min (legacy movie),
-    //   7200 = 120 min (alt legacy movie/special).
+
+
+
+
+
+
     const PLACEHOLDER_DURATION_VALUES = Object.freeze([1440, 6000, 7200]);
     const PLACEHOLDER_DURATION_SET = new Set(PLACEHOLDER_DURATION_VALUES);
 
@@ -173,10 +173,10 @@
         return true;
     }
 
-    // Fields compared explicitly above. Anything outside this set is caught
-    // by the stableStringify safety net below — guards against silent drift
-    // when new fields (like `favorite`, `nextEpisodeAt`, etc.) are added
-    // without being threaded through this equality check.
+
+
+
+
     const COMPARED_ANIME_KEYS = new Set([
         'title', 'titleUpdatedAt', 'coverImage', 'lastWatched',
         'completedAt', 'droppedAt', 'onHoldAt',
@@ -211,11 +211,11 @@
         if (getSafeString(a.nextEpisodeTimezone) !== getSafeString(b.nextEpisodeTimezone)) return false;
         if (!areEpisodesEqual(a.episodes, b.episodes)) return false;
 
-        // Safety net: any field not listed above must still match. Without
-        // this, adding a new synced field (we just hit this with `favorite`)
-        // returns "equal" for diverging entries and the change never reaches
-        // the cloud. stableStringify only runs on unrecognized keys so the
-        // common path stays O(N) on episodes, not O(N) on the whole entry.
+
+
+
+
+
         for (const key of Object.keys(a)) {
             if (COMPARED_ANIME_KEYS.has(key)) continue;
             if (stableStringify(a[key] ?? null) !== stableStringify(b[key] ?? null)) return false;
@@ -287,11 +287,11 @@
         return true;
     }
 
-    // Order-stable JSON.stringify — sorts object keys recursively so two
-    // objects with the same data but different insertion order produce the
-    // same string. Without this, shallowEqualObjectMap reports "different"
-    // for cloud↔local data that is actually identical, triggering noisy
-    // unnecessary cloud writes.
+
+
+
+
+
     function stableStringify(value) {
         if (value === null || typeof value !== 'object') return JSON.stringify(value);
         if (Array.isArray(value)) return '[' + value.map(stableStringify).join(',') + ']';
@@ -418,11 +418,11 @@
     function mergeAnimeData(localData, cloudData) {
         const merged = { ...(cloudData || {}), ...(localData || {}) };
 
-        // Helper: strip legacy autoRepaired episodes from a single entry
-        // and recompute totalWatchTime. Mutation-free — returns a new entry
-        // when changes are applied so callers' references stay clean. Same
-        // strip rule as the per-episode iterator below; centralised so the
-        // single-sided fast-path also cleans the data.
+
+
+
+
+
         const stripAutoRepaired = (entry) => {
             if (!entry || !Array.isArray(entry.episodes)) return entry;
             const filtered = entry.episodes.filter(ep => !(ep && ep.autoRepaired === true));
@@ -435,10 +435,10 @@
             const cloudAnime = cloudData?.[slug];
             const localAnime = localData?.[slug];
             if (!cloudAnime || !localAnime) {
-                // Single-sided entry — no two-side merge needed, but still
-                // run the legacy-flag strip so an autoRepaired episode that
-                // exists only on one device's local doesn't survive into
-                // the next push and resurrect on the other device.
+
+
+
+
                 merged[slug] = stripAutoRepaired(merged[slug]);
                 continue;
             }
@@ -450,26 +450,26 @@
             ]) {
                 if (!episode || typeof episode.number !== 'number' || isNaN(episode.number)) continue;
 
-                // Drop legacy `autoRepaired:true` episodes at the merge layer.
-                // These were inserted by an older auto-repair code path that
-                // no longer exists; the popup-side `removeAutoRepairedEpisodes`
-                // strips them, but the BG sync path (syncToFirebase / _doApply
-                // CloudUpdate) does NOT — which produced the classic flap:
-                // mobile popup pulls + strips → push N entries to cloud →
-                // desktop BG re-merges its own un-stripped local with the
-                // smaller cloud doc → union has the entries again → push to
-                // cloud. Total bounces back and forth between two values.
-                // Stripping here makes every consumer of mergeAnimeData see
-                // the same result, so the data converges to "no autoRepaired"
-                // permanently after a single merge cycle.
+
+
+
+
+
+
+
+
+
+
+
+
                 if (episode.autoRepaired === true) continue;
 
-                // AniList-imported episodes never carry a real watch date —
-                // older importer versions stamped them with the import time,
-                // which then re-pollutes daily stats (and survives merges
-                // because the bogus watchedAt looks "newer" than scrubbed
-                // local episodes). Strip it during the merge so the cloud
-                // copy can never resurrect the bogus stamp.
+
+
+
+
+
+
                 if (episode.durationSource === 'anilist' && episode.watchedAt != null) {
                     const { watchedAt: _drop, ...rest } = episode;
                     episode = rest;
@@ -641,11 +641,11 @@
         return result;
     }
 
-    // Top-level helper: strip legacy autoRepaired:true episodes from every
-    // entry of an animeData map. Returns a new map (does NOT mutate). Used
-    // by sync paths whose fallback (no cloud doc yet) skips mergeAnimeData
-    // and would otherwise push the un-stripped local copy back to cloud,
-    // re-introducing the very episodes the popup just removed → flap.
+
+
+
+
+
     function stripAutoRepairedEpisodesFromMap(animeData) {
         if (!animeData || typeof animeData !== 'object') return animeData;
         const out = {};

@@ -1,11 +1,11 @@
-/**
- * Anime Tracker - Storage Helper
- * Uses local storage with sync migration support
- */
 
-// Multi-part mappings now live in src/common/multipart-mappings.js — loaded
-// before this file by popup.html. Single source of truth shared with content
-// scripts and background.
+
+
+
+
+
+
+
 const _multipartMaps = (typeof window !== 'undefined' && window.AnimeTrackerMultipartMappings) || {};
 const STORAGE_SLUG_NORMALIZATION = _multipartMaps.SLUG_NORMALIZATION || {};
 const STORAGE_EPISODE_OFFSET_MAPPING = _multipartMaps.EPISODE_OFFSET_MAPPING || {};
@@ -24,7 +24,7 @@ function decodeHtmlEntities(value) {
     const textarea = document.createElement('textarea');
     let decoded = value;
 
-    // Decode a few rounds so strings like "&amp;#x2F;" fully normalize to "/".
+
     for (let i = 0; i < 3; i += 1) {
         textarea.innerHTML = decoded;
         const next = textarea.value;
@@ -36,9 +36,9 @@ function decodeHtmlEntities(value) {
 }
 
 const Storage = {
-    /**
-     * Get data from storage with sync migration
-     */
+
+
+
     async get(keys) {
         return new Promise((resolve) => {
             const requestedKeys = Array.isArray(keys) ? keys : [keys];
@@ -51,9 +51,9 @@ const Storage = {
                     return;
                 }
 
-                // Only skip the sync fallback when ALL requested keys are present locally.
-                // If even one key is missing, check sync storage so we don't silently drop
-                // data that was written there (e.g. during cross-key migration).
+
+
+
                 const hasLocalData = requestedKeys.every((key) => hasStoredValue(localResult[key]));
 
                 if (hasLocalData || legacySyncKeys.length === 0) {
@@ -88,9 +88,9 @@ const Storage = {
         });
     },
 
-    /**
-     * Set data to storage
-     */
+
+
+
     async set(data) {
         return new Promise((resolve, reject) => {
             chrome.storage.local.set(data, () => {
@@ -108,9 +108,9 @@ const Storage = {
         });
     },
 
-    /**
-     * Remove keys from storage
-     */
+
+
+
     async remove(keys) {
         return new Promise((resolve, reject) => {
             chrome.storage.local.remove(keys, () => {
@@ -123,9 +123,9 @@ const Storage = {
         });
     },
 
-    /**
-     * Invalidate cached stats if version changed
-     */
+
+
+
     async invalidateCachedStats(currentVersion) {
         return new Promise((resolve) => {
             chrome.storage.local.get(['cachedStatsVersion'], (result) => {
@@ -143,16 +143,16 @@ const Storage = {
         });
     },
 
-    /**
-     * Migrate multi-part anime entries to merged format.
-     * Also fixes accidental slugs that end with -episode/-ep.
-     */
+
+
+
+
     async migrateMultiPartAnime() {
-        // Prevent concurrent migrations (e.g. two popup windows open simultaneously).
-        // Uses a token-based CAS: write our unique token, brief wait, re-read; if
-        // our token isn't there, another popup won the race and we abort.
+
+
+
         const LOCK_KEY = '_migrationLock';
-        const LOCK_MAX_AGE = 30000; // 30s — stale lock safety net
+        const LOCK_MAX_AGE = 30000;
         const myToken = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
         try {
             const lockResult = await new Promise(r => chrome.storage.local.get([LOCK_KEY], r));
@@ -170,7 +170,7 @@ const Storage = {
                 return false;
             }
         } catch {
-            // If lock check fails, proceed anyway — better than skipping migration
+
         }
 
         const releaseLock = () => {
@@ -343,7 +343,7 @@ const Storage = {
                     );
                 }
 
-                // Generic migration for accidentally saved slugs ending in -episode/-ep.
+
                 for (const oldSlug of Object.keys(animeData)) {
                     const cleanedSlug = oldSlug
                         .replace(/-(?:episodes?|ep)$/i, '')
@@ -358,7 +358,7 @@ const Storage = {
                     }
                 }
 
-                // Title-based canonical migration for known inconsistent slug families.
+
                 for (const oldSlug of Object.keys(animeData)) {
                     const oldEntry = animeData[oldSlug];
                     const canonicalSlug = getCanonicalSlugFromTitle(
@@ -394,6 +394,6 @@ const Storage = {
     }
 };
 
-// Export
+
 window.AnimeTracker = window.AnimeTracker || {};
 window.AnimeTracker.Storage = Storage;

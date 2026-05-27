@@ -1,22 +1,6 @@
-/**
- * Anime Tracker — Status resolver + small data mutations (pure helpers)
- *
- * Extracted from main.js to make these pure functions independently
- * testable. They DO depend on `window.AnimeTracker.{FillerService,
- * SeasonGrouping, AnilistService, CONFIG}` for status classification, but
- * they don't reach into popup-local closure state (animeData/videoProgress)
- * — callers pass in the entries they want classified.
- *
- * Exposes `window.AnimeTracker.StatusService`:
- *   - `AnimeStatus`               — string constants (WATCHING, COMPLETED, ...)
- *   - `getStatus(slug, anime)`    — classify one anime entry
- *   - `isCompleted(slug, anime)`  — boolean shortcut
- *   - `getCalendarDayDiff(iso)`   — calendar-day delta (UTC-safe)
- *   - `repairAiringCompleted(data, options)` — rescue mis-flagged airing anime
- *   - `setManualListState(entry, state, at)` — write list-state + timestamps
- *   - `markTitleEdited(entry, title, at)`    — explicit title change
- *   - `clearDeletedAnimeSlug(deletedAnime, slug)` — drop a tombstone (immutable)
- */
+
+
+
 (function () {
     'use strict';
 
@@ -33,29 +17,24 @@
         const target = new Date(isoString);
         if (isNaN(target.getTime())) return 0;
         const now = new Date();
-        // Use UTC midnight to avoid DST drift: the day-clock shifts by 1h
-        // twice a year and a plain `(midnightA - midnightB) / 86400000`
-        // would round to ±1 day on those days. UTC has fixed-length days.
+
+
         const nowUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
         const targetUtc = Date.UTC(target.getFullYear(), target.getMonth(), target.getDate());
         return Math.round((nowUtc - targetUtc) / 86400000);
     }
 
-    /**
-     * Unified anime status resolver. Replaces the old
-     * isAnimeCompleted / isAgedCompleted / isCaughtUpAiring trio.
-     * Returns one of AnimeStatus.{WATCHING|COMPLETED|AIRING|DROPPED|ON_HOLD}.
-     */
+
     function getStatus(slug, anime) {
         const AT = window.AnimeTracker;
         const { FillerService, SeasonGrouping, AnilistService, CONFIG } = AT;
         if (!anime) return AnimeStatus.WATCHING;
         const listState = String(anime.listState || '').toLowerCase();
 
-        // ── On Hold ─────────────────────────────────────────────────────────
+
         if (anime.onHoldAt || listState === AnimeStatus.ON_HOLD) return AnimeStatus.ON_HOLD;
 
-        // ── Dropped ─────────────────────────────────────────────────────────
+
         if (anime.droppedAt || listState === AnimeStatus.DROPPED) return AnimeStatus.DROPPED;
 
         const watchedCount = anime.episodes?.length || 0;
@@ -66,7 +45,7 @@
         const isPartiallyUploaded = metaTotal && latestAvailable && latestAvailable < metaTotal;
         const looksLikeStandaloneSpecial = /(?:^|-)special(?:-|$)|(?:^|-)ova(?:-|$)|(?:^|-)ona(?:-|$)|(?:^|-)fan-letter(?:-|$)/i.test(lowerSlug);
 
-        // ── Completion checks ───────────────────────────────────────────────
+
         let isComplete = false;
 
         if (watchedCount === 0) {
@@ -91,7 +70,7 @@
             ) {
                 isComplete = true;
             } else if (anilistStatus === 'FINISHED' && progressData.total == null && !isPartiallyUploaded) {
-                // Total unknown: don't auto-complete, let user decide
+
                 isComplete = false;
             } else if (anilistStatus === 'FINISHED' && progressData.total != null) {
                 const highestEp = Math.max(0, ...(anime.episodes || []).map(ep => Number(ep.number) || 0));
@@ -100,7 +79,7 @@
         }
 
         if (isComplete) {
-            // Decide whether to show in completed section (aged) or still in main list
+
             const isAged =
                 anime.completedAt ||
                 listState === AnimeStatus.COMPLETED ||
@@ -111,7 +90,7 @@
             return isAged ? AnimeStatus.COMPLETED : AnimeStatus.WATCHING;
         }
 
-        // ── Caught up with airing ───────────────────────────────────────────
+
         if (watchedCount > 0 && !anime.completedAt && listState !== AnimeStatus.COMPLETED && latestAvailable > 0) {
             const highestWatched = Math.max(0, ...(anime.episodes || []).map(ep => Number(ep.number) || 0));
 
@@ -161,7 +140,7 @@
             return;
         }
 
-        // active — clear all
+
         delete entry.completedAt;
         delete entry.droppedAt;
         delete entry.onHoldAt;
@@ -190,12 +169,7 @@
         return Math.max(localTotal, cachedTotal, 0);
     }
 
-    /**
-     * Rescue anime that look "completed" locally but the source is still
-     * releasing AND we know there are more episodes available than the user
-     * has watched. Flips them back to active so they don't get filed under
-     * "Completed list" prematurely.
-     */
+
     function repairAiringCompleted(data, options = {}) {
         const AT = window.AnimeTracker;
         const targetData = data || {};
@@ -230,14 +204,7 @@
         return changed;
     }
 
-    /**
-     * Persist `listState:'completed'` for anime that getStatus() classifies as
-     * finished but that carry no explicit completion marker. The an1me.to
-     * watchlist sync only reads completedAt / listState / totalEpisodes, so
-     * AniList-metadata-detected completions are invisible to it — without this
-     * they never leave the site's "Watching" list. Currently-releasing anime
-     * are skipped so this never fights repairAiringCompleted.
-     */
+
     function persistDetectedCompletions(data, options = {}) {
         const AT = window.AnimeTracker;
         const targetData = data || {};
@@ -253,11 +220,10 @@
             if (anime.droppedAt || anime.onHoldAt) continue;
 
             const listState = String(anime.listState || '').toLowerCase();
-            if (anime.completedAt || listState === 'completed') continue;   // already marked
+            if (anime.completedAt || listState === 'completed') continue;
             if (listState === 'dropped' || listState === 'on_hold') continue;
 
-            // Releasing anime drift in and out of "caught up" — leave those to
-            // repairAiringCompleted so the two passes never fight.
+
             if (AT.AnilistService?.getStatus(String(slug).toLowerCase()) === 'RELEASING') continue;
 
             if (getStatus(slug, anime) !== AnimeStatus.COMPLETED) continue;

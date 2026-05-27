@@ -1,14 +1,6 @@
-// Shared multi-part anime mappings — single source of truth across content
-// scripts, popup, and background. Previously duplicated in three places.
-//
-// SLUG_NORMALIZATION: maps episode-list slugs (the URL form on an1me.to) to
-// the canonical "merged" slug we store under, so a multi-part series like
-// Bleach: Sennen Kessen-hen becomes one entry in the user's library instead
-// of three separate ones.
-//
-// EPISODE_OFFSET_MAPPING: when a sub-slug's episode 1 is actually episode N+1
-// of the merged series, this is N. Add 'foo-season-2': 13 here when season 2
-// continues numbering from after season 1's episode 13.
+
+
+
 (function () {
     'use strict';
 

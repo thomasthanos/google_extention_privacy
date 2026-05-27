@@ -1,14 +1,14 @@
-/**
- * Anime Tracker — Stats View  (v2)
- * Full-page dashboard: hero streak, tiles, activity heatmap, monthly bars, library.
- * Pure DOM + SVG, no deps, CSP-clean.
- */
+
+
+
+
+
 (function () {
     'use strict';
 
     const SVG_NS = 'http://www.w3.org/2000/svg';
 
-    /* ── tiny DOM helpers ── */
+
     function el(tag, attrs = {}, children = []) {
         const node = document.createElement(tag);
         for (const k in attrs) {
@@ -36,9 +36,9 @@
         return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     }
 
-    /* ══════════════════════════════════════════════════════════
-       1. HERO STREAK CARD — full-width, centered
-    ══════════════════════════════════════════════════════════ */
+
+
+
     function renderStreakHero(streak) {
         const cur = streak.currentStreak;
         const best = streak.longestStreak;
@@ -46,7 +46,7 @@
 
         const hero = el('div', { class: `streak-hero ${active ? 'streak-hero--active' : 'streak-hero--idle'}` });
 
-        // Left: flame + big number
+
         const left = el('div', { class: 'streak-hero-main' }, [
             el('span', { class: 'streak-hero-flame', text: active ? '🔥' : '💤' }),
             el('div', { class: 'streak-hero-center' }, [
@@ -55,7 +55,7 @@
             ])
         ]);
 
-        // Right: best + message
+
         const msg = active
             ? (cur >= 30 ? 'Legendary run! 🏆' : cur >= 14 ? 'On fire! Keep it up.' : cur >= 7 ? 'Great week streak!' : 'Keep the momentum.')
             : 'Watch an episode to start a streak!';
@@ -73,9 +73,9 @@
         return hero;
     }
 
-    /* ══════════════════════════════════════════════════════════
-       2. STATS TILES — 3 across
-    ══════════════════════════════════════════════════════════ */
+
+
+
     function renderTiles(totals, weekly) {
         const tiles = [
             {
@@ -108,18 +108,18 @@
         ));
     }
 
-    /* ══════════════════════════════════════════════════════════
-       3. ACTIVITY HEATMAP — scaled SVG (no scrollbar)
-          Weeks auto-calculated to fill container at ~12px cells.
-          Uses viewBox scaling so SVG always fits width=100%.
-    ══════════════════════════════════════════════════════════ */
+
+
+
+
+
     function renderActivity(byDay) {
-        // Fixed 16 weeks — fits comfortably at any reasonable popup width (≥360px)
+
         const WEEKS = 16;
         const CELL = 13;
         const GAP = 3;
-        const LBL_W = 18; // weekday labels
-        const LBL_H = 16; // month labels on top
+        const LBL_W = 18;
+        const LBL_H = 16;
         const svgW = LBL_W + WEEKS * (CELL + GAP);
         const svgH = LBL_H + 7 * (CELL + GAP);
 
@@ -159,7 +159,7 @@
             return 4;
         }
 
-        // Weekday labels M/W/F
+
         ['', 'M', '', 'W', '', 'F', ''].forEach((lbl, r) => {
             if (!lbl) return;
             const t = svgEl('text', {
@@ -170,7 +170,7 @@
             root.appendChild(t);
         });
 
-        // Month labels
+
         let lastMonth = -1;
         for (let w = 0; w < WEEKS; w++) {
             const d = new Date(startDate);
@@ -187,7 +187,7 @@
             }
         }
 
-        // Cells
+
         for (let w = 0; w < WEEKS; w++) {
             for (let d = 0; d < 7; d++) {
                 const cellDate = new Date(startDate);
@@ -215,7 +215,7 @@
             }
         }
 
-        // Legend row
+
         const legend = el('div', { class: 'hm-legend' }, [
             el('span', { class: 'hm-legend-txt', text: 'Less' }),
             ...palette.map(c => {
@@ -235,9 +235,9 @@
         ]);
     }
 
-    /* ══════════════════════════════════════════════════════════
-       4. MONTHLY BARS — last 12 months
-    ══════════════════════════════════════════════════════════ */
+
+
+
     function renderMonthlyBars(byMonth) {
         const months = [];
         const now = new Date();
@@ -265,12 +265,12 @@
             'aria-label': 'Hours watched per month'
         });
 
-        // y-axis label
+
         const yLbl = svgEl('text', { x: '2', y: String(pT + 9), class: 'bar-lbl', 'font-size': '8' });
         yLbl.textContent = fmtH(max);
         root.appendChild(yLbl);
 
-        // Baseline
+
         root.appendChild(svgEl('line', {
             x1: String(pL), y1: String(pT + iH),
             x2: String(pL + iW), y2: String(pT + iH),
@@ -282,7 +282,7 @@
             const x = pL + step * i + (step - bw) / 2;
             const y = pT + iH - barH;
 
-            // Bar with gradient for active months
+
             let fill;
             if (m.seconds > 0) {
                 const gradId = `bg${i}`;
@@ -310,7 +310,7 @@
             rect.appendChild(tt);
             root.appendChild(rect);
 
-            // x label every other month
+
             if (i % 2 === 0 || m.date.getMonth() === 0) {
                 const t = svgEl('text', {
                     x: String(x + bw / 2), y: String(VH - 6),
@@ -333,7 +333,7 @@
         const streak   = StatsEngine.computeStreak(index);
         const weekly   = StatsEngine.windowStats(index, 7);
 
-        // Share button
+
         const shareBtn = el('button', {
             class: 'share-btn',
             type: 'button',
@@ -353,7 +353,7 @@
             }
         });
 
-        // Section builder helper
+
         function section(title, content, cls = '') {
             return el('div', { class: `stat-card ${cls}` }, [
                 title ? el('div', { class: 'stat-card-title', text: title }) : null,

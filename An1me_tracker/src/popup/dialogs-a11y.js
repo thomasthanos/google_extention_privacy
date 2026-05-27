@@ -1,24 +1,10 @@
-/**
- * Anime Tracker — Dialog accessibility + inline-confirm toast
- *
- * Focus-trap helpers that keep keyboard users contained inside modal dialogs,
- * plus a lightweight inline-confirm UI used in place of `window.confirm`
- * (which blocks the popup process and can dismiss it on some browsers).
- *
- * Extracted from main.js. No popup-local closure state.
- *
- * Exposes `window.AnimeTracker.Dialogs`:
- *   - `open(overlay, opts)`        — open with focus trap (was openDialogA11y)
- *   - `close(overlay)`             — close + restore focus (was closeDialogA11y)
- *   - `focusableIn(root)`          — find tabbable descendants
- *   - `inlineConfirm(opts)`        — async confirm toast (Promise<boolean>)
- */
+
+
+
 (function () {
     'use strict';
 
-    // Tracks the element that had focus before a modal opened so we can
-    // restore focus on close (a11y best practice — without this, keyboard
-    // users land back at the top of the popup instead of where they were).
+
     const _dialogState = new WeakMap();
 
     function focusableIn(root) {
@@ -50,7 +36,7 @@
         };
         overlay.addEventListener('keydown', trapHandler);
         _dialogState.set(overlay, { restoreTo, trapHandler });
-        // Focus first focusable element on next tick so the dialog renders first.
+
         requestAnimationFrame(() => {
             const focusables = focusableIn(overlay);
             (opts.initialFocus || focusables[0])?.focus();
@@ -63,19 +49,16 @@
         if (state) {
             overlay.removeEventListener('keydown', state.trapHandler);
             _dialogState.delete(overlay);
-            try { state.restoreTo?.focus?.(); } catch { /* element may have been removed */ }
+            try { state.restoreTo?.focus?.(); } catch {                                     }
         }
         overlay.classList.remove('visible');
         overlay.setAttribute('aria-hidden', 'true');
     }
 
-    /**
-     * Inline confirm toast — no native confirm() blocking, no full-page modal.
-     * Returns Promise<boolean>: true on Confirm, false on Cancel / dismiss / 8s timeout.
-     */
+
     function inlineConfirm({ title, body, confirmLabel = 'Delete', cancelLabel = 'Cancel', danger = true } = {}) {
         return new Promise((resolve) => {
-            // Replace any prior toast so spamming actions doesn't stack them.
+
             document.querySelectorAll('.at-confirm-toast').forEach(n => n.remove());
 
             const el = document.createElement('div');
@@ -92,7 +75,7 @@
                     <button type="button" class="at-confirm-ok"></button>
                 </div>
             `;
-            // Set text content separately to avoid HTML-injection through title/body params.
+
             if (title) el.querySelector('.at-confirm-title').textContent = title;
             if (body)  el.querySelector('.at-confirm-body').textContent = body;
             el.querySelector('.at-confirm-cancel').textContent = cancelLabel;
@@ -100,7 +83,7 @@
 
             const finish = (value) => {
                 el.classList.add('at-confirm-toast--leaving');
-                setTimeout(() => { try { el.remove(); } catch { /* no-op */ } }, 180);
+                setTimeout(() => { try { el.remove(); } catch {             } }, 180);
                 clearTimeout(timeoutId);
                 document.removeEventListener('keydown', onKey, true);
                 resolve(value);
@@ -113,7 +96,7 @@
 
             document.body.appendChild(el);
             requestAnimationFrame(() => el.classList.add('at-confirm-toast--visible'));
-            // Focus the confirm button so Enter triggers, Esc cancels.
+
             setTimeout(() => el.querySelector('.at-confirm-ok')?.focus(), 50);
             const onKey = (e) => {
                 if (e.key === 'Escape') finish(false);

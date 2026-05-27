@@ -207,11 +207,11 @@ const VideoMonitor = {
                     setTimeout(seek, 300);
                 }
             } else {
-                // Window-level guard so the prompt is shown at most once per
-            // (uniqueId, page-load), even if setupVideoMonitoring runs more
-            // than once (SPA re-init, multiple finders racing). Each instance
-            // also has its own resumePromptShown closure flag to short-circuit
-            // its OWN listener; the window flag covers cross-instance dedup.
+
+
+
+
+
             window.__atResumeShownFor = window.__atResumeShownFor || new Set();
             const promptKey = animeInfo.uniqueId;
 
@@ -221,10 +221,10 @@ const VideoMonitor = {
                 if (window.__atResumeShownFor.has(promptKey)) { resumePromptShown = true; return; }
                 if (!savedProgress || !(savedProgress.currentTime > CONFIG.MIN_PROGRESS_TO_SAVE)) return;
 
-                // If the video is already at (or past) the saved position,
-                // there's nothing to resume to — don't bother the user. This
-                // is the case after the user seeks forward; their own save
-                // would otherwise re-trigger the prompt every seek.
+
+
+
+
                 const here = video.currentTime || 0;
                 if (here > 0 && Math.abs(here - savedProgress.currentTime) < 5) return;
                 if (here > savedProgress.currentTime) return;
@@ -265,17 +265,17 @@ const VideoMonitor = {
             if (initialProgress && initialProgress.currentTime > CONFIG.MIN_PROGRESS_TO_SAVE) {
                 showPromptOnce(initialProgress);
             } else {
-                // Cross-device case: progress was saved on another device but
-                // hasn't synced down to this tab yet. Watch chrome.storage for
-                // the videoProgress key to update within a short window, then
-                // show the resume prompt the moment the cloud delivers it.
-                //
-                // CRITICAL: ignore writes that originated from THIS tab (the
-                // user's own playback / seeking). Storage doesn't tell us the
-                // origin directly, so we compare the new currentTime against
-                // the video's live position — if the saved value matches what
-                // we're already playing, it's our own write echoing back, not
-                // a fresh cross-device sync.
+
+
+
+
+
+
+
+
+
+
+
                 let resumeWaitTimer = null;
                 const mountAt = Date.now();
                 const RESUME_LISTEN_WINDOW_MS = 15000;
@@ -283,9 +283,9 @@ const VideoMonitor = {
 
                 const onProgressArrive = (changes, namespace) => {
                     if (namespace !== 'local' || !changes.videoProgress) return;
-                    // Stop listening after the cross-device window — protects
-                    // against the user's own forward-seek triggering a stale
-                    // prompt 30 seconds into the episode.
+
+
+
                     if (Date.now() - mountAt > RESUME_LISTEN_WINDOW_MS) {
                         chrome.storage.onChanged.removeListener(onProgressArrive);
                         return;
@@ -295,8 +295,8 @@ const VideoMonitor = {
                     if (!entry || entry.deleted) return;
                     if (!(entry.currentTime > CONFIG.MIN_PROGRESS_TO_SAVE)) return;
 
-                    // Local-echo guard: if the entry's position matches our
-                    // current playhead, this is our own save echoing back.
+
+
                     const livePos = video.currentTime || 0;
                     if (livePos > 0 && Math.abs(livePos - entry.currentTime) < SAME_POSITION_TOLERANCE) {
                         return;
@@ -410,7 +410,7 @@ const VideoMonitor = {
                     if (this.findAndMonitorVideo(animeInfo, eventHandlers)) {
                         observer.disconnect();
                         if (this.checkInterval) clearInterval(this.checkInterval);
-                        // Cancel watchdog so it doesn't fire after we already found the video.
+
                         if (observerWatchdog) { clearTimeout(observerWatchdog); observerWatchdog = null; }
                         Logger.debug('Video found via observer');
                     }

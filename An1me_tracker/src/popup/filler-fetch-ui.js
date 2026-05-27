@@ -1,9 +1,9 @@
-/**
- * Filler Fetch UI
- * Handles the "Fetch Filler Data" modal — correctly distinguishes
- * fresh fetches, valid cache hits, notFound entries, movies, and errors.
- * Used by the full library repair flow after sign-in and from Settings.
- */
+
+
+
+
+
+
 
 const FillerFetchUI = {
     IDS: {
@@ -29,7 +29,7 @@ const FillerFetchUI = {
 
     onComplete: null,
 
-    // --- Init ---------------------------------------------------------------
+
 
     init() {
         this.injectStyles();
@@ -37,7 +37,7 @@ const FillerFetchUI = {
         this.attachEventListeners();
     },
 
-    // --- Modal HTML ---------------------------------------------------------
+
 
     createModal() {
         const { overlay, container, progressFill, progressText, logFeed } = this.IDS;
@@ -91,13 +91,13 @@ const FillerFetchUI = {
         document.body.insertAdjacentHTML('beforeend', html);
     },
 
-    // --- CSS ----------------------------------------------------------------
+
 
     injectStyles() {
         if (document.getElementById('ffui-styles')) return;
         const css = `
         <style id="ffui-styles">
-        /* -- Overlay ----------------------------------- */
+
         .ffui-overlay {
             position:fixed; inset:0;
             background:rgba(7,9,14,.92);
@@ -109,7 +109,7 @@ const FillerFetchUI = {
         }
         @keyframes ffui-fade { from{opacity:0} to{opacity:1} }
 
-        /* -- Box --------------------------------------- */
+
         .ffui-box {
             background: #111520;
             background-image: radial-gradient(ellipse at 50% 0%, rgba(79,195,247,0.06) 0%, transparent 65%);
@@ -131,7 +131,7 @@ const FillerFetchUI = {
             to  {transform:translateY(0);  opacity:1}
         }
 
-        /* -- Header ------------------------------------ */
+
         .ffui-header {
             padding: 16px 18px 15px;
             background: linear-gradient(180deg, rgba(79,195,247,0.07) 0%, transparent 100%);
@@ -151,10 +151,10 @@ const FillerFetchUI = {
             flex-shrink:0;
         }
 
-        /* -- Body -------------------------------------- */
+
         .ffui-body { padding:16px 18px; display:flex; flex-direction:column; gap:14px; }
 
-        /* -- Progress ---------------------------------- */
+
         .ffui-progress-info {
             display:flex; justify-content:space-between; align-items:center;
             margin-bottom:7px;
@@ -180,7 +180,7 @@ const FillerFetchUI = {
             box-shadow: 0 0 8px rgba(79,195,247,0.4);
         }
 
-        /* -- Stats grid -------------------------------- */
+
         .ffui-stats {
             display:grid; grid-template-columns:repeat(4,1fr); gap:7px;
         }
@@ -207,7 +207,7 @@ const FillerFetchUI = {
             text-transform:uppercase; letter-spacing:.6px; font-weight:600;
         }
 
-        /* -- Live log ---------------------------------- */
+
         .ffui-log {
             background: rgba(0,0,0,0.3);
             border: 1px solid rgba(255,255,255,0.05);
@@ -239,7 +239,7 @@ const FillerFetchUI = {
             flex-shrink:0; font-size:10px; font-weight:600;
             padding: 1px 6px; border-radius:999px; white-space:nowrap;
         }
-        /* detail badge colours by row type */
+
         .ffui-log-row.is-fetch   .ffui-log-name  { color:#e8edf8; }
         .ffui-log-row.is-fetch   .ffui-log-detail { background:rgba(79,195,247,0.12); color:#4fc3f7; }
         .ffui-log-row.is-cached  .ffui-log-detail { background:rgba(107,118,148,0.12); color:#6b7694; }
@@ -256,7 +256,7 @@ const FillerFetchUI = {
         document.head.insertAdjacentHTML('beforeend', css);
     },
 
-    // --- Events -------------------------------------------------------------
+
     attachEventListeners() {
         document.getElementById(this.IDS.overlay)
             .addEventListener('click', (e) => {
@@ -271,7 +271,7 @@ const FillerFetchUI = {
         };
         document.addEventListener('keydown', this._escHandler);
     },
-    // --- Open / Close --------------------------------------------------------
+
 
     async open(options = {}) {
         const autoMode = options.autoMode === true;
@@ -292,7 +292,7 @@ const FillerFetchUI = {
         document.getElementById(this.IDS.overlay).style.display = 'none';
     },
 
-    // --- UI helpers ---------------------------------------------------------
+
 
     resetUI(options = {}) {
         const keepAutoMode = options.autoMode === true;
@@ -400,12 +400,12 @@ const FillerFetchUI = {
         }, 900);
     },
 
-    /**
-     * Append a row to the live log.
-     * @param {'fetch'|'cached'|'skip'|'error'|'movie'} type
-     * @param {string} name  - anime title
-     * @param {string} [detail] - short right-aligned note
-     */
+
+
+
+
+
+
     _log(type, name, detail = '') {
         const log = document.getElementById(this.IDS.logFeed);
         if (log.style.display === 'none') log.style.display = 'flex';

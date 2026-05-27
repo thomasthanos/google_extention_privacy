@@ -1,11 +1,5 @@
-/**
- * Anime Tracker — Filler discovery (background module)
- *
- * Resolves an an1me.to slug to its animefillerlist.com counterpart, then
- * scrapes filler/canon episode classifications. Falls back to Jikan when the
- * primary source has no match. Extracted from background.js to keep that
- * file focused on auth/sync.
- */
+
+
 
 const KNOWN_FILLER_SLUGS = {
     'naruto': 'naruto',
@@ -31,8 +25,7 @@ const KNOWN_FILLER_SLUGS = {
     'shingeki-no-kyojin-the-final-season': 'attack-on-titan',
 };
 
-// LRU-bounded resolver cache. Unbounded `{}` would grow forever on long-lived
-// service workers since every distinct slug-candidate pair landed here.
+
 const FILLER_SLUG_CACHE_MAX = 500;
 const _fillerSlugLru = new Map();
 const fillerSlugCache = {
@@ -170,9 +163,8 @@ async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
     }
 
     const candidates = generateFillerSlugCandidates(an1meSlug, animeTitle).slice(0, 5);
-    // Race candidates: cancel siblings as soon as one HEAD returns 200.
-    // Previous version waited for ALL 5 (or all to time out), wasting
-    // ~2-4s on every miss path.
+
+
     const groupCtrl = new AbortController();
     const tryCandidate = async (candidate) => {
         const perCtrl = new AbortController();
@@ -197,8 +189,8 @@ async function discoverFillerSlug(an1meSlug, animeTitle, options = {}) {
     let found = null;
     let allWere404 = false;
     try {
-        // Promise.any throws AggregateError only when EVERY promise rejects.
-        // We treat any single fulfilled promise as the answer, and abort the rest.
+
+
         found = await Promise.any(candidates.map(tryCandidate));
         groupCtrl.abort();
     } catch (aggErr) {

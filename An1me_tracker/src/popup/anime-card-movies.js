@@ -1,13 +1,6 @@
-/**
- * Anime Tracker — Movie group + single-movie card renderers
- *
- * Augments `window.AnimeTracker.AnimeCardRenderer` with `extractMovieBaseTitle`,
- * `createMovieGroup` (for franchises with multiple films) and
- * `createSingleMovieCard` (one standalone film). Pulled out so anime-card.js
- * focuses on the single-series TV card.
- *
- * Loaded AFTER anime-card.js so the AnimeCardRenderer namespace exists.
- */
+
+
+
 (function () {
     'use strict';
 

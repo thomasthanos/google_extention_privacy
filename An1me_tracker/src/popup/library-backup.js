@@ -1,17 +1,6 @@
-/**
- * Anime Tracker — Library backup helpers (pure)
- *
- * The user-facing export / import flow lives in main.js because it touches
- * popup closure state (animeData, videoProgress, render callbacks). These
- * helpers do the pure parts:
- *
- *   - `buildPayload(snapshot)`      — assemble the backup JSON object
- *   - `triggerDownload(payload)`    — blob → temporary <a download> click
- *   - `parseAndValidate(text)`      — file contents → validated parsed object
- *   - `mergeImported(local, parsed)`— CRDT-merge a backup into a local snapshot
- *
- * Exposes `window.AnimeTracker.LibraryBackup`.
- */
+
+
+
 (function () {
     'use strict';
 
@@ -46,8 +35,8 @@
         document.body.appendChild(a);
         a.click();
         a.remove();
-        // Revoke after a tick so the download has time to start.
-        setTimeout(() => { try { URL.revokeObjectURL(url); } catch { /* ignore */ } }, 1500);
+
+        setTimeout(() => { try { URL.revokeObjectURL(url); } catch {              } }, 1500);
     }
 
     function parseAndValidate(text) {
@@ -60,17 +49,14 @@
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
             throw new Error('Backup file is malformed');
         }
-        // Tolerant: animeData is the only field we strictly require to merge anything.
+
         if (!parsed.animeData || typeof parsed.animeData !== 'object') {
             throw new Error('Backup is missing animeData');
         }
         return parsed;
     }
 
-    /**
-     * Pure CRDT merge between a local snapshot and an imported backup.
-     * Returns the merged shape; callers persist + render as needed.
-     */
+
     function mergeImported(local, parsed) {
         const Merge = globalThis.AnimeTrackerMergeUtils;
         if (!Merge?.mergeAnimeData) throw new Error('Merge utils unavailable');
@@ -91,7 +77,7 @@
             ? Merge.mergeBadgeUnlocks(local?.badgeUnlocks || {}, parsed?.badgeUnlocks || {})
             : { ...(local?.badgeUnlocks || {}), ...(parsed?.badgeUnlocks || {}) };
 
-        // Same post-merge dedup pass we run after the regular cloud sync.
+
         if (ProgressManager?.removeDuplicateEpisodes) {
             mergedAnime = ProgressManager.removeDuplicateEpisodes(mergedAnime);
         }

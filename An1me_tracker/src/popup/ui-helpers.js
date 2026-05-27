@@ -96,8 +96,7 @@ const UIHelpers = {
         const pct = Math.max(0, Math.min(100, Number(value) || 0));
         if (pct <= 0 || pct >= 100) return `${Math.round(pct)}%`;
 
-        // Keep visible progress below 100 until it is truly complete, while
-        // retaining useful precision for long-running series.
+
         const rounded = Math.min(99.9, Math.round(pct * 10) / 10);
         return Number.isInteger(rounded) ? `${rounded}%` : `${rounded.toFixed(1)}%`;
     },
@@ -175,14 +174,14 @@ const UIHelpers = {
         return Object.values(animeData).reduce((sum, anime) => sum + (anime.episodes?.length || 0), 0);
     },
 
-    /**
-     * Render an anime cover image OR a letter fallback. Single source of truth for
-     * the 44x58 cover thumbnail used across anime-card / season-group / movie-group.
-     * Pass `extraClass` to add e.g. a hover hook; pass a different `size` to override.
-     *
-     * Output is HTML string (caller must already be building HTML). All inputs
-     * pass through escapeHtml/sanitizeImageUrl.
-     */
+
+
+
+
+
+
+
+
     renderCoverFigure(title, coverUrl, options = {}) {
         const { extraClass = '', size = 'default' } = options;
         const safeUrl = this.sanitizeImageUrl(coverUrl);
@@ -197,14 +196,14 @@ const UIHelpers = {
         return `<div class="${cls} at-cover--placeholder">${this.escapeHtml(letter)}</div>`;
     },
 
-    /**
-     * Lightweight one-shot status toast for action feedback (Saved, Deleted, Synced).
-     * Auto-dismisses after `duration` ms (default 2000). Multiple calls in quick
-     * succession replace prior toasts so they don't stack.
-     *
-     * @param {string} message  Plain text — set as textContent (no HTML allowed).
-     * @param {object} options  { type: 'info' | 'success' | 'error', duration?: number }
-     */
+
+
+
+
+
+
+
+
     showToast(message, options = {}) {
         const { type = 'info', duration = 2000 } = options;
         try {
@@ -230,7 +229,7 @@ const UIHelpers = {
                 el.__atToastRemoveTimer = setTimeout(() => { try { el.remove(); } catch {} }, 220);
             }, Math.max(500, duration));
         } catch {
-            // last-resort no-op so a missing document doesn't break callers
+
         }
     }
 };

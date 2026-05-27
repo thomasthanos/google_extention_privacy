@@ -1,31 +1,10 @@
-/**
- * Anime Tracker — Unified logger (popup + content scripts)
- *
- * Replaces the two parallel files that used to live at the repo root
- * (`logger.js` → PopupLogger) and inside the content namespace
- * (`src/content/logger.js` → AnimeTrackerContent.Logger). The two have
- * incompatible call signatures — popup passes a tag first, content has
- * a single baked-in prefix and dispatches via level methods (info/success/
- * warn/...) — so they can't be collapsed into ONE adapter without
- * changing every call site in the codebase.
- *
- * What this file does instead: define BOTH adapters here, side by side,
- * and expose each on the global its callers already expect. One file,
- * zero call-site churn.
- *
- *   window.PopupLogger                 — popup-context API (tag, ...args)
- *   window.AnimeTrackerContent.Logger  — content-context API (msg, ...args)
- *
- * Safe to load from popup, content scripts, or any other DOM context.
- * The `AnimeTrackerContent` namespace is created lazily so this file
- * doesn't need any guaranteed load order.
- */
+
+
+
 (function () {
     'use strict';
 
-    // ────────────────────────────────────────────────────────────────
-    // Adapter 1: PopupLogger — per-tag styled console output
-    // ────────────────────────────────────────────────────────────────
+
     const rawLog = console.log.bind(console);
     const rawWarn = console.warn.bind(console);
     const rawError = console.error.bind(console);
@@ -58,9 +37,8 @@
     function popupStyled(logFn, tag, args, opts) {
         const c = POPUP_TAG_COLORS[tag] || POPUP_DEFAULT_COLOR;
         const tagStyle = `color:${c.text};font-weight:700;background:${c.bg};padding:1px 6px;border-radius:3px;`;
-        // For info-level (compact) calls, drop ALL extras — keep the line to
-        // just `Tag message`. If you need the payload, inline it into the
-        // message string at the call site, or use warn/error.
+
+
         if (opts && opts.compact) {
             const msg = args && args.length ? args[0] : '';
             logFn(`%c${tag}`, tagStyle, msg);
@@ -106,7 +84,7 @@
     }
 
     const PopupLogger = {
-        // log → compact (drops extras; inline data into the message string).
+
         log(tag, ...args)   { if (!shouldPopupLog('INFO')) return; popupStyled(rawLog, tag, args, POPUP_COMPACT); },
         once(tag, key, ...args) { if (!shouldPopupLog('INFO')) return; popupOnce(tag, key, rawLog, args, POPUP_COMPACT); },
         throttled(tag, key, intervalMs, ...args) { if (!shouldPopupLog('INFO')) return; popupThrottled(tag, key, intervalMs, rawLog, args, POPUP_COMPACT); },
@@ -115,9 +93,7 @@
         error(tag, ...args) { popupStyled(rawError, tag, args); }
     };
 
-    // ────────────────────────────────────────────────────────────────
-    // Adapter 2: ContentLogger — single prefix + LOG_LEVEL filter
-    // ────────────────────────────────────────────────────────────────
+
     const ContentLogger = {
         levels: { DEBUG: 0, INFO: 1, SUCCESS: 1, WARN: 2, ERROR: 3 },
         prefix: '🎬 Anime Tracker',
@@ -154,8 +130,8 @@
 
         formatPlainMessage(level, message) {
             const L = this.config[level];
-            // WARN/ERROR keep timestamp (useful when something breaks).
-            // INFO/SUCCESS skip it for compactness.
+
+
             const needsTs = level === 'WARN' || level === 'ERROR' || level === 'DEBUG';
             const ts = needsTs ? ` ${this.getTimestamp()}` : '';
             return `[${this.prefix}] ${L.icon} ${level}${ts} ${message}`;
@@ -169,15 +145,15 @@
             const extras = args.filter((arg) => arg !== undefined);
 
             if (level === 'WARN' || level === 'ERROR') {
-                // WARN/ERROR keep the full objects — they're rare and the detail
-                // is usually what we want when something went wrong.
+
+
                 method(this.formatPlainMessage(level, message), ...extras);
                 return;
             }
 
             if (level === 'DEBUG') {
-                // DEBUG keeps full objects (still expandable in console) so devs
-                // can poke at them, plus a timestamp.
+
+
                 const ts = this.getTimestamp();
                 method(
                     `%c${this.prefix}%c %c${L.icon} ${level}%c %c${ts}%c %c${message}`,
@@ -190,9 +166,7 @@
                 return;
             }
 
-            // INFO / SUCCESS → minimal: prefix + icon + message. No timestamp,
-            // no extras (they were producing noisy {"id":"…"} tails). Switch
-            // LOG_LEVEL to DEBUG when you actually need the payload.
+
             method(
                 `%c${this.prefix}%c %c${L.icon} ${level}%c %c${message}`,
                 this.styles.prefix, '',
@@ -237,9 +211,7 @@
         error(msg, ...args) { this.log('ERROR', msg, ...args); }
     };
 
-    // ────────────────────────────────────────────────────────────────
-    // Expose on the globals each context expects
-    // ────────────────────────────────────────────────────────────────
+
     if (typeof window !== 'undefined') {
         window.PopupLogger = PopupLogger;
         window.AnimeTrackerContent = window.AnimeTrackerContent || {};

@@ -183,12 +183,8 @@
             const animeByDay = new Map();
 
             for (const ep of anime.episodes) {
-                // AniList-imported episodes carry the import time as `watchedAt`,
-                // not a real watch date — including them would dump every episode
-                // (×~24 min each) onto a single day and inflate "minutes today",
-                // streaks, weekday factors etc. They still count for library
-                // totals via Object.keys(animeData).length, just not for the
-                // time-series buckets.
+
+
                 if (ep?.durationSource === 'anilist') continue;
                 const d = parseDate(ep?.watchedAt);
                 if (!d) continue;
@@ -357,7 +353,7 @@
         let firstWatch = null;
         let mostRecentWatch = null;
         for (const ep of anime.episodes) {
-            // Skip AniList imports — same reason as in buildWatchIndex.
+
             if (ep?.durationSource === 'anilist') continue;
             const d = parseDate(ep?.watchedAt);
             if (!d) continue;

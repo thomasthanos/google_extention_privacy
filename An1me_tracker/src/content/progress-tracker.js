@@ -16,10 +16,10 @@ const ProgressTracker = {
     _adCacheTime: 0,
     _AD_CACHE_TTL: 15000,
 
-    // Detects quota errors across Chrome locales/versions. Older code only
-    // string-matched 'QUOTA' which fails on translated error messages and
-    // some Chromium forks. We now also accept the canonical "exceeded the
-    // quota" phrasing and the chrome.runtime.lastError name when available.
+
+
+
+
     _isQuotaError(err) {
         if (!err) return false;
         const msg = String(err.message || err || '').toLowerCase();
@@ -56,13 +56,13 @@ const ProgressTracker = {
         const num = parseInt(m[2], 10);
         const anime = animeData[slug];
         if (!anime || !Array.isArray(anime.episodes)) return false;
-        // Replaying a held title is active watching, even if this episode is
-        // already in history. Preserve a resume entry until playback finishes.
+
+
         if (anime.onHoldAt || anime.listState === 'on_hold') return false;
         return anime.episodes.some(ep => {
             if (Number(ep?.number) !== num) return false;
-            // AniList history is not a playback event in this extension.
-            // Older imports may still carry a bogus watchedAt stamp.
+
+
             if (ep?.durationSource === 'anilist') return false;
             return true;
         });
@@ -106,17 +106,17 @@ const ProgressTracker = {
         const progress = currentTime / duration;
         const remainingTime = duration - currentTime;
 
-        // Preferred path: if the skiptime helper has captured this episode's
-        // outroStart, treat it as authoritative. The legacy 85% fallback is
-        // skipped because it would override the outro signal (e.g. an
-        // episode with story until 22:00 in a 24min runtime would otherwise
-        // fire at 20:24 mid-story).
+
+
+
+
+
         if (outroStartSec && outroStartSec > 0 && outroStartSec < duration) {
             const MIN_STORY_PROGRESS = 0.50;
             if (currentTime >= outroStartSec && progress >= MIN_STORY_PROGRESS) return true;
-            // Defensive: if the captured outroStart turns out wrong (stale
-            // metadata, sub vs dub mismatch), still fire when we're very near
-            // the actual end so the episode doesn't go untracked.
+
+
+
             if (progress >= 0.95) return true;
             return false;
         }
@@ -159,10 +159,10 @@ const ProgressTracker = {
 
             if (progress.deleted) {
                 const tombstoneAge = now - (progress.deletedAt ? new Date(progress.deletedAt).getTime() : 0);
-                // 30 days — aligned with PROGRESS_TOMBSTONE_KEEP_MS in BG and
-                // content cloud-sync. Shorter retention here would prune delete
-                // markers before an offline device sees them and could
-                // resurrect stale progress on next sync.
+
+
+
+
                 const TOMBSTONE_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
                 if (tombstoneAge > TOMBSTONE_MAX_AGE) {
                     Logger.debug('Removing expired tombstone:', id);
@@ -397,10 +397,10 @@ const ProgressTracker = {
                 }
             }
         } catch (e) {
-            // Expected when the user reloads/disables the extension mid-write.
-            // The next page load will pick up where we left off via stored state,
-            // so swallowing here is correct — but we now also log a debug line
-            // so the silence isn't surprising during dev.
+
+
+
+
             if (e?.message?.includes('Extension context invalidated')) {
                 Logger.debug('Save aborted: extension context invalidated');
             } else {
@@ -540,7 +540,7 @@ const ProgressTracker = {
 
             return anime.episodes.some(ep => {
                 if (Number(ep?.number) !== episodeNumber) return false;
-                // An imported episode becomes tracked only after real playback.
+
                 if (ep?.durationSource === 'anilist') return false;
                 return true;
             });
@@ -740,19 +740,19 @@ const ProgressTracker = {
 window.AnimeTrackerContent = window.AnimeTrackerContent || {};
 window.AnimeTrackerContent.ProgressTracker = ProgressTracker;
 
-// External-write cache invalidation. _vpCache (5 s) and _adCache (15 s) speed
-// up the hot save path by deduping consecutive reads, but a cache that
-// outlives a cloud-driven `videoProgress` / `animeData` write would let the
-// next save overwrite the freshly-merged map with a stale snapshot —
-// silently undoing progress that just arrived from another device. We hook
-// chrome.storage.onChanged and:
-//   • If the new value matches what the cache already holds (own-write
-//     case — we cached it just before the storage round-trip echoed back),
-//     keep the cache so the dedup still works.
-//   • Otherwise drop the cache so the next save reads fresh from storage.
-//
-// Equality is delegated to the shared MergeUtils helpers so we get the same
-// "ignore fetch metadata" semantics the sync layer uses.
+
+
+
+
+
+
+
+
+
+
+
+
+
 try {
     chrome.storage.onChanged.addListener((changes, namespace) => {
         if (namespace !== 'local') return;
@@ -782,4 +782,4 @@ try {
             }
         }
     });
-} catch { /* chrome.storage.onChanged unavailable — non-fatal */ }
+} catch {                                                        }

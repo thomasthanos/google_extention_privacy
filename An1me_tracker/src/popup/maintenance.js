@@ -1,22 +1,11 @@
-/**
- * Anime Tracker — Library maintenance ops (pure helpers)
- *
- * Extracted from main.js. These operate on plain data structures and
- * window.AnimeTracker.SeasonGrouping (for the movie heuristic). No popup
- * closure state — callers pass everything in and read what comes back.
- *
- * Exposes `window.AnimeTracker.Maintenance`:
- *   - `normalizeMovieDurations(data, progress)` — patch placeholder/legacy
- *     movie durations from the best available source (video progress, then
- *     totalWatchTime average, then legacy default).
- *   - `cleanupPhantomMovies(data, existingDeletedAnime)` — drop movies
- *     tracked accidentally (≤5 min watched, ≥1 day old) and tombstone them.
- */
+
+
+
 (function () {
     'use strict';
 
-    const MIN_RELIABLE_DURATION_SECONDS = 30 * 60;     // 30 min
-    const MAX_RELIABLE_DURATION_SECONDS = 4 * 60 * 60; // 4 h — safe ceiling for any anime film
+    const MIN_RELIABLE_DURATION_SECONDS = 30 * 60;
+    const MAX_RELIABLE_DURATION_SECONDS = 4 * 60 * 60;
     const LEGACY_DEFAULT_MOVIE_DURATION_SECONDS = 100 * 60;
 
     const MAX_PHANTOM_WATCH_SECONDS = 5 * 60;
@@ -89,18 +78,7 @@
         return { changed, updatedEntries };
     }
 
-    /**
-     * Strip per-episode `watchedAt` from AniList-imported episodes.
-     *
-     * Older versions of the AniList importer stamped every imported episode
-     * with `watchedAt = importTime`, which then caused the stats engine to
-     * pile every imported episode (×~24 min each) onto a single day —
-     * inflating "minutes today", streaks, weekday factors, etc. The importer
-     * no longer sets `watchedAt`, but for libraries imported before that fix
-     * the bogus dates are still in storage. This helper scrubs them.
-     *
-     * Idempotent: a second run is a no-op (nothing left to strip).
-     */
+
     function scrubAnilistImportDates(data) {
         let changed = false;
         let scrubbedEpisodes = 0;
@@ -147,19 +125,11 @@
         return { changed, deletedAnime: updatedDeletedAnime };
     }
 
-    /**
-     * Quick audit of where the user's recorded watch time comes from.
-     *
-     * Useful from the popup devtools console — call
-     *   AnimeTracker.Maintenance.verifyHours()
-     * to see if anything looks suspicious (e.g. one day with thousands of
-     * minutes from an old AniList import). Read-only, never mutates.
-     */
+
     function verifyHours(data) {
         data = data || (typeof window !== 'undefined' && window.AnimeTracker?.Storage?._cachedAnimeData) || null;
-        // If no explicit data passed, the caller can `await` the storage
-        // read instead — but for synchronous devtools use we prefer to
-        // accept a passed-in object.
+
+
         if (!data) {
             return new Promise((resolve) => {
                 try {
@@ -173,7 +143,7 @@
         let realEpisodes = 0, realSeconds = 0;
         let importEpisodes = 0, importSeconds = 0;
         let importEpisodesWithDates = 0;
-        const byDay = new Map();   // dayKey → { episodes, seconds, isImportOnly }
+        const byDay = new Map();
         const importDates = new Set();
 
         for (const slug in data) {

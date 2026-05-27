@@ -1,21 +1,21 @@
-/**
- * Anime Tracker - Filler Service
- * Handles filler detection and fetching from AnimeFillerList.com
- */
+
+
+
+
 
 const FillerService = {
     STAY_SELECTIONS_KEY: 'fillerStaySelections',
 
-    // Known filler episodes - populated dynamically from animefillerlist.com
+
     KNOWN_FILLERS: {},
 
-    // Cached sorted keys for getNormalizedFillerSlug (invalidated on KNOWN_FILLERS mutation)
+
     _sortedFillerKeys: null,
 
-    // Episode types cache
+
     episodeTypesCache: {},
 
-    // Episodes where the user explicitly chose "Stay Here" instead of auto-skip
+
     stayedFillersCache: {},
 
     normalizeStayedFillers(rawSelections) {
@@ -60,15 +60,15 @@ const FillerService = {
         return storedEpisodes.includes(Number(episodeNum));
     },
 
-    /**
-     * Get normalized slug for filler lookup.
-     * Keys are checked longest-first so that more specific slugs (e.g.
-     * "naruto-shippuden") always win over shorter prefixes (e.g. "naruto").
-     */
+
+
+
+
+
     getNormalizedFillerSlug(slug) {
         const lowerSlug = slug.toLowerCase();
 
-        // Fast path: exact match
+
         if (this.KNOWN_FILLERS[lowerSlug]) return lowerSlug;
 
         const cleanSlug = lowerSlug
@@ -77,7 +77,7 @@ const FillerService = {
 
         if (this.KNOWN_FILLERS[cleanSlug]) return cleanSlug;
 
-        // Sort keys longest-first (cached; invalidated when KNOWN_FILLERS is mutated).
+
         if (!this._sortedFillerKeys) {
             this._sortedFillerKeys = Object.keys(this.KNOWN_FILLERS).sort((a, b) => b.length - a.length);
         }
@@ -95,18 +95,18 @@ const FillerService = {
         return lowerSlug;
     },
 
-    /**
-     * Check if slug looks like a movie/special that won't have filler data
-     */
+
+
+
     isLikelyMovie(slug) {
         return !!globalThis.AnimeTrackerMergeUtils?.isLikelyMovieSlug?.(slug);
     },
 
-    /**
-     * Fetch episode types from animefillerlist.com via background script.
-     * Pass animeTitle so background can use it for slug discovery.
-     * Returns the cached/fetched episode types, or null if not available.
-     */
+
+
+
+
+
     async fetchEpisodeTypes(animeSlug, animeTitle = null) {
         const { CONFIG } = window.AnimeTracker;
         const { Storage } = window.AnimeTracker;
@@ -157,7 +157,7 @@ const FillerService = {
                 const cachedData = {
                     ...response.episodeTypes,
                     cachedAt: Date.now(),
-                    _fillerSlug: response.fillerSlug || null  // persist so loadCachedEpisodeTypes can use it
+                    _fillerSlug: response.fillerSlug || null
                 };
 
                 this.episodeTypesCache[animeSlug] = cachedData;
@@ -179,9 +179,9 @@ const FillerService = {
         }
     },
 
-    /**
-     * Update KNOWN_FILLERS from fetched episode types.
-     */
+
+
+
     updateFromEpisodeTypes(animeSlug, episodeTypes) {
         const { Logger } = window.AnimeTracker;
 
@@ -222,12 +222,12 @@ const FillerService = {
         slugVariations.forEach(slug => {
             this.KNOWN_FILLERS[slug] = fillerRanges;
         });
-        this._sortedFillerKeys = null; // invalidate sorted-keys cache
+        this._sortedFillerKeys = null;
     },
 
-    /**
-     * Load cached episode types from storage
-     */
+
+
+
     async loadCachedEpisodeTypes(animeData) {
         const { Storage } = window.AnimeTracker;
         const { Logger } = window.AnimeTracker;
@@ -253,10 +253,10 @@ const FillerService = {
         }
     },
 
-    /**
-     * Auto-fetch missing episode types with rate limiting.
-     * Returns true if any new data was fetched, false if everything was cached.
-     */
+
+
+
+
     async autoFetchMissing(animeData, onComplete, onProgress) {
         const { CONFIG } = window.AnimeTracker;
         const { Logger } = window.AnimeTracker;
@@ -343,9 +343,9 @@ const FillerService = {
         }
     },
 
-    /**
-     * Check if an episode is filler
-     */
+
+
+
     isFillerEpisode(slug, episodeNum) {
         const normalizedSlug = this.getNormalizedFillerSlug(slug);
         const fillers = this.KNOWN_FILLERS[normalizedSlug];
@@ -353,18 +353,18 @@ const FillerService = {
         return fillers.some(([start, end]) => episodeNum >= start && episodeNum <= end);
     },
 
-    /**
-     * Count filler episodes watched
-     */
+
+
+
     countFillerEpisodes(slug, episodes) {
         const normalizedSlug = this.getNormalizedFillerSlug(slug);
         if (!episodes || !this.KNOWN_FILLERS[normalizedSlug]) return 0;
         return episodes.filter(ep => this.isFillerEpisode(slug, ep.number)).length;
     },
 
-    /**
-     * Get filler info for anime
-     */
+
+
+
     getFillerInfo(slug, episodes) {
         const normalizedSlug = this.getNormalizedFillerSlug(slug);
         const fillers = this.KNOWN_FILLERS[normalizedSlug];
@@ -376,9 +376,9 @@ const FillerService = {
         return { total: totalFillers, watched: watchedFillers };
     },
 
-    /**
-     * Get skipped filler episodes (watched past them but didn't watch them)
-     */
+
+
+
     getSkippedFillers(slug, episodes, currentEpisode) {
         const normalizedSlug = this.getNormalizedFillerSlug(slug);
         const fillers = this.KNOWN_FILLERS[normalizedSlug];
@@ -398,9 +398,9 @@ const FillerService = {
         return skippedFillers.sort((a, b) => a - b);
     },
 
-    /**
-     * Format skipped fillers into compact ranges
-     */
+
+
+
     formatSkippedFillersCompact(fillerNumbers) {
         if (!fillerNumbers || fillerNumbers.length === 0) return '';
 
@@ -429,9 +429,9 @@ const FillerService = {
         return ranges.join(', ');
     },
 
-    /**
-     * Get unwatched filler episodes up to a given total
-     */
+
+
+
     getUnwatchedFillers(slug, episodes, totalEpisodes) {
         const normalizedSlug = this.getNormalizedFillerSlug(slug);
         const fillers = this.KNOWN_FILLERS[normalizedSlug];
@@ -451,18 +451,18 @@ const FillerService = {
         return unwatchedFillers.sort((a, b) => a - b);
     },
 
-    /**
-     * Get watched canon episode count (total minus fillers)
-     */
+
+
+
     getCanonEpisodeCount(slug, episodes) {
         if (!episodes) return 0;
         const fillerCount = this.countFillerEpisodes(slug, episodes);
         return episodes.length - fillerCount;
     },
 
-    /**
-     * Get total canon episodes for anime
-     */
+
+
+
     getTotalCanonEpisodes(slug, totalEpisodes) {
         const normalizedSlug = this.getNormalizedFillerSlug(slug);
         const fillers = this.KNOWN_FILLERS[normalizedSlug];
@@ -474,15 +474,30 @@ const FillerService = {
 
     getTotalEpisodes(slug, anime = null) {
         const normalizedSlug = slug.toLowerCase();
+        const candidates = [];
 
-        const anilistTotal = window.AnimeTracker?.AnilistService?.getTotalEpisodes(normalizedSlug);
-        if (anilistTotal && anilistTotal > 0) return anilistTotal;
+        const anilistService = window.AnimeTracker?.AnilistService;
+        const anilistTotal = anilistService?.getTotalEpisodes(normalizedSlug);
+        if (Number.isFinite(anilistTotal) && anilistTotal > 0) candidates.push(anilistTotal);
 
         if (anime && Number.isFinite(anime.totalEpisodes) && anime.totalEpisodes > 0) {
-            return anime.totalEpisodes;
+            candidates.push(anime.totalEpisodes);
         }
 
-        return null;
+        const latestAvailable = anilistService?.getLatestEpisode(normalizedSlug);
+        if (Number.isFinite(latestAvailable) && latestAvailable > 0) candidates.push(latestAvailable);
+
+        if (anime && Array.isArray(anime.episodes)) {
+            let maxTracked = 0;
+            for (const ep of anime.episodes) {
+                const n = Number(ep?.number) || 0;
+                if (n > maxTracked) maxTracked = n;
+            }
+            if (maxTracked > 0) candidates.push(maxTracked);
+        }
+
+        if (candidates.length === 0) return null;
+        return Math.max(...candidates);
     },
 
     calculateProgress(episodeCount, slug, anime = null) {
@@ -517,6 +532,6 @@ const FillerService = {
     }
 };
 
-// Export
+
 window.AnimeTracker = window.AnimeTracker || {};
 window.AnimeTracker.FillerService = FillerService;

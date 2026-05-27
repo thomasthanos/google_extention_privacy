@@ -1,23 +1,20 @@
-/**
- * Anime Tracker — AniList shared core
- *
- * GraphQL client + push engine, loaded by both the BG service worker
- * (importScripts) and the popup (<script>). Exposed on globalThis.AniListCore.
- */
+
+
+
 (function () {
     'use strict';
 
     const GQL_ENDPOINT = 'https://graphql.anilist.co';
-    const REQUEST_GAP_MS = 1800;                        // pace API calls — AniList rate-limits hard
+    const REQUEST_GAP_MS = 1800;
     const MEDIA_CACHE_TTL = 30 * 24 * 60 * 60 * 1000;
     const MEDIA_NOTFOUND_TTL = 7 * 24 * 60 * 60 * 1000;
-    const RESOLVER_V = 6;                               // bump to invalidate notFound caches
+    const RESOLVER_V = 6;
 
     const AUTH_KEY = 'anilist_auth';
     const MEDIA_MAP_KEY = 'anilist_media_map';
     const PUSHED_KEY = 'anilist_pushed';
     const SCHEMA_KEY = 'anilist_push_schema';
-    const PUSH_SCHEMA = 2;       // bump to force re-push (mutation shape change)
+    const PUSH_SCHEMA = 2;
 
     function sget(keys) {
         return new Promise((res) => {
@@ -35,13 +32,8 @@
 
     function slugify(title) {
         return String(title || '').toLowerCase().trim()
-            // Replace any non-word/space/dash with a SPACE first so that
-            // characters like `/`, `×`, `:`, `(` act as word separators
-            // instead of silently disappearing. Without this:
-            //   `Fate/stay night`  → `fatestay-night`     (wrong, no `/` left a gap)
-            //   `HUNTER×HUNTER`    → `hunterhunter`       (wrong, `×` had no surrounding spaces)
-            // With the space-substitution, these collapse to the correct
-            // `fate-stay-night` / `hunter-hunter` slugs an1me.to actually uses.
+
+
             .replace(/[^\w\s-]/g, ' ')
             .replace(/[\s_]+/g, '-')
             .replace(/-+/g, '-')
@@ -63,7 +55,7 @@
             await paced();
             let res;
             try {
-                // 20 s timeout — without it, a hung fetch would freeze the whole sync.
+
                 const controller = new AbortController();
                 const tid = setTimeout(() => controller.abort(), 20000);
                 try {
@@ -124,8 +116,7 @@
         return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() };
     }
 
-    // Imported episodes (durationSource 'anilist') carry import time, not real
-    // watch time — exclude them so we don't clobber AniList's existing dates.
+
     function watchDates(entry, status) {
         const eps = Array.isArray(entry && entry.episodes) ? entry.episodes : [];
         let minIso = null, maxIso = null, minTs = Infinity, maxTs = -Infinity;
@@ -146,7 +137,7 @@
         };
     }
 
-    // Strip trailing " Movie"/"Film" if "Movie"/"Film" already appears earlier.
+
     function _cleanTitleForSearch(title) {
         let t = String(title || '').trim();
         const m = t.match(/^(.+?)[\s:]+(?:movie|film)\s*$/i);
@@ -161,8 +152,7 @@
             .trim();
     }
 
-    // AniList's tokenizer is strict — special chars and lone tokens like "S1"
-    // cause 0-result searches even when the entry exists. Sanitize aggressively.
+
     function _sanitizeQuery(title) {
         let t = String(title || '');
         t = t.replace(/[\/:\-–—‐'’"".,!?(){}[\]]+/g, ' ');
@@ -173,8 +163,7 @@
         return t.replace(/\s+/g, ' ').trim();
     }
 
-    // Roman numerals (i/ii/iii) and Japanese suffixes (hen/go) are KEPT
-    // — they disambiguate sequels (Heaven's Feel I/II/III, Russia-go).
+
     const STOP_WORDS = new Set([
         'no', 'ni', 'de', 'wa', 'ga', 'to', 'mo', 'na', 'da', 'ka', 'e', 'wo',
         'sa', 'n', 'ya', 'yo',
@@ -185,9 +174,7 @@
         'episode', 'ova', 'ona'
     ]);
 
-    // Head + tail keyword extraction: keep franchise prefix AND distinguishing
-    // suffix. "Fate Stay Night Movie Heavens Feel II Lost Butterfly" with n=4
-    // → "Fate Stay Lost Butterfly".
+
     function _distinctiveKeywords(title, n) {
         const words = _sanitizeQuery(title)
             .split(/\s+/)
@@ -234,8 +221,7 @@
             }
         }
 
-        // MAL id from aniskip's bundle is the strongest signal — 1:1 lookup,
-        // no fuzzy guessing.
+
         let malIdHint = hints?.malId;
         if (!malIdHint) {
             try {
@@ -244,7 +230,7 @@
                 if (entry && Number.isFinite(Number(entry.malId)) && Number(entry.malId) > 0) {
                     malIdHint = Number(entry.malId);
                 }
-            } catch { /* best-effort */ }
+            } catch {                   }
         }
 
         const formatHint = _formatFromSlug(slug);
@@ -253,7 +239,7 @@
 
         let result = null;
         try {
-            // Path 1: MAL ID — authoritative, no scoring.
+
             if (Number.isFinite(malIdHint) && malIdHint > 0) {
                 try {
                     const data = await gql(
@@ -266,12 +252,12 @@
                     }
                 } catch (e) {
                     const msg = String(e?.message || '');
-                    // Network/rate errors must bubble — don't poison cache as notFound.
+
                     if (!/not found/i.test(msg) && msg !== 'http_404') throw e;
                 }
             }
 
-            // Path 2: Title search, max 3 query variants to limit rate-limit risk.
+
             if (!result) {
                 const seen = new Set();
                 const queries = [];
@@ -313,8 +299,7 @@
                     if (picked) { bestPick = picked; break; }
                 }
 
-                // Fallback: drop format filter — AniList may store the entry as
-                // a different format (TV_SHORT/SPECIAL) than the slug suggests.
+
                 if (!bestPick && formatHint) {
                     const q = _distinctiveKeywords(cleanedTitle || title, 3);
                     if (q && !seen.has(q.toLowerCase())) {
@@ -344,8 +329,8 @@
             }
         } catch (e) {
             const msg = String(e?.message || '');
-            // Real "no match" → cache as notFound. Network/rate errors must NOT
-            // be cached so a transient failure doesn't stick for 7 days.
+
+
             if (/not found/i.test(msg) || msg === 'http_404') result = null;
             else throw e;
         }
@@ -361,9 +346,7 @@
             .replace(/\s+/g, ' ');
     }
 
-    // Score AniList candidates and return the best — only if score clears the
-    // confidence threshold AND beats the runner-up by a clear margin.
-    // Returning null caches as notFound, preventing wrong AniList writes.
+
     function _pickBestCandidate(list, queryTitle, hints) {
         const queryNorm = _normalizeTitle(queryTitle);
         const queryWords = new Set(queryNorm.split(' ').filter(w => w.length > 1));
@@ -384,9 +367,7 @@
             return bestOverlap;
         };
 
-        // Trust AniList's own ranking when format matches and overlap is decent.
-        // Score-and-margin gate is too strict for franchise movies where
-        // multiple candidates share most words.
+
         if (hints?.formatHint && list.length > 0) {
             const top = list[0];
             if (top.format === hints.formatHint && overlapRatio(top) >= 0.6) return top;
@@ -439,10 +420,7 @@
         return (best && bestScore >= 5 && (bestScore - secondScore) >= 3) ? best : null;
     }
 
-    // Push local library progress to AniList. Batched + resumable: stops after
-    // `maxWork` real network pushes and reports `truncated` so the SW can
-    // re-schedule. Dedup via `anilist_pushed` makes everything after the first
-    // sync cheap.
+
     async function runPush({ token, maxWork = 1e9, onProgress } = {}) {
         if (!token) throw new Error('not_connected');
 
@@ -458,9 +436,7 @@
         const total = slugs.length;
         const now = Date.now();
 
-        // Pre-filter: slugs already cached as notFound (current resolverV, in
-        // TTL) cost zero API calls but used to burn the work budget — fast-fail
-        // them so a run with only these doesn't truncate-loop forever.
+
         const isFreshNotFound = (slug) => {
             const c = mediaMap[slug];
             if (!c || !c.notFound) return false;
@@ -471,8 +447,7 @@
 
         let done = 0, ok = 0, skipped = 0, failed = 0, retryableFailed = 0, work = 0, truncated = false;
 
-        // One-shot migration: backfill datesLocked for legacy pure-AniList
-        // imports. Coalesced to a single storage write.
+
         let migrationDirty = false;
         for (const slug of slugs) {
             const entry = animeData[slug];
@@ -500,9 +475,7 @@
             const status = pushStatus(entry, progress);
             const prev = pushed[slug];
 
-            // datesLocked: set on import preseed so we don't overwrite AniList's
-            // existing dates with a "today" date from a newly-promoted episode.
-            // Cleared once the user watches beyond the imported count.
+
             const datesLocked = !!(prev && prev.datesLocked && progress <= (prev.progress || 0));
             const { startedAt, completedAt } = datesLocked ? { startedAt: null, completedAt: null } : watchDates(entry, status);
             const startedAtKey = startedAt ? `${startedAt.year}-${startedAt.month}-${startedAt.day}` : '';
@@ -530,9 +503,8 @@
             if (onProgress) onProgress({ done, total, ok, skipped, failed, currentSlug: slug, currentTitle: entry?.title || slug, phase: 'resolving' });
 
             try {
-                // No `year` hint: only signal we have is `watchedAt` (when the
-                // user watched), which is NOT the anime's release year. Passing
-                // it would push the matcher toward newer entries.
+
+
                 const totalEpHint = Number(entry?.totalEpisodes);
                 const hints = {
                     totalEpisodes: Number.isFinite(totalEpHint) && totalEpHint > 0 ? totalEpHint : null

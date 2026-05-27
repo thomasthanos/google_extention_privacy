@@ -1,35 +1,10 @@
-/**
- * Anime Tracker — AniList integration (popup)
- *
- * Owns OAuth (connect / disconnect), the Settings card UI, and the one-shot
- * "Import from AniList" action. The actual progress PUSH runs in the
- * background service worker (src/background/anilist-sync.js) so it works
- * even when the popup is closed — this file just triggers it and mirrors
- * its status (written to `anilist_sync_status`) into the card.
- *
- * Shared GraphQL + push logic lives in src/common/anilist-core.js.
- */
+
+
+
 (function () {
     'use strict';
 
-    // ════════════════════════════════════════════════════════════════════
-    // ════════════════════════════════════════════════════════════════════
-    //  CONFIG — AniList API client IDs (https://anilist.co/settings/developer)
-    //
-    //  Two apps registered, one redirect URI each (AniList caps each app at
-    //  one URI). Auto-switch by runtime extension ID so dev work doesn't
-    //  pollute the prod app's redirect setting and prod users keep working
-    //  after a release without manual edits.
-    //
-    //  • PROD app:  registered → https://<PROD_EXTENSION_ID>.chromiumapp.org/
-    //  • DEV  app:  registered → https://<your dev unpacked id>.chromiumapp.org/
-    //
-    //  Implicit grant (response_type=token) → only client_id is shipped;
-    //  client_secret stays out of the codebase by design (extension JS is
-    //  publicly readable).
-    //
-    //  Import-by-username works without OAuth — only push sync needs it.
-    // ════════════════════════════════════════════════════════════════════
+
     const ANILIST_CLIENT_ID_PROD = '42051';
     const ANILIST_CLIENT_ID_DEV  = '42224';
     const PROD_EXTENSION_ID = 'gilapmpjgicjledlmpgiakofhodfifbl';
@@ -82,7 +57,7 @@
         });
     }
 
-    // ── Auth ─────────────────────────────────────────────────────────────
+
     let _auth = null;
 
     async function loadAuth() {
@@ -97,7 +72,7 @@
         try { return chrome.identity.getRedirectURL(); } catch { return ''; }
     }
 
-    // Fetch the viewer's name/avatar once and fold it into stored auth.
+
     async function ensureViewer() {
         if (!Core || !isConnected() || (_auth && _auth.viewer)) return;
         try {
@@ -112,9 +87,7 @@
         }
     }
 
-    // Detect environments without a working chrome.identity.launchWebAuthFlow
-    // (Orion / Safari / Firefox / mobile). On these, we can't run the OAuth
-    // flow — the user must connect on desktop, then auth syncs via Firebase.
+
     function isMobileLikeEnv() {
         const ua = navigator.userAgent || '';
         if (/Orion|Firefox|FxiOS/i.test(ua)) return true;
@@ -132,14 +105,7 @@
         if (!ANILIST_CLIENT_ID) throw new Error('no_client_id');
         if (isMobileLikeEnv()) throw new Error('mobile_unsupported');
 
-        // launchWebAuthFlow auto-listens on chrome.identity.getRedirectURL().
-        // AniList's implicit-grant docs do NOT include `redirect_uri` in the
-        // authorize URL — the server uses whatever is registered on the dev
-        // app settings. Sending `redirect_uri` here triggers a strict
-        // validation path that returns `unsupported_grant_type` if anything
-        // is off (encoding, trailing slash, etc.). The registered URI must
-        // match `chrome.identity.getRedirectURL()` for this extension's
-        // runtime ID — auto-switched per env via PROD_EXTENSION_ID above.
+
         const redirectUri = getRedirectUri();
         if (!redirectUri) throw new Error('no_redirect_uri');
 
@@ -152,9 +118,8 @@
                 chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true }, (url) => {
                     if (chrome.runtime.lastError) {
                         const msg = chrome.runtime.lastError.message || '';
-                        // Re-tag the generic Chrome error with a hint about
-                        // the most likely root cause so the popup can show
-                        // an actionable message instead of just echoing it.
+
+
                         if (/page could not be loaded/i.test(msg)) {
                             reject(new Error(`auth_page_failed:${redirectUri}`));
                         } else {
@@ -187,22 +152,13 @@
         await sremove([AUTH_KEY]);
     }
 
-    // Push the current local AniList auth state up to Firestore via
-    // FirebaseSync (loaded from src/popup/firebase-sync.js). Best-effort:
-    // failures are logged but never block the local connect/disconnect —
-    // the next sign-in's loadAndSyncData reconcile will retry.
-    //
-    // Single-writer model: ONLY this function pushes anilistAuth to the
-    // cloud. The BG service worker only ever READS it (in pollCloudData →
-    // applyCloudAnilistAuth) and only ever clears the LOCAL token on a 401
-    // reconnect — never propagates that clear to cloud (so a transient
-    // mobile 401 can't sign the user out across all devices).
+
     async function pushAuthToCloud(reason) {
         try {
             const FS = (typeof window !== 'undefined' && window.FirebaseSync) || null;
             if (!FS || typeof FS.pushAnilistAuthToCloud !== 'function') return;
             const user = (typeof FS.getUser === 'function') ? FS.getUser() : null;
-            if (!user) return;  // signed-out — nothing to sync to
+            if (!user) return;
             const username = _lastUsername || (_auth?.viewer?.name || null);
             await FS.pushAnilistAuthToCloud(_auth || null, username);
         } catch (e) {
@@ -210,7 +166,7 @@
         }
     }
 
-    // ── Import (public AniList list → local library) ─────────────────────
+
     async function importFromUsername(username) {
         if (!Core) throw new Error('core_missing');
         const name = String(username || '').trim();
@@ -242,7 +198,7 @@
         for (const e of entries) {
             const status = e.status;
             const progress = Number(e.progress) || 0;
-            // Skip pure "planning" entries — nothing watched, nothing to track.
+
             if (progress <= 0 && status !== 'COMPLETED') { skipped++; continue; }
 
             const media = e.media || {};
@@ -251,12 +207,7 @@
             const slug = Core.slugify(mTitle.romaji || title);
             if (!slug) { skipped++; continue; }
 
-            // Additive only — never overwrite an entry the user already tracks.
-            // BUT: backfill missing alternate-title fields on the existing
-            // entry. The slug-migration helper uses these to recover from
-            // bad slugs by probing alternate slugifications (e.g. an1me.to
-            // uses the English-title slug for FMA Brotherhood while the
-            // import created a romaji slug that 404s).
+
             if (animeData[slug]) {
                 let touched = false;
                 if (mTitle.english && !animeData[slug].englishTitle) {
@@ -272,8 +223,8 @@
                     touched = true;
                 }
                 if (touched) {
-                    // Bump listStateUpdatedAt-equivalent for merge ordering;
-                    // we don't change listState itself.
+
+
                     animeData[slug].alternateTitlesUpdatedAt = importedAt;
                 }
                 skipped++;
@@ -284,11 +235,8 @@
             const count = (status === 'COMPLETED' && total > 0) ? total : progress;
             const episodes = [];
             for (let n = 1; n <= count; n++) {
-                // No per-episode `watchedAt` for AniList imports — we don't
-                // know the real watch date, and stamping every episode with
-                // `now` would dump the whole import onto a single day in
-                // "minutes today" / streak / weekday stats. The entry-level
-                // `lastWatched` (set below) gives the card a sensible date.
+
+
                 episodes.push({ number: n, duration: 1440, durationSource: 'anilist' });
             }
 
@@ -300,9 +248,8 @@
                 lastWatched: importedAt,
                 totalEpisodes: total > 0 ? total : null,
                 coverImage: (media.coverImage && media.coverImage.large) || null,
-                // Persist alternate-title forms so slug-migration can probe
-                // multiple candidate slugs when an1me.to 404s on the romaji
-                // form (it often uses the English title for licensed shows).
+
+
                 englishTitle: mTitle.english || null,
                 romajiTitle: mTitle.romaji || null,
                 nativeTitle: mTitle.native || null
@@ -323,18 +270,14 @@
 
             animeData[slug] = entryObj;
 
-            // Pre-seed the caches so the background push skips this entry
-            // (AniList already has it) instead of re-searching + re-writing it.
+
             if (media.id) {
                 mediaMap[slug] = { mediaId: media.id, episodes: total || null, cachedAt: now };
                 pushed[slug] = {
                     progress: Core.localProgress(entryObj),
                     status: Core.pushStatus(entryObj, count),
-                    // Lock dates for pure imports: AniList already has the
-                    // correct history. We must not overwrite it with a
-                    // "today" date just because the user watches ep1 later.
-                    // The lock is cleared when progress advances beyond the
-                    // imported count (i.e. the user watches new episodes).
+
+
                     datesLocked: true
                 };
             }
@@ -343,23 +286,21 @@
         }
 
         if (added > 0) {
-            // Also write SCHEMA_KEY so the background push doesn't wipe the
-            // pre-seeded pushed cache on first run after import.
+
+
             await sset({ animeData, [Core.MEDIA_MAP_KEY]: mediaMap, [Core.PUSHED_KEY]: pushed, [Core.SCHEMA_KEY]: Core.PUSH_SCHEMA });
         }
         return { added, skipped, total: entries.length };
     }
 
-    // ── UI ───────────────────────────────────────────────────────────────
+
     const CARD_ID = 'anilistCard';
     const STYLE_ID = 'anilist-card-styles';
     let _busy = false;
     let _lastUsername = '';
     let _syncStatus = null;
-    // Mirrors `firebase_user` from chrome.storage.local. Drives the mobile
-    // placeholder copy: signed in → "waiting for desktop", signed out →
-    // "sign in to tracker first". Updated by the boot IIFE + onChanged
-    // listener so the card re-renders within ms of a tracker sign-in/out.
+
+
     let _firebaseSignedIn = false;
 
     function injectStyles() {
@@ -377,7 +318,7 @@
                 font-family:'Inter','Segoe UI',system-ui,sans-serif;
             }
 
-            /* ─── LOGGED-OUT — logo left, text right ────────────────── */
+
             #${CARD_ID} .anilist-empty {
                 display:flex; flex-direction:column;
                 gap:10px;
@@ -434,7 +375,7 @@
                 width:14px; height:14px; fill:currentColor; stroke:none;
             }
 
-            /* ─── Collapsibles — How does this work / Advanced import ── */
+
             #${CARD_ID} .anilist-collapsible {
                 width:100%; margin-top:4px;
             }
@@ -475,7 +416,7 @@
                 to { opacity:1; transform:translateY(0); }
             }
 
-            /* Redirect URL row inside the collapsible */
+
             #${CARD_ID} .anilist-url-row {
                 display:flex; align-items:stretch; gap:6px; margin-top:4px;
             }
@@ -499,7 +440,7 @@
                 border-color:rgba(76,175,130,0.4) !important;
             }
 
-            /* ─── Disconnected: divider + import-without-connecting ──── */
+
             #${CARD_ID} .anilist-divider {
                 height:1px; background:rgba(255,255,255,0.07);
                 margin:14px 0 10px;
@@ -533,7 +474,7 @@
                 margin-top:6px; word-break:break-word;
             }
 
-            /* ─── LOGGED-IN — compact head ──────────────────────────── */
+
             #${CARD_ID} .anilist-head {
                 display:grid; grid-template-columns:auto minmax(0,1fr) auto;
                 align-items:center; gap:11px;
@@ -578,7 +519,7 @@
                 box-shadow:0 0 0 3px rgba(76,175,130,0.18), 0 0 8px rgba(76,175,130,0.55);
             }
 
-            /* ─── Status strip + progress bar ──────────────────────── */
+
             #${CARD_ID} .anilist-progress {
                 height:4px; border-radius:999px;
                 background:rgba(255,255,255,0.06);
@@ -616,7 +557,7 @@
                 white-space:normal;
             }
 
-            /* ─── Action row (Sync now + Disconnect) ──────────────── */
+
             #${CARD_ID} .anilist-actions-row {
                 display:flex; gap:8px; align-items:center;
                 margin-bottom:6px;
@@ -682,8 +623,7 @@
         const connected = isConnected();
         const importName = escapeHtml(_lastUsername || (connected && _auth?.viewer?.name) || '');
 
-        // Status strip + progress bar are reused by both states. The status
-        // div is hidden when empty (CSS rule `:empty { display:none }`).
+
         const statusArea = `
             <div class="anilist-progress" id="anilistProgress" hidden>
                 <div class="anilist-progress-fill" id="anilistProgressFill"></div>
@@ -691,8 +631,7 @@
             <div class="anilist-status" id="anilistStatus"></div>
         `;
 
-        // Reusable import row (used in both Advanced import + standalone).
-        // Re-renders preserve any value the user already typed via `importName`.
+
         const importInputRow = `
             <div class="anilist-import-row">
                 <input class="anilist-input" id="anilistUsername" type="text"
@@ -703,7 +642,7 @@
         `;
 
         if (connected) {
-            // ─── LOGGED-IN STATE — compact, calm ────────────────────────
+
             const name = escapeHtml(_auth?.viewer?.name || 'AniList user');
             const initial = escapeHtml((name[0] || 'A').toUpperCase());
             const avatar = _auth?.viewer?.avatar || '';
@@ -736,14 +675,11 @@
             `;
         }
 
-        // ─── LOGGED-OUT STATE — welcoming, centered hierarchy ───────────
+
         const redirectUri = escapeHtml(getRedirectUri());
         const onMobile = isMobileLikeEnv();
-        // Sub-state for the mobile placeholder: distinguish "tracker signed in,
-        // just waiting for a desktop connect" from "tracker signed out — user
-        // needs to sign into the tracker first before any sync can happen".
-        // _firebaseSignedIn is updated by the boot IIFE + onChanged listener;
-        // missing/false flips the message to a more actionable wording.
+
+
         const trackerSignedIn = !!_firebaseSignedIn;
         const connectBlock = onMobile
             ? (trackerSignedIn
@@ -801,7 +737,7 @@
             if (kind) el.setAttribute('data-kind', kind);
             else el.removeAttribute('data-kind');
         }
-        // A plain status message ends a progress run — hide the bar.
+
         const bar = document.getElementById('anilistProgress');
         if (bar) bar.hidden = true;
     }
@@ -842,14 +778,13 @@
         return `${Math.floor(hrs / 24)}d ago`;
     }
 
-    // Mirror the background sync status (written by anilist-sync.js) into the
-    // card. Keeps the card meaningful at all times — no blank gap.
+
     function applySyncStatus(st) {
         if (!isConnected()) return;
 
         if (st && st.state === 'running') {
-            // SW died mid-run if no real progress for 3 min (advancedAt only
-            // updates on actual forward motion, not on heartbeats).
+
+
             const staleMs = 3 * 60 * 1000;
             const lastAdvanced = st.advancedAt || st.updatedAt;
             if (lastAdvanced && (Date.now() - lastAdvanced) > staleMs) {
@@ -879,8 +814,8 @@
 
         if (st && st.state === 'idle') {
             const bits = [];
-            // Compact strip: "23m ago · 0 updated · 68 unchanged · 28 unmatched"
-            // Time first (most useful at-a-glance), then counts.
+
+
             if (st.finishedAt) bits.push(relativeTime(st.finishedAt));
             if (typeof st.ok === 'number') bits.push(`${st.ok} updated`);
             if (typeof st.skipped === 'number') bits.push(`${st.skipped} unchanged`);
@@ -891,7 +826,7 @@
             }
         }
 
-        // No sync ran yet — clear status so the strip collapses (CSS :empty).
+
         setStatus('');
     }
 
@@ -911,10 +846,8 @@
             else if (msg === 'mobile_unsupported') setStatus('Connect from desktop — login will sync to mobile via Firebase', 'err');
             else if (/cancel|closed|user_cancelled/i.test(msg)) setStatus('Sign-in cancelled', 'err');
             else if (msg.startsWith('auth_page_failed:')) {
-                // Most common cause: the registered redirect URI on
-                // https://anilist.co/settings/developer (client_id 42051)
-                // does not match this extension's runtime ID. Show the URI
-                // they need to register.
+
+
                 const redirectUri = msg.slice('auth_page_failed:'.length);
                 setStatus(
                     `AniList rejected the redirect. Register this URL on `
@@ -928,12 +861,10 @@
         }
         if (ok) {
             renderCard();
-            // Push the freshly-acquired token up to Firestore so other
-            // devices (mobile/Orion/Safari) can pick it up without running
-            // OAuth themselves. Fire-and-forget — local connect already
-            // succeeded, cloud sync is best-effort.
-            pushAuthToCloud('connect').catch(() => { /* warned inside */ });
-            // Kick off the first background sync right away.
+
+
+            pushAuthToCloud('connect').catch(() => {                     });
+
             doSyncNow();
         }
     }
@@ -941,15 +872,14 @@
     async function doDisconnect() {
         if (_busy) return;
         await disconnect();
-        // Mirror the disconnect to cloud so other devices stop using this
-        // (now revoked) token. Fire-and-forget; local state already cleared.
-        pushAuthToCloud('disconnect').catch(() => { /* warned inside */ });
+
+
+        pushAuthToCloud('disconnect').catch(() => {                     });
         renderCard();
         setStatus('Disconnected from AniList');
     }
 
-    // Triggers the SW to push — keeps going if the popup closes. Card mirrors
-    // progress via the `anilist_sync_status` storage key.
+
     function doSyncNow() {
         if (!isConnected()) { setStatus('Connect AniList first', 'err'); return; }
         setSyncing(true);
@@ -989,10 +919,9 @@
             const res = await importFromUsername(username);
             _lastUsername = username;
             await sset({ [USERNAME_KEY]: username });
-            // Mirror the username to cloud — even without a token, this lets
-            // mobile devices pre-fill the import field with the same name.
-            // Coalesces with the auth field-mask (single anilistAuth field).
-            pushAuthToCloud('import-username').catch(() => { /* warned inside */ });
+
+
+            pushAuthToCloud('import-username').catch(() => {                     });
             if (res.added > 0) {
                 setStatus(`Imported ${res.added} anime · ${res.skipped} already in your library`, 'ok');
             } else {
@@ -1015,14 +944,14 @@
         document.getElementById('anilistUsername')?.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { e.preventDefault(); doImport(); }
         });
-        // Copy-redirect button (logged-out state, inside "How does this work?")
+
         document.getElementById('anilistRedirectCopy')?.addEventListener('click', async (e) => {
             const btn = e.currentTarget;
             const code = document.getElementById('anilistRedirectCode');
             const text = code?.textContent || '';
             try { await navigator.clipboard.writeText(text); }
             catch {
-                // Clipboard blocked — fall back to text selection
+
                 const range = document.createRange();
                 if (code) range.selectNodeContents(code);
                 const sel = window.getSelection();
@@ -1037,7 +966,7 @@
                 btn.classList.remove('anilist-url-copy--done');
             }, 1400);
         });
-        // Drop a broken avatar image so the gradient + initial show instead.
+
         document.getElementById('anilistAvatar')?.addEventListener('error', (e) => {
             e.target.remove();
         }, { once: true });
@@ -1048,7 +977,7 @@
         if (!body) return;
         body.innerHTML = renderCardBody();
         bindCard();
-        // Connected card always shows a meaningful status (never a blank gap).
+
         if (isConnected()) applySyncStatus(_syncStatus);
     }
 
@@ -1063,10 +992,7 @@
         card.id = CARD_ID;
         card.innerHTML = '<div id="anilistBody"></div>';
 
-        // Slot under the "CONNECTIONS" section label if present (new layout).
-        // Find the label whose text matches and insert immediately after it.
-        // Falls back to slotting above the Danger zone (legacy slot), then to
-        // appending — keeps this resilient to settings-view reshuffles.
+
         const labels = inner.querySelectorAll('.settings-section-label');
         let connectionsLabel = null;
         for (const lbl of labels) {
@@ -1086,7 +1012,7 @@
         renderCard();
     }
 
-    // ── Boot ─────────────────────────────────────────────────────────────
+
     (async () => {
         try {
             const stored = await sget([USERNAME_KEY, STATUS_KEY, 'firebase_user']);
@@ -1101,27 +1027,17 @@
 
         injectCard();
 
-        // Mobile sign-in safety net: when we're on a mobile-like browser,
-        // signed into the tracker, but have no local AniList token yet,
-        // ask the SW to bypass its caches and do a fresh Firestore read.
-        // Fixes the window where the desktop just pushed a token but the
-        // mobile SW still serves a 4-min-old cached doc that predates the
-        // push, plus the 3-min poll gate that would otherwise block a
-        // reactive refresh. Fires at most once per popup session and only
-        // when needed (i.e. signed-in on tracker AND not connected to
-        // AniList AND on a browser where OAuth doesn't work).
+
         try {
             if (isMobileLikeEnv() && _firebaseSignedIn && !isConnected()) {
                 chrome.runtime.sendMessage(
                     { type: 'WAKE_AND_POLL_CLOUD_FORCE' },
                     () => { void chrome.runtime.lastError; }
                 );
-                // The poll's applyCloudUpdate will applyCloudAnilistAuth →
-                // chrome.storage.local.set('anilist_auth') → our onChanged
-                // listener fires loadAuth() + renderCard(). No further
-                // action needed here — UI will flip to connected on its own.
+
+
             }
-        } catch { /* best-effort */ }
+        } catch {                   }
 
         try {
             chrome.storage.onChanged.addListener((changes, namespace) => {
@@ -1137,17 +1053,16 @@
                     const newUid = changes.firebase_user?.newValue?.uid || null;
                     const wasSignedIn = _firebaseSignedIn;
                     _firebaseSignedIn = !!newUid;
-                    // Re-render the empty-state placeholder so its messaging
-                    // (signed-in vs signed-out) matches the current state.
+
+
                     if (wasSignedIn !== _firebaseSignedIn && !isConnected()) {
                         renderCard();
                     }
                 }
             });
-        } catch { /* ignore */ }
+        } catch {              }
 
-        // Re-evaluate stale running state every 30s — storage.onChanged
-        // never fires when the SW dies mid-run.
+
         setInterval(() => {
             if (_syncStatus && _syncStatus.state === 'running') {
                 applySyncStatus(_syncStatus);

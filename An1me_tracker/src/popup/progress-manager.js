@@ -1,7 +1,7 @@
-/**
- * Anime Tracker - Progress Manager
- * Handles progress tracking, cleaning, and data management
- */
+
+
+
+
 
 const ProgressManager = {
     getCanonicalSlug(slug, title = '') {
@@ -12,9 +12,9 @@ const ProgressManager = {
         return window.AnimeTracker.SlugUtils.getCanonicalTitle(slug, title);
     },
 
-    /**
-     * Merge known slug aliases into canonical slugs (anime + progress + deleted markers).
-     */
+
+
+
     normalizeCanonicalSlugs(animeData, videoProgress = {}, deletedAnime = {}) {
         const normalizedAnime = { ...(animeData || {}) };
         const normalizedProgress = { ...(videoProgress || {}) };
@@ -140,9 +140,9 @@ const ProgressManager = {
         };
     },
 
-    /**
-     * Remove duplicate episodes from anime data
-     */
+
+
+
     removeDuplicateEpisodes(animeData) {
         const log = (window.PopupLogger && window.PopupLogger.warn) || console.warn;
         if (!animeData || typeof animeData !== 'object') {
@@ -191,10 +191,10 @@ const ProgressManager = {
         return cleaned;
     },
 
-    /**
-     * Remove previously auto-repaired episodes so totals only reflect
-     * explicitly tracked watches.
-     */
+
+
+
+
     removeAutoRepairedEpisodes(animeData) {
         if (!animeData || typeof animeData !== 'object') {
             return { cleanedData: {}, removedCount: 0 };
@@ -225,9 +225,9 @@ const ProgressManager = {
         return { cleanedData, removedCount };
     },
 
-    /**
-     * Clean progress for tracked/completed episodes
-     */
+
+
+
     cleanTrackedProgress(animeData, videoProgress, deletedAnime = {}) {
         const { UIHelpers } = window.AnimeTracker;
         const { CONFIG } = window.AnimeTracker;
@@ -244,11 +244,11 @@ const ProgressManager = {
         for (const [animeSlug, anime] of Object.entries(animeData)) {
             if (anime.episodes) {
                 anime.episodes.forEach(ep => {
-                    // Current playback of a held title is resumable, including
-                    // replays of an episode already present in watch history.
+
+
                     if (anime.onHoldAt || anime.listState === 'on_hold') return;
-                    // AniList history is not a playback event; older imports
-                    // may still carry a bogus watchedAt stamp.
+
+
                     if (ep?.durationSource === 'anilist') return;
                     trackedIds.add(UIHelpers.getUniqueId(animeSlug, ep.number));
                 });
@@ -266,19 +266,19 @@ const ProgressManager = {
             const animeEntry = animeSlug ? animeData[animeSlug] : null;
             const isMovieProgress = !!animeEntry && SeasonGrouping?.isMovie?.(animeSlug, animeEntry);
 
-            // Keep movie progress entries for duration recovery
+
             if (isTracked && isMovieProgress && !progress.deleted) {
                 cleaned[id] = progress;
                 continue;
             }
 
             if (isTracked || isCompleted) {
-                // Episode is already tracked in animeData → resume progress is no longer needed.
-                // Completed entries (>= 85%) are also removed.
+
+
                 removedCount++;
             } else {
-                // Untracked + not completed → keep (user may resume later).
-                // Users can manually dismiss via the × button in the In Progress section.
+
+
                 cleaned[id] = progress;
             }
         }
@@ -286,11 +286,11 @@ const ProgressManager = {
         return { cleaned, removedCount };
     },
 
-    /**
-     * Get anime that currently have active resume progress.
-     * Includes tracked titles too, so the top "In Progress" group can act as a
-     * true continue-watching list.
-     */
+
+
+
+
+
     getInProgressAnime(animeData, videoProgress) {
         const inProgressMap = new Map();
         const completedPercentage = window.AnimeTracker?.CONFIG?.COMPLETED_PERCENTAGE || 85;
@@ -308,8 +308,8 @@ const ProgressManager = {
             if ((Number(progress.percentage) || 0) >= completedPercentage) continue;
 
             const trackedAnime = animeData?.[animeSlug];
-            // Starting playback again is an explicit resume signal, so an
-            // on-hold title with active progress belongs in In Progress.
+
+
             if (trackedAnime?.completedAt || trackedAnime?.droppedAt) continue;
             let trackedEpisodeNumbers = trackedEpsBySlug.get(animeSlug);
             if (!trackedEpisodeNumbers) {
@@ -317,16 +317,16 @@ const ProgressManager = {
                     !(trackedAnime?.onHoldAt || trackedAnime?.listState === 'on_hold')
                         && Array.isArray(trackedAnime?.episodes)
                         ? trackedAnime.episodes
-                            // Imports remain resumable until playback promotes
-                            // them to durationSource: 'video'.
+
+
                             .filter(ep => ep?.durationSource !== 'anilist')
                             .map(ep => Number(ep?.number)).filter(n => Number.isFinite(n) && n > 0)
                         : []
                 );
                 trackedEpsBySlug.set(animeSlug, trackedEpisodeNumbers);
             }
-            // Outside a held replay, history entries are stale resume records
-            // and should not appear in the top continue-watching section.
+
+
             if (trackedEpisodeNumbers.has(episodeNum)) continue;
             let existing = inProgressMap.get(animeSlug);
             if (!existing) {
@@ -350,15 +350,15 @@ const ProgressManager = {
                 duration: progress.duration,
                 percentage: progress.percentage,
                 savedAt: progress.savedAt,
-                watchedAt: progress.watchedAt || progress.savedAt, // watchedAt is when first started
-                pagePath: progress.pagePath || null // original URL slug when it deviates from <slug>-episode-<n>
+                watchedAt: progress.watchedAt || progress.savedAt,
+                pagePath: progress.pagePath || null
             });
 
             if (progress.savedAt && progress.savedAt > existing.lastProgress) {
                 existing.lastProgress = progress.savedAt;
             }
 
-            // Update coverImage if new progress has it and existing doesn't
+
             if (progress.coverImage && !existing.coverImage) {
                 existing.coverImage = progress.coverImage;
             }
@@ -368,6 +368,6 @@ const ProgressManager = {
     }
 };
 
-// Export
+
 window.AnimeTracker = window.AnimeTracker || {};
 window.AnimeTracker.ProgressManager = ProgressManager;

@@ -20,8 +20,8 @@ const AnimeCardRenderer = {
             }
         }
 
-        // AniList history and held replays remain resumable; hide snippets for
-        // normal watched episodes only.
+
+
         const trackedEpisodeNumbers = new Set(
             (anime.onHoldAt || anime.listState === 'on_hold' ? [] : (anime.episodes || []))
                 .filter(ep => ep?.durationSource !== 'anilist')
@@ -122,12 +122,12 @@ const AnimeCardRenderer = {
         const _mainPartial = _mainMetaTotal && _mainLatest && _mainLatest < _mainMetaTotal;
         const availableInfo = _mainPartial && _mainLatest > 0 ? ` / ${_mainLatest} available` : '';
 
-        // Airing-aware progress: when only some episodes have aired so far,
-        // use the *aired count* as the denominator instead of the season's
-        // planned total. Otherwise the bar pretends the user is permanently
-        // behind ("13 / 24 = 54%") when they're actually fully caught up
-        // ("10 / 10 = 100%"). The percentage automatically re-derives when
-        // AniList polling refreshes `_mainLatest` after a new episode airs.
+
+
+
+
+
+
         const isAiringPartial = _mainPartial && _mainLatest > 0 && anilistStatusForProgress === 'RELEASING';
         const airingDenominator = isAiringPartial ? _mainLatest : null;
 
@@ -193,7 +193,12 @@ const AnimeCardRenderer = {
             || (progressData.progress === 100 && totalWatchedEpisodes > 0 && !_isPartiallyUploaded)
             || isFinishedByAnilist
             || (isMovieEntry && totalWatchedEpisodes > 0);
-        const displayTotal = _isPartiallyUploaded && _latestAvail > 0 ? _latestAvail : totalEpisodesPossible;
+        const displayTotalRaw = _isPartiallyUploaded && _latestAvail > 0 ? _latestAvail : totalEpisodesPossible;
+        const displayTotal = Math.max(
+            Number(displayTotalRaw) || 0,
+            Number(currentEpisode) || 0,
+            Number(_latestAvail) || 0
+        );
         const totalProgressText = displayTotal > 0 ? `${currentEpisode}/${displayTotal}` : `${currentEpisode}`;
         const episodeProgressText = currentEpisode > 0 ? `Ep ${totalProgressText}` : '';
         const isDropped = !!anime.droppedAt;

@@ -1,17 +1,6 @@
-/**
- * Anime Tracker — AniList background sync (service worker)
- *
- * Pushes watch progress to AniList without the popup being open. Batched via
- * AniListCore.runPush so a large first sync finishes across several short
- * runs rather than hitting the MV3 service-worker lifetime cap.
- *
- * Triggers:
- *   • animeData storage change (debounced via chrome.alarms — survives SW kills)
- *   • manual "Sync now" from the popup (ANILIST_SYNC_NOW — runs immediately)
- *   • periodic safety-net alarm (every 30 min — catches missed storage events)
- *
- * Loaded by background.js via importScripts after anilist-core.js.
- */
+
+
+
 (function () {
     'use strict';
 
@@ -44,9 +33,7 @@
         return sset({ [STATUS_KEY]: { ...obj, updatedAt: Date.now() } });
     }
 
-    // Chrome clamps alarm delays under 1 min in production extensions, so
-    // alarms are only used for the debounced background path — never for
-    // user-facing "Sync now" (which runs runBackgroundPush directly).
+
     function armPushAlarm(delayMinutes) {
         try {
             chrome.alarms.create(PUSH_ALARM, { delayInMinutes: Math.max(1, delayMinutes || 1) });
@@ -83,10 +70,8 @@
         let lastSlug = '';
         let heartbeatTimer = null;
         try {
-            // Don't blank-out the status with done=0 at run start — that
-            // shows "0/N" on every alarm wake even when most are cached.
-            // The first onProgress overwrites this; just refresh updatedAt
-            // so the popup's stale-detector knows we're alive.
+
+
             const existing = await sget([STATUS_KEY]);
             const last = existing[STATUS_KEY];
             if (last && last.state === 'running') {
@@ -95,8 +80,7 @@
                 await writeStatus({ state: 'running', done: last?.done || 0, total: last?.total || 0, reason });
             }
 
-            // Heartbeat: refresh updatedAt every 10 s so the popup's stale
-            // detector (3 min) doesn't trip during a long resolveMedia call.
+
             heartbeatTimer = setInterval(() => {
                 if (!lastProgress) return;
                 writeStatus({ state: 'running', ...lastProgress });
@@ -124,8 +108,8 @@
                         phase: p.phase || null,
                         advancedAt: lastAdvancedAt
                     };
-                    // Bypass throttle when a new slug starts so the user sees
-                    // forward motion even through long fetches.
+
+
                     const isNewSlug = !!p.currentSlug;
                     if (!isNewSlug && now - lastWrite < PROGRESS_WRITE_GAP_MS) return;
                     lastWrite = now;
@@ -161,8 +145,8 @@
         } catch (e) {
             const msg = String(e?.message || '');
             if (msg === 'reconnect') {
-                // Token rejected — clear auth so the popup prompts to reconnect.
-                try { await chrome.storage.local.remove([Core.AUTH_KEY]); } catch { /* ignore */ }
+
+                try { await chrome.storage.local.remove([Core.AUTH_KEY]); } catch {              }
                 await writeStatus({ state: 'error', error: 'reconnect', finishedAt: Date.now() });
             } else {
                 await writeStatus({ state: 'error', error: msg, finishedAt: Date.now() });
@@ -180,21 +164,21 @@
 
     chrome.alarms.onAlarm.addListener((alarm) => {
         if (alarm.name !== PUSH_ALARM && alarm.name !== PUSH_ALARM_PERIODIC) return;
-        runBackgroundPush(alarm.name === PUSH_ALARM_PERIODIC ? 'periodic' : 'alarm').catch(() => { /* errors written to status */ });
+        runBackgroundPush(alarm.name === PUSH_ALARM_PERIODIC ? 'periodic' : 'alarm').catch(() => {                                });
     });
 
     chrome.storage.onChanged.addListener((changes, namespace) => {
         if (namespace !== 'local') return;
 
-        // Auth toggled — keep the periodic alarm in sync with connected state.
+
         if (changes[Core.AUTH_KEY]) {
             const newAuth = changes[Core.AUTH_KEY].newValue;
             const connected = !!(newAuth && newAuth.accessToken && (!newAuth.expiresAt || newAuth.expiresAt > Date.now()));
             if (connected) {
                 try { chrome.alarms.create(PUSH_ALARM_PERIODIC, { delayInMinutes: 5, periodInMinutes: 30 }); }
-                catch { /* ignore */ }
+                catch {              }
             } else {
-                try { chrome.alarms.clear(PUSH_ALARM_PERIODIC); } catch { /* ignore */ }
+                try { chrome.alarms.clear(PUSH_ALARM_PERIODIC); } catch {              }
             }
         }
 
@@ -204,14 +188,14 @@
 
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         if (message && message.type === 'ANILIST_SYNC_NOW') {
-            runBackgroundPush('manual').catch(() => { /* errors written to status */ });
+            runBackgroundPush('manual').catch(() => {                                });
             sendResponse({ received: true });
             return true;
         }
         return false;
     });
 
-    // SW startup: resume interrupted sync, (re)arm the periodic safety-net.
+
     sget([STATUS_KEY, Core.AUTH_KEY]).then((s) => {
         const st = s[STATUS_KEY];
         const auth = s[Core.AUTH_KEY];
@@ -219,9 +203,9 @@
 
         if (connected) {
             try { chrome.alarms.create(PUSH_ALARM_PERIODIC, { delayInMinutes: 5, periodInMinutes: 30 }); }
-            catch { /* ignore */ }
+            catch {              }
         } else {
-            try { chrome.alarms.clear(PUSH_ALARM_PERIODIC); } catch { /* ignore */ }
+            try { chrome.alarms.clear(PUSH_ALARM_PERIODIC); } catch {              }
         }
 
         if (st && st.state === 'running') {

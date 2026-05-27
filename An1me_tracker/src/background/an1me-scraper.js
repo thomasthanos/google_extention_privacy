@@ -1,14 +1,5 @@
-/**
- * Anime Tracker — an1me.to page scraper (background module)
- *
- * Fetches and parses an1me.to anime pages for: total episodes, status,
- * latest available episode, next-episode countdown, cover image, internal
- * site anime ID, and runtime. Also exposes a batch helper that fans out
- * scrapes in chunks of 3 with backoff so we don't hammer the site.
- *
- * Extracted from background.js. Functions remain at SW global scope so
- * existing call sites in the message handler continue to work.
- */
+
+
 
 function isSeasonLikeSlug(slug) {
     return /-(?:season-?\d+|(?:\d+)(?:st|nd|rd|th)-season|s\d+|(?:part|cour)-?\d+|(?:ii|iii|iv|v|vi))(?=$|-)/i.test(String(slug || ''));
@@ -137,8 +128,7 @@ async function fetchAnimePageInfo(slug) {
         status = 'RELEASING';
     }
 
-    // For finished entries, the highest uploaded episode is a reasonable
-    // fallback total. For airing shows it is only the current availability.
+
     if (!totalEpisodes && latestEpisode && status === 'FINISHED') {
         totalEpisodes = latestEpisode;
     }
@@ -241,8 +231,8 @@ async function batchFetchAnimeInfo(slugs) {
                 }
             } catch (e) {
                 console.warn(`[BG] Fetch failed for ${slug}:`, e.message);
-                // Write a result so the popup's storage-listener counts this
-                // slug as done and doesn't wait until the safety-net timeout.
+
+
                 const is404 = /HTTP 404/i.test(e.message);
                 await bgStorageSet({
                     [`animeinfo_${slug}`]: is404

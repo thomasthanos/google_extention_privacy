@@ -4,7 +4,7 @@ const AnilistService = {
     CACHE_TTL: 24 * 60 * 60 * 1000,
     CACHE_TTL_AIRING: 60 * 60 * 1000,
     CACHE_TTL_NOT_FOUND: 3 * 24 * 60 * 60 * 1000,
-    CACHE_TTL_RETRYABLE: 15 * 60 * 1000,   // retry transient errors after 15 min
+    CACHE_TTL_RETRYABLE: 15 * 60 * 1000,
 
     getTotalEpisodes(slug) {
         const data = this.cache[slug];
@@ -74,15 +74,15 @@ const AnilistService = {
         }
     },
 
-    /**
-     * Delegates the actual fetching to the BG service worker (which already
-     * rate-limits via batchFetchAnimeInfo). Progress is observed by listening
-     * to chrome.storage.onChanged for `animeinfo_${slug}` writes — the BG
-     * persists each result after a successful fetch, so we can count those
-     * as completed steps without adding any new BG-protocol surface.
-     *
-     * Signature now matches FillerService.autoFetchMissing(animeData, onComplete, onProgress).
-     */
+
+
+
+
+
+
+
+
+
     async autoFetchMissing(animeData, onComplete, onProgress) {
         const { Storage } = window.AnimeTracker;
 
@@ -179,7 +179,7 @@ const AnilistService = {
             if (onComplete) onComplete();
             resolveOuter();
         }
-        }); // end new Promise
+        });
     }
 };
 

@@ -9,8 +9,7 @@
 
     const TIER_LABEL = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Platinum' };
 
-    // Inline SVG icon registry. Each id matches BADGE_DEFS[].svg.
-    // Style: 24×24 viewBox, currentColor stroke, no fill (tier color via CSS).
+
     const SVG_ICONS = {
         sprout: '<path d="M12 22V11"/><path d="M12 11c0-3 2-5 5-5-1 3-3 5-5 5z"/><path d="M12 14c0-3-2-5-5-5 1 3 3 5 5 5z"/>',
         hundred: '<circle cx="12" cy="12" r="9"/><path d="M8 9v6M16 9v6M10.5 9h3v6h-3z"/>',
@@ -40,8 +39,8 @@
     };
 
     let _lastBadgeEvaluation = [];
-    // 1 hour: short enough that the AI keeps driving the target, long enough
-    // that a manual click sticks while the user is actively reviewing it.
+
+
     const MANUAL_OVERRIDE_MS = 60 * 60 * 1000;
 
     function escapeHtml(value) {
@@ -357,10 +356,8 @@
                     [field]: value,
                     smartManaged: true,
                     updatedAt: now.toISOString(),
-                    // Treat the manual click as a short hint, not a 3-day veto.
-                    // The user expects the AI to keep adapting the target on
-                    // its own — a short window (1 hour) gives them time to
-                    // see the manual value before auto-apply kicks in again.
+
+
                     manualOverrideUntil: new Date(now.getTime() + MANUAL_OVERRIDE_MS).toISOString()
                 }
             };
@@ -420,10 +417,7 @@
             });
         });
 
-        // Single-open accordion behaviour for the achievement category
-        // groups. Native `<details>` lets multiple panels stay open; this
-        // listener closes siblings the moment one opens, matching Settings'
-        // "Volume" / "Variety" / "Tempo" mental model.
+
         const groupSections = container.querySelectorAll('.badge-group-section');
         groupSections.forEach((section) => {
             section.addEventListener('toggle', () => {

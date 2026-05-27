@@ -17,20 +17,20 @@
     let lastTimeupdateTime = 0;
     let lastVideoSource = '';
     let earlyTrackDone = false;
-    // Dedup the "episode complete" notification: it can fire from the early
-    // 85%-completion path AND from the `ended` event at 100%. Without this
-    // flag, both paths show the toast for the same episode.
+
+
+
     let completionNotificationShown = false;
     function showCompletionOnce() {
         if (completionNotificationShown) return;
         completionNotificationShown = true;
         AT.Notifications.showCompletion(animeInfo);
     }
-    // outroStart (in seconds) for the current episode, sourced from the
-    // skiptime-helper cache. When present, completion fires when the user
-    // hits the start of the credits — far more accurate than the static 85%
-    // threshold which can fall mid-story (long credits) or mid-credits
-    // (short credits) depending on the anime.
+
+
+
+
+
     let cachedOutroStartSec = null;
     function parseSkipTime(text) {
         if (!text || typeof text !== 'string') return 0;
@@ -45,8 +45,8 @@
         if (!info?.animeSlug || !info?.episodeNumber) return;
         const epNum = Number(info.episodeNumber);
 
-        // 1. Manually-captured timestamps take priority — the user explicitly
-        //    captured this episode, so respect their data over a community DB.
+
+
         try {
             const key = `skiptimeCache:${info.animeSlug}__episode-${epNum}`;
             const result = await chrome.storage.local.get([key]);
@@ -55,11 +55,11 @@
                 const sec = parseSkipTime(stored.outroStart);
                 if (sec > 0) { cachedOutroStartSec = sec; return; }
             }
-        } catch { /* fall through to AniSkip */ }
+        } catch {                               }
 
-        // 2. AniSkip community DB. The SW caches results aggressively (90 days
-        //    on hit, 7 on miss) so this is at most one network call per
-        //    (anime, episode) per ~3 months, regardless of rewatches.
+
+
+
         try {
             const video = AT.VideoMonitor?.getVideoElement?.();
             const len = (video?.duration && Number.isFinite(video.duration)) ? Math.round(video.duration) : 0;
@@ -79,10 +79,10 @@
             });
             const sec = Number(resp?.outroStart) || 0;
             if (sec > 0) cachedOutroStartSec = sec;
-        } catch { /* leave null — fall through to legacy 85% threshold */ }
+        } catch {                                                         }
     }
-    // Expose for progress-tracker.saveVideoProgress() so its internal
-    // "stop saving progress when complete" gate uses the same smart logic.
+
+
     window.AnimeTrackerContent = window.AnimeTrackerContent || {};
     window.AnimeTrackerContent.getCachedOutroStartSec = () => cachedOutroStartSec;
 
@@ -180,10 +180,10 @@
         if (!lastVideoSource) { lastVideoSource = src; return false; }
         if (src === lastVideoSource) return false;
         lastVideoSource = src;
-        // Only reset tracking state if the actual EPISODE changed (uniqueId differs
-        // from what we're tracking). A plain src change usually means quality/mirror
-        // switch within the same episode — resetting the accumulator then would
-        // wipe out legit watch time and block completion at end of episode.
+
+
+
+
         if (currentEpisodeId && animeInfo && currentEpisodeId !== animeInfo.uniqueId) {
             resetEpisodeTrackingState('episode id changed via video source');
             return true;
@@ -191,10 +191,10 @@
         return false;
     }
 
-    // Near-end bypass for the misclick guard. Once the user is this close to the
-    // actual end of the video, it's no longer plausible that this is a misclick —
-    // skip the 120s accumulator minimum and mark complete even if the accumulator
-    // was wiped (e.g. by a mid-episode quality switch).
+
+
+
+
     function isNearEnd(currentTime, duration) {
         if (!duration || duration <= 0) return false;
         const remaining = duration - currentTime;
@@ -202,10 +202,10 @@
         return remaining <= 30 || progress >= 0.95;
     }
 
-    // Returns true when the misclick guard should block a completion attempt.
-    // Combines the legacy near-end bypass with a hard floor on real playback so
-    // mobile "scrub-to-end" gestures (which produce progress ≥ 0.95 instantly)
-    // can no longer auto-complete an episode the user never actually watched.
+
+
+
+
     function shouldBlockCompletion(currentTime, duration) {
         const { CONFIG } = AT;
         const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
@@ -287,10 +287,10 @@
                 trackingState = TrackingState.COMPLETED;
             }
         } catch (e) {
-            // On failure (e.g. transient storage error, extension context invalidated),
-            // reset both trackingState AND earlyTrackDone so subsequent timeupdate
-            // events can retry. Otherwise earlyTrackDone stays true forever and the
-            // raw handler never calls trackImmediately again.
+
+
+
+
             trackingState = TrackingState.IDLE;
             earlyTrackDone = false;
             if (e?.message?.includes('Extension context invalidated') || !Storage.isContextValid()) {
@@ -357,11 +357,11 @@
             await tryRefreshTrackedDuration(videoElement, 'timeupdate');
         }
 
-        // Pass cachedOutroStartSec so the captured outro timing is honored
-        // here too, not just inside trackImmediately. Previously this site
-        // (and the two below in the debounced handler) called shouldMarkComplete
-        // with only two args, which silently disabled the outroStart-based
-        // completion path and forced everyone back to the 85% threshold.
+
+
+
+
+
         if (ProgressTracker.shouldMarkComplete(currentTime, duration, cachedOutroStartSec)) {
             if (shouldBlockCompletion(currentTime, duration)) {
                 const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
@@ -378,9 +378,9 @@
         const { VideoMonitor } = AT;
         const videoElement = VideoMonitor.getVideoElement();
         await tryRefreshTrackedDuration(videoElement, 'loadedmetadata');
-        // Re-load outroStart now that we know the actual duration. AniSkip
-        // can use episodeLength to disambiguate when multiple timings exist
-        // for the same (mal_id, episode) — typical for re-cut releases.
+
+
+
         if (animeInfo && cachedOutroStartSec === null) {
             loadOutroStartFor(animeInfo);
         }
@@ -478,10 +478,10 @@
         if (animeInfo && videoElement) {
             const duration = videoElement.duration || 0;
             const currentTime = videoElement.currentTime || 0;
-            // The `ended` event fires at the natural end of the video. Mostly
-            // not a misclick, but on mobile a touch-scrub to the end also fires
-            // `ended` with accumulator near 0 — shouldBlockCompletion enforces
-            // the HARD_MIN floor so those cases are still rejected.
+
+
+
+
             if (trackingState !== TrackingState.COMPLETED
                 && shouldBlockCompletion(currentTime, duration)) {
                 const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
@@ -790,13 +790,13 @@
         };
         apply();
 
-        // Tear down any prior observer/timeout so re-runs (e.g. after SPA
-        // navigation between episodes) don't leak stacked watchers.
+
+
         if (_currentEpisodeObserver) { try { _currentEpisodeObserver.disconnect(); } catch { } _currentEpisodeObserver = null; }
         if (_currentEpisodeObserverTimeout) { clearTimeout(_currentEpisodeObserverTimeout); _currentEpisodeObserverTimeout = null; }
 
-        // Scope to the episode list container only — was previously falling
-        // back to document.body which fires for every unrelated mutation.
+
+
         const target = document.querySelector('.episode-list-display-box')
             || document.querySelector('.episode-head')
             || document.body;
@@ -808,8 +808,8 @@
         _currentEpisodeObserver.observe(target, {
             childList: true, subtree: true, attributes: true, attributeFilter: ['class']
         });
-        // 60s — long enough for slow-loading episode lists, short enough to
-        // not be a forever-listener on long-lived pages.
+
+
         _currentEpisodeObserverTimeout = setTimeout(() => {
             try { _currentEpisodeObserver?.disconnect(); } catch { }
             _currentEpisodeObserver = null;
@@ -875,6 +875,68 @@
         } catch (e) { Logger.debug('Filler coloring failed:', e.message); }
     }
 
+    function detectPageMaxEpisode(animeSlug, currentEpisodeNumber) {
+        let pageMax = 0;
+        try {
+            const escaped = String(animeSlug || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            if (!escaped) return Number(currentEpisodeNumber) || 0;
+            const hrefPattern = new RegExp(`/watch/${escaped}-episode-(\\d+)`, 'i');
+
+            const grid = document.querySelector('#episodeGrid');
+            if (grid) {
+                const items = grid.querySelectorAll('a[data-search], a[href*="-episode-"]');
+                for (const a of items) {
+                    const ds = parseInt(a.getAttribute('data-search') || '', 10);
+                    if (Number.isFinite(ds) && ds > pageMax) pageMax = ds;
+                    const m = (a.getAttribute('href') || '').match(hrefPattern);
+                    if (m) {
+                        const n = parseInt(m[1], 10);
+                        if (Number.isFinite(n) && n > pageMax) pageMax = n;
+                    }
+                }
+            }
+
+            const allLinks = document.querySelectorAll(`a[href*="${animeSlug}-episode-"]`);
+            for (const a of allLinks) {
+                const m = (a.getAttribute('href') || '').match(hrefPattern);
+                if (!m) continue;
+                const n = parseInt(m[1], 10);
+                if (!Number.isFinite(n) || n <= 0 || n > 9999) continue;
+                if (n > pageMax) pageMax = n;
+            }
+        } catch {}
+
+        const cur = Number(currentEpisodeNumber) || 0;
+        if (cur > pageMax) pageMax = cur;
+        return pageMax;
+    }
+
+    async function bumpLatestEpisodeFromPage(info) {
+        if (!info?.animeSlug) return;
+        try {
+            const pageMax = detectPageMaxEpisode(info.animeSlug, info.episodeNumber);
+            if (!(pageMax > 0)) return;
+
+            const key = `animeinfo_${info.animeSlug}`;
+            const result = await new Promise((resolve) => {
+                try { chrome.storage.local.get([key], (r) => resolve(r || {})); }
+                catch { resolve({}); }
+            });
+            const cached = (result && result[key]) || null;
+            const cachedLatest = Number(cached?.latestEpisode) || 0;
+            if (pageMax <= cachedLatest) return;
+
+            const updated = { ...(cached || {}), latestEpisode: pageMax };
+            await new Promise((resolve) => {
+                try { chrome.storage.local.set({ [key]: updated }, () => resolve()); }
+                catch { resolve(); }
+            });
+            AT.Logger?.debug?.(`Bumped ${key}.latestEpisode → ${pageMax}`);
+        } catch (e) {
+            AT.Logger?.warn?.('bumpLatestEpisodeFromPage failed:', e?.message || e);
+        }
+    }
+
     async function init() {
         const { Logger, AnimeParser, ProgressTracker, VideoMonitor, Notifications } = AT;
         Logger.debug('Init', window.location.pathname);
@@ -896,6 +958,7 @@
         if (!animeInfo) { Logger.debug('No anime info found'); return; }
         currentEpisodeId = animeInfo.uniqueId;
         loadOutroStartFor(animeInfo);
+        bumpLatestEpisodeFromPage(animeInfo).catch(() => {});
 
         const hasDetectedTotal = Number.isFinite(animeInfo.totalEpisodes) && animeInfo.totalEpisodes > 0 && animeInfo.totalEpisodes < 10000;
 
@@ -962,11 +1025,11 @@
                         while (fillerEpisodes.includes(nextCanon) && nextCanon <= maxSearch) nextCanon++;
                         if (nextCanon <= maxSearch) {
                         Logger.info(`⏭ Filler detected (Ep ${animeInfo.episodeNumber}), skipping to Ep ${nextCanon}`);
-                        // Build a dismissible toast — the previous version did
-                        // an unconditional `window.location.href = ...` after 1.5s
-                        // even if the user pressed Back or wanted to watch the
-                        // filler intentionally. Now they get a Cancel button and
-                        // a Skip Now button.
+
+
+
+
+
                         let cancelled = false;
                         const skipDelayMs = 4500;
                         try {
@@ -1026,7 +1089,7 @@
                             actionWrap.appendChild(cancelBtn);
                             toast.appendChild(actionWrap);
                             document.body.appendChild(toast);
-                            // Cancel-on-back: if user navigates away, abort the redirect.
+
                             window.addEventListener('beforeunload', () => { cancelled = true; }, { once: true });
                         } catch { }
                         setTimeout(() => {
@@ -1059,6 +1122,9 @@
 
         try { setupServerSwitchObserver(); }
         catch (err) { Logger.warn('setupServerSwitchObserver failed:', err); }
+
+        try { maybeFallbackInvalidActiveServer(); }
+        catch (err) { Logger.warn('maybeFallbackInvalidActiveServer failed:', err); }
 
         try {
             const result = await chrome.storage.local.get(['auto4kServerEnabled']);
@@ -1099,6 +1165,39 @@
 
     let _autoServerClickInFlight = false;
     const _SERVER_SWITCH_REBIND_DELAY_MS = 700;
+
+    function isValidEmbedPayload(span) {
+        const enc = span?.getAttribute?.('data-embed-id') || '';
+        const idx = enc.indexOf(':');
+        if (idx < 0) return false;
+        let html = '';
+        try { html = atob(enc.slice(idx + 1)); } catch { return false; }
+        if (!html) return false;
+        if (/<div\s+class\s*=\s*["']?error["']?/i.test(html)) return false;
+        if (/invalid\s+video\s+url/i.test(html)) return false;
+        const m = html.match(/<iframe\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/i);
+        if (!m) return false;
+        const src = (m[1] || '').trim();
+        if (!src) return false;
+        if (/^about:blank$/i.test(src)) return false;
+        return true;
+    }
+
+    function findFirstValidAlternative(container, except) {
+        const spans = Array.from(container.querySelectorAll('[data-embed-id]'));
+        for (const s of spans) {
+            if (s === except) continue;
+            if (/4k/i.test(s.textContent || '')) continue;
+            if (!isValidEmbedPayload(s)) continue;
+            return s;
+        }
+        for (const s of spans) {
+            if (s === except) continue;
+            if (!isValidEmbedPayload(s)) continue;
+            return s;
+        }
+        return null;
+    }
 
     function setupServerSwitchObserver() {
         const { Logger, ProgressTracker, VideoMonitor } = AT;
@@ -1172,6 +1271,13 @@
                 }
                 if (!fourK) continue;
 
+                if (!isValidEmbedPayload(fourK)) {
+                    triggered = true;
+                    window.__atAuto4kClickedFor.add(animeInfo.uniqueId);
+                    Logger.debug('Auto-4k: 4k chip present but payload invalid — skipping');
+                    return true;
+                }
+
                 if (fourK === activeSpan) {
                     triggered = true;
                     window.__atAuto4kClickedFor.add(animeInfo.uniqueId);
@@ -1212,20 +1318,86 @@
         AT.VideoMonitor.addCleanup(cleanup);
     }
 
+    function maybeFallbackInvalidActiveServer() {
+        const { Logger } = AT;
+        if (!animeInfo) return;
+
+        window.__atFallbackDoneFor = window.__atFallbackDoneFor || new Set();
+        if (window.__atFallbackDoneFor.has(animeInfo.uniqueId)) return;
+
+        let triggered = false;
+        let pollTimer = null;
+        let mo = null;
+        let killTimer = null;
+
+        const cleanup = () => {
+            if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+            if (mo) { try { mo.disconnect(); } catch {} mo = null; }
+            if (killTimer) { clearTimeout(killTimer); killTimer = null; }
+        };
+
+        const tryFallback = () => {
+            if (triggered) return true;
+            const containers = document.querySelectorAll('.player-selection');
+            for (const container of containers) {
+                if (container.offsetParent === null) continue;
+                const active = container.querySelector('[data-embed-id].active');
+                if (!active) continue;
+                if (isValidEmbedPayload(active)) continue;
+
+                const replacement = findFirstValidAlternative(container, active);
+                if (!replacement) {
+                    Logger.warn('Active server invalid but no valid alternative in this row');
+                    continue;
+                }
+
+                _autoServerClickInFlight = true;
+                try {
+                    replacement.click();
+                    triggered = true;
+                    window.__atFallbackDoneFor.add(animeInfo.uniqueId);
+                    Logger.info(`Active server invalid — fell back to "${(replacement.textContent || '').trim()}"`);
+                } catch (err) {
+                    Logger.warn('Invalid-server fallback click failed:', err);
+                } finally {
+                    setTimeout(() => { _autoServerClickInFlight = false; }, 200);
+                }
+                return true;
+            }
+            return false;
+        };
+
+        if (tryFallback()) return;
+
+        pollTimer = setInterval(() => {
+            if (tryFallback()) cleanup();
+        }, 500);
+
+        mo = new MutationObserver(() => {
+            if (tryFallback()) cleanup();
+        });
+        try { mo.observe(document.body, { childList: true, subtree: true }); }
+        catch {}
+
+        killTimer = setTimeout(cleanup, 30000);
+
+        AT.VideoMonitor.addCleanup(cleanup);
+    }
+
     const setupNavigationObserver = () => {
         const { Logger, ProgressTracker, VideoMonitor } = AT;
 
-        // Patch history.pushState / replaceState once per page so SPA
-        // navigations that don't go through a click (programmatic routing,
-        // browser back/forward via popstate) still trigger a re-init. This
-        // is much cheaper than the MutationObserver fallback that previously
-        // fired on every body subtree mutation.
-        //
-        // Window-level guard (not just historyPatched module flag) — if the
-        // content script is re-injected during SPA navigation, this module's
-        // closure resets but the previous patch is still chained on
-        // history.pushState. Without this guard, every re-injection adds
-        // another wrapper and dispatches N copies of at:locationchange.
+
+
+
+
+
+
+
+
+
+
+
         if (!historyPatched && !window.__atHistoryPatched) {
             historyPatched = true;
             window.__atHistoryPatched = true;
@@ -1247,11 +1419,11 @@
             window.addEventListener('popstate', dispatchUrlChange);
         }
 
-        // Strip query / hash when comparing URLs so an1me.to's pushState
-        // calls that only update tracking params or in-page anchors don't
-        // count as real navigation. Without this, EVERY pushState fires
-        // trackImmediately() and re-init — which can mark the current
-        // episode as "watched" while the user is just browsing/scrolling.
+
+
+
+
+
         const _pathOf = (href) => {
             try { return new URL(href, location.origin).pathname; }
             catch { return href; }
@@ -1261,20 +1433,20 @@
         const handleUrlChange = () => {
             const prevPath = _pathOf(lastUrl);
             const currPath = _pathOf(location.href);
-            if (prevPath === currPath) return;        // hash/query-only — ignore
+            if (prevPath === currPath) return;
             const previousUrl = lastUrl;
             lastUrl = location.href;
 
-            // Only flush the in-flight episode if we WERE on a watch page —
-            // otherwise we'd fire trackImmediately() on every back-button on
-            // the homepage, listing pages, etc.
+
+
+
             if (_isWatchPath(previousUrl)) {
                 trackImmediately();
             }
 
-            // Only re-init if the new URL is ALSO a watch page. Leaving the
-            // watch context just lets the existing tracking session unwind
-            // through the cleanup hooks naturally.
+
+
+
             if (!_isWatchPath(location.href)) return;
 
             if (navigationDebounceTimeout) clearTimeout(navigationDebounceTimeout);
@@ -1327,8 +1499,8 @@
             if (isNavigation) { Logger.debug('Navigation click detected, tracking immediately'); trackImmediately(); }
         }, { capture: true, passive: true });
 
-        // History-based detection (above) replaces the previous body-subtree
-        // MutationObserver. Keep a tiny cleanup hook for the debounce timer.
+
+
         VideoMonitor.addCleanup(() => {
             if (navigationDebounceTimeout) { clearTimeout(navigationDebounceTimeout); navigationDebounceTimeout = null; }
         });

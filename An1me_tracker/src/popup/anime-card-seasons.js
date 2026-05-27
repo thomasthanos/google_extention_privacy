@@ -1,13 +1,6 @@
-/**
- * Anime Tracker — Multi-season group renderer
- *
- * Augments `window.AnimeTracker.AnimeCardRenderer` with `createSeasonGroup`
- * (the largest single method in the original file, ~450 lines) and the
- * helper `extractBaseTitle`. Pulled out so the main anime-card.js focuses
- * on the single-series card path.
- *
- * Loaded AFTER anime-card.js so the AnimeCardRenderer namespace exists.
- */
+
+
+
 (function () {
     'use strict';
 

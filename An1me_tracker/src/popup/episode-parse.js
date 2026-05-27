@@ -1,19 +1,6 @@
-/**
- * Anime Tracker — Episode-range parsing + slug helpers (pure)
- *
- * Powers the "Add Anime" dialog: parses user-typed ranges like
- * `1-12, 14, 18-20` into sorted unique numbers, splits canon from filler
- * episodes using FillerService data, and extracts slugs from various
- * URL shapes the user might paste.
- *
- * Exposes `window.AnimeTracker.EpisodeParse`:
- *   - `parseRanges(input)`
- *   - `buildRangeString(episodeNumbers)`
- *   - `splitCanonAndFillers(slug, episodeNumbers)`
- *   - `extractSlugFromInput(input)`
- *   - `generateTitleFromSlug(slug)`
- *   - `renderEpisodesPreview(input)`  — DOM side-effect (counter + filler label)
- */
+
+
+
 (function () {
     'use strict';
 
@@ -88,10 +75,7 @@
         const watchOnlyMatch = input.match(watchPattern);
         if (watchOnlyMatch) return normalizeSlug(watchOnlyMatch[1]);
 
-        // Fallback: turn arbitrary text into a slug. Lower-case FIRST so the
-        // strip step doesn't gobble uppercase letters — previous behavior
-        // turned "Cowboy Bebop" into "owboy-ebop" because `[^a-z0-9-]` is
-        // case-sensitive and ran before normalizeSlug's `.toLowerCase()`.
+
         return normalizeSlug(
             input.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
         );
@@ -101,16 +85,7 @@
         return slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     }
 
-    /**
-     * Live preview for the Add-Anime dialog. Reads the current slug input
-     * directly from `#animeSlug` so the function stays decoupled from any
-     * popup-local `elements` closure.
-     *
-     * Drives:
-     *   - #episodesCounter (live count + progress bar against known total)
-     *   - #includeFillerLabel (visibility based on filler presence)
-     *   - .episodes-input.invalid-range (validation border)
-     */
+
     function renderEpisodesPreview(input) {
         const fillerLabel = document.getElementById('includeFillerLabel');
         const includeFillerText = document.getElementById('includeFillerText');
@@ -147,13 +122,13 @@
         const includeFillers = document.getElementById('includeFillers')?.checked || false;
         const finalCount = (includeFillers || fillers.length === 0) ? allEpisodes.length : canon.length;
 
-        // ── Out-of-range validation ─────────────────────────────────────
+
         const knownTotal = window.AnimeTracker?.__addDialogState?.knownTotal || null;
         const maxEntered = allEpisodes[allEpisodes.length - 1];
         const outOfRange = !!(knownTotal && maxEntered > knownTotal);
         if (epInput) epInput.classList.toggle('invalid-range', outOfRange);
 
-        // ── Live counter + progress bar ────────────────────────────────
+
         if (counter && counterText && counterFill) {
             counter.style.display = 'block';
             const ICON = '<svg class="counter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
@@ -168,7 +143,7 @@
             }
         }
 
-        // ── Filler-include block (toggle + ranges preview, unified box) ──
+
         const block = document.getElementById('includeFillersBlock');
         const rangesPreview = document.getElementById('fillersRangesPreview');
         if (block) {
@@ -176,8 +151,8 @@
                 block.style.display = 'block';
                 block.dataset.checked = includeFillers ? 'true' : 'false';
                 if (includeFillerText) {
-                    // Pill stays compact — count only. Full ranges are shown
-                    // in the preview row below ONLY when the toggle is ON.
+
+
                     const n = fillers.length;
                     includeFillerText.textContent = includeFillers
                         ? `Fillers included (${n})`
@@ -185,9 +160,8 @@
                 }
                 if (rangesPreview) {
                     rangesPreview.textContent = `Fillers: ${buildRangeString(fillers)}`;
-                    // Visibility is driven purely by the parent block's
-                    // [data-checked] attribute via CSS — no inline display
-                    // toggling here so the transition stays in CSS.
+
+
                 }
             } else {
                 block.style.display = 'none';

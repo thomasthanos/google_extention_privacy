@@ -1,7 +1,7 @@
-/**
- * Anime Tracker - Episode Writer
- * Shared synchronous writer for tracked episodes.
- */
+
+
+
+
 
 const EpisodeWriter = {
     MAX_REASONABLE_DURATION_SECONDS: 6 * 60 * 60,
@@ -42,7 +42,7 @@ const EpisodeWriter = {
                 WatchlistSync.syncFromStorage(siteAnimeId, slug, { fallbackType: 'watching' });
             }
         } catch {
-            // Non-critical sync path.
+
         }
     },
 
@@ -65,10 +65,10 @@ const EpisodeWriter = {
         }
     },
 
-    /**
-     * Mutates animeData with the newly watched episode, if needed.
-     * Returns an operation result for callers to decide follow-up actions.
-     */
+
+
+
+
     writeEpisode(info, duration, animeData, options = {}) {
         if (!info || !info.animeSlug || !info.episodeNumber) {
             return { changed: false, changeType: 'none' };
@@ -138,8 +138,8 @@ const EpisodeWriter = {
         if (existingIndex !== -1) {
             const existingEpisode = animeData[slug].episodes[existingIndex] || {};
             const currentDuration = Number(existingEpisode.duration) || 0;
-            // Promote an AniList-imported episode to a real watched episode:
-            // the user has now actually watched it, so stamp watchedAt + video duration.
+
+
             if (existingEpisode.durationSource === 'anilist') {
                 const nowIso = this._compactNow();
                 animeData[slug].episodes[existingIndex] = {
@@ -148,7 +148,7 @@ const EpisodeWriter = {
                     duration: validDuration > 0 ? validDuration : currentDuration,
                     durationSource: 'video'
                 };
-                // Also promote the second episode of a double if it was imported.
+
                 if (info.isDoubleEpisode && info.secondEpisodeNumber) {
                     const secondNum = this._normalizeEpisodeNumber(info.secondEpisodeNumber);
                     const secondIdx = animeData[slug].episodes
@@ -207,7 +207,7 @@ const EpisodeWriter = {
             }
         }
 
-        // Recompute from episodes so double-episode pushes are counted correctly.
+
         animeData[slug].totalWatchTime = animeData[slug].episodes
             .reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
         const nowIso = this._compactNow();

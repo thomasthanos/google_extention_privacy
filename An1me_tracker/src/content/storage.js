@@ -1,12 +1,12 @@
-/**
- * Anime Tracker - Content Script Storage
- * Chrome storage wrapper with sync fallback
- */
 
-// Match popup/storage.js — `some(key !== undefined)` triggered the migration
-// short-circuit as soon as ONE key existed locally, so a partially-migrated
-// state (e.g. videoProgress present locally but animeData still in sync)
-// silently skipped the remaining sync→local migration on this side.
+
+
+
+
+
+
+
+
 function hasStoredValue(value) {
     if (value === undefined || value === null) return false;
     if (typeof value !== 'object') return true;
@@ -16,9 +16,9 @@ function hasStoredValue(value) {
 const ContentStorage = {
     LEGACY_SYNC_KEYS: new Set(['animeData', 'trackedEpisodes', 'videoProgress']),
 
-    /**
-     * Check if extension context is still valid
-     */
+
+
+
     isContextValid() {
         try {
             return chrome.runtime && chrome.runtime.id;
@@ -27,9 +27,9 @@ const ContentStorage = {
         }
     },
 
-    /**
-     * Get data from storage
-     */
+
+
+
     async get(keys) {
         const { Logger } = window.AnimeTrackerContent;
 
@@ -64,8 +64,8 @@ const ContentStorage = {
                     return;
                 }
 
-                // Only skip the sync fallback when ALL requested keys are
-                // present locally — matches popup/storage.js semantics.
+
+
                 const hasLocalData = requestedKeys.every((key) => hasStoredValue(localResult[key]));
 
                 if (hasLocalData || legacySyncKeys.length === 0) {
@@ -101,9 +101,9 @@ const ContentStorage = {
         });
     },
 
-    /**
-     * Set data to storage
-     */
+
+
+
     async set(data) {
         return new Promise((resolve, reject) => {
             if (!this.isContextValid()) {
@@ -140,10 +140,10 @@ const ContentStorage = {
         const requested = Array.isArray(keys) ? keys : [keys];
         const run = async () => {
             const data = await this.get(requested);
-            // Storage read timed out — bail before the mutator runs. Otherwise
-            // the mutator's `data.x = data.x || {}` seeds empty maps and the
-            // set() below clobbers real storage with them. Callers detect this
-            // via the returned `__timedOut` flag.
+
+
+
+
             if (data && data.__timedOut) return data;
             const result = mutator(data);
             if (result && typeof result.then === 'function') await result;
@@ -161,6 +161,6 @@ const ContentStorage = {
 
 };
 
-// Export
+
 window.AnimeTrackerContent = window.AnimeTrackerContent || {};
 window.AnimeTrackerContent.Storage = ContentStorage;

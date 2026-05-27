@@ -1,26 +1,6 @@
-/**
- * Anime Tracker — Skiptime Contributor Helper
- *
- * Dropdown helper inside the player's center controls on `an1me.to/watch/*`
- * that lets the user capture
- * intro/outro timestamps with one click while watching, and auto-fills
- * the site's existing skiptime contribution panel + submits it.
- *
- * Toggle ON/OFF via the popup Settings view. The panel mounts/unmounts
- * live on `chrome.storage.onChanged` for `skiptimeHelperEnabled`.
- *
- * UX:
- *  - Compact trigger button next to the player's center controls
- *  - Dropdown menu above the controls
- *  - 4 buttons: Intro Start (1) / Intro End (2) / Outro Start (3) / Outro End (4)
- *  - Reset (0) + quick disable action
- *  - Auto-fills outro-end from video duration on first capture
- *  - When all 4 captured → 3-sec countdown toast with Cancel → auto-submit
- *  - Cache survives reload (chrome.storage.local, keyed per episode slug)
- *  - Cache cleared after successful submit OR after 7 days idle
- *  - Keyboard shortcuts active when player has focus (skipped while typing
- *    in another input)
- */
+
+
+
 (function () {
     'use strict';
 
@@ -64,7 +44,6 @@
     let lastEpisodeIdentity = null;
     let submitCountdownTimer = null;
 
-    // ─── Helpers ────────────────────────────────────────────────────────
 
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -161,9 +140,8 @@
     }
 
     function cacheKey() {
-        // Key per actual parsed episode, not full href. This keeps the helper
-        // stable through in-page URL noise while still resetting on real
-        // episode changes.
+
+
         return STORAGE_CACHE_PREFIX + getEpisodeIdentity();
     }
 
@@ -200,7 +178,7 @@
             const result = await chrome.storage.local.get([key]);
             const stored = result[key];
             if (!stored) return defaultCache();
-            // Auto-prune stale caches.
+
             if (stored.updatedAt) {
                 const age = Date.now() - new Date(stored.updatedAt).getTime();
                 if (age > CACHE_TTL_MS) {
@@ -236,9 +214,7 @@
         return !!(cache.introStart && cache.introEnd && cache.outroStart && cache.outroEnd);
     }
 
-    // Partial-submit support: user can choose to contribute just intro or just
-    // outro (e.g. anime with no opening, or they captured only one half).
-    // Returns true when at least one full pair (start + end) is captured.
+
     function isSubmittable(cache) {
         const introPair = !!(cache.introStart && cache.introEnd);
         const outroPair = !!(cache.outroStart && cache.outroEnd);
@@ -377,8 +353,8 @@
     }
 
     function getDurationSeconds() {
-        // Lazy-resolve video so duration works even before the cached
-        // reference catches up.
+
+
         if (!isVideoConnected(video)) video = getVideoElement();
         if (video && Number.isFinite(video.duration) && video.duration > 0) {
             return Math.floor(video.duration);
@@ -388,7 +364,6 @@
         return parseTimeToSeconds(text.split('/')[1]?.trim());
     }
 
-    // ─── Toast ──────────────────────────────────────────────────────────
 
     function showToast(message, type = 'info', ttl = 1800) {
         let toast = document.getElementById(TOAST_ID);
@@ -407,8 +382,8 @@
     }
 
     function showCountdownToast({ secondsLeft, onCancel }) {
-        // Replace any existing toast (including the regular one). We render
-        // a small action-button toast so the user can cancel auto-submit.
+
+
         const existing = document.getElementById(TOAST_ID);
         if (existing) { try { existing.remove(); } catch {} }
 
@@ -431,9 +406,8 @@
     }
 
     async function captureTimestamp(targetKey) {
-        // Lazy-resolve the video element on every click so we don't need to
-        // race the player initialization. The cached `video` reference may
-        // still be null from mount time if the player loaded after us.
+
+
         if (!isVideoConnected(video)) {
             video = getVideoElement();
             if (video) {
@@ -456,9 +430,7 @@
         const cache = await loadCache();
         cache[targetKey] = time;
 
-        // Auto-fill Outro End from video duration the first time the user
-        // captures any other slot (so submission can complete without
-        // explicitly seeking to the very end of the episode).
+
         if (targetKey !== 'outroEnd' && !cache.outroEnd) {
             const dur = getDurationSeconds();
             if (dur > 0) cache.outroEnd = formatTime(dur);
@@ -478,8 +450,7 @@
         cancelSubmitCountdown();
         await clearCache();
 
-        // Re-prime outro-end from video duration so subsequent captures still
-        // hit the auto-complete path.
+
         const dur = getDurationSeconds();
         if (dur > 0) {
             await saveCache({ ...defaultCache(), outroEnd: formatTime(dur) });
@@ -489,10 +460,9 @@
         showToast('Reset. Outro End auto-filled.', 'info');
     }
 
-    // ─── Auto-submit flow ───────────────────────────────────────────────
 
     function startAutoSubmitFlow(cache) {
-        if (submitCountdownTimer) return; // already running
+        if (submitCountdownTimer) return;
 
         let secondsLeft = 3;
         let cancelled = false;
@@ -561,10 +531,7 @@
         field.dispatchEvent(new Event('blur', { bubbles: true }));
     }
 
-    /**
-     * Wait for a DOM node matching `selector`. Uses MutationObserver instead
-     * of poll-and-sleep — instant resolve when the node appears.
-     */
+
     function waitForSelector(selector, timeoutMs = 3500) {
         return new Promise((resolve) => {
             const existing = document.querySelector(selector);
@@ -623,17 +590,13 @@
         const ok = await ensureSkipPanelOpen();
         if (!ok) return false;
 
-        // Disable the site's auto-link toggles so they don't overwrite our
-        // manually captured outro-end with `intro+89s`.
+
         const introToggle = findField('#intro-toggle');
         const outroToggle = findField('#outro-toggle');
         if (introToggle) introToggle.dataset.linked = 'false';
         if (outroToggle) outroToggle.dataset.linked = 'false';
 
-        // Skip targets the user didn't capture (partial intro-only or
-        // outro-only contribution). Writing `null` here previously stuck a
-        // literal "null" string into the form field, which the site then
-        // either rejected or submitted as bogus data.
+
         for (const t of TARGETS) {
             const value = cache[t.key];
             if (!value) continue;
@@ -735,10 +698,8 @@
 
     function ensureControlsObserver() {
         if (controlsObserver || !helperEnabled) return;
-        // Throttle the callback: ArtPlayer + ad scripts produce constant DOM
-        // mutations during playback. Without throttling, every batch triggers
-        // a querySelector chain (getControlsHost) which is wasted work on
-        // mobile. 250ms is small enough that re-mount feels instantaneous.
+
+
         const runCheck = () => {
             controlsObserverThrottle = null;
             if (!helperEnabled) return;
@@ -1194,10 +1155,7 @@
         panelEl.classList.toggle('is-active', captured > 0);
         panelEl.classList.toggle('is-complete', captured === 4);
 
-        // Enable the manual Submit button as soon as a full intro pair OR a
-        // full outro pair is captured, so users contributing only one half
-        // don't have to wait for the auto-submit countdown that fires only
-        // when all 4 are filled.
+
         const submitBtn = panelEl.querySelector('.at-skip-submit');
         if (submitBtn) submitBtn.disabled = !isSubmittable(cache);
 
@@ -1309,8 +1267,8 @@
             }
 
             if (!urlObserver) {
-                // Throttled: episode identity rarely changes, but document.body
-                // subtree mutations fire constantly during playback.
+
+
                 const runIdentityCheck = () => {
                     urlObserverThrottle = null;
                     const nextEpisodeIdentity = getEpisodeIdentity();
@@ -1341,8 +1299,7 @@
                 }
             );
 
-            // ArtPlayer can re-render the controls immediately after we inject.
-            // Re-arm observation and verify the panel actually survived.
+
             ensureControlsObserver();
             ensureEpisodeWatcher();
             setTimeout(() => {
@@ -1494,7 +1451,7 @@
         }
     }
 
-    // Public API for tests / future popup integrations.
+
     window.AnimeTrackerContent = window.AnimeTrackerContent || {};
     window.AnimeTrackerContent.SkiptimeHelper = {
         mount: scheduleMount,

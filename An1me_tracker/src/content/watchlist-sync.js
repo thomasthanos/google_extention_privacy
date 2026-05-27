@@ -10,8 +10,8 @@ const WatchlistSync = {
         };
     },
 
-    // Human-readable label for each watchlist status. Used in log messages
-    // so users see "Watching" / "On Hold" instead of internal `on_hold`.
+
+
     _STATUS_LABEL: {
         watching: 'Watching',
         completed: 'Completed',
@@ -26,8 +26,8 @@ const WatchlistSync = {
     },
 
     _shortName(animeSlug, fallbackTitle) {
-        // Prefer the human title if available; fall back to the slug with
-        // dashes turned into spaces and Title Case so the log is readable.
+
+
         if (fallbackTitle) return String(fallbackTitle);
         if (!animeSlug) return 'this anime';
         return String(animeSlug)
@@ -112,12 +112,12 @@ const WatchlistSync = {
         const Logger = this._logger();
         if (!animeId || !animeSlug) return false;
 
-        // When the user updates / reloads the extension while a watch tab is
-        // open, the old content script keeps running but chrome.runtime is
-        // gone. Any storage call from now on rejects with "Extension context
-        // invalidated". There's nothing useful we can do — the new content
-        // script will mount on the next page load — so we silently no-op
-        // instead of emitting a noisy WARN.
+
+
+
+
+
+
         const Storage = window.AnimeTrackerContent?.Storage;
         if (Storage?.isContextValid && !Storage.isContextValid()) return false;
 
@@ -131,7 +131,7 @@ const WatchlistSync = {
             }
             return await this.updateStatus(animeId, type, animeSlug, options);
         } catch (e) {
-            // Swallow extension-context errors quietly — same reason as above.
+
             const msg = String(e?.message || '').toLowerCase();
             if (msg.includes('extension context') || msg.includes('cannot access')) return false;
             Logger.warn(`WatchlistSync: syncFromStorage failed for ${animeSlug}: ${e.message}`);
@@ -179,9 +179,9 @@ const WatchlistSync = {
     async _sendWatchlistRequest(animeId, type, Logger) {
         const action = type === 'remove' ? 'remove_from_watchlist' : 'add_to_watchlist';
 
-        // Verbose technical log kept at debug so it stays accessible while
-        // dev-mode debugging the AJAX endpoint, but doesn't spam the console
-        // for normal users.
+
+
+
         Logger.debug(`WatchlistSync: POST ${action} type="${type}" anime #${animeId}`);
 
         try {
@@ -257,9 +257,9 @@ const WatchlistSync = {
             previousType &&
             previousType !== type;
 
-        // Build a single user-friendly intent line so the user sees ONE
-        // message describing what we're doing, instead of two raw HTTP logs
-        // for the remove + add pair.
+
+
+
         let intent;
         if (type === 'remove') {
             intent = `Watchlist: removing "${name}" from your an1me.to list…`;
@@ -286,7 +286,7 @@ const WatchlistSync = {
         const success = await this._sendWatchlistRequest(animeId, type, Logger);
         if (success) {
             if (animeSlug) await this._persistSyncedType(animeSlug, type);
-            // Outcome line, distinct verbs depending on context.
+
             if (type === 'remove') {
                 Logger.success?.(`Watchlist: ✓ removed "${name}"`)
                     || Logger.info(`Watchlist: ✓ removed "${name}"`);
@@ -303,14 +303,14 @@ const WatchlistSync = {
         return success;
     },
 
-    /**
-     * Self-healing reconcile: pushes any anime whose resolved completed /
-     * dropped / on-hold state differs from what was last synced to an1me.to.
-     * Runs on every page load (cheap — no network when nothing is stale) so a
-     * completion detected later (e.g. by the popup persisting `listState`)
-     * still reaches the site. updateStatus() does the proper remove-then-add,
-     * so a "Watching" entry actually moves to "Completed".
-     */
+
+
+
+
+
+
+
+
     async reconcileWatchlistStatuses() {
         const Logger = this._logger();
         const LOCK_KEY = 'watchlistRepairLock';
@@ -326,7 +326,7 @@ const WatchlistSync = {
             const { animeData = {}, [LOCK_KEY]: lockTs = 0 } =
                 await chrome.storage.local.get(['animeData', LOCK_KEY]);
 
-            // Only entries whose an1me.to status is genuinely stale.
+
             const stale = [];
             for (const [slug, entry] of Object.entries(animeData)) {
                 if (!entry?.siteAnimeId) continue;
@@ -396,24 +396,24 @@ setTimeout(() => {
     WatchlistSync.reconcileWatchlistStatuses().catch(() => {});
 }, 2500);
 
-// Wake the background SW and trigger one cloud poll — but only on /watch/
-// pages. Previously this fired on every an1me.to page load (homepage,
-// listing, anime details), which paid a Firestore read every time the user
-// browsed the site even when they weren't using the tracker. Cross-device
-// sync still feels instant because:
-//   - the popup itself triggers a poll on open (popupAlive port connect)
-//   - the watch page triggers it via cloud-sync.js content script
-// The SW's `pollCloudData` self-rate-limits (5-min gate for convenience
-// reasons) so this is cheap regardless.
+
+
+
+
+
+
+
+
+
 if (/\/watch\//.test(location.pathname)) {
     try {
         chrome.runtime.sendMessage({ type: 'WAKE_AND_POLL_CLOUD' }, () => {
             if (chrome.runtime.lastError) {
-                // SW unreachable (e.g. signed-out, freshly installed). Safe to ignore.
+
             }
         });
     } catch {
-        // Extension context invalidated — ignore.
+
     }
 }
 
