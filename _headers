@@ -1,7 +1,8 @@
-/*
+/reset*
     Content-Security-Policy: default-src 'self'; connect-src https://identitytoolkit.googleapis.com; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'
     Referrer-Policy: no-referrer
     X-Content-Type-Options: nosniff
     X-Frame-Options: DENY
     Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
     Cache-Control: no-store
+    X-Robots-Tag: noindex, nofollow, noarchive

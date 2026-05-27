@@ -149,6 +149,7 @@
 
         try {
             const result = await firebaseResetPassword({ oobCode: actionCode });
+            window.history.replaceState({}, document.title, window.location.pathname);
             accountEmail.textContent = maskEmail(result.email || '');
             showView('form');
             passwordInput.focus();
