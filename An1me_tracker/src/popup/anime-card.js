@@ -20,12 +20,11 @@ const AnimeCardRenderer = {
             }
         }
 
-        // AniList-imported episodes without real watchedAt are not "truly"
-        // tracked — keep their resume snippets visible so the user can pick
-        // them up where they left off.
+        // AniList history and held replays remain resumable; hide snippets for
+        // normal watched episodes only.
         const trackedEpisodeNumbers = new Set(
-            (anime.episodes || [])
-                .filter(ep => !(ep?.durationSource === 'anilist' && !ep?.watchedAt))
+            (anime.onHoldAt || anime.listState === 'on_hold' ? [] : (anime.episodes || []))
+                .filter(ep => ep?.durationSource !== 'anilist')
                 .map(ep => ep.number)
         );
 

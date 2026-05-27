@@ -113,11 +113,13 @@ const EpisodeWriter = {
             animeData[slug].episodes = [];
         }
 
-        if (animeData[slug].onHoldAt) {
+        let resumedFromInactiveState = false;
+        if (animeData[slug].onHoldAt || animeData[slug].listState === 'on_hold') {
             delete animeData[slug].onHoldAt;
             animeData[slug].listState = 'active';
             animeData[slug].listStateUpdatedAt = this._compactNow();
             this._syncWatching(animeData[slug].siteAnimeId || info.siteAnimeId, slug);
+            resumedFromInactiveState = true;
         }
 
         if (animeData[slug].droppedAt) {
@@ -125,6 +127,7 @@ const EpisodeWriter = {
             animeData[slug].listState = 'active';
             animeData[slug].listStateUpdatedAt = this._compactNow();
             this._syncWatching(animeData[slug].siteAnimeId || info.siteAnimeId, slug);
+            resumedFromInactiveState = true;
         }
 
         const validDuration = this._normalizeDuration(duration, logPrefix);
@@ -174,6 +177,10 @@ const EpisodeWriter = {
                     .reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
                 animeData[slug].lastWatched = this._compactNow();
                 return { changed: true, changeType: 'updated-placeholder' };
+            }
+            if (resumedFromInactiveState) {
+                animeData[slug].lastWatched = this._compactNow();
+                return { changed: true, changeType: 'resumed-existing' };
             }
             return { changed: false, changeType: 'none' };
         }

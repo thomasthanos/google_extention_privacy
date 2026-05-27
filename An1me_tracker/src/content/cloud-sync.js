@@ -105,9 +105,21 @@
     async function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
         if (options?.keepalive) return fetch(url, options);
         const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+        let timedOut = false;
+        const timer = setTimeout(() => {
+            timedOut = true;
+            ctrl.abort();
+        }, timeoutMs);
         try {
             return await fetch(url, { ...options, signal: ctrl.signal });
+        } catch (error) {
+            if (timedOut) {
+                const timeoutError = new Error(`Request timed out after ${Math.ceil(timeoutMs / 1000)}s`);
+                timeoutError.name = 'TimeoutError';
+                timeoutError.isTimeout = true;
+                throw timeoutError;
+            }
+            throw error;
         } finally {
             clearTimeout(timer);
         }
@@ -388,7 +400,12 @@
         const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         try {
             const r = await fetchWithTimeout(url, { headers: { Authorization: `Bearer ${token}` } });
-            if (!r.ok) return null;
+            if (r.status === 404) return null;
+            if (!r.ok) {
+                const error = new Error(`HTTP ${r.status}`);
+                error.status = r.status;
+                throw error;
+            }
             const doc = fromFSDoc(await r.json());
             _cloudDocCache = doc;
             _cloudDocCacheTime = Date.now();
@@ -396,7 +413,9 @@
             return doc;
         } catch (e) {
             Logger?.warn(`Cloud fetch failed: ${e.message}`);
-            return null;
+            // A normal direct write cannot safely replace map fields without
+            // first reading cloud state. Leave local data intact and retry.
+            throw e;
         }
     }
 
@@ -448,9 +467,11 @@
         for (const [slug, anime] of Object.entries(animeData)) {
             if (anime?.episodes) {
                 for (const ep of anime.episodes) {
-                    // AniList-imported episodes without a real watchedAt are
-                    // not "truly" tracked — keep videoProgress for resume.
-                    if (ep?.durationSource === 'anilist' && !ep?.watchedAt) continue;
+                    // Keep current replay progress while a title is on hold.
+                    if (anime.onHoldAt || anime.listState === 'on_hold') continue;
+                    // AniList history is not a playback event; older imports
+                    // may still carry a bogus watchedAt stamp.
+                    if (ep?.durationSource === 'anilist') continue;
                     trackedIds.add(`${slug}__episode-${ep.number}`);
                 }
             }
@@ -483,9 +504,10 @@
             for (const ep of anime.episodes) {
                 const num = Number(ep?.number) || 0;
                 if (num <= 0) continue;
-                // AniList-imported episodes without a real watchedAt are not
-                // "truly" tracked — keep their videoProgress for resume.
-                if (ep?.durationSource === 'anilist' && !ep?.watchedAt) continue;
+                // Keep current replay progress while a title is on hold.
+                if (anime.onHoldAt || anime.listState === 'on_hold') continue;
+                // Keep resume progress until playback promotes the import.
+                if (ep?.durationSource === 'anilist') continue;
                 trackedIds.add(`${slug}__episode-${num}`);
             }
         }

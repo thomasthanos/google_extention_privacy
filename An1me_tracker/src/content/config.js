@@ -7,7 +7,6 @@ const ContentConfig = {
     PROGRESS_WRITE_THROTTLE_MS: 20000,
     PAUSE_WRITE_THROTTLE_MS: 5000,
     MIN_PROGRESS_TO_SAVE: 5,
-    NEW_ANIME_GRACE_SECONDS: 120,
     MIN_WATCH_SECONDS_BEFORE_COMPLETE: 120,
     // Hard floor: even when isNearEnd() exempts the misclick guard, completion
     // is still blocked if the user accumulated less than this many seconds of

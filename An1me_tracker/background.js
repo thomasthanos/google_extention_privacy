@@ -118,9 +118,21 @@ function clearSyncPending() {
 async function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
     if (options?.keepalive) return fetch(url, options);
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+        timedOut = true;
+        ctrl.abort();
+    }, timeoutMs);
     try {
         return await fetch(url, { ...options, signal: ctrl.signal });
+    } catch (error) {
+        if (timedOut) {
+            const timeoutError = new Error(`Request timed out after ${Math.ceil(timeoutMs / 1000)}s`);
+            timeoutError.name = 'TimeoutError';
+            timeoutError.isTimeout = true;
+            throw timeoutError;
+        }
+        throw error;
     } finally {
         clearTimeout(timer);
     }
@@ -135,9 +147,11 @@ function cleanTrackedProgressBg(animeData, videoProgress, deletedAnime = {}) {
     for (const [slug, anime] of Object.entries(animeData)) {
         if (anime.episodes) {
             for (const ep of anime.episodes) {
-                // AniList-imported episodes without a real watchedAt are not
-                // "truly" tracked — keep their videoProgress so resume works.
-                if (ep?.durationSource === 'anilist' && !ep?.watchedAt) continue;
+                // Keep current replay progress while a title is on hold.
+                if (anime.onHoldAt || anime.listState === 'on_hold') continue;
+                // AniList history is not a playback event; older imports
+                // may still carry a bogus watchedAt stamp.
+                if (ep?.durationSource === 'anilist') continue;
                 trackedIds.add(`${slug}__episode-${ep.number}`);
             }
         }
@@ -603,10 +617,14 @@ async function fetchCloudData(user, token) {
         try {
             const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
             const response = await fetchWithTimeout(url, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (response.status === 404) {
+                // A missing user document is the only safe "empty cloud" state.
+                return null;
+            }
             if (!response.ok) {
                 // Log the actual status so we can diagnose silent fetch failures
-                // (a 401 from a stale SW token, 403 from rules denial, 404 for
-                // genuinely-missing doc, etc.). Previously every non-OK was
+                // (a 401 from a stale SW token, 403 from rules denial, or
+                // server failure). Previously every non-OK was
                 // collapsed into a silent null and the popup couldn't tell why.
                 const body = await response.text().catch(() => '');
                 console.warn(`[BG] fetchCloudData HTTP ${response.status} for users/${user.uid.slice(0, 8)}…: ${body.slice(0, 160)}`);
@@ -619,12 +637,9 @@ async function fetchCloudData(user, token) {
             }
             return fromFSDoc(await response.json());
         } catch (e) {
-            console.warn('[BG] Could not fetch cloud data:', e?.message || e);
-            // Re-throw status errors so callers can distinguish them from
-            // network errors. Network/timeout errors still resolve to null
-            // (no `e.status`) so the existing fallback paths still work.
-            if (e?.status) throw e;
-            return null;
+            // Do not turn a failed read into an empty cloud document. A writer
+            // must merge against known state or retry instead of overwriting it.
+            throw e;
         }
     })();
 
@@ -774,11 +789,12 @@ async function fetchCloudDataCached(user, token) {
     try {
         doc = await fetchCloudData(user, token);
     } catch (e) {
-        // Status errors (401/403/404) — don't cache, let the next attempt
-        // (e.g. with a refreshed token) try again. Surface the error code
-        // via a throw to GET_CLOUD_DOC so the popup can do a direct fetch.
+        // Network, timeout, and HTTP errors must not become an empty document.
+        // A real missing document is returned as null from HTTP 404 above.
         const err = new Error(e?.message || 'Fetch failed');
         err.status = e?.status || null;
+        err.isTimeout = !!e?.isTimeout;
+        err.name = e?.name || err.name;
         throw err;
     }
     if (doc) {
@@ -841,10 +857,9 @@ async function syncProgressOnly() {
                 mergedVP = cleanTrackedProgressBg(result.animeData || {}, mergedVP, result.deletedAnime || {});
             }
         } catch (e) {
-            // Network/auth errors fetching cloud → fall back to local-only push.
-            // Better to surface our progress than to skip the write entirely;
-            // the next successful poll will resolve any divergence.
-            console.warn('[BG] Cloud-first merge in syncProgressOnly failed; pushing local only:', e?.message || e);
+            // Never replace the cloud progress map after a failed pre-read.
+            // Keep local progress and retry once the cloud state is known.
+            throw e;
         }
 
         // If the merge produced something different from local, write the
@@ -932,8 +947,9 @@ async function syncProgressOnly() {
         }
         });
     } catch (error) {
-        console.error('[BG] Progress sync error:', error);
-        armSyncRetry('progress', `network: ${error?.message || error}`);
+        const reason = error?.isTimeout ? 'timeout' : 'network';
+        console.error(`[BG] Progress sync ${reason}:`, error?.message || error);
+        armSyncRetry('progress', `${reason}: ${error?.message || error}`);
     } finally {
         progressSyncInProgress = false;
         if (progressSyncPending) {
@@ -1105,10 +1121,11 @@ async function syncToFirebase() {
         }
         });
     } catch (error) {
-        console.error('[BG] Sync error:', error);
-        // Network / timeout / abort — treat like 5xx so we don't lose the change.
+        const reason = error?.isTimeout ? 'timeout' : 'network';
+        console.error(`[BG] Sync ${reason}:`, error?.message || error);
+        // A failed pre-read or write is retried without losing the local change.
         markSyncPending();
-        armSyncRetry('full', `network: ${error?.message || error}`);
+        armSyncRetry('full', `${reason}: ${error?.message || error}`);
     } finally {
         syncInProgress = false;
         if (pendingSync) {

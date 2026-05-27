@@ -138,12 +138,12 @@
 
             const anime = (animeData && animeData[slug]) || null;
             // Episode already in the tracked library → finished, not "in progress".
-            // Exception: AniList-imported episodes without a real watchedAt
-            // haven't actually been watched on an1me.to — keep their resume cards.
+            // AniList history has not been watched on an1me.to; older imports
+            // may still carry a bogus watchedAt stamp. Keep their resume cards.
             if (Array.isArray(anime && anime.episodes)
                 && anime.episodes.some((ep) => {
                     if (Number(ep && ep.number) !== episode) return false;
-                    if (ep && ep.durationSource === 'anilist' && !ep.watchedAt) return false;
+                    if (ep && ep.durationSource === 'anilist') return false;
                     return true;
                 })) {
                 continue;

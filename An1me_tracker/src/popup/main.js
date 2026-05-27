@@ -1712,18 +1712,9 @@
             normalized.animeData || {}
         );
         const repairedData = ProgressManager.removeDuplicateEpisodes(withoutAutoRepaired.cleanedData);
-        const rawProgressForDurations = normalized.videoProgress || {};
-        const { cleaned: cleanedProgress, removedCount: progressRemoved } =
-            ProgressManager.cleanTrackedProgress(
-                repairedData, rawProgressForDurations,
-                normalized.deletedAnime || sourceDeleted
-            );
-
-        const durationKey = `normalizeMovieDurations${maintenanceSuffix}`;
-        const phantomKey = `cleanupPhantomMovies${maintenanceSuffix}`;
-        // One-shot-effective scrub: removes the bogus `watchedAt = importTime`
-        // stamp from AniList-imported episodes (older importer behaviour).
-        // Idempotent — once scrubbed, the loop short-circuits on every entry.
+        // Scrub old importer timestamps before progress cleanup. Otherwise an
+        // imported episode can look watched for this pass and its freshly saved
+        // resume entry is removed before the scrub has a chance to fix it.
         const anilistDateScrub = scrubAnilistImportDates(repairedData);
         if (anilistDateScrub.changed) {
             try {
@@ -1734,6 +1725,15 @@
                 );
             } catch { /* logger unavailable */ }
         }
+        const rawProgressForDurations = normalized.videoProgress || {};
+        const { cleaned: cleanedProgress, removedCount: progressRemoved } =
+            ProgressManager.cleanTrackedProgress(
+                repairedData, rawProgressForDurations,
+                normalized.deletedAnime || sourceDeleted
+            );
+
+        const durationKey = `normalizeMovieDurations${maintenanceSuffix}`;
+        const phantomKey = `cleanupPhantomMovies${maintenanceSuffix}`;
         const durationFix = shouldRunMaintenance(durationKey)
             ? normalizeMovieDurations(repairedData, rawProgressForDurations)
             : { changed: false };
@@ -2799,7 +2799,7 @@
                     const existing = existingByNumber.get(ep.number);
                     if (!existing) {
                         existingEpisodes.push(ep);
-                    } else if (existing.durationSource === 'anilist' && !existing.watchedAt) {
+                    } else if (existing.durationSource === 'anilist') {
                         // Promote imported episode to manually-confirmed watched.
                         const idx = existingEpisodes.indexOf(existing);
                         existingEpisodes[idx] = { ...existing, watchedAt: now, duration: inferredDuration, durationSource: 'manual' };

@@ -56,12 +56,14 @@ const ProgressTracker = {
         const num = parseInt(m[2], 10);
         const anime = animeData[slug];
         if (!anime || !Array.isArray(anime.episodes)) return false;
+        // Replaying a held title is active watching, even if this episode is
+        // already in history. Preserve a resume entry until playback finishes.
+        if (anime.onHoldAt || anime.listState === 'on_hold') return false;
         return anime.episodes.some(ep => {
             if (Number(ep?.number) !== num) return false;
-            // AniList-imported episodes without a real watchedAt are not yet
-            // "truly" tracked — allow resume progress to be saved so the user
-            // can pick up where they left off when they actually watch it.
-            if (ep?.durationSource === 'anilist' && !ep?.watchedAt) return false;
+            // AniList history is not a playback event in this extension.
+            // Older imports may still carry a bogus watchedAt stamp.
+            if (ep?.durationSource === 'anilist') return false;
             return true;
         });
     },
@@ -302,16 +304,6 @@ const ProgressTracker = {
                 return;
             }
 
-            const graceSeconds = Number(CONFIG.NEW_ANIME_GRACE_SECONDS) || 0;
-            if (graceSeconds > 0 && currentTime < graceSeconds) {
-                const slugMatch = uniqueId.match(/^(.+)__episode-\d+$/);
-                const slug = slugMatch ? slugMatch[1] : null;
-                if (slug && !animeData[slug]) {
-                    Logger.debug(`Skip new-anime save (<${graceSeconds}s): ${uniqueId} @ ${Math.floor(currentTime)}s`);
-                    return;
-                }
-            }
-
             if (typeof videoProgress !== 'object' || Array.isArray(videoProgress)) {
                 Logger.warn('Invalid videoProgress structure, resetting');
                 videoProgress = {};
@@ -544,12 +536,12 @@ const ProgressTracker = {
             if (!anime || !anime.episodes || !Array.isArray(anime.episodes)) {
                 return false;
             }
+            if (anime.onHoldAt || anime.listState === 'on_hold') return false;
 
             return anime.episodes.some(ep => {
                 if (Number(ep?.number) !== episodeNumber) return false;
-                // AniList-imported episodes without a real watchedAt are not
-                // "truly" tracked — let the user actually watch and promote them.
-                if (ep?.durationSource === 'anilist' && !ep?.watchedAt) return false;
+                // An imported episode becomes tracked only after real playback.
+                if (ep?.durationSource === 'anilist') return false;
                 return true;
             });
         } catch (e) {

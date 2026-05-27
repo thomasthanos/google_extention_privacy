@@ -244,9 +244,12 @@ const ProgressManager = {
         for (const [animeSlug, anime] of Object.entries(animeData)) {
             if (anime.episodes) {
                 anime.episodes.forEach(ep => {
-                    // AniList-imported episodes without a real watchedAt are not
-                    // "truly" tracked — keep their videoProgress so resume works.
-                    if (ep?.durationSource === 'anilist' && !ep?.watchedAt) return;
+                    // Current playback of a held title is resumable, including
+                    // replays of an episode already present in watch history.
+                    if (anime.onHoldAt || anime.listState === 'on_hold') return;
+                    // AniList history is not a playback event; older imports
+                    // may still carry a bogus watchedAt stamp.
+                    if (ep?.durationSource === 'anilist') return;
                     trackedIds.add(UIHelpers.getUniqueId(animeSlug, ep.number));
                 });
             }
@@ -305,23 +308,25 @@ const ProgressManager = {
             if ((Number(progress.percentage) || 0) >= completedPercentage) continue;
 
             const trackedAnime = animeData?.[animeSlug];
-            if (trackedAnime?.completedAt || trackedAnime?.droppedAt || trackedAnime?.onHoldAt) continue;
+            // Starting playback again is an explicit resume signal, so an
+            // on-hold title with active progress belongs in In Progress.
+            if (trackedAnime?.completedAt || trackedAnime?.droppedAt) continue;
             let trackedEpisodeNumbers = trackedEpsBySlug.get(animeSlug);
             if (!trackedEpisodeNumbers) {
                 trackedEpisodeNumbers = new Set(
-                    Array.isArray(trackedAnime?.episodes)
+                    !(trackedAnime?.onHoldAt || trackedAnime?.listState === 'on_hold')
+                        && Array.isArray(trackedAnime?.episodes)
                         ? trackedAnime.episodes
-                            // AniList-imported episodes without a real watchedAt
-                            // haven't actually been watched — keep them showing
-                            // up as in-progress when there's resume data.
-                            .filter(ep => !(ep?.durationSource === 'anilist' && !ep?.watchedAt))
+                            // Imports remain resumable until playback promotes
+                            // them to durationSource: 'video'.
+                            .filter(ep => ep?.durationSource !== 'anilist')
                             .map(ep => Number(ep?.number)).filter(n => Number.isFinite(n) && n > 0)
                         : []
                 );
                 trackedEpsBySlug.set(animeSlug, trackedEpisodeNumbers);
             }
-            // If the episode is already in the tracked/watch list, this resume entry
-            // is stale and should not appear in the top continue-watching section.
+            // Outside a held replay, history entries are stale resume records
+            // and should not appear in the top continue-watching section.
             if (trackedEpisodeNumbers.has(episodeNum)) continue;
             let existing = inProgressMap.get(animeSlug);
             if (!existing) {
