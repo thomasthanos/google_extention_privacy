@@ -668,7 +668,7 @@
     }
 
     const root = typeof globalThis !== 'undefined' ? globalThis : self;
-    root.AnimeTrackerMergeUtils = {
+    const exports = {
         mergeVideoProgress,
         mergeAnimeData,
         mergeDeletedAnime,
@@ -687,4 +687,13 @@
         stripAutoRepairedEpisodesFromMap,
         PLACEHOLDER_DURATION_VALUES
     };
+    root.AnimeTrackerMergeUtils = exports;
+
+    if (typeof window !== 'undefined') {
+        const ATC = (window.AnimeTrackerContent = window.AnimeTrackerContent || {});
+        ATC.MergeUtils = exports;
+
+        const AT = (window.AnimeTracker = window.AnimeTracker || {});
+        AT.MergeUtils = exports;
+    }
 })();

@@ -494,6 +494,11 @@
     const { normalizeMovieDurations, cleanupPhantomMovies, scrubAnilistImportDates } = AT.Maintenance;
 
     function showAuthScreen() {
+        // // Paused auth as requested: immediately bypass login and load local app dashboard
+        // showMainApp(null);
+        // loadData();
+        // return;
+
         elements.authSection.style.display = 'flex';
         elements.mainApp.style.display = 'none';
 
@@ -5014,7 +5019,32 @@
 
 
 
-                await chrome.storage.local.set({ pendingBackgroundMetadataRepair: true });
+                try {
+                    chrome.runtime.sendMessage({
+                        type: 'START_LIBRARY_REPAIR',
+                        forceInfoRefresh: false,
+                        forceFillerRefresh: false
+                    }, (response) => {
+                        const err = chrome.runtime.lastError;
+                        if (err) {
+                            PopupLogger.warn('Login', 'Failed to start library repair via message:', err.message);
+                        } else {
+                            PopupLogger.log('Login', 'Library repair successfully triggered on sign-in');
+                        }
+                    });
+                } catch (e) {
+                    PopupLogger.error('Login', 'Failed to send START_LIBRARY_REPAIR message:', e);
+                }
+                try {
+                    const SlugMigration = window.AnimeTrackerSlugMigration;
+                    if (SlugMigration && typeof SlugMigration.migrate === 'function') {
+                        SlugMigration.migrate({ force: true }).then((result) => {
+                            if (result && result.renamed > 0) {
+                                PopupLogger.log('SlugMigration', `Post-login recovered ${result.renamed} bad slug(s)`);
+                            }
+                        }).catch(() => {});
+                    }
+                } catch {}
                 await maybePromptPostUpdateFetch();
             },
             onUserSignedOut: () => {

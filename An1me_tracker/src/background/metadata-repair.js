@@ -507,7 +507,7 @@ async function startLibraryRepair(options = {}) {
     return state;
 }
 
-async function maybeStartPendingMetadataRepair() {
+async function maybeStartPendingMetadataRepair(force = false) {
     const stored = await bgStorageGet([PENDING_METADATA_REPAIR_KEY]);
     if (!stored[PENDING_METADATA_REPAIR_KEY]) return false;
 
@@ -519,7 +519,7 @@ async function maybeStartPendingMetadataRepair() {
         const lastRun = Number(gateRead[META_LAST_RUN_KEY]) || 0;
         const existingState = await getMetadataRepairState();
         const isIdle = !existingState || existingState.status !== 'running';
-        if (isIdle && lastRun > 0 && (Date.now() - lastRun) < META_REPAIR_GATE_MS) {
+        if (!force && isIdle && lastRun > 0 && (Date.now() - lastRun) < META_REPAIR_GATE_MS) {
 
 
             await bgStorageSet({ [PENDING_METADATA_REPAIR_KEY]: false });

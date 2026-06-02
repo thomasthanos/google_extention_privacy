@@ -15,27 +15,47 @@ function toOrdinal(n) {
     return `${num}th`;
 }
 
+const WATCH_TO_INFO_SLUGS = {
+    'hunterhunter': 'hunter-x-hunter-2011',
+    'hunter-x-hunter-movie-1-phantom-rouge-movie': 'hunter-x-hunter-movie-1-phantom-rouge',
+    'hunter-x-hunter-movie-2-the-last-mission-movie': 'hunter-x-hunter-movie-2-the-last-mission',
+    'initial-d-final-stage-255': 'initial-d-final-stage'
+};
+
 function buildAnimeInfoSlugCandidates(slug) {
     const input = String(slug || '').toLowerCase();
     if (!input) return [];
 
-    const out = [input];
+    let clean = input;
+    if (WATCH_TO_INFO_SLUGS[input]) {
+        clean = WATCH_TO_INFO_SLUGS[input];
+    }
+
+    const out = [clean];
     const add = (value) => {
         if (!value || out.includes(value)) return;
         out.push(value);
     };
 
-    add(input.replace(/-season-?(\d+)(?=$|-)/i, (_m, num) => {
+    if (clean.endsWith('-movie')) {
+        add(clean.replace(/-movie$/i, ''));
+    }
+    if (clean.endsWith('-movie-movie')) {
+        add(clean.replace(/-movie-movie$/i, ''));
+        add(clean.replace(/-movie-movie$/i, '-movie'));
+    }
+
+    add(clean.replace(/-season-?(\d+)(?=$|-)/i, (_m, num) => {
         const ord = toOrdinal(num);
         return ord ? `-${ord}-season` : _m;
     }));
 
-    add(input.replace(/-(\d+)(st|nd|rd|th)-season(?=$|-)/i, '-season-$1'));
+    add(clean.replace(/-(\d+)(st|nd|rd|th)-season(?=$|-)/i, '-season-$1'));
 
-    add(input.replace(/-s(\d+)(?=$|-)/i, '-season-$1'));
+    add(clean.replace(/-s(\d+)(?=$|-)/i, '-season-$1'));
 
-    if (!isSeasonLikeSlug(input)) {
-        const base = input.replace(
+    if (!isSeasonLikeSlug(clean)) {
+        const base = clean.replace(
             /-(?:season-?\d+|(?:\d+)(?:st|nd|rd|th)-season|s\d+|part-?\d+|cour-?\d+|(?:ii|iii|iv|v|vi))$/i,
             ''
         );

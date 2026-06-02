@@ -44,6 +44,7 @@ function CANONICAL_EPISODE_OFFSET_MAPPING() {
 const SERIES_MOVIE_MERGE_SLUGS = new Set([
     'trinity-seven',
     'fate',
+    'hunter-x-hunter'
 ]);
 
 const SeasonGrouping = {
@@ -172,6 +173,7 @@ const SeasonGrouping = {
         if (slug.startsWith('one-piece')) return 'one-piece';
         if (slug.startsWith('dragon-ball')) return 'dragon-ball';
         if (slug.startsWith('naruto')) return 'naruto';
+        if (slug.startsWith('hunter-x-hunter') || slug.startsWith('hunterhunter')) return 'hunter-x-hunter';
 
         return slug
             .replace(/-movie.*$/i, '')
@@ -194,6 +196,7 @@ const SeasonGrouping = {
         if (slug.startsWith('shingeki-no-kyojin')) return 'shingeki-no-kyojin';
         if (slug.startsWith('initial-d')) return 'initial-d';
         if (slug.startsWith('bleach')) return 'bleach';
+        if (slug.startsWith('hunter-x-hunter') || slug.startsWith('hunterhunter')) return 'hunter-x-hunter';
 
         return slug
             .replace(/-season-?\d+(-[a-z-]+)?$/i, '')
@@ -370,6 +373,11 @@ const SeasonGrouping = {
 
         if (slug === 'trinity-seven-nanatsu-no-taizai-to-nana-madoushi') return 2;
 
+        if (slug.startsWith('hunter-x-hunter') || slug.startsWith('hunterhunter')) {
+            if (slug.includes('2011')) return 2;
+            return 1;
+        }
+
         return 1;
     },
 
@@ -438,6 +446,11 @@ const SeasonGrouping = {
         }
 
         if (slug === 'trinity-seven-nanatsu-no-taizai-to-nana-madoushi') return 'Movie: Nanatsu no Taizai to Nana Madoushi';
+
+        if (slug.startsWith('hunter-x-hunter') || slug.startsWith('hunterhunter')) {
+            if (slug.includes('2011')) return '2011 Version';
+            return '1999 Version';
+        }
 
         const seasonNum = this.getSeasonNumber(slug);
         return `Season ${seasonNum}`;

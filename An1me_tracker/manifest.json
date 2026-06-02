@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "An1me.to Tracker",
-  "version": "6.7.1",
+  "version": "6.7.2",
   "description": "Track your anime watching progress on an1me.to with cloud sync across all browsers",
   "author": "ThomasThanos",
   "permissions": [
@@ -43,36 +43,23 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "https://an1me.to/*",
-        "https://*.an1me.to/*"
-      ],
+      "matches": ["https://an1me.to/*", "https://*.an1me.to/*"],
       "exclude_matches": [
         "https://an1me.to/watch/*",
         "https://*.an1me.to/watch/*"
       ],
-      "js": [
-        "src/content/watchlist-sync.js"
-      ],
+      "js": ["src/content/watchlist-sync.js"],
       "run_at": "document_idle",
       "all_frames": false
     },
     {
-      "matches": [
-        "https://an1me.to/*",
-        "https://*.an1me.to/*"
-      ],
-      "js": [
-        "src/content/copy-guard.js"
-      ],
+      "matches": ["https://an1me.to/*", "https://*.an1me.to/*"],
+      "js": ["src/content/copy-guard.js"],
       "run_at": "document_start",
       "all_frames": false
     },
     {
-      "matches": [
-        "https://an1me.to/watch/*",
-        "https://*.an1me.to/watch/*"
-      ],
+      "matches": ["https://an1me.to/watch/*", "https://*.an1me.to/watch/*"],
       "js": [
         "src/common/multipart-mappings.js",
         "src/content/config.js",
@@ -87,24 +74,17 @@
         "src/content/skiptime-helper.js",
         "src/content/main.js",
         "src/common/merge-utils.js",
-        "src/content/merge-utils.js",
         "src/common/firebase-config.js",
         "src/common/firestore-codec.js",
         "src/common/auth-classifier.js",
-        "src/common/auth-tokens.js",
-        "src/content/cloud-sync.js"
+        "src/common/auth-tokens.js"
       ],
       "run_at": "document_idle",
       "all_frames": false
     },
     {
-      "matches": [
-        "https://an1me.to/",
-        "https://*.an1me.to/"
-      ],
-      "js": [
-        "src/content/continue-watching.js"
-      ],
+      "matches": ["https://an1me.to/", "https://*.an1me.to/"],
+      "js": ["src/content/continue-watching.js"],
       "run_at": "document_idle",
       "all_frames": false
     }
@@ -119,10 +99,7 @@
         "src/fonts/PROXON.ttf",
         "src/fonts/comic_sans.ttf"
       ],
-      "matches": [
-        "https://an1me.to/*",
-        "https://*.an1me.to/*"
-      ]
+      "matches": ["https://an1me.to/*", "https://*.an1me.to/*"]
     }
   ]
 }

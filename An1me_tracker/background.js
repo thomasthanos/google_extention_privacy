@@ -1947,7 +1947,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
 
     if (changes.pendingBackgroundMetadataRepair?.newValue === true) {
-        maybeStartPendingMetadataRepair().catch((error) => {
+        maybeStartPendingMetadataRepair(true).catch((error) => {
             console.error('[BG] Failed to start pending repair on flag flip:', error);
         });
     }
@@ -2112,6 +2112,108 @@ async function persistBeforeUnloadTrack(animeInfo, duration) {
 
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message.type === 'SYNC_TO_FIREBASE_IMMEDIATE') {
+        sendResponse({ received: true });
+        if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
+        markSyncPending();
+        syncToFirebase();
+        syncProgressOnly();
+        return true;
+    }
+
+    if (message.type === 'GET_AUTH_STATE') {
+        (async () => {
+            try {
+                const user = await getFirebaseUser();
+                const tokens = await bgStorageGet(['firebase_tokens']);
+                sendResponse({ success: true, user, tokens: tokens?.firebase_tokens || null });
+            } catch (e) {
+                sendResponse({ success: false, error: e.message });
+            }
+        })();
+        return true;
+    }
+
+    if (message.type === 'PUSH_PLAYBACK_SETTINGS') {
+        (async () => {
+            try {
+                const user = await getFirebaseUser();
+                const token = await getFirebaseToken();
+                if (!user || !token) {
+                    sendResponse({ success: false, error: 'not_authenticated' });
+                    return;
+                }
+                const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
+                const mask = 'updateMask.fieldPaths=playbackSettings';
+                const res = await fetchWithTimeout(`${url}?${mask}`, {
+                    method: 'PATCH',
+                    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        fields: jsonToFirestoreFields({
+                            playbackSettings: message.playbackSettings
+                        })
+                    })
+                });
+                if (res.ok) {
+                    if (_bgCloudDocCache && _bgCloudDocCacheUid === user.uid) {
+                        _bgCloudDocCache.playbackSettings = message.playbackSettings;
+                        _bgCloudDocCacheTime = Date.now();
+                        bgStorageSet({
+                            [_BG_CLOUD_CACHE_KEY]: { uid: user.uid, doc: _bgCloudDocCache, cachedAt: _bgCloudDocCacheTime }
+                        }).catch(() => {});
+                    }
+                    sendResponse({ success: true });
+                } else {
+                    const errText = await res.text().catch(() => '');
+                    sendResponse({ success: false, error: `HTTP ${res.status}: ${errText}` });
+                }
+            } catch (e) {
+                sendResponse({ success: false, error: e.message });
+            }
+        })();
+        return true;
+    }
+
+    if (message.type === 'PUSH_ANILIST_AUTH') {
+        (async () => {
+            try {
+                const user = await getFirebaseUser();
+                const token = await getFirebaseToken();
+                if (!user || !token) {
+                    sendResponse({ success: false, error: 'not_authenticated' });
+                    return;
+                }
+                const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
+                const mask = 'updateMask.fieldPaths=anilistAuth';
+                const res = await fetchWithTimeout(`${url}?${mask}`, {
+                    method: 'PATCH',
+                    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        fields: jsonToFirestoreFields({
+                            anilistAuth: message.anilistAuth
+                        })
+                    })
+                });
+                if (res.ok) {
+                    if (_bgCloudDocCache && _bgCloudDocCacheUid === user.uid) {
+                        _bgCloudDocCache.anilistAuth = message.anilistAuth;
+                        _bgCloudDocCacheTime = Date.now();
+                        bgStorageSet({
+                            [_BG_CLOUD_CACHE_KEY]: { uid: user.uid, doc: _bgCloudDocCache, cachedAt: _bgCloudDocCacheTime }
+                        }).catch(() => {});
+                    }
+                    sendResponse({ success: true });
+                } else {
+                    const errText = await res.text().catch(() => '');
+                    sendResponse({ success: false, error: `HTTP ${res.status}: ${errText}` });
+                }
+            } catch (e) {
+                sendResponse({ success: false, error: e.message });
+            }
+        })();
+        return true;
+    }
+
     if (message.type === 'SYNC_TO_FIREBASE') {
         sendResponse({ received: true });
         if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);

@@ -122,7 +122,7 @@ const FillerService = {
 
             if (cached.notFound) {
                 const age = cached.cachedAt ? Date.now() - cached.cachedAt : Infinity;
-                if (age < CONFIG.FILLER_NOT_FOUND_CACHE_TTL) return null;
+                if (age < CONFIG.FILLER_NOT_FOUND_CACHE_TTL) return cached;
                 delete this.episodeTypesCache[animeSlug];
             }
 
@@ -169,7 +169,7 @@ const FillerService = {
                 const notFoundEntry = { notFound: true, cachedAt: Date.now() };
                 this.episodeTypesCache[animeSlug] = notFoundEntry;
                 await Storage.set({ [`episodeTypes_${animeSlug}`]: notFoundEntry });
-                return null;
+                return notFoundEntry;
             } else {
                 throw new Error(response.error || 'Unknown error');
             }
@@ -301,6 +301,9 @@ const FillerService = {
                             processed++;
                             if (onProgress) onProgress(processed, total, animeTitle || slug);
                             if (episodeTypes) {
+                                if (episodeTypes.notFound) {
+                                    return { slug, success: true, notFound: true };
+                                }
                                 this.updateFromEpisodeTypes(slug, episodeTypes);
                                 return { slug, success: true };
                             }

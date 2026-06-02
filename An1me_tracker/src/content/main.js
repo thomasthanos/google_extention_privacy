@@ -365,7 +365,7 @@
         if (ProgressTracker.shouldMarkComplete(currentTime, duration, cachedOutroStartSec)) {
             if (shouldBlockCompletion(currentTime, duration)) {
                 const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
-                Logger.debug(`Threshold reached but only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), waiting...`);
+                Logger.throttled('block-completion-raw', 'DEBUG', 10000, `Threshold reached but only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), waiting...`);
                 return;
             }
             earlyTrackDone = true;
@@ -414,7 +414,7 @@
 
             if (shouldBlockCompletion(currentTime, duration)) {
                 const minWatch = CONFIG.MIN_WATCH_SECONDS_BEFORE_COMPLETE || 120;
-                Logger.debug(`Debounced: threshold reached but only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), waiting...`);
+                Logger.throttled('block-completion-debounced', 'DEBUG', 10000, `Debounced: threshold reached but only ${Math.round(accumulatedPlaybackSeconds)}s of real playback (need ${minWatch}s), waiting...`);
                 return;
             }
 
@@ -597,24 +597,7 @@
             } catch { }
 
             try {
-                const { Storage, EpisodeWriter } = AT;
-                const cs = AT.CloudSync || window.AnimeTrackerContent?.CloudSync;
-                if (cs && typeof cs.pushKeepaliveWithPayload === 'function') {
-                    Storage.get(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']).then((snap) => {
-                        const animeData = snap.animeData || {};
-                        const videoProgress = { ...(snap.videoProgress || {}) };
-                        const deletedAnime = snap.deletedAnime || {};
-                        const groupCovers = snap.groupCoverImages || {};
-                        EpisodeWriter.writeEpisode(animeInfo, duration, animeData, { logPrefix: 'beforeUnload-keepalive' });
-                        const tossIds = [animeInfo.uniqueId];
-                        if (animeInfo.isDoubleEpisode && animeInfo.secondEpisodeNumber) {
-                            const base = animeInfo.uniqueId.replace(/__episode-\d+$/, '');
-                            tossIds.push(`${base}__episode-${animeInfo.secondEpisodeNumber}`);
-                        }
-                        for (const id of tossIds) delete videoProgress[id];
-                        cs.pushKeepaliveWithPayload({ animeData, videoProgress, deletedAnime, groupCoverImages: groupCovers });
-                    }).catch(() => { });
-                }
+                chrome.runtime.sendMessage({ type: 'SYNC_TO_FIREBASE_IMMEDIATE' }, () => { void chrome.runtime.lastError; });
             } catch { }
         } else {
             ProgressTracker.saveVideoProgress(animeInfo.uniqueId, currentTime, duration, true, true);

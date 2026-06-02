@@ -19,10 +19,14 @@
         /-(?:movie|special|ova|ona|recap|pv|music|short)(?:-|$)/i,
         /-hen-movie$/i
     ];
-    function shouldSkipSlugForMigration(slug) {
+    function isMovieOrSpecialSlug(slug) {
         for (const re of SKIP_PATTERNS) {
             if (re.test(slug)) return true;
         }
+        return false;
+    }
+    function shouldSkipSlugForMigration(slug) {
+        // No longer skip movie/ova/special slugs upfront; we check for compatibility when resolving.
         return false;
     }
 
@@ -342,8 +346,14 @@
             state.perSlug[slug] = { triedAt: Date.now(), resolved: resolved || null };
 
             if (resolved) {
-                renames.push({ from: slug, to: resolved });
-                logInfo(`Found target for "${slug}" → "${resolved}"`);
+                const sourceIsMovie = isMovieOrSpecialSlug(slug);
+                const targetIsMovie = isMovieOrSpecialSlug(resolved);
+                if (sourceIsMovie === targetIsMovie) {
+                    renames.push({ from: slug, to: resolved });
+                    logInfo(`Found target for "${slug}" → "${resolved}"`);
+                } else {
+                    logWarn(`Skipping incompatible rename for "${slug}" → "${resolved}" (movie/series type mismatch)`);
+                }
             }
         }
 
