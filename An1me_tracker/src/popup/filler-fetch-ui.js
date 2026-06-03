@@ -260,14 +260,14 @@ const FillerFetchUI = {
     attachEventListeners() {
         document.getElementById(this.IDS.overlay)
             .addEventListener('click', (e) => {
-                if (e.target.id === this.IDS.overlay && !this.state.isRunning) this.close();
+                if (e.target.id === this.IDS.overlay) this.close();
             });
 
         if (this._escHandler) {
             try { document.removeEventListener('keydown', this._escHandler); } catch {}
         }
         this._escHandler = (e) => {
-            if (e.key === 'Escape' && this.state.isOpen && !this.state.isRunning) this.close();
+            if (e.key === 'Escape' && this.state.isOpen) this.close();
         };
         document.addEventListener('keydown', this._escHandler);
     },
@@ -286,13 +286,10 @@ const FillerFetchUI = {
     },
 
     close() {
-        if (this.state.isRunning) return;
         this.state.isOpen = false;
         this.state.autoMode = false;
         document.getElementById(this.IDS.overlay).style.display = 'none';
     },
-
-
 
     resetUI(options = {}) {
         const keepAutoMode = options.autoMode === true;

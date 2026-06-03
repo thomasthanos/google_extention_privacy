@@ -2553,7 +2553,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === 'START_LIBRARY_REPAIR') {
         startLibraryRepair({
             forceInfoRefresh: message.forceInfoRefresh === true,
-            forceFillerRefresh: message.forceFillerRefresh === true
+            forceFillerRefresh: message.forceFillerRefresh === true,
+            isMobile: message.isMobile === true
         })
             .then((state) => sendResponse({ success: true, state }))
             .catch((error) => sendResponse({ success: false, error: error.message }));

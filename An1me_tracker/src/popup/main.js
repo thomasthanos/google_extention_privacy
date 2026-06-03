@@ -3206,7 +3206,7 @@
 
 
             if (stored.metadataRepairState?.status === 'running') {
-                await applyMetadataRepairState(stored.metadataRepairState, { autoOpenRunning: true });
+                await applyMetadataRepairState(stored.metadataRepairState, { autoOpenRunning: false });
             }
         } catch (e) {
             PopupLogger.warn('Init', 'Post-update silent sync failed:', e);
@@ -3240,7 +3240,8 @@
             const response = await sendRuntimeMessage({
                 type: 'START_LIBRARY_REPAIR',
                 forceInfoRefresh,
-                forceFillerRefresh
+                forceFillerRefresh,
+                isMobile: !detectHasGoogleAuth()
             }, 30000);
 
             if (!response?.success) {
@@ -5023,7 +5024,8 @@
                     chrome.runtime.sendMessage({
                         type: 'START_LIBRARY_REPAIR',
                         forceInfoRefresh: false,
-                        forceFillerRefresh: false
+                        forceFillerRefresh: false,
+                        isMobile: !detectHasGoogleAuth()
                     }, (response) => {
                         const err = chrome.runtime.lastError;
                         if (err) {

@@ -12,7 +12,8 @@ const METADATA_REPAIR_RETRYABLE_TTL_MS = 15 * 60 * 1000;
 const METADATA_REPAIR_ITEMS_PER_TICK = 3;
 const METADATA_REPAIR_INTER_ITEM_DELAY_MS = 250;
 const METADATA_REPAIR_MAX_LOGS = 60;
-const METADATA_REPAIR_MAX_ATTEMPTS = 3;
+const isMobileUA = typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPad|iPod|Orion/i.test(navigator.userAgent || '');
+const METADATA_REPAIR_MAX_ATTEMPTS = isMobileUA ? 1 : 2;
 const METADATA_REPAIR_RETRY_BASE_DELAY_MS = 1500;
 
 function delay(ms) {
@@ -160,6 +161,7 @@ function countMetadataRepairOutcome(logEntry) {
 async function buildLibraryRepairPlan(animeData, options = {}) {
     const forceInfoRefresh = options.forceInfoRefresh === true;
     const forceFillerRefresh = options.forceFillerRefresh === true;
+    const isMobile = options.isMobile === true || isMobileUA;
     const entries = Object.entries(animeData || {});
     const storageKeys = [];
 
@@ -176,6 +178,12 @@ async function buildLibraryRepairPlan(animeData, options = {}) {
     let skipped = 0;
 
     for (const [slug, anime] of entries) {
+        if (isMobile) {
+            const listState = anime?.listState || 'active';
+            if (listState === 'completed' || listState === 'dropped') {
+                continue;
+            }
+        }
         const infoEntry = cachedEntries[`animeinfo_${slug}`];
         const fillerEntry = cachedEntries[`episodeTypes_${slug}`];
         const movieLike = isLikelyMovieSlug(slug);

@@ -65,6 +65,9 @@ function buildAnimeInfoSlugCandidates(slug) {
     return out;
 }
 
+const isMobileScraperUA = typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPad|iPod|Orion/i.test(navigator.userAgent || '');
+const SCRAPER_TIMEOUT_MS = isMobileScraperUA ? 6000 : 8000;
+
 async function fetchAnimePageInfo(slug) {
     const candidates = buildAnimeInfoSlugCandidates(slug);
     if (candidates.length === 0) {
@@ -74,7 +77,7 @@ async function fetchAnimePageInfo(slug) {
     let resolvedSlug = candidates[0];
     let url = `https://an1me.to/anime/${resolvedSlug}/`;
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 15000);
+    const timer = setTimeout(() => ctrl.abort(), SCRAPER_TIMEOUT_MS);
     let response;
     try {
         response = await fetch(url, { signal: ctrl.signal });
@@ -85,7 +88,7 @@ async function fetchAnimePageInfo(slug) {
     if (!response.ok && response.status === 404 && candidates.length > 1) {
         for (const candidateSlug of candidates.slice(1)) {
             const ctrl2 = new AbortController();
-            const timer2 = setTimeout(() => ctrl2.abort(), 15000);
+            const timer2 = setTimeout(() => ctrl2.abort(), SCRAPER_TIMEOUT_MS);
             try {
                 const candidateResponse = await fetch(`https://an1me.to/anime/${candidateSlug}/`, { signal: ctrl2.signal });
                 if (candidateResponse.ok) {
