@@ -88,6 +88,10 @@ app.use(
         return callback(null, true);
       }
 
+      if (origin.startsWith("chrome-extension://")) {
+        return callback(null, true);
+      }
+
       return callback(new Error("Not allowed by CORS"));
     }
   })
@@ -130,7 +134,7 @@ const mailTransport = nodemailer.createTransport({
   }
 });
 
-async function sendEmail({ to, subject, html }) {
+async function sendEmail({ to, subject, html, text }) {
   const from = `"${process.env.SMTP_FROM_NAME || appName}" <${process.env.SMTP_FROM_EMAIL}>`;
 
   if (process.env.RESEND_API_KEY) {
@@ -144,7 +148,8 @@ async function sendEmail({ to, subject, html }) {
         from,
         to,
         subject,
-        html
+        html,
+        text
       })
     });
 
@@ -160,7 +165,8 @@ async function sendEmail({ to, subject, html }) {
     from,
     to,
     subject,
-    html
+    html,
+    text
   });
 }
 
@@ -214,7 +220,11 @@ app.post("/send-password-reset", passwordResetLimiter, async (req, res) => {
     await sendEmail({
       to: email,
       subject: `Reset your ${appName} password`,
-      html
+      html,
+      text:
+        `A password reset was requested for ${email}.\n\n` +
+        `Reset your ${appName} password here:\n${resetLink}\n\n` +
+        "If you did not request this email, you can safely ignore it."
     });
   } catch (error) {
     console.error("Password reset email failed:", error);

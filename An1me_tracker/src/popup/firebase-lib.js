@@ -3,6 +3,8 @@ const FirebaseLib = (function () {
 
   const API_KEY = firebaseConfig.apiKey;
   const PROJECT_ID = firebaseConfig.projectId;
+  const PASSWORD_RESET_ENDPOINT =
+    "https://an1me-tracker-password-reset.onrender.com/send-password-reset";
 
   const OAUTH_CLIENT_ID_LOCAL = '851894443732-st4bqk291b03jf6bscup0eqck2n60gmq.apps.googleusercontent.com';
 //   const OAUTH_CLIENT_ID_LOCAL =
@@ -905,35 +907,40 @@ const FirebaseLib = (function () {
   async function sendPasswordReset(email) {
     if (!email) throw new Error("MISSING_EMAIL");
     try {
-      await _identityToolkitPost("accounts:sendOobCode", {
-        requestType: "PASSWORD_RESET",
-        email,
+      const response = await fetchWithTimeout(PASSWORD_RESET_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
       });
+
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch {}
+
+      if (!response.ok) {
+        throw new Error(payload?.message || "RESET_EMAIL_FAILED");
+      }
+
       PopupLogger.log(
         "Firebase",
-        `Password reset request accepted for ${email}`,
+        `Custom password reset request accepted for ${email}`,
       );
       return {
         ok: true,
-        message:
+        message: payload?.message ||
           "If an account exists for that email, a reset link has been sent.",
       };
     } catch (err) {
-      const map = mapIdentityToolkitError(err?.message);
-
-      if (map.suppressError) {
-        PopupLogger.log(
-          "Firebase",
-          `Password reset (treating as success): ${err?.message}`,
-        );
-        return { ok: true, message: map.friendly };
-      }
-      const friendlyErr = new Error(map.friendly);
-      friendlyErr.code = String(err?.message || "")
-        .split(":")[0]
-        .trim()
-        .toUpperCase()
-        .replace(/\s+/g, "_");
+      PopupLogger.warn(
+        "Firebase",
+        `Custom password reset failed: ${err?.message || err}`,
+      );
+      const friendlyErr = new Error(
+        "Couldn't send the reset email. Please try again.",
+      );
       friendlyErr.original = err;
       throw friendlyErr;
     }
