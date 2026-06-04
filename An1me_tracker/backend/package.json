@@ -1,0 +1,18 @@
+{
+  "name": "an1me-tracker-password-reset-backend",
+  "version": "1.0.0",
+  "description": "Custom Firebase password reset email backend for An1me Tracker.",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "firebase-admin": "^13.0.2",
+    "nodemailer": "^6.9.16"
+  }
+}
