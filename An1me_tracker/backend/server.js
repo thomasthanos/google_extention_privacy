@@ -18,17 +18,25 @@ const genericSuccessMessage =
   "If this email exists, a password reset email has been sent.";
 
 const requiredEnvVars = [
-  "SMTP_HOST",
-  "SMTP_USER",
-  "SMTP_PASS",
   "SMTP_FROM_EMAIL",
   "ACTION_URL"
 ];
 
 const missingEnvVars = requiredEnvVars.filter((key) => !process.env[key]);
+const hasSmtpConfig = Boolean(
+  process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS
+);
+const hasResendApiConfig = Boolean(process.env.RESEND_API_KEY);
+
 if (missingEnvVars.length > 0) {
   console.warn(
     `Missing environment values: ${missingEnvVars.join(", ")}. The server can start, but email sending will fail until they are set.`
+  );
+}
+
+if (!hasSmtpConfig && !hasResendApiConfig) {
+  console.warn(
+    "Missing email sender config. Set RESEND_API_KEY for production hosting, or SMTP_HOST, SMTP_USER, and SMTP_PASS for SMTP/Nodemailer."
   );
 }
 
@@ -115,6 +123,40 @@ const mailTransport = nodemailer.createTransport({
   }
 });
 
+async function sendEmail({ to, subject, html }) {
+  const from = `"${process.env.SMTP_FROM_NAME || appName}" <${process.env.SMTP_FROM_EMAIL}>`;
+
+  if (process.env.RESEND_API_KEY) {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from,
+        to,
+        subject,
+        html
+      })
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`Resend API failed with ${response.status}: ${errorBody}`);
+    }
+
+    return;
+  }
+
+  await mailTransport.sendMail({
+    from,
+    to,
+    subject,
+    html
+  });
+}
+
 function isValidEmail(email) {
   return typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -162,8 +204,7 @@ app.post("/send-password-reset", passwordResetLimiter, async (req, res) => {
       appName
     );
 
-    await mailTransport.sendMail({
-      from: `"${process.env.SMTP_FROM_NAME || appName}" <${process.env.SMTP_FROM_EMAIL}>`,
+    await sendEmail({
       to: email,
       subject: `Reset your ${appName} password`,
       html
