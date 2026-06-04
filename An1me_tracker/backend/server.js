@@ -95,6 +95,13 @@ app.use(
 
 app.use(express.json({ limit: "20kb" }));
 
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "An1me Tracker password reset backend is running."
+  });
+});
+
 app.get("/health", (req, res) => {
   res.json({
     success: true,
