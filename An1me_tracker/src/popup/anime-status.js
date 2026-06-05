@@ -114,17 +114,24 @@
         );
     }
 
-    function setManualListState(entry, state, at = new Date().toISOString()) {
+    function setManualListState(entry, state, at = new Date().toISOString(), isManual = false) {
         if (!entry) return;
         entry.listState = state;
         entry.listStateUpdatedAt = at;
 
         if (state === 'completed') {
             entry.completedAt = entry.completedAt || at;
+            if (isManual) {
+                entry.manualComplete = true;
+            } else {
+                delete entry.manualComplete;
+            }
             delete entry.droppedAt;
             delete entry.onHoldAt;
             return;
         }
+
+        delete entry.manualComplete;
 
         if (state === 'dropped') {
             entry.droppedAt = entry.droppedAt || at;
@@ -186,19 +193,31 @@
             const listState = String(anime.listState || '').toLowerCase();
             if (!anime.completedAt && listState !== 'completed') continue;
             if (AT.SeasonGrouping.isMovie(slug, anime)) continue;
+            if (anime.manualComplete === true) continue;
 
             const watchedCount = Array.isArray(anime.episodes) ? anime.episodes.length : 0;
             if (watchedCount <= 0) continue;
 
             const lowerSlug = String(slug || '').toLowerCase();
             const anilistStatus = AT.AnilistService?.getStatus(lowerSlug);
-            if (anilistStatus !== 'RELEASING') continue;
-
             const knownTotal = getKnownTotalEpisodesForRepair(lowerSlug, anime);
             if (knownTotal <= watchedCount) continue;
 
-            setManualListState(anime, 'active', new Date().toISOString());
-            changed = true;
+            let shouldRevert = false;
+            if (anilistStatus === 'RELEASING') {
+                shouldRevert = true;
+            } else {
+                const totalCanon = AT.FillerService?.getTotalCanonEpisodes(lowerSlug, knownTotal) || knownTotal;
+                const canonWatched = AT.FillerService?.getCanonEpisodeCount(lowerSlug, anime.episodes) || watchedCount;
+                if (canonWatched < totalCanon) {
+                    shouldRevert = true;
+                }
+            }
+
+            if (shouldRevert) {
+                setManualListState(anime, 'active', new Date().toISOString());
+                changed = true;
+            }
         }
 
         return changed;

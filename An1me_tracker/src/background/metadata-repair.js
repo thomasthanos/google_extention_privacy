@@ -329,6 +329,14 @@ async function finalizeMetadataRepair(state, patch = {}) {
     };
     await setMetadataRepairState(finalState);
     await chrome.alarms.clear(METADATA_REPAIR_ALARM);
+
+    // If there is a pending repair (e.g. from an anime added during this run), trigger it once this loop completes.
+    setTimeout(() => {
+        maybeStartPendingMetadataRepair(true).catch((error) => {
+            console.error('[BG] Failed to trigger pending repair after finalization:', error);
+        });
+    }, 100);
+
     return finalState;
 }
 
@@ -459,16 +467,19 @@ async function runMetadataRepairBatch(options = {}) {
 }
 
 async function startLibraryRepair(options = {}) {
-    await bgStorageSet({ [PENDING_METADATA_REPAIR_KEY]: false });
-
     const existing = await getMetadataRepairState();
     if (existing?.status === 'running') {
+        // If already running, mark the pending flag as true so that it starts a new sweep
+        // when the current one finishes, ensuring no newly added anime are missed.
+        await bgStorageSet({ [PENDING_METADATA_REPAIR_KEY]: true });
         scheduleMetadataRepairFallback(1);
         runMetadataRepairBatch().catch((error) => {
             console.error('[BG] Failed to resume running repair:', error);
         });
         return existing;
     }
+
+    await bgStorageSet({ [PENDING_METADATA_REPAIR_KEY]: false });
 
     const stored = await bgStorageGet(['animeData']);
     const animeData = stored.animeData || {};

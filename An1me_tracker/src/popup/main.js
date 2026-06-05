@@ -125,7 +125,7 @@
 
 
 
-    const POPUP_CLOUD_REFRESH_MS = 5 * 60 * 1000;
+    const POPUP_CLOUD_REFRESH_MS = 30 * 1000;
     let popupCloudRefreshTimer = null;
 
     function getSettingsDonateButton() {
@@ -2013,6 +2013,11 @@
         if (forceFresh) {
             try { AT.FirebaseSync.clearCachedUserDocument(); } catch {}
         }
+        try {
+            chrome.runtime.sendMessage({ type: 'WAKE_AND_POLL_CLOUD' });
+        } catch (e) {
+            PopupLogger.debug('Sync', 'Failed to dispatch bg cloud poll request:', e);
+        }
         await loadAndSyncData();
     }
 
@@ -2181,7 +2186,7 @@
             if (wasCompleted) {
                 setManualListState(animeData[slug], 'active', now);
             } else {
-                setManualListState(animeData[slug], 'completed', now);
+                setManualListState(animeData[slug], 'completed', now, true);
             }
 
             const result = await Storage.get(['videoProgress', 'deletedAnime', 'groupCoverImages']);
@@ -4671,7 +4676,8 @@
 
             if (changes.metadataRepairState) {
                 handledRepairStateChange = true;
-                void applyMetadataRepairState(changes.metadataRepairState.newValue || null, { autoOpenRunning: true });
+                const isLoggedIn = !!AT?.FirebaseSync?.getUser?.();
+                void applyMetadataRepairState(changes.metadataRepairState.newValue || null, { autoOpenRunning: isLoggedIn });
             }
 
 
@@ -5002,6 +5008,11 @@
                 } catch {}
                 await refreshPopupCloudData(true);
                 startPopupCloudRefresh();
+                try {
+                    chrome.runtime.sendMessage({ type: 'WAKE_AND_POLL_CLOUD_FORCE' });
+                } catch (e) {
+                    PopupLogger.error('Login', 'Failed to trigger cloud poll:', e);
+                }
 
 
 

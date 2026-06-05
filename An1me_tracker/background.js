@@ -1936,9 +1936,21 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     }
 
     if (changes.animeData) {
-        maybeStartPendingMetadataRepair().catch((error) => {
-            console.error('[BG] Failed to honor pending repair request:', error);
-        });
+        const oldAnime = changes.animeData.oldValue || {};
+        const newAnime = changes.animeData.newValue || {};
+        const oldSlugs = Object.keys(oldAnime);
+        const newSlugs = Object.keys(newAnime);
+        const hasNewSlug = newSlugs.some(s => !oldSlugs.includes(s));
+
+        if (hasNewSlug) {
+            bgStorageSet({ pendingBackgroundMetadataRepair: true }).catch((error) => {
+                console.error('[BG] Failed to trigger repair for new anime:', error);
+            });
+        } else {
+            maybeStartPendingMetadataRepair().catch((error) => {
+                console.error('[BG] Failed to honor pending repair request:', error);
+            });
+        }
     }
 
 
@@ -2658,12 +2670,6 @@ chrome.runtime.onInstalled.addListener((details) => {
                 payload.postUpdateFetchToVersion = toVersion;
             }
             return bgStorageSet(payload);
-        }).then(() => {
-
-
-            maybeStartPendingMetadataRepair().catch((error) => {
-                console.warn('[BG] Post-update repair start failed:', error);
-            });
         }).catch((e) => console.warn('[BG] Post-update flag write failed:', e));
     }
 });
