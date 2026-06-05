@@ -18,7 +18,6 @@
     "https://identitytoolkit.googleapis.com/*",
     "https://securetoken.googleapis.com/*",
     "https://firestore.googleapis.com/*",
-    "https://an1me-tracker-password-reset.onrender.com/*",
     "https://graphql.anilist.co/*",
     "https://www.animefillerlist.com/*",
     "https://api.jikan.moe/*",

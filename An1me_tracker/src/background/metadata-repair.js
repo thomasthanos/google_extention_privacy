@@ -58,9 +58,8 @@ async function runMetadataRepairWithRetry(task, options = {}) {
     throw lastError || new Error('Metadata repair retry failed');
 }
 
-function scheduleMetadataRepairTick(delayMs = 0) {
-    const when = Date.now() + Math.max(50, delayMs);
-    chrome.alarms.create(METADATA_REPAIR_ALARM, { when });
+function scheduleMetadataRepairFallback(delayInMinutes = 1) {
+    chrome.alarms.create(METADATA_REPAIR_ALARM, { delayInMinutes });
 }
 
 async function getMetadataRepairState() {
@@ -334,8 +333,6 @@ async function finalizeMetadataRepair(state, patch = {}) {
 }
 
 async function runMetadataRepairBatch(options = {}) {
-    const { maxItems = METADATA_REPAIR_ITEMS_PER_TICK } = options;
-
     if (metadataRepairInProgress) return false;
     metadataRepairInProgress = true;
 
@@ -346,7 +343,10 @@ async function runMetadataRepairBatch(options = {}) {
             return false;
         }
 
-        for (let step = 0; step < maxItems; step++) {
+        // Schedule an initial fallback alarm for 2 minutes to handle unexpected crashes/suspensions
+        scheduleMetadataRepairFallback(2);
+
+        while (true) {
             state = await getMetadataRepairState();
             if (!state || state.status !== 'running') {
                 await chrome.alarms.clear(METADATA_REPAIR_ALARM);
@@ -376,6 +376,11 @@ async function runMetadataRepairBatch(options = {}) {
                     updatedAt: startedAt
                 };
                 await setMetadataRepairState(state);
+            }
+
+            // Extend/refresh fallback alarm every 5 items to keep background execution slice active
+            if (index % 5 === 0) {
+                scheduleMetadataRepairFallback(2);
             }
 
             let infoResult;
@@ -435,9 +440,6 @@ async function runMetadataRepairBatch(options = {}) {
             await setMetadataRepairState(state);
             await delay(METADATA_REPAIR_INTER_ITEM_DELAY_MS);
         }
-
-        scheduleMetadataRepairTick(500);
-        return true;
     } catch (error) {
         console.error('[BG] Library repair failed:', error);
         const state = await getMetadataRepairState();
@@ -447,6 +449,8 @@ async function runMetadataRepairBatch(options = {}) {
                 errorMessage: error.message || 'Unknown repair error',
                 completedAt: new Date().toISOString()
             });
+        } else {
+            await chrome.alarms.clear(METADATA_REPAIR_ALARM).catch(() => {});
         }
         return false;
     } finally {
@@ -459,8 +463,8 @@ async function startLibraryRepair(options = {}) {
 
     const existing = await getMetadataRepairState();
     if (existing?.status === 'running') {
-        scheduleMetadataRepairTick(0);
-        runMetadataRepairBatch({ maxItems: 1 }).catch((error) => {
+        scheduleMetadataRepairFallback(1);
+        runMetadataRepairBatch().catch((error) => {
             console.error('[BG] Failed to resume running repair:', error);
         });
         return existing;
@@ -508,8 +512,8 @@ async function startLibraryRepair(options = {}) {
     }
 
     await setMetadataRepairState(state);
-    scheduleMetadataRepairTick(0);
-    runMetadataRepairBatch({ maxItems: 1 }).catch((error) => {
+    scheduleMetadataRepairFallback(1);
+    runMetadataRepairBatch().catch((error) => {
         console.error('[BG] Failed to start library repair batch:', error);
     });
     return state;
@@ -547,8 +551,8 @@ async function maybeStartPendingMetadataRepair(force = false) {
 async function resumeMetadataRepairIfNeeded() {
     const state = await getMetadataRepairState();
     if (state?.status !== 'running') return;
-    scheduleMetadataRepairTick(0);
-    runMetadataRepairBatch({ maxItems: 1 }).catch((error) => {
+    scheduleMetadataRepairFallback(1);
+    runMetadataRepairBatch().catch((error) => {
         console.error('[BG] Failed to resume metadata repair on boot:', error);
     });
 }
