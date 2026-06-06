@@ -256,7 +256,7 @@ const AnimeCardRenderer = {
         let inlineEtaHtml = '';
         try {
             const StatsEngine = window.AnimeTracker?.StatsEngine;
-            const knownTotalEpisodes = Number(anime.totalEpisodes) || Number(AnilistService?.getTotalEpisodes(slug)) || 0;
+            const knownTotalEpisodes = Number(AnilistService?.getTotalEpisodes(slug)) || Number(anime.totalEpisodes) || 0;
             const nextEpisodeAtRaw = AnilistService?.getNextEpisodeAt(slug);
             const nextEpisodeAt = nextEpisodeAtRaw ? new Date(nextEpisodeAtRaw) : null;
             const hasUpcomingCountdown = !!nextEpisodeAt && Number.isFinite(nextEpisodeAt.getTime()) && nextEpisodeAt.getTime() > Date.now();

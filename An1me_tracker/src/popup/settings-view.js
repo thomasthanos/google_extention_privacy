@@ -36,12 +36,18 @@
     }
 
 
-    function renderHeader(user) {
+    function renderHeader(user, needsReauth = false) {
         const photo = user?.photoURL ? escapeHtml(user.photoURL) : 'src/icons/icon48.png';
         const name = escapeHtml(user?.displayName || user?.email?.split('@')[0] || 'User');
         const email = escapeHtml(user?.email || '');
         const signedIn = !!user;
 
+        const bannerHtml = (signedIn && needsReauth) ? `
+            <div class="settings-reauth-banner" id="settingsReauthBanner">
+                <span class="settings-reauth-warning">Cloud sync paused. Reconnect required.</span>
+                <button class="settings-reauth-btn" id="settingsReauthBtn" type="button">Reconnect</button>
+            </div>
+        ` : '';
 
         return `
             <header class="settings-header" data-signed-in="${signedIn}">
@@ -57,6 +63,7 @@
                 </div>
                 <span class="settings-account-status" data-when="signed-out"
                       ${signedIn ? 'hidden' : ''}>Local only</span>
+                ${bannerHtml}
             </header>
         `;
     }
@@ -227,7 +234,8 @@
             user = null,
             settings = {},
             passwordIsSet = false,
-            isMobile = false
+            isMobile = false,
+            needsReauth = false
         } = params;
 
         const state = {
@@ -243,7 +251,7 @@
         if (!alreadyRendered) {
             container.innerHTML = `
                 <div class="settings-view-inner">
-                    ${renderHeader(user)}
+                    ${renderHeader(user, needsReauth)}
                     ${renderPreferencesSection(state)}
                     ${renderConnectionsSection()}
                     ${renderDataSection()}
@@ -278,7 +286,23 @@
             if (user) localOnlyBadge.setAttribute('hidden', '');
             else localOnlyBadge.removeAttribute('hidden');
         }
-        if (headerEl) headerEl.dataset.signedIn = user ? 'true' : 'false';
+        if (headerEl) {
+            headerEl.dataset.signedIn = user ? 'true' : 'false';
+            
+            const bannerEl = headerEl.querySelector('#settingsReauthBanner');
+            if (user && needsReauth) {
+                if (!bannerEl) {
+                    headerEl.insertAdjacentHTML('beforeend', `
+                        <div class="settings-reauth-banner" id="settingsReauthBanner">
+                            <span class="settings-reauth-warning">Cloud sync paused. Reconnect required.</span>
+                            <button class="settings-reauth-btn" id="settingsReauthBtn" type="button">Reconnect</button>
+                        </div>
+                    `);
+                }
+            } else {
+                bannerEl?.remove();
+            }
+        }
 
 
         const dangerCard = container.querySelector('.settings-card--danger .settings-action-grid');

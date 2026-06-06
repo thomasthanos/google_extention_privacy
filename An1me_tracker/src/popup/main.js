@@ -1503,6 +1503,7 @@
 
         let storedSettings = {};
         let passwordIsSet = false;
+        let needsReauth = false;
         try {
             const stored = await chrome.storage.local.get([
                 COPY_GUARD_STORAGE_KEY,
@@ -1522,6 +1523,7 @@
 
 
             passwordIsSet = !!(marker?.uid && user?.uid && marker.uid === user.uid && marker.setAt);
+            needsReauth = await window.FirebaseLib?.isReauthNeeded?.() || false;
         } catch (e) {
             PopupLogger.warn('Settings', 'Failed to load toggle state for view:', e);
         }
@@ -1530,7 +1532,8 @@
             user,
             settings: storedSettings,
             passwordIsSet,
-            isMobile: !detectHasGoogleAuth()
+            isMobile: !detectHasGoogleAuth(),
+            needsReauth
         });
 
         container.scrollTop = 0;
@@ -3900,6 +3903,9 @@
         const toast = document.createElement('div');
         toast.id = 'atGenericToast';
         toast.className = `at-toast at-toast--${type}`;
+        if (typeof opts.onClick === 'function') {
+            toast.classList.add('at-toast--clickable');
+        }
         toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
         toast.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
         toast.style.setProperty('--at-toast-duration', `${duration}ms`);
@@ -3928,8 +3934,8 @@
             <button type="button" class="at-toast-close" aria-label="Dismiss">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                      stroke-linecap="round" aria-hidden="true">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
+                     <line x1="18" y1="6" x2="6" y2="18"/>
+                     <line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
             </button>
             <span class="at-toast-progress" aria-hidden="true"></span>
@@ -3944,7 +3950,19 @@
             toast.classList.add('at-toast--leaving');
             setTimeout(() => { try { toast.remove(); } catch {             } }, 180);
         };
-        toast.querySelector('.at-toast-close').addEventListener('click', dismiss);
+        
+        toast.querySelector('.at-toast-close').addEventListener('click', (e) => {
+            e.stopPropagation();
+            dismiss();
+        });
+
+        if (typeof opts.onClick === 'function') {
+            toast.addEventListener('click', (e) => {
+                if (e.target.closest('.at-toast-close')) return;
+                dismiss();
+                opts.onClick();
+            });
+        }
 
         document.body.appendChild(toast);
 
@@ -3967,13 +3985,15 @@
     window.AnimeTracker = window.AnimeTracker || {};
     window.AnimeTracker.showToast = showToast;
 
-    async function signOut() {
+    async function signOut(preserveLocalData = true) {
         const { Storage, FirebaseSync } = AT;
-        animeData = {};
-        videoProgress = {};
+        if (!preserveLocalData) {
+            animeData = {};
+            videoProgress = {};
+            await Storage.set({ animeData: {}, videoProgress: {} });
+        }
         lastMetadataRepairState = null;
         await chrome.storage.local.set({ pendingBackgroundMetadataRepair: false, metadataRepairState: null });
-        await Storage.set({ animeData: {}, videoProgress: {} });
         await FirebaseSync.signOut();
         renderAnimeList();
         updateStats();
@@ -4199,6 +4219,13 @@
                 setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
                 signOut();
+                return;
+            }
+
+            if (e.target.closest('#settingsReauthBtn')) {
+                setSettingsDataToolsExpanded(false);
+                setSettingsPreferencesExpanded(false);
+                signOut(true);
                 return;
             }
 
@@ -4993,9 +5020,10 @@
                     if (needs) {
                         showToast({
                             title: 'Reconnect to sync',
-                            body: 'We could not reach Firebase recently. Sign in again to resume cloud sync — your data is safe locally.',
+                            body: 'We could not reach Firebase recently. Click here to reconnect to sync.',
                             type: 'warn',
-                            duration: 9000
+                            duration: 9000,
+                            onClick: () => signOut(true)
                         });
                     }
                 } catch {                                         }

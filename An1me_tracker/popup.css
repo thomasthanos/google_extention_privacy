@@ -6078,6 +6078,16 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
                      0 1px 0 rgba(255, 255, 255, 0.15) inset
 }
 
+.at-toast--clickable {
+  cursor: pointer;
+}
+
+.at-toast--clickable.at-toast--visible:hover {
+  transform: translate(-50%, -2px);
+  filter: brightness(1.08);
+}
+
+
 .at-toast-icon {
   flex-shrink: 0;
   width: 18px;
@@ -7878,6 +7888,49 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .settings-pill-signout .settings-icon {
   width: 15px;
   height: 15px
+}
+
+/* Reconnect/Reauth banner */
+.settings-reauth-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(240, 80, 80, 0.08);
+  border: 1px solid rgba(240, 80, 80, 0.25);
+  border-radius: 10px;
+  margin-top: 8px;
+  box-sizing: border-box;
+}
+
+.settings-reauth-warning {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #ff9d9d;
+}
+
+.settings-reauth-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid rgba(240, 80, 80, 0.45);
+  background: rgba(240, 80, 80, 0.22);
+  color: #ffcfcf;
+  transition: all var(--tf);
+}
+
+.settings-reauth-btn:hover {
+  background: rgba(240, 80, 80, 0.35);
+  border-color: rgba(240, 80, 80, 0.65);
+  color: #fff;
 }
 
 /* When signed out, the pill is hidden and we show the Local-only badge instead.

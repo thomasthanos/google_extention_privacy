@@ -477,11 +477,22 @@ const FillerService = {
 
     getTotalEpisodes(slug, anime = null) {
         const normalizedSlug = slug.toLowerCase();
-        const candidates = [];
-
         const anilistService = window.AnimeTracker?.AnilistService;
         const anilistTotal = anilistService?.getTotalEpisodes(normalizedSlug);
-        if (Number.isFinite(anilistTotal) && anilistTotal > 0) candidates.push(anilistTotal);
+
+        // If AniList has a valid total episodes count, we should prioritize it!
+        if (Number.isFinite(anilistTotal) && anilistTotal > 0) {
+            let maxTracked = 0;
+            if (anime && Array.isArray(anime.episodes)) {
+                for (const ep of anime.episodes) {
+                    const n = Number(ep?.number) || 0;
+                    if (n > maxTracked) maxTracked = n;
+                }
+            }
+            return Math.max(anilistTotal, maxTracked);
+        }
+
+        const candidates = [];
 
         if (anime && Number.isFinite(anime.totalEpisodes) && anime.totalEpisodes > 0) {
             candidates.push(anime.totalEpisodes);

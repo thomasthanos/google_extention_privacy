@@ -341,7 +341,7 @@
 
         const anilist = window.AnimeTracker?.AnilistService;
         const configuredTarget = Number(anime.targetEpisodes) || 0;
-        const total = configuredTarget || Number(anime.totalEpisodes) || Number(anilist?.getTotalEpisodes?.(anime.slug)) || 0;
+        const total = configuredTarget || Number(anilist?.getTotalEpisodes?.(anime.slug)) || Number(anime.totalEpisodes) || 0;
         const allowSingleEpisodeForecast = !!anime.allowSingleEpisodeForecast;
         if (!total) return null;
 

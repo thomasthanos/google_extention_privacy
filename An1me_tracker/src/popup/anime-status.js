@@ -169,11 +169,12 @@
 
     function getKnownTotalEpisodesForRepair(slug, anime) {
         const AT = window.AnimeTracker;
-        const localTotal = Number(anime?.totalEpisodes) || 0;
         const cachedTotal = Number(
             AT.AnilistService?.getTotalEpisodes(String(slug || '').toLowerCase())
         ) || 0;
-        return Math.max(localTotal, cachedTotal, 0);
+        if (cachedTotal > 0) return cachedTotal;
+        const localTotal = Number(anime?.totalEpisodes) || 0;
+        return Math.max(localTotal, 0);
     }
 
 
