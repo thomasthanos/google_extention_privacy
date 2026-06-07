@@ -146,13 +146,6 @@
         return t || String(title || '').trim();
     }
 
-    function _stripMovieNumber(title) {
-        return String(title || '')
-            .replace(/\b(?:movie|film)\s+0?\d{1,2}\b/gi, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-    }
-
 
     function _sanitizeQuery(title) {
         let t = String(title || '');

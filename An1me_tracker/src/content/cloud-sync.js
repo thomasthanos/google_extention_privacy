@@ -204,7 +204,7 @@
             const tokens = {
                 idToken: data.id_token,
                 refreshToken: data.refresh_token,
-                expiresAt: Date.now() + parseInt(data.expires_in) * 1000
+                expiresAt: Date.now() + parseInt(data.expires_in, 10) * 1000
             };
             try { await chrome.storage.local.set({ firebase_tokens: tokens }); } catch (e) {
                 Logger?.warn(`Failed to persist refreshed token: ${e.message}`);
@@ -1186,12 +1186,20 @@
             (async () => {
                 try { currentToken = await getValidToken(); } catch { }
             })();
-            setInterval(async () => {
+            const swTokenRefreshTimer = setInterval(async () => {
                 try {
                     const t = await getValidToken();
                     if (t) currentToken = t;
                 } catch { }
             }, 45 * 60 * 1000);
+            let swTeardownRan = false;
+            const swTeardown = () => {
+                if (swTeardownRan) return;
+                swTeardownRan = true;
+                clearInterval(swTokenRefreshTimer);
+            };
+            window.addEventListener('beforeunload', swTeardown);
+            window.addEventListener('pagehide', swTeardown, { passive: true });
             return;
         }
 

@@ -879,7 +879,8 @@
                 }
             }
 
-            const allLinks = document.querySelectorAll(`a[href*="${animeSlug}-episode-"]`);
+            const cssSlug = animeSlug.replace(/["\\]/g, '\\$&');
+            const allLinks = document.querySelectorAll(`a[href*="${cssSlug}-episode-"]`);
             for (const a of allLinks) {
                 const m = (a.getAttribute('href') || '').match(hrefPattern);
                 if (!m) continue;
@@ -1449,10 +1450,12 @@
                 }
             }, 200);
         };
+        // Persistent for the document lifetime — intentionally NOT tied to
+        // VideoMonitor.cleanup(), which runs on every init() and would otherwise
+        // tear this down after the first episode, killing SPA-navigation re-init.
+        // handleUrlChange is idempotent (module-level lastUrl), so a single
+        // registration is correct.
         window.addEventListener('at:locationchange', handleUrlChange);
-        VideoMonitor.addCleanup(() => {
-            window.removeEventListener('at:locationchange', handleUrlChange);
-        });
 
         document.addEventListener('click', (e) => {
             const target = e.target.closest('[data-open-nav-episode], .episode-navigation, .next-episode, .prev-episode, .episode-list-item, a, button');

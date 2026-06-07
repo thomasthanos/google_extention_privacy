@@ -229,7 +229,7 @@ const FirebaseLib = (function () {
             const tokens = {
               idToken: data.idToken,
               refreshToken: data.refreshToken,
-              expiresAt: Date.now() + parseInt(data.expiresIn) * 1000,
+              expiresAt: Date.now() + parseInt(data.expiresIn, 10) * 1000,
             };
 
             await chrome.storage.local.set({
@@ -400,7 +400,7 @@ const FirebaseLib = (function () {
         const tokens = {
           idToken: data.id_token,
           refreshToken: data.refresh_token,
-          expiresAt: Date.now() + parseInt(data.expires_in) * 1000,
+          expiresAt: Date.now() + parseInt(data.expires_in, 10) * 1000,
         };
 
         const tokensHelper = window.AnimeTrackerAuthTokens;
@@ -758,7 +758,7 @@ const FirebaseLib = (function () {
     const tokens = {
       idToken: data.idToken,
       refreshToken: data.refreshToken,
-      expiresAt: Date.now() + parseInt(data.expiresIn) * 1000,
+      expiresAt: Date.now() + parseInt(data.expiresIn, 10) * 1000,
     };
     await chrome.storage.local.set({
       [STORAGE_KEYS.USER]: user,
@@ -850,7 +850,7 @@ const FirebaseLib = (function () {
       const tokens = {
         idToken: data.idToken,
         refreshToken: data.refreshToken,
-        expiresAt: Date.now() + parseInt(data.expiresIn) * 1000,
+        expiresAt: Date.now() + parseInt(data.expiresIn, 10) * 1000,
       };
       await chrome.storage.local.set({ [STORAGE_KEYS.TOKENS]: tokens });
     }

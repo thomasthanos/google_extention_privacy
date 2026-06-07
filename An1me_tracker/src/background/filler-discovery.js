@@ -97,7 +97,6 @@ function generateFillerSlugCandidates(an1meSlug, animeTitle) {
         'yakusoku-no-neverland': 'promised-neverland',
         'tensei-shitara-slime-datta-ken': 'that-time-i-got-reincarnated-slime',
         'kenpuu-denki': 'berserk',
-        'naruto-shippuuden': 'naruto-shippuden',
     };
     for (const [jpBase, enBase] of Object.entries(JP_TO_EN)) {
         if (slug.startsWith(jpBase)) {

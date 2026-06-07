@@ -766,7 +766,7 @@ async function refreshFirebaseToken(refreshToken) {
         const tokens = {
             idToken: data.id_token,
             refreshToken: data.refresh_token,
-            expiresAt: Date.now() + parseInt(data.expires_in) * 1000
+            expiresAt: Date.now() + parseInt(data.expires_in, 10) * 1000
         };
 
 
