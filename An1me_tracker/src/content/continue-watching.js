@@ -60,26 +60,29 @@
     }
 
 
-    function computeNextEpisodeUrl(anime, slug, episode) {
-        if (!anime) return null;
-
-        const inactive = anime.completedAt
-            || anime.droppedAt
+    function isHardInactive(anime) {
+        if (!anime) return false;
+        return anime.droppedAt
             || anime.onHoldAt
-            || anime.listState === 'completed'
             || anime.listState === 'dropped'
             || anime.listState === 'on_hold';
-        if (inactive) return null;
+    }
+
+    function computeNextEpisodeUrl(anime, slug, episode, animeInfo) {
+        if (!anime) return null;
+
+        if (isHardInactive(anime)) return null;
 
         const next = episode + 1;
-        const latestEp = Number(anime.latestEpisode) || 0;
-        const totalEp = Number(anime.totalEpisodes) || 0;
-        const hasFutureRelease = !!anime.nextEpisodeAt;
+        const latestEp = Number(animeInfo && animeInfo.latestEpisode) || Number(anime.latestEpisode) || 0;
+        const totalEp = Number(animeInfo && animeInfo.totalEpisodes) || Number(anime.totalEpisodes) || 0;
+        const status = String((animeInfo && animeInfo.status) || anime.status || '').toUpperCase();
+        const hasFutureRelease = !!((animeInfo && animeInfo.nextEpisodeAt) || anime.nextEpisodeAt);
 
         let available = false;
         if (latestEp >= next) {
             available = true;
-        } else if (latestEp === 0 && !hasFutureRelease && totalEp >= next) {
+        } else if (!hasFutureRelease && totalEp >= next && (latestEp === 0 || status === 'FINISHED')) {
 
 
             available = true;
@@ -101,7 +104,14 @@
         return parts.join(' · ');
     }
 
-    function buildItems(videoProgress, animeData) {
+    function getWatchedEpisodeNumbers(anime) {
+        return (anime && Array.isArray(anime.episodes) ? anime.episodes : [])
+            .filter((ep) => !ep || ep.durationSource !== 'anilist')
+            .map((ep) => Number(ep && ep.number))
+            .filter((n) => Number.isFinite(n) && n > 0);
+    }
+
+    function buildItems(videoProgress, animeData, animeInfoBySlug) {
         const bySlug = new Map();
 
         const addItem = (item) => {
@@ -128,6 +138,7 @@
             const { slug, episode } = parsed;
 
             const anime = (animeData && animeData[slug]) || null;
+            const animeInfo = (animeInfoBySlug && animeInfoBySlug[slug]) || null;
 
             const currentTime = Number(entry.currentTime) || 0;
             if (currentTime <= 0) continue;
@@ -146,9 +157,12 @@
 
             const COMPLETED_PERCENTAGE = 85;
             if (percentage >= COMPLETED_PERCENTAGE) {
-                const nextUrl = computeNextEpisodeUrl(anime, slug, episode);
+                const watchedNumbers = getWatchedEpisodeNumbers(anime);
+                const maxKnownWatched = watchedNumbers.length ? Math.max(...watchedNumbers) : 0;
+                const baseEpisode = Math.max(episode, maxKnownWatched);
+                const nextUrl = computeNextEpisodeUrl(anime, slug, baseEpisode, animeInfo);
                 if (nextUrl) {
-                    const nextEpisode = episode + 1;
+                    const nextEpisode = baseEpisode + 1;
                     addItem({
                         slug,
                         episode: nextEpisode,
@@ -158,7 +172,7 @@
                         cover: safeCover(entry.coverImage) || safeCover(anime && anime.coverImage),
                         subline: `Ep ${nextEpisode} · Start`,
                         url: nextUrl,
-                        nextUrl: computeNextEpisodeUrl(anime, slug, nextEpisode),
+                        nextUrl: computeNextEpisodeUrl(anime, slug, nextEpisode, animeInfo),
                         nextNumber: nextEpisode + 1,
                         isStart: true
                     });
@@ -169,7 +183,7 @@
                     cover: safeCover(entry.coverImage) || safeCover(anime && anime.coverImage),
                     subline: formatSubline(episode, currentTime, duration, percentage),
                     url: resumeUrl(slug, episode, entry),
-                    nextUrl: computeNextEpisodeUrl(anime, slug, episode),
+                    nextUrl: computeNextEpisodeUrl(anime, slug, episode, animeInfo),
                     nextNumber: episode + 1,
                     isStart: false
                 });
@@ -179,21 +193,14 @@
         for (const [slug, anime] of Object.entries(animeData || {})) {
             if (!anime || !anime.episodes || anime.episodes.length === 0) continue;
 
-            const inactive = anime.completedAt
-                || anime.droppedAt
-                || anime.onHoldAt
-                || anime.listState === 'completed'
-                || anime.listState === 'dropped'
-                || anime.listState === 'on_hold';
-            if (inactive) continue;
+            if (isHardInactive(anime)) continue;
 
-            const watchedEpisodeNumbers = anime.episodes
-                .map((ep) => Number(ep && ep.number))
-                .filter((n) => Number.isFinite(n) && n > 0);
+            const watchedEpisodeNumbers = getWatchedEpisodeNumbers(anime);
             if (watchedEpisodeNumbers.length === 0) continue;
 
             const maxCompleted = Math.max(...watchedEpisodeNumbers);
-            const nextUrl = computeNextEpisodeUrl(anime, slug, maxCompleted);
+            const animeInfo = (animeInfoBySlug && animeInfoBySlug[slug]) || null;
+            const nextUrl = computeNextEpisodeUrl(anime, slug, maxCompleted, animeInfo);
             if (nextUrl) {
                 const nextEpisode = maxCompleted + 1;
                 const savedAt = anime.lastWatched ? new Date(anime.lastWatched).getTime() : 0;
@@ -210,7 +217,7 @@
                     cover: safeCover(anime.coverImage),
                     subline: `Ep ${nextEpisode} · Start`,
                     url: nextUrl,
-                    nextUrl: computeNextEpisodeUrl(anime, slug, nextEpisode),
+                    nextUrl: computeNextEpisodeUrl(anime, slug, nextEpisode, animeInfo),
                     nextNumber: nextEpisode + 1,
                     isStart: true
                 });
@@ -874,13 +881,49 @@
         startShareWatcher();
     }
 
+    function collectAnimeInfoKeys(videoProgress, animeData) {
+        const slugs = new Set(Object.keys(animeData || {}));
+        for (const key of Object.keys(videoProgress || {})) {
+            const parsed = parseProgressKey(key);
+            if (parsed && parsed.slug) slugs.add(parsed.slug);
+        }
+        return [...slugs].map((slug) => `animeinfo_${slug}`);
+    }
+
+    function pickAnimeInfoBySlug(storageResult) {
+        const out = {};
+        for (const [key, value] of Object.entries(storageResult || {})) {
+            if (!key.startsWith('animeinfo_') || !value) continue;
+            out[key.slice('animeinfo_'.length)] = value;
+        }
+        return out;
+    }
+
     function loadAndRender() {
         if (dismissed || !isContextValid()) return;
         chrome.storage.local.get(['videoProgress', 'animeData'], (result) => {
             if (chrome.runtime.lastError) return;
-            try {
-                render(buildItems(result.videoProgress || {}, result.animeData || {}));
-            } catch {                                 }
+            const videoProgress = result.videoProgress || {};
+            const animeData = result.animeData || {};
+            const infoKeys = collectAnimeInfoKeys(videoProgress, animeData);
+            const finish = (infoResult) => {
+                try {
+                    render(buildItems(videoProgress, animeData, pickAnimeInfoBySlug(infoResult)));
+                } catch {                                 }
+            };
+
+            if (!infoKeys.length) {
+                finish({});
+                return;
+            }
+
+            chrome.storage.local.get(infoKeys, (infoResult) => {
+                if (chrome.runtime.lastError) {
+                    finish({});
+                    return;
+                }
+                finish(infoResult || {});
+            });
         });
     }
 
@@ -903,7 +946,14 @@
     try {
         chrome.storage.onChanged.addListener((changes, namespace) => {
             if (namespace !== 'local') return;
-            if (changes.videoProgress || changes.animeData) scheduleRender();
+            const changedKeys = Object.keys(changes || {});
+            if (
+                changes.videoProgress
+                || changes.animeData
+                || changedKeys.some((key) => key.startsWith('animeinfo_'))
+            ) {
+                scheduleRender();
+            }
         });
     } catch {              }
 
