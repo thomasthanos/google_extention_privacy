@@ -8,6 +8,15 @@
     const AnimeCardRenderer = (AT.AnimeCardRenderer = AT.AnimeCardRenderer || {});
 
     Object.assign(AnimeCardRenderer, {
+        getRealMovieEpisodes(anime) {
+            return (anime?.episodes || []).filter(ep => ep?.durationSource !== 'anilist');
+        },
+
+        getRealMovieWatchTime(anime) {
+            return this.getRealMovieEpisodes(anime)
+                .reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
+        },
+
         extractMovieBaseTitle(title) {
             return title
                 .replace(/\s*-?\s*Movie\s*\d+.*$/i, '')
@@ -35,10 +44,11 @@
 
             const movieItemsHTML = movies.map(({ slug, anime }) => {
                 const movieLabel = SeasonGrouping.getMovieLabel(slug, anime.title);
-                const watchTime = anime.totalWatchTime || 0;
+                const realEpisodes = this.getRealMovieEpisodes(anime);
+                const watchTime = this.getRealMovieWatchTime(anime);
                 const formattedTime = UIHelpers.formatDuration(watchTime);
 
-                const isWatched = anime.episodes?.length > 0 || watchTime > 0;
+                const isWatched = realEpisodes.length > 0 || watchTime > 0;
                 const statusClass = isWatched ? 'complete' : 'not-started';
                 const statusIcon = isWatched ? '✓' : '○';
 
@@ -61,7 +71,10 @@
                 `;
             }).join('');
 
-            const watchedCount = movies.filter(m => m.anime.episodes?.length > 0 || (m.anime.totalWatchTime || 0) > 0).length;
+            const watchedCount = movies.filter(m => {
+                const realEpisodes = this.getRealMovieEpisodes(m.anime);
+                return realEpisodes.length > 0 || this.getRealMovieWatchTime(m.anime) > 0;
+            }).length;
             const allMoviesWatchedForDate = watchedCount >= movies.length;
             let lastWatchedText;
             if (allMoviesWatchedForDate && watchedCount > 0) {
@@ -123,9 +136,10 @@
             const { UIHelpers } = window.AnimeTracker;
 
             const title = anime.title || slug;
-            const watchTime = anime.totalWatchTime || 0;
+            const realEpisodes = this.getRealMovieEpisodes(anime);
+            const watchTime = this.getRealMovieWatchTime(anime);
             const formattedTime = UIHelpers.formatDuration(watchTime);
-            const isWatched = anime.episodes?.length > 0 || watchTime > 0;
+            const isWatched = realEpisodes.length > 0 || watchTime > 0;
             let lastWatched;
             if (isWatched) {
                 const startedDate = UIHelpers.getStartedDate(anime);

@@ -1266,7 +1266,10 @@
         let totalWatchTime = 0;
         for (const [, anime] of animeEntries) {
             const uniqueEpisodeNumbers = new Set(
-                (anime.episodes || []).map(ep => Number(ep?.number)).filter(n => Number.isFinite(n) && n > 0)
+                (anime.episodes || [])
+                    .filter(ep => ep?.durationSource !== 'anilist')
+                    .map(ep => Number(ep?.number))
+                    .filter(n => Number.isFinite(n) && n > 0)
             );
             totalWatchedEpisodes += uniqueEpisodeNumbers.size;
 

@@ -188,6 +188,7 @@ const SeasonGrouping = {
             return this.getMovieBaseSlug(slug);
         }
 
+        if (slug.startsWith('jujutsu-kaisen')) return 'jujutsu-kaisen';
         if (slug.startsWith('fate-zero') || slug.startsWith('fate-stay-night')) return 'fate';
         if (slug.startsWith('naruto')) return 'naruto';
         if (slug.startsWith('one-punch-man')) return 'one-punch-man';
@@ -311,7 +312,11 @@ const SeasonGrouping = {
         }
 
         if (slug.startsWith('jujutsu-kaisen')) {
-            if (slug.includes('culling-game') || slug.includes('season-3') || slug.includes('dead-culling-game') || slug.includes('shimetsu-kaiyuu')) return 3;
+            if (slug.includes('culling-game') || slug.includes('season-3') || slug.includes('dead-culling-game') || slug.includes('shimetsu-kaiyuu')) {
+                if (slug.includes('koupen') || slug.includes('part-2') || slug.includes('part2')) return 3.2;
+                if (slug.includes('zenpen') || slug.includes('part-1') || slug.includes('part1')) return 3.1;
+                return 3;
+            }
             if (slug.includes('season-2') || slug.includes('2nd-season') || slug.includes('shibuya-incident') || slug.includes('kaigyoku-gyokusetsu')) return 2;
             if (slug.includes('0') || slug.includes('movie')) return 0;
             return 1;
@@ -406,7 +411,11 @@ const SeasonGrouping = {
         }
 
         if (slug.startsWith('jujutsu-kaisen')) {
-            if (slug.includes('culling-game') || slug.includes('season-3') || slug.includes('dead-culling-game') || slug.includes('shimetsu-kaiyuu')) return 'Season 3';
+            if (slug.includes('culling-game') || slug.includes('season-3') || slug.includes('dead-culling-game') || slug.includes('shimetsu-kaiyuu')) {
+                if (slug.includes('koupen') || slug.includes('part-2') || slug.includes('part2')) return 'Season 3 Part 2';
+                if (slug.includes('zenpen') || slug.includes('part-1') || slug.includes('part1')) return 'Season 3 Part 1';
+                return 'Season 3';
+            }
             if (slug.includes('season-2') || slug.includes('2nd-season') || slug.includes('shibuya-incident') || slug.includes('kaigyoku-gyokusetsu')) return 'Season 2';
             if (slug.includes('0') || slug.includes('movie')) return 'Movie 0';
             return 'Season 1';

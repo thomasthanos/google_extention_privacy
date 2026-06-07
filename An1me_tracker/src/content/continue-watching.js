@@ -104,6 +104,23 @@
     function buildItems(videoProgress, animeData) {
         const bySlug = new Map();
 
+        const addItem = (item) => {
+            const existing = bySlug.get(item.slug);
+            if (!existing) {
+                bySlug.set(item.slug, item);
+                return;
+            }
+            if (!item.isStart && existing.isStart) {
+                bySlug.set(item.slug, item);
+            } else if (item.isStart && !existing.isStart) {
+                // keep existing in-progress card
+            } else {
+                if (item.savedAt > existing.savedAt) {
+                    bySlug.set(item.slug, item);
+                }
+            }
+        };
+
         for (const [key, entry] of Object.entries(videoProgress || {})) {
             if (key === '__slugIndex' || !entry || entry.deleted) continue;
             const parsed = parseProgressKey(key);
@@ -111,16 +128,6 @@
             const { slug, episode } = parsed;
 
             const anime = (animeData && animeData[slug]) || null;
-
-
-            if (Array.isArray(anime && anime.episodes)
-                && anime.episodes.some((ep) => {
-                    if (Number(ep && ep.number) !== episode) return false;
-                    if (ep && ep.durationSource === 'anilist') return false;
-                    return true;
-                })) {
-                continue;
-            }
 
             const currentTime = Number(entry.currentTime) || 0;
             if (currentTime <= 0) continue;
@@ -137,18 +144,77 @@
                 ? anime.title.trim()
                 : humanizeSlug(slug);
 
-            const item = {
-                slug, episode, percentage, savedAt, title,
-                cover: safeCover(entry.coverImage) || safeCover(anime && anime.coverImage),
-                subline: formatSubline(episode, currentTime, duration, percentage),
-                url: resumeUrl(slug, episode, entry),
-                nextUrl: computeNextEpisodeUrl(anime, slug, episode),
-                nextNumber: episode + 1
-            };
+            const COMPLETED_PERCENTAGE = 85;
+            if (percentage >= COMPLETED_PERCENTAGE) {
+                const nextUrl = computeNextEpisodeUrl(anime, slug, episode);
+                if (nextUrl) {
+                    const nextEpisode = episode + 1;
+                    addItem({
+                        slug,
+                        episode: nextEpisode,
+                        percentage: 0,
+                        savedAt,
+                        title,
+                        cover: safeCover(entry.coverImage) || safeCover(anime && anime.coverImage),
+                        subline: `Ep ${nextEpisode} · Start`,
+                        url: nextUrl,
+                        nextUrl: computeNextEpisodeUrl(anime, slug, nextEpisode),
+                        nextNumber: nextEpisode + 1,
+                        isStart: true
+                    });
+                }
+            } else {
+                addItem({
+                    slug, episode, percentage, savedAt, title,
+                    cover: safeCover(entry.coverImage) || safeCover(anime && anime.coverImage),
+                    subline: formatSubline(episode, currentTime, duration, percentage),
+                    url: resumeUrl(slug, episode, entry),
+                    nextUrl: computeNextEpisodeUrl(anime, slug, episode),
+                    nextNumber: episode + 1,
+                    isStart: false
+                });
+            }
+        }
 
+        for (const [slug, anime] of Object.entries(animeData || {})) {
+            if (!anime || !anime.episodes || anime.episodes.length === 0) continue;
 
-            const existing = bySlug.get(slug);
-            if (!existing || savedAt >= existing.savedAt) bySlug.set(slug, item);
+            const inactive = anime.completedAt
+                || anime.droppedAt
+                || anime.onHoldAt
+                || anime.listState === 'completed'
+                || anime.listState === 'dropped'
+                || anime.listState === 'on_hold';
+            if (inactive) continue;
+
+            const watchedEpisodeNumbers = anime.episodes
+                .map((ep) => Number(ep && ep.number))
+                .filter((n) => Number.isFinite(n) && n > 0);
+            if (watchedEpisodeNumbers.length === 0) continue;
+
+            const maxCompleted = Math.max(...watchedEpisodeNumbers);
+            const nextUrl = computeNextEpisodeUrl(anime, slug, maxCompleted);
+            if (nextUrl) {
+                const nextEpisode = maxCompleted + 1;
+                const savedAt = anime.lastWatched ? new Date(anime.lastWatched).getTime() : 0;
+                const title = (typeof anime.title === 'string' && anime.title.trim())
+                    ? anime.title.trim()
+                    : humanizeSlug(slug);
+
+                addItem({
+                    slug,
+                    episode: nextEpisode,
+                    percentage: 0,
+                    savedAt,
+                    title,
+                    cover: safeCover(anime.coverImage),
+                    subline: `Ep ${nextEpisode} · Start`,
+                    url: nextUrl,
+                    nextUrl: computeNextEpisodeUrl(anime, slug, nextEpisode),
+                    nextNumber: nextEpisode + 1,
+                    isStart: true
+                });
+            }
         }
 
         return [...bySlug.values()]
@@ -461,7 +527,9 @@
         const resume = document.createElement('a');
         resume.className = 'at-cw-resume';
         resume.href = item.url;
-        resume.title = `Resume — ${item.title} · ${item.subline}`;
+        resume.title = item.isStart 
+            ? `Start — ${item.title} · Ep ${item.episode}`
+            : `Resume — ${item.title} · ${item.subline}`;
 
         const thumb = document.createElement('div');
         thumb.className = 'at-cw-thumb';
@@ -516,14 +584,14 @@
         const resumeBtn = document.createElement('a');
         resumeBtn.className = 'at-cw-btn at-cw-btn-resume';
         resumeBtn.href = item.url;
-        resumeBtn.title = `Resume episode ${item.episode}`;
+        resumeBtn.title = item.isStart ? `Start episode ${item.episode}` : `Resume episode ${item.episode}`;
         resumeBtn.innerHTML =
             '<svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true" fill="currentColor"><polygon points="8 5 19 12 8 19"/></svg>'
-            + '<span>Resume</span>';
+            + `<span>${item.isStart ? 'Start' : 'Resume'}</span>`;
         actions.appendChild(resumeBtn);
 
 
-        if (item.nextUrl) {
+        if (item.nextUrl && !item.isStart) {
             const next = document.createElement('a');
             next.className = 'at-cw-btn at-cw-btn-next';
             next.href = item.nextUrl;

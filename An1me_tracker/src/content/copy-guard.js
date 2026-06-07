@@ -5,15 +5,6 @@
     const STYLE_ID = 'anime-tracker-copy-guard-style';
     const STORAGE_KEY = 'copyGuardEnabled';
 
-
-
-
-
-
-
-
-
-
     const ALLOWED_SELECTORS = [
         '[data-at-allow-copy]',
         '.group-data-\\[language\\=jp\\]\\/body\\:hidden.line-clamp-2.leading-relaxed',
@@ -155,19 +146,12 @@
     function auditSelectorsOnce() {
         if (_selectorAuditDone) return;
 
-
-
         const run = () => {
             _selectorAuditDone = true;
             try {
                 const matches = document.querySelectorAll(ALLOWED_SELECTOR).length;
                 if (matches === 0 && document.body) {
-
-
-
-
-
-                    console.warn(
+                    console.log(
                         '[CopyGuard] No allowed-copy elements matched on this page — ' +
                         'an1me.to markup may have changed. Consider updating ALLOWED_SELECTORS in ' +
                         'src/content/copy-guard.js or marking allowed elements with data-at-allow-copy.'

@@ -13,6 +13,8 @@ const SlugUtils = {
         if (safeSlug.startsWith('jujutsu-kaisen') || safeTitle.includes('jujutsu kaisen')) {
             if (/\b0\b|movie/.test(context))
                 return 'jujutsu-kaisen-0';
+            if (safeSlug.includes('shimetsu-kaiyuu') || safeSlug.includes('culling-game'))
+                return safeSlug;
             if (/season\s*3|part\s*3|culling\s*game|dead[-\s]*culling|shimetsu|kaiyuu/.test(context))
                 return 'jujutsu-kaisen-season-3';
             if (/season\s*2|2nd\s*season|shibuya|kaigyoku|gyokusetsu/.test(context))

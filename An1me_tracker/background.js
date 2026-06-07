@@ -433,9 +433,9 @@ function armSyncRetry(kind, reason) {
     s.incAttempts();
     try {
         chrome.alarms.create(s.alarmName, { delayInMinutes: delayMin });
-        console.warn(`[BG] ${kind} sync retry scheduled in ${delayMin} min (attempt ${s.getAttempts()}, reason: ${reason})`);
+        console.log(`[BG] ${kind} sync retry scheduled in ${delayMin} min (attempt ${s.getAttempts()}, reason: ${reason})`);
     } catch (e) {
-        console.warn(`[BG] Could not arm ${kind} retry alarm:`, e?.message || e);
+        console.log(`[BG] Could not arm ${kind} retry alarm:`, e?.message || e);
     }
 }
 
@@ -733,14 +733,14 @@ async function refreshFirebaseToken(refreshToken) {
             );
         } catch (networkErr) {
 
-            console.warn('[BG] Token refresh network error:', networkErr?.message || networkErr);
+            console.log('[BG] Token refresh network error:', networkErr?.message || networkErr);
             await _bgOnRefreshTransient(`network: ${networkErr?.message || networkErr}`);
             return { tokens: null, permanent: false, error: `network: ${networkErr?.message || networkErr}` };
         }
         if (!response.ok) {
             const body = await response.text().catch(() => '');
             const permanent = _bgClassifyRefreshError(response.status, body);
-            console.warn(`[BG] Token refresh HTTP ${response.status} (${permanent ? 'permanent' : 'transient'}): ${body.slice(0, 200)}`);
+            console.log(`[BG] Token refresh HTTP ${response.status} (${permanent ? 'permanent' : 'transient'}): ${body.slice(0, 200)}`);
             if (!permanent) await _bgOnRefreshTransient(`HTTP ${response.status}`);
             return { tokens: null, permanent, error: `HTTP ${response.status}` };
         }
@@ -1336,7 +1336,7 @@ async function syncProgressOnly() {
         });
     } catch (error) {
         const reason = error?.isTimeout ? 'timeout' : 'network';
-        console.error(`[BG] Progress sync ${reason}:`, error?.message || error);
+        console.log(`[BG] Progress sync ${reason}:`, error?.message || error);
         armSyncRetry('progress', `${reason}: ${error?.message || error}`);
     } finally {
         progressSyncInProgress = false;
@@ -1521,7 +1521,7 @@ async function syncToFirebase() {
         });
     } catch (error) {
         const reason = error?.isTimeout ? 'timeout' : 'network';
-        console.error(`[BG] Sync ${reason}:`, error?.message || error);
+        console.log(`[BG] Sync ${reason}:`, error?.message || error);
 
         markSyncPending();
         armSyncRetry('full', `${reason}: ${error?.message || error}`);
@@ -2460,7 +2460,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ received: true });
         if (Array.isArray(message.slugs) && message.slugs.length > 0) {
             batchFetchAnimeInfo(message.slugs).catch(e =>
-                console.warn('[BG] Batch fetch error:', e)
+                console.log('[BG] Batch fetch error:', e)
             );
         }
         return true;
@@ -2471,7 +2471,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         const { animeId, watchlistType } = message;
         if (animeId && watchlistType) {
             syncWatchlistToSite(animeId, watchlistType).catch(e =>
-                console.warn('[BG] Watchlist sync error:', e)
+                console.log('[BG] Watchlist sync error:', e)
             );
         }
         return true;
@@ -2637,14 +2637,14 @@ chrome.runtime.onInstalled.addListener((details) => {
                 } else if (result?.permanent) {
 
                     await helper.setNeedsReauth(true);
-                    console.warn(`[BG] Post-update silent refresh: permanent (${result?.error || '?'}) — needsReauth set, tokens preserved`);
+                    console.log(`[BG] Post-update silent refresh: permanent (${result?.error || '?'}) — needsReauth set, tokens preserved`);
                 } else {
 
 
-                    console.warn(`[BG] Post-update silent refresh: transient (${result?.error || '?'}) — retry alarm armed`);
+                    console.log(`[BG] Post-update silent refresh: transient (${result?.error || '?'}) — retry alarm armed`);
                 }
             } catch (e) {
-                console.warn('[BG] Post-update silent refresh failed:', e?.message || e);
+                console.log('[BG] Post-update silent refresh failed:', e?.message || e);
             }
         })();
 
@@ -2738,13 +2738,13 @@ chrome.runtime.onConnect.addListener((port) => {
 chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === METADATA_REPAIR_ALARM) {
         runMetadataRepairBatch().catch((error) => {
-            console.error('[BG] Metadata repair alarm failed:', error);
+            console.log('[BG] Metadata repair alarm failed:', error);
         });
         return;
     }
 
     if (alarm.name === SMART_NOTIF_ALARM) {
-        checkNewEpisodes().catch(e => console.warn('[BG] Smart notif check error:', e));
+        checkNewEpisodes().catch(e => console.log('[BG] Smart notif check error:', e));
         return;
     }
 

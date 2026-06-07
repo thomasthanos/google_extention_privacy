@@ -254,7 +254,7 @@ const VideoMonitor = {
                         if (retryCount < MAX_RETRIES) {
                             setTimeout(checkReady, 500);
                         } else {
-                            Logger.warn(`Video not ready after ${MAX_RETRIES} retries`);
+                            Logger.debug(`Video not ready after ${MAX_RETRIES} retries`);
                         }
                     }
                 };
@@ -383,7 +383,7 @@ const VideoMonitor = {
             this.checkInterval = setInterval(() => {
                 if (this.retryCount >= CONFIG.MAX_RETRIES) {
                     clearInterval(this.checkInterval);
-                    Logger.warn('Video not found after max retries');
+                    Logger.info('Video not found after max retries');
                     return;
                 }
 

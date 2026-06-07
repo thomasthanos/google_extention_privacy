@@ -167,8 +167,9 @@
     }
 
 
-    async function importFromUsername(username) {
+    async function importFromUsername(username, options = {}) {
         if (!Core) throw new Error('core_missing');
+        if (options?.source !== 'manual') throw new Error('manual_import_required');
         const name = String(username || '').trim();
         if (!name) throw new Error('no_username');
 
@@ -234,18 +235,13 @@
             const total = Number(media.episodes) || 0;
             const count = (status === 'COMPLETED' && total > 0) ? total : progress;
             const episodes = [];
-            for (let n = 1; n <= count; n++) {
-
-
-                episodes.push({ number: n, duration: 1440, durationSource: 'anilist' });
-            }
 
             const entryObj = {
                 title,
                 slug,
                 episodes,
-                totalWatchTime: episodes.length * 1440,
-                lastWatched: importedAt,
+                totalWatchTime: 0,
+                lastWatched: null,
                 totalEpisodes: total > 0 ? total : null,
                 coverImage: (media.coverImage && media.coverImage.large) || null,
 
@@ -916,7 +912,7 @@
         setBusy(true);
         setStatus(`Importing ${username}'s AniList list…`);
         try {
-            const res = await importFromUsername(username);
+            const res = await importFromUsername(username, { source: 'manual' });
             _lastUsername = username;
             await sset({ [USERNAME_KEY]: username });
 

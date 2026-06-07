@@ -94,6 +94,7 @@
         const eps = Array.isArray(entry?.episodes) ? entry.episodes : [];
         let max = 0;
         for (const ep of eps) {
+            if (ep?.durationSource === 'anilist') continue;
             const n = Number(ep && ep.number) || 0;
             if (n > max) max = n;
         }
