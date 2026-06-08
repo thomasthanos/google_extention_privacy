@@ -1,14 +1,41 @@
 
 
-
-
-
 (function () {
     'use strict';
 
-
     const AT = window.AnimeTracker;
 
+    // Donate dropdown UI lives in src/popup/lib/donate-dropdown.js
+    const {
+        open: openDonateDropdown,
+        close: closeDonateDropdown,
+        position: positionDonateDropdown,
+        getButton: getSettingsDonateButton
+    } = AT.DonateDropdown;
+
+    // Toasts live in src/popup/lib/toasts.js
+    const { showToast, showAuthToast } = AT;
+
+    // Auth UI lives in src/popup/lib/auth-ui.js
+    const { signInWithGoogle, handleEmailAuth, handleForgotPassword } = AT.AuthUI;
+
+    // Add/edit-anime dialogs live in src/popup/lib/add-anime-dialog.js
+    const {
+        showAddAnimeDialog, onSlugInputChange, hideAddAnimeDialog, syncWatchlistFromPopup,
+        addAnimeWithEpisodes, showEditTitleDialog, hideEditTitleDialog, saveEditedTitle,
+        editAnimeTitle, fetchFillerForAnime
+    } = AT.AddAnimeDialog;
+
+    // Anime actions live in src/popup/lib/anime-actions.js
+    const {
+        deleteProgress, deleteAnime, toggleAnimeCompleted, toggleAnimeDropped,
+        toggleAnimeFavorite, toggleAnimeOnHold, clearAllData
+    } = AT.AnimeActions;
+
+    // Render pipeline lives in src/popup/lib/render-list.js
+    const {
+        captureExpansionState, restoreExpansionState, renderEntryGroupsHtml, renderCompactSectionHtml, partitionEntriesByStatus, buildLatestActivityMap, attachSlugIndex, renderAnimeList, refreshCompactChevrons, installCardEventListeners, setupCardEventListeners
+    } = AT.RenderList;
 
     let animeData = {};
     let videoProgress = {};
@@ -20,10 +47,44 @@
     let badgeState = {};
     let lastBadgeSnapshot = [];
     let currentViewMode = null;
+
+    // ─── Shared popup state ───────────────────────────────────────────────
+    // Accessors bound to this IIFE's closure variables so extracted modules
+    // (popup/lib/*) read & write the SAME state — single source of truth here.
+    // (Dialog-state getters reference vars declared lower down; only invoked at
+    //  runtime, so no TDZ issue.)
+    AT.PopupState = {
+        get animeData() { return animeData; },
+        set animeData(v) { animeData = v; },
+        get videoProgress() { return videoProgress; },
+        set videoProgress(v) { videoProgress = v; },
+        get addDialogDetectedTitle() { return _addDialogDetectedTitle; },
+        set addDialogDetectedTitle(v) { _addDialogDetectedTitle = v; },
+        get addDialogKnownTotal() { return _addDialogKnownTotal; },
+        set addDialogKnownTotal(v) { _addDialogKnownTotal = v; },
+        get addDialogTotalCanon() { return _addDialogTotalCanon; },
+        set addDialogTotalCanon(v) { _addDialogTotalCanon = v; },
+        get addDialogCurrentSlug() { return _addDialogCurrentSlug; },
+        set addDialogCurrentSlug(v) { _addDialogCurrentSlug = v; },
+        get currentCategory() { return currentCategory; },
+        set currentCategory(v) { currentCategory = v; },
+        get currentSort() { return currentSort; },
+        set currentSort(v) { currentSort = v; },
+        get currentCompactStatus() { return currentCompactStatus; },
+        set currentCompactStatus(v) { currentCompactStatus = v; },
+        get currentCompactStatusOpen() { return currentCompactStatusOpen; },
+        set currentCompactStatusOpen(v) { currentCompactStatusOpen = v; },
+        get badgeState() { return badgeState; },
+        set badgeState(v) { badgeState = v; },
+        get goalSettings() { return goalSettings; },
+        set goalSettings(v) { goalSettings = v; },
+        get lastRenderedListMarkup() { return _lastRenderedListMarkup; },
+        set lastRenderedListMarkup(v) { _lastRenderedListMarkup = v; }
+    };
+
     const COPY_GUARD_STORAGE_KEY = 'copyGuardEnabled';
     const GOAL_SETTINGS_KEY = 'goalSettings';
     const BADGE_STATE_KEY = 'badgeUnlocks';
-
 
     const elements = {
 
@@ -92,8 +153,9 @@
         categoryTabs: document.getElementById('categoryTabs')
     };
 
-
-    let editingSlug = null;
+    AT.AddAnimeDialog._init({ elements, markInternalSave, renderAnimeList, updateStats });
+    AT.AnimeActions._init({ elements, hideDialog, markInternalSave, renderAnimeList, updateStats });
+    AT.RenderList._init({ elements, _ipPatch, getActiveFilter, markInternalSave, normalizeCompactStatus, suppressHoverUntilMouseMove, updateStats });
     let loadAndSyncInProgress = false;
     let metadataRepairPromise = null;
     let lastMetadataRepairState = null;
@@ -102,10 +164,6 @@
     const OWN_WRITE_TTL_MS = 15000;
     const ownWriteTokens = new Set();
     const MAINTENANCE_INTERVAL_MS = 24 * 60 * 60 * 1000;
-
-
-
-
 
     function shouldRunMaintenance(name) {
         try {
@@ -122,69 +180,11 @@
     let realignCategoryTabs = () => {};
     let categorySwitchTimer = null;
 
-
-
-
     const POPUP_CLOUD_REFRESH_MS = 30 * 1000;
     let popupCloudRefreshTimer = null;
 
-    function getSettingsDonateButton() {
-        return document.getElementById('settingsDonate');
-    }
-
-    function closeDonateDropdown() {
-        if (!elements.donateDropdown) return;
-        elements.donateDropdown.classList.remove('visible');
-        delete elements.donateDropdown.dataset.placement;
-    }
-
-    function positionDonateDropdown() {
-        const dropdown = elements.donateDropdown;
-        const trigger = getSettingsDonateButton();
-        const content = dropdown?.querySelector('.donate-dropdown-content');
-        if (!dropdown || !trigger || !content) return;
-
-        const triggerRect = trigger.getBoundingClientRect();
-        const dropdownWidth = Math.ceil(content.offsetWidth || 220);
-        const dropdownHeight = Math.ceil(content.offsetHeight || 132);
-        const gap = 8;
-        const viewportPadding = 10;
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-
-        let left = triggerRect.right - dropdownWidth;
-        left = Math.max(viewportPadding, Math.min(left, viewportWidth - dropdownWidth - viewportPadding));
-
-        let top = triggerRect.top - dropdownHeight - gap;
-        let placement = 'above';
-
-        if (top < viewportPadding) {
-            top = Math.min(triggerRect.bottom + gap, viewportHeight - dropdownHeight - viewportPadding);
-            placement = 'below';
-        }
-
-        const arrowOffset = triggerRect.left + (triggerRect.width / 2) - left;
-        const clampedArrow = Math.max(22, Math.min(arrowOffset, dropdownWidth - 22));
-
-        dropdown.style.left = `${Math.round(left)}px`;
-        dropdown.style.top = `${Math.round(top)}px`;
-        dropdown.style.setProperty('--donate-arrow-offset', `${Math.round(clampedArrow)}px`);
-        dropdown.dataset.placement = placement;
-    }
-
-    function openDonateDropdown() {
-        if (!elements.donateDropdown || !getSettingsDonateButton()) return;
-        positionDonateDropdown();
-        elements.donateDropdown.classList.add('visible');
-        requestAnimationFrame(positionDonateDropdown);
-    }
-
-
-
-
-
-
-
+    // ─── Donate dropdown → src/popup/lib/donate-dropdown.js ───
+    // (aliased near the top as AT.DonateDropdown)
 
     let _lastRenderedListMarkup = null;
 
@@ -240,29 +240,11 @@
         return elements.searchInput?.value || '';
     }
 
-
-
-
-
-
-
-
-
-
-
     const SMART_NOTIF_STORAGE_KEY = 'smartNotificationsEnabled';
     const AUTO_SKIP_FILLER_STORAGE_KEY = 'autoSkipFillers';
 
-
-
     const SKIPTIME_HELPER_KEY = 'skiptimeHelperEnabled';
     const AUTO_4K_SERVER_KEY = 'auto4kServerEnabled';
-
-
-
-
-
-
 
     const PASSWORD_SET_MARKER_KEY = 'passwordSetMarker';
 
@@ -350,9 +332,6 @@
             return config.defaultsTo;
         }
     }
-
-
-
 
     const renderCopyGuardSetting = (enabled) => renderToggle('copyGuard', enabled);
     const renderSmartNotifSetting = (enabled) => renderToggle('smartNotif', enabled);
@@ -489,8 +468,6 @@
         persistDetectedCompletions
     } = AT.StatusService;
 
-
-
     const { normalizeMovieDurations, cleanupPhantomMovies, scrubAnilistImportDates } = AT.Maintenance;
 
     function showAuthScreen() {
@@ -504,8 +481,6 @@
 
         const hasGoogleAuth = detectHasGoogleAuth();
 
-
-
         PopupLogger.log('Auth',
             `hasGoogleAuth=${hasGoogleAuth} · redirect=${(() => {
                 try { return chrome?.identity?.getRedirectURL?.() || '∅'; } catch { return '∅'; }
@@ -515,33 +490,11 @@
             authContent.classList.toggle('auth-mobile', !hasGoogleAuth);
         }
 
-
-
-
         const emailForm = document.getElementById('authEmailForm');
         const orDivider = document.querySelector('.auth-or-divider');
         if (emailForm) emailForm.style.display = hasGoogleAuth ? 'none' : '';
         if (orDivider) orDivider.style.display = hasGoogleAuth ? 'none' : '';
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     function detectHasGoogleAuth() {
         const ua = navigator.userAgent || '';
@@ -560,10 +513,6 @@
         elements.authSection.style.display = 'none';
         elements.mainApp.style.display = 'flex';
         realignCategoryTabs();
-
-
-
-
 
         const avatar = document.getElementById('settingsAvatar');
         const userName = document.getElementById('settingsUserName');
@@ -591,405 +540,7 @@
         }
     }
 
-
-
-
-
-
-
-
-
-    function captureExpansionState(listEl) {
-        const expandedCards = new Set();
-        listEl.querySelectorAll('.anime-card.expanded').forEach(card => {
-            const slug = card.querySelector('.anime-delete')?.dataset?.slug;
-            if (slug) expandedCards.add(slug);
-        });
-        const expandedSeasonGroups = new Set();
-        listEl.querySelectorAll('.anime-season-group.expanded').forEach(g => {
-            if (g.dataset.baseSlug) expandedSeasonGroups.add(g.dataset.baseSlug);
-        });
-        const expandedSeasonItems = new Set();
-        listEl.querySelectorAll('.season-item.expanded').forEach(item => {
-            if (item.dataset.slug) expandedSeasonItems.add(item.dataset.slug);
-        });
-        const expandedMovieGroups = new Set();
-        listEl.querySelectorAll('.anime-movie-group.expanded').forEach(g => {
-            if (g.dataset.baseSlug) expandedMovieGroups.add(g.dataset.baseSlug);
-        });
-        const ipGroupWasOpen = listEl.querySelector('.ip-group-content')?.classList.contains('open') ?? false;
-        return { expandedCards, expandedSeasonGroups, expandedSeasonItems, expandedMovieGroups, ipGroupWasOpen };
-    }
-
-    function restoreExpansionState(listEl, state) {
-        listEl.querySelectorAll('.anime-card').forEach(card => {
-            const slug = card.querySelector('.anime-delete')?.dataset?.slug;
-            if (slug && state.expandedCards.has(slug)) card.classList.add('expanded');
-        });
-        listEl.querySelectorAll('.anime-season-group').forEach(g => {
-            if (g.dataset.baseSlug && state.expandedSeasonGroups.has(g.dataset.baseSlug))
-                g.classList.add('expanded');
-        });
-        listEl.querySelectorAll('.season-item').forEach(item => {
-            if (item.dataset.slug && state.expandedSeasonItems.has(item.dataset.slug))
-                item.classList.add('expanded');
-        });
-        listEl.querySelectorAll('.anime-movie-group').forEach(g => {
-            if (g.dataset.baseSlug && state.expandedMovieGroups.has(g.dataset.baseSlug))
-                g.classList.add('expanded');
-        });
-        if (state.ipGroupWasOpen) {
-            const ipContent = listEl.querySelector('.ip-group-content');
-            const ipChevron = listEl.querySelector('.ip-group-chevron');
-            if (ipContent) ipContent.classList.add('open');
-            if (ipChevron) ipChevron.style.transform = 'rotate(0deg)';
-        }
-    }
-
-
-
-
-
-
-
-
-    function renderEntryGroupsHtml(entriesToRender, orderMap, visibleProgress) {
-        if (!entriesToRender.length) return '';
-        const { AnimeCardRenderer, SeasonGrouping } = AT;
-
-        const groups = SeasonGrouping.groupByBase(entriesToRender);
-        const groupsArray = Array.from(groups.entries());
-        groupsArray.sort((a, b) => {
-            const aIndex = Math.min(...a[1].map(e => orderMap.get(e.slug) ?? Number.MAX_SAFE_INTEGER));
-            const bIndex = Math.min(...b[1].map(e => orderMap.get(e.slug) ?? Number.MAX_SAFE_INTEGER));
-            return aIndex - bIndex;
-        });
-
-        let html = '';
-        for (const [baseSlug, groupedEntries] of groupsArray) {
-            if (SeasonGrouping.isMovieGroup(groupedEntries)) {
-                if (groupedEntries.length > 1) {
-                    html += AnimeCardRenderer.createMovieGroup(baseSlug, groupedEntries);
-                } else {
-                    const { slug, anime } = groupedEntries[0];
-                    html += AnimeCardRenderer.createSingleMovieCard(slug, anime);
-                }
-            } else if (SeasonGrouping.hasMultipleSeasons(groupedEntries)) {
-                html += AnimeCardRenderer.createSeasonGroup(baseSlug, groupedEntries, visibleProgress);
-            } else {
-                const { slug, anime } = groupedEntries[0];
-                html += AnimeCardRenderer.createAnimeCard(slug, anime, visibleProgress);
-            }
-        }
-        return html;
-    }
-
-
-
-
-
-
-
-
-    function renderCompactSectionHtml({ classPrefix, toggleId, label, subLabel, cardsHtml, isOpen }) {
-        return `
-            <div class="${classPrefix}-list-section">
-                <div class="${classPrefix}-list-label" id="${toggleId}">
-                    <div class="${classPrefix}-list-label-left">
-                        <span class="${classPrefix}-list-label-title">${label}</span>
-                        <span class="${classPrefix}-list-label-sub">${subLabel}</span>
-                    </div>
-                    <svg class="${classPrefix}-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: ${isOpen ? 'rotate(0deg)' : 'rotate(-90deg)'}">
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                </div>
-                <div class="${classPrefix}-list-cards${isOpen ? ' open' : ''}">
-                    <div class="list-inner">
-                        ${cardsHtml}
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-
-
-
-
-
-    function partitionEntriesByStatus(sortedEntries) {
-        const normal = [];
-        const completed = [];
-        const dropped = [];
-        const airing = [];
-        const onHold = [];
-        for (const entry of sortedEntries) {
-            switch (getAnimeStatus(entry[0], entry[1])) {
-                case AnimeStatus.DROPPED:   dropped.push(entry); break;
-                case AnimeStatus.COMPLETED: completed.push(entry); break;
-                case AnimeStatus.AIRING:    airing.push(entry); break;
-                case AnimeStatus.ON_HOLD:   onHold.push(entry); break;
-                default:                    normal.push(entry); break;
-            }
-        }
-        completed.sort(([, a], [, b]) =>
-            new Date(b.lastWatched || 0).getTime() - new Date(a.lastWatched || 0).getTime()
-        );
-        return { normal, completed, dropped, airing, onHold };
-    }
-
-
-
-
-
-
-    function buildLatestActivityMap(entries, videoProgress) {
-        const progressLatestBySlug = new Map();
-        for (const [id, progress] of Object.entries(videoProgress || {})) {
-            if (!id || id === '__slugIndex' || progress?.deleted) continue;
-            const sepIdx = id.indexOf('__episode-');
-            if (sepIdx === -1) continue;
-            const slug = id.slice(0, sepIdx);
-            const t = progress?.savedAt ? new Date(progress.savedAt).getTime() : 0;
-            if (!t) continue;
-            const cur = progressLatestBySlug.get(slug) || 0;
-            if (t > cur) progressLatestBySlug.set(slug, t);
-        }
-        const latestMap = new Map();
-        for (const [slug, anime] of entries) {
-            const lastWatchedTs = anime.lastWatched ? new Date(anime.lastWatched).getTime() : 0;
-            const progressTs = progressLatestBySlug.get(slug) || 0;
-            latestMap.set(slug, Math.max(lastWatchedTs || 0, progressTs));
-        }
-        return latestMap;
-    }
-
-
-
-
-
-
-    function attachSlugIndex(visibleProgress) {
-        const slugIndex = {};
-        for (const [id, progress] of Object.entries(visibleProgress)) {
-            const sepIdx = id.indexOf('__episode-');
-            if (sepIdx === -1) continue;
-            const slug = id.substring(0, sepIdx);
-            if (!slugIndex[slug]) slugIndex[slug] = [];
-            slugIndex[slug].push([id, progress]);
-        }
-        Object.defineProperty(visibleProgress, '__slugIndex', {
-            value: slugIndex,
-            enumerable: false,
-            configurable: true,
-            writable: true
-        });
-    }
-
-    function renderAnimeList(filter = '') {
-        const { AnimeCardRenderer, ProgressManager, SeasonGrouping } = AT;
-
-        const expansionState = captureExpansionState(elements.animeList);
-
-
-        const categoryFilter = (slug, anime) => {
-            if (currentCategory === 'all') return true;
-            const isMovie = SeasonGrouping.isMovie(slug, anime);
-            if (currentCategory === 'movies') return isMovie;
-            if (currentCategory === 'series') return !isMovie;
-            return true;
-        };
-
-
-        window.AnimeTracker._animeDataRef = animeData;
-
-        const entries = Object.entries(animeData)
-            .filter(([slug, anime]) => {
-                const matchesSearch = !filter || anime.title.toLowerCase().includes(filter.toLowerCase());
-                const matchesCategory = categoryFilter(slug, anime);
-                return matchesSearch && matchesCategory;
-            });
-
-        const visibleProgress = Object.fromEntries(
-            Object.entries(videoProgress).filter(([, p]) => !p.deleted)
-        );
-        attachSlugIndex(visibleProgress);
-
-        const inProgressAnime = ProgressManager.getInProgressAnime(animeData, visibleProgress)
-            .filter(anime => {
-                const matchesSearch = !filter || anime.title.toLowerCase().includes(filter.toLowerCase());
-                const trackedAnime = animeData[anime.slug];
-                if (trackedAnime?.droppedAt) return false;
-                if (trackedAnime && isAnimeCompleted(anime.slug, trackedAnime)) return false;
-                const categoryAnime = trackedAnime || anime;
-                const matchesCategory = categoryFilter(anime.slug || '', categoryAnime);
-                return matchesSearch && matchesCategory;
-            })
-            .sort((a, b) => new Date(b.lastProgress || 0) - new Date(a.lastProgress || 0));
-
-        if (entries.length === 0 && inProgressAnime.length === 0) {
-            if (_lastRenderedListMarkup !== '') {
-                elements.animeList.replaceChildren();
-                _lastRenderedListMarkup = '';
-            }
-            elements.emptyState.classList.add('visible');
-            return;
-        }
-
-        elements.emptyState.classList.remove('visible');
-
-        const latestMap = buildLatestActivityMap(entries, videoProgress);
-
-
-        const sortedEntries = entries.sort((a, b) => {
-            const [, animeA] = a;
-            const [, animeB] = b;
-            switch (currentSort) {
-                case 'date':     return latestMap.get(b[0]) - latestMap.get(a[0]);
-                case 'name':     return animeA.title.localeCompare(animeB.title, 'en');
-                case 'episodes': return (animeB.episodes?.length || 0) - (animeA.episodes?.length || 0);
-                default:         return 0;
-            }
-        });
-
-        const orderMap = new Map(sortedEntries.map(([slug], index) => [slug, index]));
-        const { normal: normalEntries, completed: completedEntries, dropped: droppedEntries,
-                airing: airingEntries, onHold: onHoldEntries } = partitionEntriesByStatus(sortedEntries);
-
-        const completedOrderMap = new Map(completedEntries.map(([slug], index) => [slug, index]));
-
-        const trackedHtml        = renderEntryGroupsHtml(normalEntries, orderMap, visibleProgress);
-        const completedCardsHtml = renderEntryGroupsHtml(completedEntries, completedOrderMap, visibleProgress);
-        const droppedCardsHtml   = renderEntryGroupsHtml(droppedEntries, completedOrderMap, visibleProgress);
-        const airingCardsHtml    = renderEntryGroupsHtml(airingEntries, completedOrderMap, visibleProgress);
-        const onHoldCardsHtml    = renderEntryGroupsHtml(onHoldEntries, completedOrderMap, visibleProgress);
-        const inProgressHtml     = AnimeCardRenderer.createInProgressGroup(inProgressAnime);
-
-
-
-
-        const completedGroupHtml = completedEntries.length > 0
-            ? renderCompactSectionHtml({
-                classPrefix: 'completed',
-                toggleId: 'completedListToggle',
-                label: 'COMPLETED LIST',
-                subLabel: `${AT.CONFIG.COMPLETED_LIST_MIN_DAYS}+ days since last watch`,
-                cardsHtml: completedCardsHtml,
-                isOpen: currentCompactStatusOpen
-            })
-            : '';
-        const droppedGroupHtml = droppedEntries.length > 0
-            ? renderCompactSectionHtml({
-                classPrefix: 'dropped',
-                toggleId: 'droppedListToggle',
-                label: 'DROPPED LIST',
-                subLabel: `${droppedEntries.length} anime`,
-                cardsHtml: droppedCardsHtml,
-                isOpen: currentCompactStatusOpen
-            })
-            : '';
-        const airingGroupHtml = airingEntries.length > 0
-            ? renderCompactSectionHtml({
-                classPrefix: 'airing',
-                toggleId: 'airingListToggle',
-                label: '⬤ AIRING LIST',
-                subLabel: `${airingEntries.length} anime · Caught up`,
-                cardsHtml: airingCardsHtml,
-                isOpen: currentCompactStatusOpen
-            })
-            : '';
-        const onHoldGroupHtml = onHoldEntries.length > 0
-            ? renderCompactSectionHtml({
-                classPrefix: 'onhold',
-                toggleId: 'onHoldListToggle',
-                label: 'ON HOLD',
-                subLabel: `${onHoldEntries.length} anime`,
-                cardsHtml: onHoldCardsHtml,
-                isOpen: currentCompactStatusOpen
-            })
-            : '';
-
-        const compactStatusItems = [
-            { key: 'airing', label: 'Airing', count: airingEntries.length, sectionHtml: airingGroupHtml },
-            { key: 'on_hold', label: 'Hold', count: onHoldEntries.length, sectionHtml: onHoldGroupHtml },
-            { key: 'completed', label: 'Completed', count: completedEntries.length, sectionHtml: completedGroupHtml },
-            { key: 'dropped', label: 'Dropped', count: droppedEntries.length, sectionHtml: droppedGroupHtml }
-        ].filter(item => item.count > 0);
-
-        if (compactStatusItems.length > 0) {
-            currentCompactStatus = normalizeCompactStatus(currentCompactStatus);
-            if (!compactStatusItems.some(item => item.key === currentCompactStatus)) {
-                currentCompactStatus = compactStatusItems[0].key;
-            }
-        }
-
-        const activeCompactItem = compactStatusItems.find(item => item.key === currentCompactStatus) || null;
-        const chipsHtml = compactStatusItems.length > 0
-            ? `
-                <div class="status-chip-row" role="tablist" aria-label="Quick status lists">
-                    ${compactStatusItems.map((item, index) => `
-                        <button
-                            type="button"
-                            class="status-chip${item.key === currentCompactStatus ? ' active' : ''} ${item.key.replace('_', '-')}"
-                            data-compact-status="${item.key}"
-                            aria-pressed="${item.key === currentCompactStatus ? 'true' : 'false'}">
-                            <span class="status-chip-label">${item.label}</span>
-                            <span class="status-chip-count">${item.count}</span>
-                        </button>${index < compactStatusItems.length - 1 ? '<span class="status-chip-sep">•</span>' : ''}
-                    `).join('')}
-                </div>
-            `
-            : '';
-        const activeCompactSectionHtml = activeCompactItem ? activeCompactItem.sectionHtml : '';
-
-        const combinedHtml = inProgressHtml + trackedHtml + chipsHtml + activeCompactSectionHtml;
-
-
-
-
-
-
-
-        if (combinedHtml === _lastRenderedListMarkup && elements.animeList.firstChild) {
-
-
-
-            if (elements.animeList.querySelector('.ip-card')) {
-                _ipPatch(videoProgress || {});
-            }
-            return;
-        }
-
-
-        elements.animeList.classList.add('no-transition');
-
-
-
-
-        const range = document.createRange();
-        range.selectNodeContents(elements.animeList);
-        const fragment = range.createContextualFragment(combinedHtml);
-        elements.animeList.replaceChildren(fragment);
-        _lastRenderedListMarkup = combinedHtml;
-
-        restoreExpansionState(elements.animeList, expansionState);
-
-        setupCardEventListeners();
-
-        if (elements.animeList.querySelector('.ip-card')) {
-            _ipPatch(videoProgress || {});
-        }
-
-
-        requestAnimationFrame(() => {
-            elements.animeList.classList.remove('no-transition');
-        });
-    }
-
-
-
-
-
+    // Render pipeline → src/popup/lib/render-list.js
 
     async function exportLibraryToJson() {
         const { Storage, LibraryBackup } = AT;
@@ -1028,7 +579,6 @@
         markInternalSave(merged);
         await Storage.set(merged);
 
-
         animeData = merged.animeData;
         videoProgress = merged.videoProgress;
         if (merged.goalSettings) goalSettings = merged.goalSettings;
@@ -1037,8 +587,6 @@
 
         renderAnimeList(elements.searchInput?.value || '');
         await updateStats();
-
-
 
         const user = FirebaseSync?.getUser?.();
         if (user) {
@@ -1053,205 +601,6 @@
             type: 'success', duration: 2600
         });
     }
-
-
-
-
-
-
-
-
-
-    const COMPACT_TOGGLE_CHEVRONS = [
-        ['airingListToggle', 'airing-chevron'],
-        ['onHoldListToggle', 'onhold-chevron'],
-        ['completedListToggle', 'completed-chevron'],
-        ['droppedListToggle', 'dropped-chevron']
-    ];
-
-    function refreshCompactChevrons() {
-        if (!elements.animeList) return;
-        for (const [toggleId, chevronClass] of COMPACT_TOGGLE_CHEVRONS) {
-            const toggle = elements.animeList.querySelector(`#${toggleId}`);
-            if (!toggle) continue;
-            const cards = toggle.nextElementSibling;
-            const chevron = toggle.querySelector(`.${chevronClass}`);
-            if (!chevron || !cards) continue;
-            chevron.style.transform = cards.classList.contains('open') ? 'rotate(0deg)' : 'rotate(-90deg)';
-        }
-    }
-
-
-
-
-
-
-
-
-
-    function installCardEventListeners() {
-        const list = elements.animeList;
-        if (!list || list.__cardListenersInstalled) return;
-
-        list.addEventListener('click', (e) => {
-            const target = e.target;
-
-
-            for (const [toggleId] of COMPACT_TOGGLE_CHEVRONS) {
-                const toggle = target.closest(`#${toggleId}`);
-                if (!toggle || !list.contains(toggle)) continue;
-                e.stopPropagation();
-                const cards = toggle.nextElementSibling;
-                if (cards) {
-                    cards.classList.toggle('open');
-                    currentCompactStatusOpen = cards.classList.contains('open');
-                }
-                refreshCompactChevrons();
-                return;
-            }
-
-
-            const chip = target.closest('[data-compact-status]');
-            if (chip && list.contains(chip)) {
-                e.preventDefault();
-                e.stopImmediatePropagation();
-                const nextStatus = normalizeCompactStatus(chip.dataset.compactStatus || '');
-                if (nextStatus !== currentCompactStatus) {
-                    currentCompactStatus = nextStatus;
-                    _lastRenderedListMarkup = null;
-                    suppressHoverUntilMouseMove();
-                    renderAnimeList(getActiveFilter());
-                }
-                return;
-            }
-
-
-            const moreFillers = target.closest('.show-more-fillers');
-            if (moreFillers && list.contains(moreFillers)) {
-                e.stopPropagation();
-                const hidden = moreFillers.previousElementSibling;
-                if (hidden?.classList.contains('hidden-fillers')) {
-                    const isExpanded = hidden.classList.toggle('expanded');
-                    moreFillers.textContent = isExpanded ? moreFillers.dataset.lessText : moreFillers.dataset.moreText;
-                }
-                return;
-            }
-            const moreEps = target.closest('.show-more-episodes');
-            if (moreEps && list.contains(moreEps)) {
-                e.stopPropagation();
-                const hidden = moreEps.previousElementSibling;
-                if (hidden?.classList.contains('hidden-episodes')) {
-                    const isExpanded = hidden.classList.toggle('expanded');
-                    moreEps.textContent = isExpanded ? moreEps.dataset.lessText : moreEps.dataset.moreText;
-                }
-                return;
-            }
-
-
-            const editBtn = target.closest('.movie-edit-btn, .anime-edit-title, .season-edit-btn');
-            if (editBtn && list.contains(editBtn) && editBtn.dataset.slug) {
-                e.stopPropagation();
-                editAnimeTitle(editBtn.dataset.slug);
-                return;
-            }
-            const delBtn = target.closest('.movie-delete-btn, .season-delete-btn');
-            if (delBtn && list.contains(delBtn) && delBtn.dataset.slug) {
-                e.stopPropagation();
-                deleteAnime(delBtn.dataset.slug);
-                return;
-            }
-
-
-            const seasonHeader = target.closest('.season-item-header');
-            if (seasonHeader && list.contains(seasonHeader)) {
-
-
-
-                const seasonItem = seasonHeader.closest('.season-item');
-                if (seasonItem && !seasonItem.classList.contains('season-item-movie')) {
-                    e.stopPropagation();
-                    seasonItem.classList.toggle('expanded');
-                }
-                return;
-            }
-
-
-            const movieGroupHeader = target.closest('.movie-group-header');
-            if (movieGroupHeader && list.contains(movieGroupHeader)) {
-                const group = movieGroupHeader.closest('.anime-movie-group');
-                if (group) group.classList.toggle('expanded');
-                return;
-            }
-            const seasonGroupHeader = target.closest('.season-group-header');
-            if (seasonGroupHeader && list.contains(seasonGroupHeader)) {
-                const group = seasonGroupHeader.closest('.anime-season-group');
-                if (group) group.classList.toggle('expanded');
-                return;
-            }
-            const partItemHeader = target.closest('.part-item-header');
-            if (partItemHeader && list.contains(partItemHeader)) {
-                e.stopPropagation();
-                const partItem = partItemHeader.closest('.part-item');
-                if (partItem) partItem.classList.toggle('expanded');
-                return;
-            }
-
-
-
-            const collapsibleHeader = target.closest(
-                '.in-progress-header, .episodes-header, .parts-header'
-            );
-            if (collapsibleHeader && list.contains(collapsibleHeader)) {
-                e.stopPropagation();
-                const card = collapsibleHeader.closest('.anime-card');
-                if (card && !card.classList.contains('expanded')) card.classList.add('expanded');
-                const parent = collapsibleHeader.parentElement;
-                if (parent) parent.classList.toggle('collapsed');
-                return;
-            }
-
-
-            const cardHeader = target.closest('.anime-card-header');
-            if (cardHeader && list.contains(cardHeader)) {
-
-
-                if (target.closest('.anime-card-actions') ||
-                    target.closest('.anime-header-actions') ||
-                    target.closest('.anime-fetch-filler')) {
-                    return;
-                }
-                e.stopPropagation();
-                const card = cardHeader.closest('.anime-card');
-                if (card) {
-                    const wasExpanded = card.classList.toggle('expanded');
-                    card.setAttribute('aria-expanded', wasExpanded ? 'true' : 'false');
-                }
-            }
-        });
-
-
-
-        list.addEventListener('keydown', (e) => {
-            if (e.key !== 'Enter' && e.key !== ' ') return;
-            const card = e.target.classList?.contains('anime-card') ? e.target : null;
-            if (!card) return;
-            e.preventDefault();
-            const wasExpanded = card.classList.toggle('expanded');
-            card.setAttribute('aria-expanded', wasExpanded ? 'true' : 'false');
-        });
-
-        list.__cardListenersInstalled = true;
-    }
-
-
-
-    function setupCardEventListeners() {
-        installCardEventListeners();
-        refreshCompactChevrons();
-    }
-
-
-
 
     async function updateStats() {
         const { UIHelpers, SeasonGrouping, Storage } = AT;
@@ -1272,10 +621,6 @@
                     .filter(n => Number.isFinite(n) && n > 0)
             );
             totalWatchedEpisodes += uniqueEpisodeNumbers.size;
-
-
-
-
 
             for (const ep of (anime.episodes || [])) {
                 if (ep?.durationSource === 'anilist') continue;
@@ -1333,12 +678,6 @@
         const previousState = badgeState || {};
         const next = { ...previousState };
 
-
-
-
-
-
-
         const trulyNew = [];
         for (const badge of newlyUnlocked) {
             if (!previousState[badge.id]) {
@@ -1381,20 +720,12 @@
         }
     }
 
-
-
-
-
-
     let _hoverSuppressionActive = false;
     function suppressHoverUntilMouseMove() {
         if (_hoverSuppressionActive) return;
         _hoverSuppressionActive = true;
         document.body.classList.add('is-suppressing-hover');
         const startedAt = performance.now();
-
-
-
 
         const MIN_DURATION_MS = 180;
         const release = () => {
@@ -1415,8 +746,6 @@
             document.removeEventListener('pointermove', release, true);
             clearTimeout(safetyTimer);
         };
-
-
 
         const safetyTimer = setTimeout(cleanup, 800);
         document.addEventListener('mousemove', release, true);
@@ -1440,8 +769,6 @@
             appRoot.classList.toggle('goals-mode', mode === 'goals');
             appRoot.classList.toggle('settings-mode', mode === 'settings');
         }
-
-
 
         const isViewMode = !!mode;
         if (elements.categoryTabs) elements.categoryTabs.style.display = isViewMode ? 'none' : '';
@@ -1478,12 +805,6 @@
         }
     }
 
-
-
-
-
-
-
     async function renderSettingsView() {
         const container = document.getElementById('settingsView');
         const mainContent = document.querySelector('.main-content');
@@ -1499,10 +820,6 @@
         }
 
         const user = AT?.FirebaseSync?.getUser?.() || null;
-
-
-
-
 
         let storedSettings = {};
         let passwordIsSet = false;
@@ -1522,8 +839,6 @@
                 skiptimeHelper: stored[SKIPTIME_HELPER_KEY] === true
             };
             const marker = stored[PASSWORD_SET_MARKER_KEY];
-
-
 
             passwordIsSet = !!(marker?.uid && user?.uid && marker.uid === user.uid && marker.setAt);
             needsReauth = await window.FirebaseLib?.isReauthNeeded?.() || false;
@@ -1584,10 +899,6 @@
         }
     }
 
-
-
-
-
     let _autoSyncCount = 0;
     function startAutoSync() {
         _autoSyncCount++;
@@ -1599,10 +910,6 @@
             scheduleDefaultSyncStatusRestore(1500);
         }
     }
-
-
-
-
 
     function _truncTitle(t, max) {
         return t && t.length > max ? t.slice(0, max) + '…' : t;
@@ -1626,7 +933,6 @@
         const allFillersCached = slugs.every(slug =>
             FillerService.isLikelyMovie(slug) || !!FillerService.episodeTypesCache[slug]
         );
-
 
         const allAnilistCached = slugs.every(slug => {
             const c = AT.AnilistService.cache?.[slug];
@@ -1664,9 +970,6 @@
     async function recoverFromQuotaPressure(context = 'sync') {
         const { Storage, ProgressManager } = AT;
 
-
-
-
         const QUOTA_BYTES = 10 * 1024 * 1024;
         const TARGET_BYTES = Math.round(QUOTA_BYTES * 0.70);
 
@@ -1689,17 +992,12 @@
                 });
             });
 
-
-
-
             const cacheKeys = Object.keys(all).filter((key) =>
                 key.startsWith('animeinfo_') || key.startsWith('episodeTypes_')
             );
             if (cacheKeys.length > 0) {
                 await Storage.remove(cacheKeys);
             }
-
-
 
             const localAnimeData = all.animeData || {};
             const localVideoProgress = all.videoProgress || {};
@@ -1710,7 +1008,6 @@
                 const bTs = new Date(b[1]?.savedAt || b[1]?.watchedAt || 0).getTime() || 0;
                 return bTs - aTs;
             });
-
 
             let capCurrent = Math.min(2000, sortedProgress.length);
             let trimmedProgress = Object.fromEntries(sortedProgress.slice(0, capCurrent));
@@ -1724,10 +1021,6 @@
             let bytesNow = await measureBytes();
             let pass = 1;
             const maxPasses = 3;
-
-
-
-
 
             while (bytesNow > TARGET_BYTES && pass < maxPasses && capCurrent > 250) {
                 pass += 1;
@@ -1751,19 +1044,6 @@
         }
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
     function runMaintenancePipeline(rawData, options = {}) {
         const { ProgressManager, UIHelpers } = AT;
         const { maintenanceSuffix = '', baselineForCleanCount = null } = options;
@@ -1780,8 +1060,6 @@
             normalized.animeData || {}
         );
         const repairedData = ProgressManager.removeDuplicateEpisodes(withoutAutoRepaired.cleanedData);
-
-
 
         const anilistDateScrub = scrubAnilistImportDates(repairedData);
         if (anilistDateScrub.changed) {
@@ -1854,8 +1132,6 @@
 
         let changed = repairAiringCompletedEntries(animeData);
 
-
-
         if (persistDetectedCompletions(animeData)) changed = true;
 
         if (changed) {
@@ -1867,16 +1143,11 @@
 
     async function runAutoFetchIfNeeded() {
 
-
-
         if (!AT.FirebaseSync?.getUser?.()) return;
 
         const { FillerService } = AT;
         const slugsList = Object.keys(animeData);
         const { allFillersCached, allAnilistCached } = checkAllCached(slugsList);
-
-
-
 
         const repairState = await syncMetadataRepairStateFromStorage();
         const repairRunning = repairState?.status === 'running';
@@ -1930,9 +1201,6 @@
         }
     }
 
-
-
-
     async function loadAndSyncData(options = {}) {
         if (loadAndSyncInProgress) return;
         loadAndSyncInProgress = true;
@@ -1955,9 +1223,6 @@
                     realignCategoryTabs();
                 }
             }
-
-
-
 
             await loadData({ skipAutoFetch });
 
@@ -1995,8 +1260,6 @@
                     return;
                 }
             }
-
-
 
             if (error?.code === 'AUTH_REJECTED') {
                 showToast({
@@ -2038,10 +1301,6 @@
         stopPopupCloudRefresh();
         if (document.hidden || !AT?.FirebaseSync?.getUser?.()) return;
 
-
-
-
-
         popupCloudRefreshTimer = setInterval(() => {
             refreshPopupCloudData(false).catch((error) => {
                 PopupLogger.debug('Sync', 'Background popup refresh skipped:', error?.message || error);
@@ -2049,346 +1308,7 @@
         }, POPUP_CLOUD_REFRESH_MS);
     }
 
-    async function deleteProgress(slug, episodeNumber) {
-        const { Storage, FirebaseSync } = AT;
-        const uniqueId = `${slug}__episode-${episodeNumber}`;
-
-        try {
-            const result = await Storage.get(['videoProgress']);
-            const currentVideoProgress = result.videoProgress || {};
-
-            if (currentVideoProgress[uniqueId]) {
-                const GRACE_MS = 5000;
-                const savedAt = currentVideoProgress[uniqueId].savedAt
-                    ? new Date(currentVideoProgress[uniqueId].savedAt).getTime()
-                    : Date.now();
-                const deletedAt = new Date(Math.max(Date.now(), savedAt + GRACE_MS + 1)).toISOString();
-
-                currentVideoProgress[uniqueId] = {
-                    ...currentVideoProgress[uniqueId],
-                    deleted: true,
-                    deletedAt
-                };
-                videoProgress = currentVideoProgress;
-                const dataToSave = { videoProgress: currentVideoProgress };
-                const user = FirebaseSync.getUser();
-                if (user) dataToSave.userId = user.uid;
-                markInternalSave(dataToSave);
-                await Storage.set(dataToSave);
-
-                if (user) {
-                    try {
-                        const gcResult = await Storage.get(['groupCoverImages']);
-                        await FirebaseSync.saveToCloud({
-                            animeData, videoProgress: currentVideoProgress,
-                            groupCoverImages: gcResult.groupCoverImages || {}
-                        }, true);
-                    } catch (syncErr) {
-                        PopupLogger.error('Delete', 'Cloud sync failed:', syncErr);
-                    }
-                }
-
-                renderAnimeList(elements.searchInput?.value || '');
-            }
-        } catch (e) {
-            PopupLogger.error('Delete', 'Error:', e);
-            showToast('Failed to delete progress. Please try again.', 'error');
-        }
-    }
-
-
-
-
-
-    const _deletingSlugs = new Set();
-
-
-
-    async function deleteAnime(slug) {
-        const { Storage, FirebaseSync } = AT;
-        if (_deletingSlugs.has(slug)) return;
-
-
-
-        const animeTitle = animeData[slug]?.title || slug;
-        const ok = await showInlineConfirm({
-            title: 'Delete this anime?',
-            body: `“${animeTitle}” will be removed from your library across all devices.`,
-            confirmLabel: 'Delete',
-            cancelLabel: 'Keep'
-        });
-        if (!ok) return;
-        _deletingSlugs.add(slug);
-        const wasInAnimeData = !!animeData[slug];
-        const siteAnimeId = animeData[slug]?.siteAnimeId;
-        if (wasInAnimeData) delete animeData[slug];
-
-        try {
-            const result = await Storage.get(['videoProgress', 'deletedAnime', 'groupCoverImages']);
-            const currentVideoProgress = result.videoProgress || {};
-            let progressDeleted = 0;
-            const progressPrefix = slug + '__episode-';
-            for (const id of Object.keys(currentVideoProgress)) {
-                if (id.startsWith(progressPrefix)) { delete currentVideoProgress[id]; progressDeleted++; }
-            }
-
-            if (progressDeleted === 0 && !wasInAnimeData) {
-                PopupLogger.warn('Delete', 'No data found to delete for:', slug);
-                return;
-            }
-
-            videoProgress = currentVideoProgress;
-            const deletedAnime = clearDeletedAnimeSlug(result.deletedAnime || {}, slug);
-            deletedAnime[slug] = { deletedAt: new Date().toISOString() };
-
-            const dataToSave = { animeData, videoProgress: currentVideoProgress, deletedAnime };
-            const user = FirebaseSync.getUser();
-            if (user) dataToSave.userId = user.uid;
-            markInternalSave(dataToSave);
-            await Storage.set(dataToSave);
-
-            if (user) {
-                try {
-                    const gcResult = await Storage.get(['groupCoverImages']);
-                    await FirebaseSync.saveToCloud({
-                        animeData, videoProgress: currentVideoProgress, deletedAnime,
-                        groupCoverImages: gcResult.groupCoverImages || {}
-                    }, true);
-                } catch (syncErr) {
-                    PopupLogger.error('Delete', 'Cloud sync failed:', syncErr);
-                }
-            }
-
-
-            if (siteAnimeId) {
-                chrome.runtime.sendMessage(
-                    { type: 'WATCHLIST_SYNC', animeId: siteAnimeId, watchlistType: 'remove' },
-                    () => { if (chrome.runtime.lastError) {              } }
-                );
-            }
-
-            renderAnimeList(elements.searchInput?.value || '');
-            updateStats();
-            try { AT.UIHelpers?.showToast?.('Anime deleted', { type: 'success' }); } catch {}
-        } catch (e) {
-            PopupLogger.error('Delete', 'Error:', e);
-            try { AT.UIHelpers?.showToast?.('Failed to delete anime', { type: 'error', duration: 3500 }); }
-            catch { showToast('Failed to delete anime. Please try again.', 'error'); }
-        } finally {
-            _deletingSlugs.delete(slug);
-        }
-    }
-
-
-
-
-    async function toggleAnimeCompleted(slug) {
-        const { Storage, FirebaseSync } = AT;
-        if (!animeData[slug]) return;
-
-        try {
-            const now = new Date().toISOString();
-            const wasCompleted = !!animeData[slug].completedAt;
-            if (wasCompleted) {
-                setManualListState(animeData[slug], 'active', now);
-            } else {
-                setManualListState(animeData[slug], 'completed', now, true);
-            }
-
-            const result = await Storage.get(['videoProgress', 'deletedAnime', 'groupCoverImages']);
-            const currentVideoProgress = result.videoProgress || {};
-            const deletedAnime = clearDeletedAnimeSlug(result.deletedAnime || {}, slug);
-
-            const dataToSave = { animeData, videoProgress: currentVideoProgress, deletedAnime };
-            const user = FirebaseSync.getUser();
-            if (user) dataToSave.userId = user.uid;
-            markInternalSave(dataToSave);
-            await Storage.set(dataToSave);
-
-            if (user) {
-                try {
-                    await FirebaseSync.saveToCloud({
-                        animeData, videoProgress: currentVideoProgress, deletedAnime,
-                        groupCoverImages: result.groupCoverImages || {}
-                    }, true);
-                } catch (syncErr) {
-                    PopupLogger.error('Complete', 'Cloud sync failed:', syncErr);
-                }
-            }
-
-
-            syncWatchlistFromPopup(slug, wasCompleted ? 'watching' : 'completed');
-
-            renderAnimeList(elements.searchInput?.value || '');
-            updateStats();
-        } catch (e) {
-            PopupLogger.error('Complete', 'Error:', e);
-        }
-    }
-
-
-
-
-    async function toggleAnimeDropped(slug) {
-        const { Storage, FirebaseSync } = AT;
-        if (!animeData[slug]) return;
-
-        try {
-            const now = new Date().toISOString();
-            const wasDropped = !!animeData[slug].droppedAt;
-            if (wasDropped) {
-                setManualListState(animeData[slug], 'active', now);
-            } else {
-                setManualListState(animeData[slug], 'dropped', now);
-            }
-
-            const result = await Storage.get(['videoProgress', 'deletedAnime', 'groupCoverImages']);
-            const currentVideoProgress = result.videoProgress || {};
-            const deletedAnime = clearDeletedAnimeSlug(result.deletedAnime || {}, slug);
-
-            const dataToSave = { animeData, videoProgress: currentVideoProgress, deletedAnime };
-            const user = FirebaseSync.getUser();
-            if (user) dataToSave.userId = user.uid;
-            markInternalSave(dataToSave);
-            await Storage.set(dataToSave);
-
-            if (user) {
-                try {
-                    await FirebaseSync.saveToCloud({
-                        animeData, videoProgress: currentVideoProgress, deletedAnime,
-                        groupCoverImages: result.groupCoverImages || {}
-                    }, true);
-                } catch (syncErr) {
-                    PopupLogger.error('Drop', 'Cloud sync failed:', syncErr);
-                }
-            }
-
-
-            syncWatchlistFromPopup(slug, wasDropped ? 'watching' : 'dropped');
-
-            renderAnimeList(elements.searchInput?.value || '');
-            updateStats();
-        } catch (e) {
-            PopupLogger.error('Drop', 'Error:', e);
-        }
-    }
-
-
-
-
-
-    async function toggleAnimeFavorite(slug) {
-        const { Storage, FirebaseSync } = AT;
-        if (!animeData[slug]) return;
-
-        try {
-            const now = new Date().toISOString();
-            const wasFavorite = !!animeData[slug].favorite;
-            if (wasFavorite) {
-                animeData[slug].favorite = false;
-                animeData[slug].favoritedAt = null;
-            } else {
-                animeData[slug].favorite = true;
-                animeData[slug].favoritedAt = now;
-            }
-            animeData[slug].favoriteUpdatedAt = now;
-
-            const dataToSave = { animeData };
-            const user = FirebaseSync.getUser();
-            if (user) dataToSave.userId = user.uid;
-            markInternalSave(dataToSave);
-            await Storage.set(dataToSave);
-
-            if (user) {
-                try {
-                    await FirebaseSync.saveToCloud({ animeData }, true);
-                } catch (syncErr) {
-                    PopupLogger.error('Favorite', 'Cloud sync failed:', syncErr);
-                }
-            }
-
-            renderAnimeList(elements.searchInput?.value || '');
-            try { AT.UIHelpers?.showToast?.(wasFavorite ? 'Removed from favorites' : 'Added to favorites', { type: 'success', duration: 1400 }); } catch {}
-        } catch (e) {
-            PopupLogger.error('Favorite', 'Error:', e);
-        }
-    }
-
-
-
-
-    async function toggleAnimeOnHold(slug) {
-        const { Storage, FirebaseSync } = AT;
-        if (!animeData[slug]) return;
-
-        try {
-            const now = new Date().toISOString();
-            const wasOnHold = !!animeData[slug].onHoldAt;
-            if (wasOnHold) {
-                setManualListState(animeData[slug], 'active', now);
-            } else {
-                setManualListState(animeData[slug], 'on_hold', now);
-            }
-
-            const result = await Storage.get(['videoProgress', 'deletedAnime', 'groupCoverImages']);
-            const currentVideoProgress = result.videoProgress || {};
-            const deletedAnime = clearDeletedAnimeSlug(result.deletedAnime || {}, slug);
-
-            const dataToSave = { animeData, videoProgress: currentVideoProgress, deletedAnime };
-            const user = FirebaseSync.getUser();
-            if (user) dataToSave.userId = user.uid;
-            markInternalSave(dataToSave);
-            await Storage.set(dataToSave);
-
-            if (user) {
-                try {
-                    await FirebaseSync.saveToCloud({
-                        animeData, videoProgress: currentVideoProgress, deletedAnime,
-                        groupCoverImages: result.groupCoverImages || {}
-                    }, true);
-                } catch (syncErr) {
-                    PopupLogger.error('OnHold', 'Cloud sync failed:', syncErr);
-                }
-            }
-
-
-            syncWatchlistFromPopup(slug, wasOnHold ? 'watching' : 'on_hold');
-
-            renderAnimeList(elements.searchInput?.value || '');
-            updateStats();
-        } catch (e) {
-            PopupLogger.error('OnHold', 'Error:', e);
-        }
-    }
-
-
-
-
-    async function clearAllData() {
-        const { Storage, FirebaseSync } = AT;
-        const dataToSave = { animeData: {}, videoProgress: {}, groupCoverImages: {}, deletedAnime: {} };
-        const user = FirebaseSync.getUser();
-        if (user) dataToSave.userId = user.uid;
-        markInternalSave(dataToSave);
-        await Storage.set(dataToSave);
-        if (user) {
-            try {
-                await FirebaseSync.saveToCloud({
-                    animeData: {},
-                    videoProgress: {},
-                    groupCoverImages: {},
-                    deletedAnime: {}
-                }, true);
-            } catch (syncErr) {
-                PopupLogger.error('ClearAll', 'Cloud sync failed:', syncErr);
-            }
-        }
-        animeData = {};
-        videoProgress = {};
-        renderAnimeList();
-        updateStats();
-        hideDialog();
-    }
+    // Anime actions (delete/toggle/clear) → src/popup/lib/anime-actions.js
 
     const {
         open: openDialogA11y,
@@ -2399,61 +1319,7 @@
     function showDialog() { openDialogA11y(elements.confirmDialog); }
     function hideDialog() { closeDialogA11y(elements.confirmDialog); }
 
-    function showAddAnimeDialog() {
-        elements.animeSlugInput.value = '';
-        elements.episodesWatchedInput.value = '';
-        elements.animeSlugInput.classList.remove('error');
-        elements.episodesWatchedInput.classList.remove('error', 'invalid-range');
-        const includeFillersCb = document.getElementById('includeFillers');
-        if (includeFillersCb) includeFillersCb.checked = false;
-        const includeFillerLabel = document.getElementById('includeFillerLabel');
-        if (includeFillerLabel) includeFillerLabel.style.display = '';
-        const includeFillersBlock = document.getElementById('includeFillersBlock');
-        if (includeFillersBlock) {
-            includeFillersBlock.style.display = 'none';
-            includeFillersBlock.dataset.checked = 'false';
-        }
-
-
-        _setSlugStatus('idle');
-        const slugDetectedHint = document.getElementById('slugDetectedHint');
-        if (slugDetectedHint) { slugDetectedHint.style.display = 'none'; slugDetectedHint.textContent = ''; }
-        const slugMeta = document.getElementById('slugMeta');
-        if (slugMeta) {
-            slugMeta.style.display = 'none';
-            const slugCard = slugMeta.closest('.slug-card');
-            if (slugCard) slugCard.dataset.hasMeta = 'false';
-        }
-        const fillerActionBar = document.getElementById('fillerActionBar');
-        if (fillerActionBar) fillerActionBar.style.display = 'none';
-
-
-        const counter = document.getElementById('episodesCounter');
-        if (counter) counter.style.display = 'none';
-
-
-        const confirmBtn = elements.confirmAddAnime;
-        if (confirmBtn) {
-            confirmBtn.dataset.state = 'idle';
-            confirmBtn.disabled = false;
-        }
-
-        _addDialogDetectedTitle = null;
-        _addDialogKnownTotal = null;
-        _addDialogTotalCanon = null;
-        _addDialogCurrentSlug = null;
-        _publishDialogState();
-        updateEpisodesPreview('');
-        openDialogA11y(elements.addAnimeDialog, {
-            initialFocus: elements.animeSlugInput,
-            onCancel: hideAddAnimeDialog
-        });
-    }
-
-
-
-
-
+    // Add/edit-anime dialogs → src/popup/lib/add-anime-dialog.js
 
     let _addDialogDetectedTitle = null;
     let _addDialogKnownTotal = null;
@@ -2461,287 +1327,8 @@
     let _addDialogSlugDebounce = null;
     let _addDialogCurrentSlug = null;
 
-    function _setSlugStatus(status) {
-
-        const wrap = document.querySelector('.slug-input-wrap');
-        if (wrap) wrap.dataset.status = status;
-    }
-
-
-
     window.AnimeTracker = window.AnimeTracker || {};
     window.AnimeTracker.__addDialogState = { knownTotal: null };
-
-    function _publishDialogState() {
-        window.AnimeTracker.__addDialogState.knownTotal = _addDialogKnownTotal;
-    }
-
-    function _setDetectedHint(rawInput, slug) {
-        const el = document.getElementById('slugDetectedHint');
-        if (!el) return;
-        const isUrl = /^https?:\/\//i.test(rawInput || '') || /\//.test(rawInput || '');
-        if (isUrl && slug && slug !== rawInput.trim()) {
-            el.innerHTML = `Detected slug: <code>${slug}</code>`;
-            el.style.display = 'block';
-        } else {
-            el.style.display = 'none';
-            el.textContent = '';
-        }
-    }
-
-
-
-
-
-
-
-
-
-
-
-    async function onSlugInputChange(rawSlug) {
-        const { FillerService } = AT;
-        const slug = extractSlugFromInput(rawSlug);
-        _addDialogCurrentSlug = slug;
-        _setDetectedHint(rawSlug, slug);
-
-        const bar = document.getElementById('fillerActionBar');
-        const slugMeta = document.getElementById('slugMeta');
-
-        if (!slug) {
-            _setSlugStatus('idle');
-            if (bar) bar.style.display = 'none';
-            if (slugMeta) {
-            slugMeta.style.display = 'none';
-            const slugCard = slugMeta.closest('.slug-card');
-            if (slugCard) slugCard.dataset.hasMeta = 'false';
-        }
-            _addDialogKnownTotal = null;
-            _addDialogTotalCanon = null;
-            return;
-        }
-
-
-        _setSlugStatus('loading');
-        if (bar) {
-            bar.style.display = 'flex';
-            bar.className = 'filler-action-bar is-loading';
-            bar.textContent = 'Fetching…';
-        }
-
-        const [episodeTypes, animeInfoFromCache] = await Promise.all([
-            FillerService.fetchEpisodeTypes(slug).catch(() => null),
-            (async () => {
-                try {
-                    const s = await chrome.storage.local.get([`animeinfo_${slug}`]);
-                    return s[`animeinfo_${slug}`] || null;
-                } catch { return null; }
-            })()
-        ]);
-
-        if (slug !== _addDialogCurrentSlug) return;
-
-
-        let availableTotal = null;
-        let finalTotal = null;
-        if (animeInfoFromCache && !animeInfoFromCache.notFound) {
-            availableTotal = animeInfoFromCache.latestEpisode || null;
-            finalTotal = animeInfoFromCache.totalEpisodes || null;
-        }
-        if (!availableTotal && episodeTypes && !episodeTypes.notFound) {
-            availableTotal = episodeTypes.totalEpisodes || null;
-        }
-        if (!finalTotal) {
-            const al = AT.AnilistService.getTotalEpisodes?.(slug);
-            if (al && al > 0) finalTotal = al;
-        }
-        if (!availableTotal) availableTotal = finalTotal;
-
-        _addDialogKnownTotal = availableTotal;
-        _publishDialogState();
-
-        const hasFillerData = episodeTypes && !episodeTypes.notFound;
-        const fillerNums = hasFillerData ? (episodeTypes.filler || []) : [];
-        const totalEps = hasFillerData ? (episodeTypes.totalEpisodes || 0) : 0;
-        const canonCount = totalEps > 0
-            ? Math.max(0, totalEps - fillerNums.length)
-            : (availableTotal ? Math.max(0, availableTotal - fillerNums.length) : null);
-        _addDialogTotalCanon = canonCount;
-
-        const showAll = !!availableTotal;
-        const showCanon = !!canonCount && canonCount !== availableTotal;
-        const showSkip = fillerNums.length > 0;
-        const hasAnyChip = showAll || showCanon || showSkip;
-        const hasAnyInfo = hasFillerData || availableTotal;
-
-
-        if (bar) {
-            if (!hasAnyInfo && !hasAnyChip) {
-                bar.style.display = 'none';
-            } else {
-                bar.className = 'filler-action-bar';
-                bar.textContent = '';
-
-
-                const left = document.createElement('div');
-                left.className = 'fab-left';
-
-                if (canonCount !== null) {
-                    const b = document.createElement('span');
-                    b.className = 'filler-badge filler-badge-canon';
-                    b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg><span>${canonCount} canon</span>`;
-                    left.appendChild(b);
-                }
-                if (fillerNums.length > 0) {
-                    const b = document.createElement('span');
-                    b.className = 'filler-badge filler-badge-fillers fab-filler-toggle';
-                    b.setAttribute('role', 'button');
-                    b.setAttribute('tabindex', '0');
-                    b.setAttribute('aria-expanded', 'false');
-                    b.setAttribute('aria-controls', 'fabFillerDetails');
-                    b.setAttribute('title', 'Show filler episodes');
-                    const { buildRangeString: brs } = AT.EpisodeParse;
-                    const fillerStr = brs([...fillerNums].sort((a, b) => a - b));
-                    b.innerHTML =
-                        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>` +
-                        `<span>${fillerNums.length} fillers</span>` +
-                        `<svg class="fab-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>`;
-                    left.appendChild(b);
-
-
-
-
-
-
-
-                    const details = document.createElement('div');
-                    details.className = 'fab-filler-details';
-                    details.id = 'fabFillerDetails';
-                    details.hidden = true;
-                    details.textContent = fillerStr;
-
-
-
-                    b._detailsEl = details;
-                    bar._detailsEl = details;
-                }
-
-                bar.appendChild(left);
-
-
-                if (hasAnyChip) {
-                    const right = document.createElement('div');
-                    right.className = 'fab-right';
-
-                    const mkChip = (action, label, sub) => {
-                        const btn = document.createElement('button');
-                        btn.type = 'button';
-                        btn.className = 'ep-chip';
-                        btn.dataset.action = action;
-                        btn.textContent = label;
-                        if (sub) {
-                            const s = document.createElement('span');
-                            s.className = 'ep-chip-sub';
-                            s.textContent = sub;
-                            btn.appendChild(s);
-                        }
-                        return btn;
-                    };
-
-                    if (showAll) right.appendChild(mkChip('all', 'All', `1–${availableTotal}`));
-                    if (showCanon) right.appendChild(mkChip('canon', 'Canon', `${canonCount}`));
-                    if (showSkip) right.appendChild(mkChip('skip-fillers', '⏭ Skip fillers'));
-
-                    bar.appendChild(right);
-                }
-
-
-
-
-
-
-                if (bar._detailsEl) {
-                    bar.appendChild(bar._detailsEl);
-                }
-
-                bar.style.display = 'flex';
-            }
-        }
-
-
-        if (slugMeta) {
-            const cover = document.getElementById('slugMetaCover');
-            const titleEl = document.getElementById('slugMetaTitle');
-            const statsEl = document.getElementById('slugMetaStats');
-            const cachedAnilist = AT.AnilistService.cache?.[slug];
-            const detectedTitle = animeInfoFromCache?.title
-                || (cachedAnilist && !cachedAnilist.notFound && cachedAnilist.title)
-                || null;
-            const coverUrl = animeInfoFromCache?.coverImage
-                || (cachedAnilist && cachedAnilist.coverImage)
-                || null;
-            const status = animeInfoFromCache?.status || cachedAnilist?.status || null;
-
-            if (detectedTitle || coverUrl || availableTotal) {
-                const slugCard = slugMeta.closest('.slug-card');
-                if (slugCard) slugCard.dataset.hasMeta = 'true';
-                slugMeta.style.display = '';
-                if (cover) {
-                    if (coverUrl) { cover.src = coverUrl; cover.style.display = ''; }
-                    else { cover.removeAttribute('src'); cover.style.display = 'none'; }
-                }
-                if (titleEl) {
-
-
-
-
-                    const slugFallback = generateTitleFromSlug(slug);
-                    const finalTitle = detectedTitle || slugFallback;
-                    const looksRedundant = !detectedTitle
-                        || detectedTitle.toLowerCase().replace(/\s+/g, '-') === slug.toLowerCase();
-                    if (looksRedundant) {
-                        titleEl.textContent = '';
-                        titleEl.style.display = 'none';
-                    } else {
-                        titleEl.textContent = finalTitle;
-                        titleEl.style.display = '';
-                    }
-                }
-                if (statsEl) {
-                    const parts = [];
-                    if (availableTotal) parts.push(`<span>${availableTotal} eps</span>`);
-                    if (status === 'RELEASING') parts.push(`<span class="stat-airing">⬤ Airing</span>`);
-                    else if (status === 'FINISHED') parts.push(`<span class="stat-finished">✓ Finished</span>`);
-                    statsEl.innerHTML = parts.join(' · ');
-                }
-            } else {
-                const slugCard = slugMeta.closest('.slug-card');
-                if (slugCard) slugCard.dataset.hasMeta = 'false';
-                slugMeta.style.display = 'none';
-            }
-        }
-
-
-        const hasUsefulData = (episodeTypes && !episodeTypes.notFound)
-            || (animeInfoFromCache && !animeInfoFromCache.notFound);
-        _setSlugStatus(hasUsefulData ? 'ok' : (episodeTypes === null && !animeInfoFromCache ? 'idle' : 'fail'));
-
-
-        {
-            const cachedAnilist = AT.AnilistService.cache?.[slug];
-            _addDialogDetectedTitle = animeInfoFromCache?.title
-                || (cachedAnilist && !cachedAnilist.notFound && cachedAnilist.title)
-                || null;
-        }
-
-        if (elements.episodesWatchedInput.value) {
-            updateEpisodesPreview(elements.episodesWatchedInput.value);
-        }
-    }
-
-    function hideAddAnimeDialog() {
-        closeDialogA11y(elements.addAnimeDialog);
-    }
 
     const {
         parseRanges: parseEpisodeRanges,
@@ -2751,290 +1338,11 @@
         renderEpisodesPreview: updateEpisodesPreview
     } = AT.EpisodeParse;
 
-
-
-
-
-
-    function syncWatchlistFromPopup(slug, watchlistType) {
-        try {
-            const siteId = animeData[slug]?.siteAnimeId;
-            if (siteId) {
-
-                chrome.runtime.sendMessage(
-                    { type: 'WATCHLIST_SYNC', animeId: siteId, watchlistType },
-                    () => { if (chrome.runtime.lastError) {              } }
-                );
-                PopupLogger.debug('WatchlistSync', `sent ${watchlistType} for #${siteId}`);
-            } else {
-
-                PopupLogger.debug('WatchlistSync', `fetching siteAnimeId for ${slug}...`);
-                chrome.runtime.sendMessage(
-                    { type: 'FETCH_ANIME_INFO', slug },
-                    (response) => {
-                        if (chrome.runtime.lastError) return;
-                        const fetchedId = response?.info?.siteAnimeId;
-                        if (fetchedId) {
-
-                            if (animeData[slug]) animeData[slug].siteAnimeId = fetchedId;
-
-                            chrome.runtime.sendMessage(
-                                { type: 'WATCHLIST_SYNC', animeId: fetchedId, watchlistType },
-                                () => { if (chrome.runtime.lastError) {              } }
-                            );
-                            PopupLogger.debug('WatchlistSync', `fetched #${fetchedId}, sent ${watchlistType}`);
-
-                            AT.Storage.set({ animeData }).catch(() => {});
-                        } else {
-                            PopupLogger.debug('WatchlistSync', `could not find siteAnimeId for ${slug}`);
-                        }
-                    }
-                );
-            }
-        } catch (e) {
-            PopupLogger.warn('WatchlistSync', 'popup error:', e.message);
-        }
-    }
-
-
     const {
         setManualListState,
         markTitleEdited,
         clearDeletedAnimeSlug
     } = AT.StatusService;
-
-    async function addAnimeWithEpisodes() {
-        const { Storage, FirebaseSync, SeasonGrouping } = AT;
-        const slugInput = elements.animeSlugInput.value;
-        const slug = extractSlugFromInput(slugInput);
-
-
-
-        const detectedTitle = _addDialogDetectedTitle && _addDialogDetectedTitle.trim();
-        const title = detectedTitle || generateTitleFromSlug(slug);
-        const episodesRawInput = elements.episodesWatchedInput.value.trim();
-
-        if (!slug) {
-            elements.animeSlugInput.classList.add('error');
-            elements.animeSlugInput.focus();
-            return;
-        }
-        elements.animeSlugInput.classList.remove('error');
-
-        if (!episodesRawInput) {
-            elements.episodesWatchedInput.classList.add('error');
-            elements.episodesWatchedInput.focus();
-            return;
-        }
-
-        const allParsedEpisodes = parseEpisodeRanges(episodesRawInput);
-        const includeFillers = document.getElementById('includeFillers')?.checked || false;
-        const { canon } = splitCanonAndFillers(slug, allParsedEpisodes);
-        const episodeNumbers = includeFillers ? allParsedEpisodes : canon;
-
-        if (episodeNumbers.length === 0) {
-            elements.episodesWatchedInput.classList.add('error');
-            elements.episodesWatchedInput.focus();
-            return;
-        }
-        elements.episodesWatchedInput.classList.remove('error');
-
-
-
-
-
-        elements.confirmAddAnime.disabled = true;
-        elements.confirmAddAnime.dataset.state = 'loading';
-
-        try {
-            const now = new Date().toISOString();
-            const isMovie = SeasonGrouping.isMovie(slug, { title });
-            const defaultDuration = isMovie ? 0 : 1440;
-            const resumedFromHold = !!(
-                animeData[slug]
-                && (animeData[slug].onHoldAt || animeData[slug].listState === 'on_hold')
-            );
-
-
-
-            let inferredDuration = defaultDuration;
-            if (animeData[slug]) {
-                const realDurs = (animeData[slug].episodes || [])
-                    .filter(ep => ep?.durationSource === 'video' && Number(ep.duration) > 0)
-                    .map(ep => Number(ep.duration))
-                    .sort((a, b) => a - b);
-                if (realDurs.length > 0) {
-                    inferredDuration = realDurs[Math.floor(realDurs.length / 2)];
-                }
-            }
-            const episodes = episodeNumbers.map(num => ({ number: num, duration: inferredDuration, watchedAt: now }));
-
-            if (animeData[slug]) {
-                const existingEpisodes = animeData[slug].episodes || [];
-                const existingByNumber = new Map(existingEpisodes.map(ep => [ep.number, ep]));
-                for (const ep of episodes) {
-                    const existing = existingByNumber.get(ep.number);
-                    if (!existing) {
-                        existingEpisodes.push(ep);
-                    } else if (existing.durationSource === 'anilist') {
-
-                        const idx = existingEpisodes.indexOf(existing);
-                        existingEpisodes[idx] = { ...existing, watchedAt: now, duration: inferredDuration, durationSource: 'manual' };
-                    }
-                }
-                existingEpisodes.sort((a, b) => a.number - b.number);
-                animeData[slug].episodes = existingEpisodes;
-                animeData[slug].totalWatchTime = existingEpisodes.reduce((sum, ep) => sum + (ep.duration || 0), 0);
-                animeData[slug].lastWatched = now;
-                if (resumedFromHold) {
-                    setManualListState(animeData[slug], 'active', now);
-                }
-            } else {
-                animeData[slug] = {
-                    title, slug, episodes,
-                    totalWatchTime: episodes.reduce((sum, ep) => sum + (ep.duration || 0), 0),
-                    lastWatched: now, totalEpisodes: null
-                };
-
-
-
-
-            }
-
-            const deletedResult = await Storage.get(['deletedAnime']);
-            const deletedAnime = clearDeletedAnimeSlug(deletedResult.deletedAnime || {}, slug);
-            const dataToSave = { animeData, videoProgress, deletedAnime };
-            const user = FirebaseSync.getUser();
-            if (user) dataToSave.userId = user.uid;
-            markInternalSave(dataToSave);
-            await Storage.set(dataToSave);
-            if (resumedFromHold) {
-                syncWatchlistFromPopup(slug, 'watching');
-            }
-
-            renderAnimeList(elements.searchInput?.value || '');
-            updateStats();
-
-
-            elements.confirmAddAnime.dataset.state = 'success';
-            setTimeout(() => {
-                hideAddAnimeDialog();
-
-
-                if (elements.confirmAddAnime) {
-                    elements.confirmAddAnime.dataset.state = 'idle';
-                    elements.confirmAddAnime.disabled = false;
-                }
-            }, 800);
-
-
-
-
-            const isPlaceholderDur = window.AnimeTrackerMergeUtils?.isPlaceholderDuration
-                || ((d) => { const v = Number(d) || 0; return v <= 0 || v === 1440 || v === 6000 || v === 7200; });
-            const hasPlaceholderDuration = Array.isArray(animeData[slug].episodes)
-                && animeData[slug].episodes.some(ep => isPlaceholderDur(ep?.duration));
-            if (!animeData[slug].coverImage || hasPlaceholderDuration) {
-                chrome.runtime.sendMessage(
-                    { type: 'BATCH_FETCH_ANIME_INFO', slugs: [slug] },
-                    () => { if (chrome.runtime.lastError) {              } }
-                );
-            }
-
-            if (user) {
-                (async () => {
-                    const gcRes = await Storage.get(['groupCoverImages']);
-                    await FirebaseSync.saveToCloud({
-                        animeData,
-                        videoProgress,
-                        deletedAnime,
-                        groupCoverImages: gcRes.groupCoverImages || {}
-                    });
-                })().catch(err => PopupLogger.error('AddAnime', 'Cloud save error:', err));
-            }
-        } catch (error) {
-            PopupLogger.error('AddAnime', 'Error:', error);
-            showToast('Failed to add anime. Please try again.', 'error');
-
-            elements.confirmAddAnime.disabled = false;
-            elements.confirmAddAnime.dataset.state = 'idle';
-        }
-    }
-
-    function showEditTitleDialog(slug) {
-        if (!animeData[slug]) { PopupLogger.warn('EditTitle', 'Anime not found:', slug); return; }
-        editingSlug = slug;
-        elements.editTitleInput.value = animeData[slug].title || '';
-        openDialogA11y(elements.editTitleDialog, {
-            initialFocus: elements.editTitleInput,
-            onCancel: hideEditTitleDialog
-        });
-
-        try { elements.editTitleInput.select(); } catch {}
-    }
-
-    function hideEditTitleDialog() {
-        closeDialogA11y(elements.editTitleDialog);
-        editingSlug = null;
-    }
-
-    async function saveEditedTitle() {
-        const { Storage, FirebaseSync } = AT;
-        if (!editingSlug || !animeData[editingSlug]) { hideEditTitleDialog(); return; }
-
-        const newTitle = elements.editTitleInput.value.trim();
-        const currentTitle = animeData[editingSlug].title || '';
-        if (newTitle === '' || newTitle === currentTitle) { hideEditTitleDialog(); return; }
-
-        try {
-            markTitleEdited(animeData[editingSlug], newTitle);
-            const deletedResult = await Storage.get(['deletedAnime']);
-            const deletedAnime = clearDeletedAnimeSlug(deletedResult.deletedAnime || {}, editingSlug);
-            const dataToSave = { animeData, videoProgress, deletedAnime };
-            const user = FirebaseSync.getUser();
-            if (user) dataToSave.userId = user.uid;
-            markInternalSave(dataToSave);
-            await Storage.set(dataToSave);
-            renderAnimeList(elements.searchInput?.value || '');
-
-            if (user) {
-                (async () => {
-                    const gcRes = await Storage.get(['groupCoverImages']);
-                    await FirebaseSync.saveToCloud({
-                        animeData,
-                        videoProgress,
-                        deletedAnime,
-                        groupCoverImages: gcRes.groupCoverImages || {}
-                    });
-                })().catch(err => PopupLogger.error('EditTitle', 'Cloud save error:', err));
-            }
-            hideEditTitleDialog();
-            try { AT.UIHelpers?.showToast?.('Title updated', { type: 'success' }); } catch {}
-        } catch (error) {
-            PopupLogger.error('EditTitle', 'Error:', error);
-            try { AT.UIHelpers?.showToast?.('Failed to update title', { type: 'error', duration: 3500 }); }
-            catch { showToast('Failed to update title. Please try again.', 'error'); }
-        }
-    }
-
-    function editAnimeTitle(slug) { showEditTitleDialog(slug); }
-
-    async function fetchFillerForAnime(slug, btn) {
-        const { FillerService } = AT;
-        if (btn) { btn.disabled = true; btn.textContent = '...'; }
-        try {
-            const episodeTypes = await FillerService.fetchEpisodeTypes(slug);
-            if (episodeTypes) {
-                FillerService.updateFromEpisodeTypes(slug, episodeTypes);
-                renderAnimeList(elements.searchInput?.value || '');
-                updateStats();
-            }
-        } catch (error) {
-            PopupLogger.error('FetchFiller', 'Error:', error);
-        } finally {
-            if (btn) { btn.disabled = false; btn.textContent = '🎭'; }
-        }
-    }
 
     function setMetadataRepairStatus(label, synced = false) {
         if (!elements.syncStatus || !elements.syncText) return;
@@ -3173,27 +1481,6 @@
         return applyMetadataRepairState(result.metadataRepairState || null, options);
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     async function maybePromptPostUpdateFetch() {
         const { Storage } = AT;
         try {
@@ -3211,10 +1498,6 @@
                     'postUpdateFetchToVersion'
                 ]);
             }
-
-
-
-
 
             if (stored.metadataRepairState?.status === 'running') {
                 await applyMetadataRepairState(stored.metadataRepairState, { autoOpenRunning: false });
@@ -3274,719 +1557,12 @@
         return metadataRepairPromise;
     }
 
-    const GOOGLE_BTN_DEFAULT_HTML = `
-        <span class="btn-content">
-            <svg class="google-icon" viewBox="0 0 24 24">
-                <path fill="#fff" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#fff" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#fff" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#fff" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            <span>Sign in with Google</span>
-        </span>`;
+    // Auth UI (Google/email sign-in, forgot-password) → src/popup/lib/auth-ui.js
 
-    async function signInWithGoogle() {
-        const { FirebaseSync } = AT;
-        try {
-            elements.googleSignIn.disabled = true;
-            elements.googleSignIn.innerHTML = `
-                <span class="btn-content">
-                    <svg class="google-icon" style="animation:spin 0.9s linear infinite" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
-                        <circle cx="12" cy="12" r="10" stroke-opacity="0.3"/>
-                        <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
-                    </svg>
-                    <span>Signing in...</span>
-                </span>`;
-            await FirebaseSync.signInWithGoogle();
+    // Set-password modal lives in src/popup/lib/set-password-modal.js (AT.openSetPasswordModal)
+    AT.refreshSettingsViewIfOpen = () => { if (currentViewMode === 'settings') renderSettingsView(); };
 
-
-        } catch (error) {
-            const msg = (error.message || '').toLowerCase();
-            const isCancelled = msg.includes('did not approve') || msg.includes('cancelled') ||
-                msg.includes('closed') || msg.includes('popup_closed') ||
-                error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request';
-            if (!isCancelled) {
-                PopupLogger.error('Firebase', 'Sign in error:', error);
-                showAuthToast('Sign in failed. Please try again.', 'error');
-            }
-
-            await chrome.storage.local.set({ pendingBackgroundMetadataRepair: false });
-        } finally {
-            elements.googleSignIn.disabled = false;
-            elements.googleSignIn.innerHTML = GOOGLE_BTN_DEFAULT_HTML;
-        }
-    }
-
-
-
-
-
-    const EMAIL_AUTH_ERRORS = {
-        EMAIL_NOT_FOUND: 'No account found for this email.',
-        INVALID_PASSWORD: 'Wrong password. Try again or reset it.',
-        INVALID_LOGIN_CREDENTIALS: 'Wrong email or password.',
-        USER_DISABLED: 'This account has been disabled.',
-        EMAIL_EXISTS: 'An account already exists for this email.',
-        OPERATION_NOT_ALLOWED: 'Email/password sign-in is not enabled for this project. Enable it in Firebase Console → Authentication → Sign-in methods.',
-        WEAK_PASSWORD: 'Password is too weak (min 6 characters).',
-        INVALID_EMAIL: 'Please enter a valid email address.',
-        MISSING_PASSWORD: 'Please enter your password.',
-        MISSING_EMAIL: 'Please enter your email.',
-        TOO_MANY_ATTEMPTS_TRY_LATER: 'Too many attempts. Please wait a minute and try again.',
-        CREDENTIAL_TOO_OLD_LOGIN_AGAIN: 'For security, please sign in with Google again before setting a password.'
-    };
-
-    function friendlyAuthError(err) {
-        const raw = (err?.message || '').trim();
-
-        const code = raw.split(':')[0].trim().toUpperCase().replace(/\s+/g, '_');
-        return EMAIL_AUTH_ERRORS[code] || raw || 'Sign-in failed.';
-    }
-
-    function setEmailFormBusy(busy, label) {
-        const btn = document.getElementById('emailSignInBtn');
-        const forgotBtn = document.getElementById('authForgotPasswordBtn');
-        if (btn) {
-            btn.disabled = busy;
-            const lbl = btn.querySelector('.btn-auth-label');
-            if (lbl) lbl.textContent = label || 'Sign in';
-        }
-        if (forgotBtn) forgotBtn.disabled = busy;
-        const inputs = document.querySelectorAll('#authEmailForm .auth-input');
-        inputs.forEach((el) => { el.disabled = busy; });
-    }
-
-    function setEmailFormError(message, opts = {}) {
-        const errEl = document.getElementById('authEmailError');
-        if (!errEl) return;
-        const isSuccess = opts.success === true;
-        errEl.classList.toggle('auth-error--success', isSuccess);
-        if (message) {
-            errEl.textContent = message;
-            errEl.style.display = 'block';
-        } else {
-            errEl.textContent = '';
-            errEl.style.display = 'none';
-            errEl.classList.remove('auth-error--success');
-        }
-    }
-
-    function readEmailFormCredentials() {
-        const email = (document.getElementById('authEmailInput')?.value || '').trim();
-        const password = document.getElementById('authPasswordInput')?.value || '';
-        return { email, password };
-    }
-
-    function isPlausibleEmailAddress(email) {
-        if (!email || email.length > 254 || /\s/.test(email)) return false;
-
-        const atIndex = email.indexOf('@');
-        if (atIndex <= 0 || atIndex !== email.lastIndexOf('@')) return false;
-
-        const localPart = email.slice(0, atIndex);
-        const domain = email.slice(atIndex + 1);
-        if (
-            localPart.length > 64 ||
-            localPart.startsWith('.') ||
-            localPart.endsWith('.') ||
-            localPart.includes('..')
-        ) {
-            return false;
-        }
-
-        const domainLabels = domain.split('.');
-        if (domainLabels.length < 2) return false;
-        if (domainLabels.some((label) =>
-            !/^[a-z0-9-]+$/i.test(label) ||
-            label.startsWith('-') ||
-            label.endsWith('-')
-        )) {
-            return false;
-        }
-
-        return /^[a-z]{2,63}$/i.test(domainLabels[domainLabels.length - 1]);
-    }
-
-    async function handleEmailAuth({ mode }) {
-        const { FirebaseSync } = AT;
-        const { email, password } = readEmailFormCredentials();
-        setEmailFormError('');
-
-        if (!email) { setEmailFormError(EMAIL_AUTH_ERRORS.MISSING_EMAIL); return; }
-        if (!isPlausibleEmailAddress(email)) {
-            setEmailFormError(EMAIL_AUTH_ERRORS.INVALID_EMAIL);
-            document.getElementById('authEmailInput')?.focus();
-            return;
-        }
-        if (!password) { setEmailFormError(EMAIL_AUTH_ERRORS.MISSING_PASSWORD); return; }
-        if (mode === 'signup' && password.length < 6) {
-            setEmailFormError(EMAIL_AUTH_ERRORS.WEAK_PASSWORD);
-            return;
-        }
-
-        const busyLabel = mode === 'signup' ? 'Creating…' : 'Signing in…';
-        const idleLabel = 'Sign in';
-        setEmailFormBusy(true, busyLabel);
-
-        try {
-            if (mode === 'signup') {
-                await FirebaseSync.signUpWithEmailPassword(email, password);
-            } else {
-                await FirebaseSync.signInWithEmailPassword(email, password);
-            }
-
-
-
-            const pwEl = document.getElementById('authPasswordInput');
-            if (pwEl) pwEl.value = '';
-        } catch (err) {
-
-            await chrome.storage.local.set({ pendingBackgroundMetadataRepair: false });
-            PopupLogger.error('Firebase', `${mode === 'signup' ? 'Sign-up' : 'Sign-in'} error:`, err);
-            setEmailFormError(friendlyAuthError(err));
-        } finally {
-            setEmailFormBusy(false, idleLabel);
-        }
-    }
-
-    async function handleForgotPassword() {
-        const { FirebaseSync } = AT;
-        const { email } = readEmailFormCredentials();
-        setEmailFormError('');
-
-        const emailInput = document.getElementById('authEmailInput');
-        if (!email) {
-            setEmailFormError('Enter your email above first, then tap "Forgot password?".');
-            emailInput?.focus();
-            return;
-        }
-
-
-        if (!isPlausibleEmailAddress(email)) {
-            setEmailFormError(EMAIL_AUTH_ERRORS.INVALID_EMAIL);
-            emailInput?.focus();
-            return;
-        }
-
-
-
-
-        const forgotBtn = document.getElementById('authForgotPasswordBtn');
-        const originalText = forgotBtn?.textContent || 'Forgot password?';
-        if (forgotBtn) {
-            forgotBtn.disabled = true;
-            forgotBtn.textContent = 'Sending…';
-        }
-
-        try {
-            await FirebaseSync.sendPasswordReset(email);
-            PopupLogger.log('Firebase', `Password reset request accepted for ${email}`);
-
-            setEmailFormError(
-                `If an account exists for ${email}, a reset email will arrive shortly. Check your inbox and spam folder.`,
-                { success: true }
-            );
-        } catch (err) {
-            PopupLogger.error('Firebase', 'Password reset error:', err);
-            setEmailFormError(friendlyAuthError(err));
-        } finally {
-            if (forgotBtn) {
-                forgotBtn.disabled = false;
-                forgotBtn.textContent = originalText;
-            }
-        }
-    }
-
-
-
-
-
-
-
-
-
-
-
-    async function openSetPasswordModal() {
-        document.getElementById('setPasswordOverlay')?.remove();
-
-        const { FirebaseSync, Dialogs } = AT;
-        const user = FirebaseSync.getUser?.() || null;
-
-
-
-
-
-
-        let isUpdate = false;
-        try {
-            const stored = await chrome.storage.local.get([PASSWORD_SET_MARKER_KEY]);
-            const marker = stored[PASSWORD_SET_MARKER_KEY];
-            isUpdate = !!(marker?.uid && user?.uid && marker.uid === user.uid && marker.setAt);
-        } catch {                                                     }
-
-        const COPY = isUpdate ? {
-            title:        'Update password',
-            hint:         'Replace your existing password — same email, new password.',
-            saveIdle:     'Update password',
-            saveBusy:     'Updating…',
-            successTitle: 'Password updated.',
-            successBody:  'Use the new password on mobile.'
-        } : {
-            title:        'Set password for mobile',
-            hint:         'Sign in on Orion / Safari with this password — same library, same account.',
-            saveIdle:     'Save password',
-            saveBusy:     'Saving…',
-            successTitle: 'Password set.',
-            successBody:  'Use it to sign in on mobile.'
-        };
-
-        const overlay = document.createElement('div');
-        overlay.id = 'setPasswordOverlay';
-        overlay.className = 'dialog-overlay set-password-overlay';
-        overlay.setAttribute('role', 'dialog');
-        overlay.setAttribute('aria-modal', 'true');
-        overlay.setAttribute('aria-labelledby', 'setPasswordTitle');
-        overlay.setAttribute('aria-describedby', 'setPasswordHint');
-        overlay.setAttribute('aria-hidden', 'true');
-        overlay.innerHTML = `
-            <form class="dialog set-password-dialog" novalidate autocomplete="on">
-                <input type="email" name="username" autocomplete="username"
-                       value="${(user?.email || '').replace(/"/g, '&quot;')}"
-                       hidden tabindex="-1" aria-hidden="true">
-                <div class="dialog-header">
-                    <span class="set-password-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
-                        </svg>
-                    </span>
-                    <h3 id="setPasswordTitle"></h3>
-                    <button class="dialog-close" type="button" aria-label="Close dialog" data-close>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                             aria-hidden="true" focusable="false">
-                            <line x1="18" y1="6" x2="6" y2="18"/>
-                            <line x1="6" y1="6" x2="18" y2="18"/>
-                        </svg>
-                    </button>
-                </div>
-                <div class="dialog-body">
-                    <div class="set-password-hint" id="setPasswordHint">
-                        <svg class="set-password-hint-icon" viewBox="0 0 24 24" fill="none"
-                             stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                             stroke-linejoin="round" aria-hidden="true">
-                            <circle cx="12" cy="12" r="10"/>
-                            <line x1="12" y1="16" x2="12" y2="12"/>
-                            <line x1="12" y1="8" x2="12.01" y2="8"/>
-                        </svg>
-                        <div class="set-password-hint-text">
-                            <span class="set-password-hint-copy"></span>
-                            <span class="set-password-email-pill" id="setPasswordEmailPill"></span>
-                        </div>
-                    </div>
-
-                    <div class="set-password-field">
-                        <label class="set-password-label" for="setPasswordInput">New password</label>
-                        <div class="set-password-input-wrap">
-                            <input type="password" id="setPasswordInput" class="set-password-input"
-                                   autocomplete="new-password" minlength="6"
-                                   placeholder="At least 6 characters"
-                                   aria-describedby="setPasswordStrengthLabel">
-                            <button type="button" class="set-password-toggle"
-                                    data-toggle="setPasswordInput"
-                                    aria-label="Show password" aria-pressed="false">
-                                <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                                     aria-hidden="true">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                    <circle cx="12" cy="12" r="3"/>
-                                </svg>
-                                <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                                     aria-hidden="true">
-                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                                    <line x1="1" y1="1" x2="23" y2="23"/>
-                                </svg>
-                            </button>
-                        </div>
-                        <div class="set-password-strength" data-level="0">
-                            <div class="set-password-strength-bars" aria-hidden="true">
-                                <span></span><span></span><span></span>
-                            </div>
-                            <span class="set-password-strength-label" id="setPasswordStrengthLabel">&nbsp;</span>
-                        </div>
-                    </div>
-
-                    <p class="auth-error set-password-error" id="setPasswordError"
-                       role="alert" style="display:none"></p>
-                </div>
-                <div class="dialog-actions">
-                    <button class="btn btn-secondary" type="button" data-close>Cancel</button>
-                    <button class="btn btn-primary" type="submit" id="setPasswordSubmit" disabled>
-                        <span class="set-password-submit-label"></span>
-                    </button>
-                </div>
-            </form>
-        `;
-
-
-
-        overlay.querySelector('#setPasswordTitle').textContent = COPY.title;
-        overlay.querySelector('.set-password-hint-copy').textContent = COPY.hint;
-        overlay.querySelector('.set-password-submit-label').textContent = COPY.saveIdle;
-
-
-        const pillEl = overlay.querySelector('#setPasswordEmailPill');
-        if (pillEl) {
-            if (user?.email) {
-                pillEl.textContent = user.email;
-            } else {
-
-                pillEl.style.display = 'none';
-            }
-        }
-
-        const pwInput = overlay.querySelector('#setPasswordInput');
-        const submitBtn = overlay.querySelector('#setPasswordSubmit');
-        const errEl = overlay.querySelector('#setPasswordError');
-        const strengthRow = overlay.querySelector('.set-password-strength');
-        const strengthLabel = overlay.querySelector('#setPasswordStrengthLabel');
-        const formEl = overlay.querySelector('form.set-password-dialog');
-
-        const showErr = (msg) => {
-            if (!errEl) return;
-            errEl.textContent = msg || '';
-            errEl.style.display = msg ? 'block' : 'none';
-        };
-
-
-
-
-        overlay.querySelectorAll('.set-password-toggle').forEach((btn) => {
-            btn.addEventListener('click', () => {
-                const id = btn.dataset.toggle;
-                const target = overlay.querySelector(`#${id}`);
-                if (!target) return;
-                const isPassword = target.type === 'password';
-                target.type = isPassword ? 'text' : 'password';
-                btn.setAttribute('aria-pressed', isPassword ? 'true' : 'false');
-                btn.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
-                btn.closest('.set-password-input-wrap')?.classList.toggle('is-revealed', isPassword);
-
-
-                target.focus();
-                try {
-                    const len = target.value.length;
-                    target.setSelectionRange(len, len);
-                } catch {                                                     }
-            });
-        });
-
-
-
-
-
-        const computeStrength = (pw) => {
-            if (!pw) return 0;
-            let classes = 0;
-            if (/[a-z]/.test(pw)) classes++;
-            if (/[A-Z]/.test(pw)) classes++;
-            if (/\d/.test(pw))    classes++;
-            if (/[^A-Za-z0-9]/.test(pw)) classes++;
-            if (pw.length < 6) return 1;
-            if (pw.length >= 12 && classes >= 3) return 3;
-            if (pw.length >= 8  && classes >= 2) return 2;
-            return 1;
-        };
-        const STRENGTH_LABELS = { 0: '', 1: 'Weak', 2: 'Medium', 3: 'Strong' };
-        const updateStrength = () => {
-            const lvl = computeStrength(pwInput.value);
-            strengthRow.dataset.level = String(lvl);
-            strengthLabel.textContent = STRENGTH_LABELS[lvl] || '';
-        };
-
-
-        const refreshSubmitState = () => {
-            submitBtn.disabled = pwInput.value.length < 6;
-        };
-        const onAnyChange = () => {
-
-
-            if (errEl?.textContent) showErr('');
-            updateStrength();
-            refreshSubmitState();
-        };
-        pwInput.addEventListener('input', onAnyChange);
-
-
-        const close = () => { Dialogs.close(overlay); setTimeout(() => overlay.remove(), 0); };
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) close();
-            if (e.target.closest('[data-close]')) {
-                e.preventDefault();
-                close();
-            }
-        });
-
-
-        formEl.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (submitBtn.disabled) return;
-            const pw = pwInput.value;
-            showErr('');
-            if (pw.length < 6) { showErr('Password must be at least 6 characters.'); return; }
-
-            const labelEl = submitBtn.querySelector('.set-password-submit-label');
-            const setLoadingLabel = (text) => {
-                submitBtn.disabled = true;
-                submitBtn.classList.add('is-loading');
-                if (labelEl) labelEl.textContent = text;
-            };
-            const restoreIdleLabel = () => {
-                submitBtn.classList.remove('is-loading');
-                if (labelEl) labelEl.textContent = COPY.saveIdle;
-                refreshSubmitState();
-            };
-
-
-
-
-
-
-            const trySetPasswordWithReauth = async () => {
-                try {
-                    await FirebaseSync.setPasswordForCurrentUser(pw);
-                    return true;
-                } catch (firstErr) {
-                    const code = (firstErr?.message || '').split(':')[0]
-                        .trim().toUpperCase().replace(/\s+/g, '_');
-                    if (code !== 'CREDENTIAL_TOO_OLD_LOGIN_AGAIN') throw firstErr;
-
-                    PopupLogger.log('Firebase', 'Credential too old — reauthenticating via Google before retry');
-                    setLoadingLabel('Verifying with Google…');
-                    try {
-                        await FirebaseSync.signInWithGoogle();
-                    } catch (reauthErr) {
-                        const m = (reauthErr?.message || '').toLowerCase();
-                        const cancelled = m.includes('did not approve') ||
-                            m.includes('cancelled') || m.includes('closed') ||
-                            m.includes('popup_closed');
-                        if (cancelled) {
-                            throw new Error('Reauthentication cancelled. Please try again.');
-                        }
-                        throw reauthErr;
-                    }
-                    setLoadingLabel(COPY.saveBusy);
-                    await FirebaseSync.setPasswordForCurrentUser(pw);
-                    return true;
-                }
-            };
-
-            setLoadingLabel(COPY.saveBusy);
-            try {
-
-
-
-
-
-
-                if (isUpdate && user?.email) {
-                    setLoadingLabel('Checking…');
-                    try {
-                        const sameAsCurrent = await FirebaseSync.verifyPasswordSilently(user.email, pw);
-                        if (sameAsCurrent) {
-                            showErr('That\'s already your current password. Pick a new one.');
-                            restoreIdleLabel();
-                            return;
-                        }
-                    } catch (probeErr) {
-
-
-
-
-                        PopupLogger.warn('Firebase', 'Same-password probe failed:', probeErr?.message);
-                    }
-                    setLoadingLabel(COPY.saveBusy);
-                }
-                await trySetPasswordWithReauth();
-
-
-
-
-                const currentUser = FirebaseSync.getUser?.();
-                if (currentUser?.uid) {
-                    try {
-                        await chrome.storage.local.set({
-                            [PASSWORD_SET_MARKER_KEY]: {
-                                uid: currentUser.uid,
-                                setAt: new Date().toISOString()
-                            }
-                        });
-                    } catch (e) {
-                        PopupLogger.warn('Settings', `Failed to persist password-set marker: ${e?.message}`);
-                    }
-                }
-                close();
-                showToast({
-                    title: COPY.successTitle,
-                    body:  COPY.successBody,
-                    type:  'success'
-                });
-
-
-
-                if (currentViewMode === 'settings') {
-                    renderSettingsView();
-                }
-            } catch (err) {
-                PopupLogger.error('Firebase', 'Set password error:', err);
-                showErr(friendlyAuthError(err));
-                restoreIdleLabel();
-            }
-        });
-
-        document.body.appendChild(overlay);
-
-
-        Dialogs.open(overlay, { initialFocus: pwInput });
-    }
-
-    window.AnimeTracker = window.AnimeTracker || {};
-    window.AnimeTracker.openSetPasswordModal = openSetPasswordModal;
-
-    function showAuthToast(message, type = 'error') {
-        const existing = document.getElementById('authToast');
-        if (existing) existing.remove();
-        const toast = document.createElement('div');
-        toast.id = 'authToast';
-        toast.textContent = message;
-        toast.style.cssText = `
-            position:absolute; bottom:20px; left:50%; transform:translateX(-50%);
-            background:${type === 'error' ? 'rgba(240,69,69,0.9)' : 'rgba(54,212,116,0.9)'};
-            color:#fff; padding:8px 18px; border-radius:50px; font-size:12px;
-            font-weight:600; z-index:10; white-space:nowrap;
-            box-shadow:0 4px 16px rgba(0,0,0,0.4);
-            animation:fadeIn 0.2s ease;`;
-        document.getElementById('authSection')?.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-    function showToast(messageOrOpts, typeArg) {
-        const opts = (messageOrOpts && typeof messageOrOpts === 'object' && !Array.isArray(messageOrOpts))
-            ? messageOrOpts
-            : { message: String(messageOrOpts ?? ''), type: typeArg };
-        const type = opts.type === 'success' ? 'success' : 'error';
-        const duration = Math.max(1500, Math.min(opts.duration || 4000, 10000));
-
-
-
-        let title = (opts.title || '').trim();
-        let body  = (opts.body  || '').trim();
-        if (!title && !body) {
-            const raw = String(opts.message || '').trim();
-            const m = raw.match(/^([^.!?]{2,40}[.!?])\s+(.{4,})$/);
-            if (m) { title = m[1].trim(); body = m[2].trim(); }
-            else   { title = raw; }
-        }
-
-
-        document.getElementById('atGenericToast')?.remove();
-
-        const toast = document.createElement('div');
-        toast.id = 'atGenericToast';
-        toast.className = `at-toast at-toast--${type}`;
-        if (typeof opts.onClick === 'function') {
-            toast.classList.add('at-toast--clickable');
-        }
-        toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
-        toast.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
-        toast.style.setProperty('--at-toast-duration', `${duration}ms`);
-
-
-
-        const iconMarkup = type === 'success'
-            ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                  <polyline points="22 4 12 14.01 9 11.01"/>
-               </svg>`
-            : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                  <line x1="12" y1="9" x2="12" y2="13"/>
-                  <line x1="12" y1="17" x2="12.01" y2="17"/>
-               </svg>`;
-
-        toast.innerHTML = `
-            <span class="at-toast-icon" aria-hidden="true">${iconMarkup}</span>
-            <div class="at-toast-text">
-                <span class="at-toast-title"></span>
-                ${body ? '<span class="at-toast-body"></span>' : ''}
-            </div>
-            <button type="button" class="at-toast-close" aria-label="Dismiss">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" aria-hidden="true">
-                     <line x1="18" y1="6" x2="6" y2="18"/>
-                     <line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-            </button>
-            <span class="at-toast-progress" aria-hidden="true"></span>
-        `;
-
-        toast.querySelector('.at-toast-title').textContent = title;
-        if (body) toast.querySelector('.at-toast-body').textContent = body;
-
-        const dismiss = () => {
-            if (toast._dismissed) return;
-            toast._dismissed = true;
-            toast.classList.add('at-toast--leaving');
-            setTimeout(() => { try { toast.remove(); } catch {             } }, 180);
-        };
-        
-        toast.querySelector('.at-toast-close').addEventListener('click', (e) => {
-            e.stopPropagation();
-            dismiss();
-        });
-
-        if (typeof opts.onClick === 'function') {
-            toast.addEventListener('click', (e) => {
-                if (e.target.closest('.at-toast-close')) return;
-                dismiss();
-                opts.onClick();
-            });
-        }
-
-        document.body.appendChild(toast);
-
-        requestAnimationFrame(() => toast.classList.add('at-toast--visible'));
-
-        const timerId = setTimeout(dismiss, duration);
-
-        toast.addEventListener('mouseenter', () => {
-            clearTimeout(timerId);
-            toast.classList.add('at-toast--paused');
-        });
-        toast.addEventListener('mouseleave', () => {
-            toast.classList.remove('at-toast--paused');
-
-            setTimeout(dismiss, 1500);
-        });
-    }
-
-
-    window.AnimeTracker = window.AnimeTracker || {};
-    window.AnimeTracker.showToast = showToast;
+    // Toasts (showToast / showAuthToast) live in src/popup/lib/toasts.js
 
     async function signOut(preserveLocalData = true) {
         const { Storage, FirebaseSync } = AT;
@@ -4022,8 +1598,6 @@
 
         if (elements.settingsBtn) {
 
-
-
             elements.settingsBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (elements.donateDropdown) elements.donateDropdown.classList.remove('visible');
@@ -4035,7 +1609,6 @@
         }
 
         document.addEventListener('click', (e) => {
-
 
             if (elements.donateDropdown &&
                 !elements.donateDropdown.contains(e.target) &&
@@ -4071,12 +1644,6 @@
             }
         });
 
-
-
-
-
-
-
         const handleToggle = async (key, renderFn, getNext, onAfterSave) => {
             const btn = document.getElementById(key.btnId);
             if (!btn) return;
@@ -4086,8 +1653,6 @@
             try {
                 await chrome.storage.local.set({ [key.storageKey]: nextEnabled });
                 if (onAfterSave) onAfterSave(nextEnabled);
-
-
 
                 try {
                     await FirebaseSync.queuePlaybackSettingsSave();
@@ -4101,7 +1666,6 @@
         };
 
         document.addEventListener('click', async (e) => {
-
 
             if (e.target.closest('#settingsCopyGuard')) {
                 e.stopPropagation();
@@ -4235,15 +1799,13 @@
             if (e.target.closest('#settingsSetPassword')) {
                 setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
-                openSetPasswordModal();
+                AT.openSetPasswordModal();
                 return;
             }
 
             if (e.target.closest('#settingsFetchFillers')) {
                 setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
-
-
 
                 await fetchAllFillers({
                     autoStart: true,
@@ -4280,16 +1842,6 @@
             });
         }
 
-
-
-
-
-
-
-
-
-
-
         const _mainContentScroll = document.querySelector('.main-content');
         const _mainAppRoot = document.querySelector('.main-app');
         if (_mainContentScroll && _mainAppRoot) {
@@ -4324,7 +1876,6 @@
         }
 
         if (elements.addAnimeBtn) elements.addAnimeBtn.addEventListener('click', showAddAnimeDialog);
-
 
         const emptyStateAddBtn = document.getElementById('emptyStateAddBtn');
         if (emptyStateAddBtn) emptyStateAddBtn.addEventListener('click', showAddAnimeDialog);
@@ -4374,11 +1925,6 @@
             });
         }
 
-
-
-
-
-
         if (elements.addAnimeDialog) {
             elements.addAnimeDialog.addEventListener('click', (e) => {
                 const chip = e.target.closest('.ep-chip');
@@ -4417,16 +1963,11 @@
                     return;
                 }
 
-
-
-
-
                 const toggle = e.target.closest('.fab-filler-toggle');
                 if (toggle && elements.addAnimeDialog.contains(toggle)) {
                     e.preventDefault();
                     const expanded = toggle.getAttribute('aria-expanded') === 'true';
                     toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-
 
                     let details = toggle._detailsEl;
                     if (!details) {
@@ -4523,8 +2064,6 @@
                 const tabRect = activeTab.getBoundingClientRect();
                 if (!containerRect.width || !tabRect.width) return;
 
-
-
                 const offsetX = tabRect.left - containerRect.left;
                 slider.style.width = tabRect.width + 'px';
                 slider.style.transform = `translateX(${offsetX}px)`;
@@ -4556,7 +2095,6 @@
                 attempt();
             };
 
-
             const initialActive = elements.categoryTabs.querySelector('.category-tab.active');
             requestAnimationFrame(() => moveSlider(initialActive, true));
 
@@ -4568,7 +2106,6 @@
 
                     elements.categoryTabs.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
                     tab.classList.add('active');
-
 
                     setViewMode(null);
 
@@ -4589,7 +2126,6 @@
                 });
             });
         }
-
 
         const viewStatsBtn = document.getElementById('viewStatsBtn');
         const viewGoalsBtn = document.getElementById('viewGoalsBtn');
@@ -4679,7 +2215,6 @@
 
                 if (typeof _ipPatch === 'function') _ipPatch(videoProgress);
 
-
                 if (doesProgressChangeAffectLists(
                     changes.videoProgress.oldValue || {},
                     changes.videoProgress.newValue || {}
@@ -4709,11 +2244,6 @@
                 const isLoggedIn = !!AT?.FirebaseSync?.getUser?.();
                 void applyMetadataRepairState(changes.metadataRepairState.newValue || null, { autoOpenRunning: isLoggedIn });
             }
-
-
-
-
-
 
             if (isExternalUpdate && (
                 changes.animeData ||
@@ -4863,18 +2393,12 @@
                     return;
                 }
 
-
-
-
             });
         }
     }
 
     async function init() {
         const { FirebaseSync, Storage, FillerFetchUI } = AT;
-
-
-
 
         try {
             const _popupAlivePort = chrome.runtime.connect({ name: 'popupAlive' });
@@ -4883,9 +2407,6 @@
         } catch (e) {
             PopupLogger.debug('Init', 'popupAlive port connect failed:', e?.message || e);
         }
-
-
-
 
         try {
             chrome.runtime.onMessage.addListener((msg) => {
@@ -4936,7 +2457,6 @@
             loadAuto4kServerSetting()
         ]);
 
-
         try {
             const { ProgressManager } = AT;
 
@@ -4947,7 +2467,6 @@
             } else {
                 const raw = await Storage.get(['animeData', 'videoProgress', 'deletedAnime']);
                 let dirty = false;
-
 
                 if (raw.videoProgress && raw.animeData) {
                     const { cleaned, removedCount } = ProgressManager.cleanTrackedProgress(raw.animeData, raw.videoProgress, raw.deletedAnime || {});
@@ -4981,16 +2500,6 @@
             PopupLogger.warn('Cleanup', 'Auto-cleanup failed:', e);
         }
 
-
-
-
-
-
-
-
-
-
-
         try {
             const SlugMigration = window.AnimeTrackerSlugMigration;
             if (SlugMigration && typeof SlugMigration.migrate === 'function') {
@@ -5014,10 +2523,6 @@
             onUserSignedIn: async (user) => {
                 showMainApp(user);
 
-
-
-
-
                 try {
                     const needs = await window.FirebaseLib?.isReauthNeeded?.();
                     if (needs) {
@@ -5031,9 +2536,6 @@
                     }
                 } catch {                                         }
 
-
-
-
                 try {
                     chrome.runtime.sendMessage({ type: 'GET_VERSION' }, () => { void chrome.runtime.lastError; });
                 } catch {}
@@ -5045,8 +2547,6 @@
                     PopupLogger.error('Login', 'Failed to trigger cloud poll:', e);
                 }
 
-
-
                 const syncResult = AT.FirebaseSync.lastSyncResult || null;
                 const providers = user.providers || [];
                 PopupLogger.log('Sync',
@@ -5056,11 +2556,6 @@
                     `uid=${user.uid?.slice(0, 8)}… ` +
                     `providers=[${providers.join(', ')}] ` +
                     `signedInVia=${user.signedInVia || 'google'}`);
-
-
-
-
-
 
                 try {
                     chrome.runtime.sendMessage({
@@ -5099,14 +2594,10 @@
                 showMainApp(null);
                 loadData();
 
-
                 maybePromptPostUpdateFetch().catch(() => {});
             }
         });
     }
-
-
-
 
     function _ipPatch(vp) {
         const completedPct = AT.CONFIG?.COMPLETED_PERCENTAGE || 85;
@@ -5156,12 +2647,6 @@
             if (rem) rem.textContent = remStr;
         });
     }
-
-
-
-
-
-
 
     document.addEventListener('keydown', (e) => {
         const target = e.target;

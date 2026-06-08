@@ -2,15 +2,15 @@
 
 
 importScripts(
-    'src/common/firebase-config.js',
-    'src/common/auth-classifier.js',
-    'src/common/auth-tokens.js',
-    'src/background/aniskip.js',
-    'src/background/filler-discovery.js',
-    'src/background/an1me-scraper.js',
-    'src/background/smart-notifications.js',
-    'src/background/watchlist-sync.js',
-    'src/background/metadata-repair.js'
+    'src/common/cloud/firebase-config.js',
+    'src/common/cloud/auth-classifier.js',
+    'src/common/cloud/auth-tokens.js',
+    'src/background/fetchers/aniskip.js',
+    'src/background/fetchers/filler-discovery.js',
+    'src/background/fetchers/an1me-scraper.js',
+    'src/background/jobs/smart-notifications.js',
+    'src/background/sync/watchlist-sync.js',
+    'src/background/jobs/metadata-repair.js'
 );
 
 const FIREBASE_API_KEY = (self.firebaseConfig && self.firebaseConfig.apiKey) || '';
@@ -22,12 +22,12 @@ const FIRESTORE_DATABASE = `projects/${FIREBASE_PROJECT_ID}/databases/(default)`
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/${FIRESTORE_DATABASE}`;
 const CLOUD_CONSUMER_POLL_MIN_GAP_MS = 3 * 60 * 1000;
 
-importScripts('src/common/merge-utils.js', 'src/common/firestore-codec.js');
+importScripts('src/common/data/merge-utils.js', 'src/common/cloud/firestore-codec.js');
 
 
 
 
-importScripts('src/common/anilist-core.js', 'src/background/anilist-sync.js');
+importScripts('src/common/data/anilist-core.js', 'src/background/sync/anilist-sync.js');
 
 const sharedMergeUtils = self.AnimeTrackerMergeUtils || {};
 const missingMergeUtil = (name) => () => {

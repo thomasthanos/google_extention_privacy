@@ -31,61 +31,79 @@ Current version: `6.8.0`.
 ├── popup.html
 ├── popup.css
 └── src/
-    ├── background/
-    │   ├── an1me-scraper.js
-    │   ├── aniskip.js
-    │   ├── filler-discovery.js
-    │   ├── metadata-repair.js
-    │   ├── smart-notifications.js
-    │   └── watchlist-sync.js
-    ├── common/
-    │   ├── firebase-config.js
-    │   ├── firestore-codec.js
-    │   ├── logger.js
-    │   ├── merge-utils.js
-    │   └── multipart-mappings.js
-    ├── content/
-    │   ├── anime-parser.js
-    │   ├── cloud-sync.js
-    │   ├── config.js
-    │   ├── copy-guard.js
-    │   ├── episode-writer.js
-    │   ├── main.js
-    │   ├── merge-utils.js     (shim → src/common/merge-utils.js)
-    │   ├── notifications.js
-    │   ├── progress-tracker.js
-    │   ├── skiptime-helper.js
-    │   ├── storage.js
-    │   ├── video-monitor.js
-    │   └── watchlist-sync.js
-    ├── popup/
-    │   ├── achievements-engine.js
-    │   ├── anilist-service.js
-    │   ├── anime-card.js
-    │   ├── anime-card-inprogress.js   (augments AnimeCardRenderer)
-    │   ├── anime-card-movies.js       (augments AnimeCardRenderer)
-    │   ├── anime-card-seasons.js      (augments AnimeCardRenderer)
-    │   ├── anime-status.js
-    │   ├── config.js
-    │   ├── dialogs-a11y.js
-    │   ├── episode-parse.js
-    │   ├── filler-fetch-ui.js
-    │   ├── filler-service.js
-    │   ├── firebase-lib.js
-    │   ├── firebase-sync.js
-    │   ├── goals-view.js
-    │   ├── library-backup.js
-    │   ├── main.js
-    │   ├── maintenance.js
-    │   ├── merge-utils.js     (shim → src/common/merge-utils.js)
-    │   ├── progress-manager.js
-    │   ├── settings-view.js
-    │   ├── share-card.js
-    │   ├── slug-utils.js
-    │   ├── stats-engine.js
-    │   ├── stats-view.js
-    │   ├── storage.js
-    │   └── ui-helpers.js
+    ├── background/            # service worker (importScripts in background.js)
+    │   ├── fetchers/          # pull data from external sources
+    │   │   ├── an1me-scraper.js
+    │   │   ├── aniskip.js
+    │   │   └── filler-discovery.js
+    │   ├── sync/              # push/sync user data to external services
+    │   │   ├── anilist-sync.js
+    │   │   └── watchlist-sync.js
+    │   └── jobs/              # scheduled / alarm-driven tasks
+    │       ├── metadata-repair.js
+    │       └── smart-notifications.js
+    ├── common/                # shared across content + popup + background
+    │   ├── logger.js          # used everywhere
+    │   ├── cloud/             # Firebase / Firestore / auth plumbing
+    │   │   ├── auth-classifier.js
+    │   │   ├── auth-tokens.js
+    │   │   ├── firebase-config.js
+    │   │   └── firestore-codec.js
+    │   └── data/              # data transforms & domain logic
+    │       ├── anilist-core.js
+    │       ├── merge-utils.js
+    │       ├── multipart-mappings.js
+    │       └── slug-migration.js
+    ├── content/               # injected into an1me.to pages
+    │   ├── main.js            # entry point / orchestrator
+    │   ├── player/            # video playback tracking (/watch)
+    │   │   ├── episode-writer.js
+    │   │   ├── progress-tracker.js
+    │   │   ├── skiptime-helper.js   # stateful controller (mount/capture/submit)
+    │   │   ├── skiptime-styles.js   # CSS (pure string builder)
+    │   │   ├── skiptime-utils.js    # pure helpers (time/identity/cache/DOM)
+    │   │   └── video-monitor.js
+    │   ├── page/              # DOM parsing & page-level features
+    │   │   ├── anime-parser.js
+    │   │   ├── continue-watching.js
+    │   │   ├── copy-guard.js
+    │   │   └── watchlist-sync.js
+    │   └── lib/               # config, storage, notifications
+    │       ├── config.js
+    │       ├── notifications.js
+    │       └── storage.js
+    ├── popup/                 # popup + side panel UI
+    │   ├── main.js            # entry point / orchestrator
+    │   ├── cards/             # anime card rendering
+    │   │   ├── anime-card.js
+    │   │   ├── anime-card-inprogress.js   (augments AnimeCardRenderer)
+    │   │   ├── anime-card-movies.js       (augments AnimeCardRenderer)
+    │   │   ├── anime-card-seasons.js      (augments AnimeCardRenderer)
+    │   │   └── share-card.js
+    │   ├── views/             # full screens + their logic
+    │   │   ├── achievements-engine.js
+    │   │   ├── goals-view.js
+    │   │   ├── settings-view.js
+    │   │   ├── stats-engine.js
+    │   │   └── stats-view.js
+    │   ├── services/          # external APIs & sync
+    │   │   ├── anilist-api.js
+    │   │   ├── anilist-service.js
+    │   │   ├── filler-service.js
+    │   │   ├── firebase-lib.js
+    │   │   └── firebase-sync.js
+    │   └── lib/               # helpers / utilities
+    │       ├── anime-status.js
+    │       ├── config.js
+    │       ├── dialogs-a11y.js
+    │       ├── episode-parse.js
+    │       ├── filler-fetch-ui.js
+    │       ├── library-backup.js
+    │       ├── maintenance.js
+    │       ├── progress-manager.js
+    │       ├── slug-utils.js
+    │       ├── storage.js
+    │       └── ui-helpers.js
     ├── icons/
     └── fonts/
 ```
@@ -98,9 +116,9 @@ Three injection groups (see `manifest.json`):
 
 | Match | Scripts |
 |---|---|
-| any an1me.to (except `/watch/*`) | `src/content/watchlist-sync.js` |
-| any an1me.to (incl. `/watch/*`) | `src/content/copy-guard.js` (`document_start`) |
-| `/watch/*` only | full content stack: config → logger → storage → anime-parser → notifications → episode-writer → progress-tracker → watchlist-sync → video-monitor → skiptime-helper → main → merge-utils (shared+shim) → firebase-config → firestore-codec → cloud-sync |
+| any an1me.to (except `/watch/*`) | `src/content/page/watchlist-sync.js` |
+| any an1me.to (incl. `/watch/*`) | `src/content/page/copy-guard.js` (`document_start`) |
+| `/watch/*` only | full content stack: multipart-mappings → config → logger → storage → anime-parser → notifications → episode-writer → progress-tracker → watchlist-sync → video-monitor → skiptime-helper → main → merge-utils → firebase-config → firestore-codec → auth-classifier → auth-tokens |
 
 Watch-page responsibilities:
 - Parse anime/episode context (URL + DOM + page scripts)

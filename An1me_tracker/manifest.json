@@ -48,43 +48,45 @@
         "https://an1me.to/watch/*",
         "https://*.an1me.to/watch/*"
       ],
-      "js": ["src/content/watchlist-sync.js"],
+      "js": ["src/content/page/watchlist-sync.js"],
       "run_at": "document_idle",
       "all_frames": false
     },
     {
       "matches": ["https://an1me.to/*", "https://*.an1me.to/*"],
-      "js": ["src/content/copy-guard.js"],
+      "js": ["src/content/page/copy-guard.js"],
       "run_at": "document_start",
       "all_frames": false
     },
     {
       "matches": ["https://an1me.to/watch/*", "https://*.an1me.to/watch/*"],
       "js": [
-        "src/common/multipart-mappings.js",
-        "src/content/config.js",
+        "src/common/data/multipart-mappings.js",
+        "src/content/lib/config.js",
         "src/common/logger.js",
-        "src/content/storage.js",
-        "src/content/anime-parser.js",
-        "src/content/notifications.js",
-        "src/content/episode-writer.js",
-        "src/content/progress-tracker.js",
-        "src/content/watchlist-sync.js",
-        "src/content/video-monitor.js",
-        "src/content/skiptime-helper.js",
+        "src/content/lib/storage.js",
+        "src/content/page/anime-parser.js",
+        "src/content/lib/notifications.js",
+        "src/content/player/episode-writer.js",
+        "src/content/player/progress-tracker.js",
+        "src/content/page/watchlist-sync.js",
+        "src/content/player/video-monitor.js",
+        "src/content/player/skiptime-utils.js",
+        "src/content/player/skiptime-styles.js",
+        "src/content/player/skiptime-helper.js",
         "src/content/main.js",
-        "src/common/merge-utils.js",
-        "src/common/firebase-config.js",
-        "src/common/firestore-codec.js",
-        "src/common/auth-classifier.js",
-        "src/common/auth-tokens.js"
+        "src/common/data/merge-utils.js",
+        "src/common/cloud/firebase-config.js",
+        "src/common/cloud/firestore-codec.js",
+        "src/common/cloud/auth-classifier.js",
+        "src/common/cloud/auth-tokens.js"
       ],
       "run_at": "document_idle",
       "all_frames": false
     },
     {
       "matches": ["https://an1me.to/", "https://*.an1me.to/"],
-      "js": ["src/content/continue-watching.js"],
+      "js": ["src/content/page/continue-watching.js"],
       "run_at": "document_idle",
       "all_frames": false
     }
