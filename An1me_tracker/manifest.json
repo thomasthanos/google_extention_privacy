@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "An1me.to Tracker",
-  "version": "6.8.0",
+  "version": "6.8.1",
   "description": "Track your anime watching progress on an1me.to with cloud sync across all browsers",
   "author": "ThomasThanos",
   "permissions": [
@@ -76,10 +76,7 @@
         "src/content/player/skiptime-helper.js",
         "src/content/main.js",
         "src/common/data/merge-utils.js",
-        "src/common/cloud/firebase-config.js",
-        "src/common/cloud/firestore-codec.js",
-        "src/common/cloud/auth-classifier.js",
-        "src/common/cloud/auth-tokens.js"
+        "src/common/cloud.js"
       ],
       "run_at": "document_idle",
       "all_frames": false

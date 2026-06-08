@@ -37,6 +37,16 @@
         captureExpansionState, restoreExpansionState, renderEntryGroupsHtml, renderCompactSectionHtml, partitionEntriesByStatus, buildLatestActivityMap, attachSlugIndex, renderAnimeList, refreshCompactChevrons, installCardEventListeners, setupCardEventListeners
     } = AT.RenderList;
 
+    // Metadata-repair lives in src/popup/lib/metadata-repair.js
+    const {
+        setMetadataRepairStatus, restoreDefaultSyncStatus, scheduleDefaultSyncStatusRestore, applyAnimeInfoCacheChange, applyEpisodeTypesCacheChange, applyMetadataRepairState, syncMetadataRepairStateFromStorage, maybePromptPostUpdateFetch, fetchAllFillers
+    } = AT.MetadataRepair;
+
+    // Stats / goals / views live in src/popup/lib/stats-views.js
+    const {
+        updateStats, loadGoalAndBadgeState, persistBadgeUnlocks, setViewMode, renderSettingsView, renderGoalsView
+    } = AT.StatsViews;
+
     let animeData = {};
     let videoProgress = {};
     let currentSort = 'date';
@@ -45,7 +55,6 @@
     let currentCompactStatusOpen = false;
     let goalSettings = null;
     let badgeState = {};
-    let lastBadgeSnapshot = [];
     let currentViewMode = null;
 
     // ─── Shared popup state ───────────────────────────────────────────────
@@ -79,7 +88,11 @@
         get goalSettings() { return goalSettings; },
         set goalSettings(v) { goalSettings = v; },
         get lastRenderedListMarkup() { return _lastRenderedListMarkup; },
-        set lastRenderedListMarkup(v) { _lastRenderedListMarkup = v; }
+        set lastRenderedListMarkup(v) { _lastRenderedListMarkup = v; },
+        get lastMetadataRepairState() { return lastMetadataRepairState; },
+        set lastMetadataRepairState(v) { lastMetadataRepairState = v; },
+        get currentViewMode() { return currentViewMode; },
+        set currentViewMode(v) { currentViewMode = v; }
     };
 
     const COPY_GUARD_STORAGE_KEY = 'copyGuardEnabled';
@@ -156,10 +169,10 @@
     AT.AddAnimeDialog._init({ elements, markInternalSave, renderAnimeList, updateStats });
     AT.AnimeActions._init({ elements, hideDialog, markInternalSave, renderAnimeList, updateStats });
     AT.RenderList._init({ elements, _ipPatch, getActiveFilter, markInternalSave, normalizeCompactStatus, suppressHoverUntilMouseMove, updateStats });
+    AT.MetadataRepair._init({ elements, detectHasGoogleAuth, markInternalSave, scheduleDeferredListRefresh, sendRuntimeMessage, updateStats });
+    AT.StatsViews._init({ elements, detectHasGoogleAuth, setTopStatValue });
     let loadAndSyncInProgress = false;
-    let metadataRepairPromise = null;
     let lastMetadataRepairState = null;
-    let metadataRepairStatusResetTimer = null;
 
     const OWN_WRITE_TTL_MS = 15000;
     const ownWriteTokens = new Set();
@@ -602,123 +615,7 @@
         });
     }
 
-    async function updateStats() {
-        const { UIHelpers, SeasonGrouping, Storage } = AT;
-        const animeEntries = Object.entries(animeData);
-        const groups = SeasonGrouping.groupByBase(animeEntries);
-        const totalAnimeCount = groups.size;
-        setTopStatValue(elements.totalAnime, totalAnimeCount);
-        const totalMoviesCount = animeEntries.filter(([slug, anime]) => SeasonGrouping.isMovie(slug, anime)).length;
-        if (elements.totalMovies) setTopStatValue(elements.totalMovies, totalMoviesCount);
-
-        let totalWatchedEpisodes = 0;
-        let totalWatchTime = 0;
-        for (const [, anime] of animeEntries) {
-            const uniqueEpisodeNumbers = new Set(
-                (anime.episodes || [])
-                    .filter(ep => ep?.durationSource !== 'anilist')
-                    .map(ep => Number(ep?.number))
-                    .filter(n => Number.isFinite(n) && n > 0)
-            );
-            totalWatchedEpisodes += uniqueEpisodeNumbers.size;
-
-            for (const ep of (anime.episodes || [])) {
-                if (ep?.durationSource === 'anilist') continue;
-                totalWatchTime += Number(ep?.duration) || 0;
-            }
-        }
-
-        const totalTimeStr = UIHelpers.formatDurationShort(totalWatchTime);
-        setTopStatValue(elements.totalEpisodes, totalWatchedEpisodes);
-        setTopStatValue(elements.totalTime, totalTimeStr);
-
-        try {
-            const manifest = chrome.runtime.getManifest();
-            await Storage.set({
-                cachedStats: {
-                    totalAnime:    totalAnimeCount,
-                    totalMovies:   totalMoviesCount,
-                    totalEpisodes: totalWatchedEpisodes,
-                    totalTime:     totalTimeStr,
-                    _version: manifest?.version || null,
-                    _savedAt: Date.now()
-                }
-            });
-        } catch (e) {
-            PopupLogger.error('Stats', 'Failed to cache stats:', e);
-        }
-    }
-
-    async function loadGoalAndBadgeState() {
-        try {
-            const result = await chrome.storage.local.get([GOAL_SETTINGS_KEY, BADGE_STATE_KEY]);
-            const AchievementsEngine = window.AnimeTracker?.AchievementsEngine;
-            const defaults = AchievementsEngine?.getDefaultGoalSettings?.() || {
-                daily:   { targetMinutes: 60, updatedAt: null },
-                weekly:  { targetEpisodes: 5, updatedAt: null },
-                monthly: { targetEpisodes: 20, updatedAt: null }
-            };
-            const stored = result[GOAL_SETTINGS_KEY] || {};
-            goalSettings = {
-                daily:   { ...defaults.daily,   ...(stored.daily   || {}) },
-                weekly:  { ...defaults.weekly,  ...(stored.weekly  || {}) },
-                monthly: { ...defaults.monthly, ...(stored.monthly || {}) }
-            };
-            badgeState = result[BADGE_STATE_KEY] || {};
-        } catch (e) {
-            PopupLogger.warn('Goals', 'Failed to load goal/badge state:', e);
-            goalSettings = null;
-            badgeState = {};
-        }
-    }
-
-    async function persistBadgeUnlocks(newlyUnlocked) {
-        if (!Array.isArray(newlyUnlocked) || newlyUnlocked.length === 0) return;
-        const nowIso = new Date().toISOString();
-        const previousState = badgeState || {};
-        const next = { ...previousState };
-
-        const trulyNew = [];
-        for (const badge of newlyUnlocked) {
-            if (!previousState[badge.id]) {
-                next[badge.id] = { unlockedAt: nowIso, notified: false };
-                trulyNew.push(badge);
-            }
-        }
-
-        if (trulyNew.length === 0) {
-
-            return;
-        }
-
-        badgeState = next;
-        try {
-            await chrome.storage.local.set({ [BADGE_STATE_KEY]: next });
-        } catch (e) {
-            PopupLogger.warn('Goals', 'Failed to persist badge unlocks:', e);
-        }
-
-        if (trulyNew.length > 3) {
-            try {
-                chrome.runtime.sendMessage({
-                    type: 'BADGES_UNLOCKED_BATCH',
-                    count: trulyNew.length
-                }, () => { if (chrome.runtime.lastError) { } });
-            } catch { }
-        } else {
-            for (const badge of trulyNew) {
-                try {
-                    chrome.runtime.sendMessage({
-                        type: 'BADGE_UNLOCKED',
-                        id: badge.id,
-                        title: badge.title,
-                        desc: badge.desc,
-                        icon: badge.icon
-                    }, () => { if (chrome.runtime.lastError) { } });
-                } catch { }
-            }
-        }
-    }
+    // Stats / goals / views → src/popup/lib/stats-views.js
 
     let _hoverSuppressionActive = false;
     function suppressHoverUntilMouseMove() {
@@ -750,153 +647,6 @@
         const safetyTimer = setTimeout(cleanup, 800);
         document.addEventListener('mousemove', release, true);
         document.addEventListener('pointermove', release, true);
-    }
-
-    function setViewMode(mode) {
-        const appRoot = document.querySelector('.app');
-        const mainContent = document.querySelector('.main-content');
-        const statsView = document.getElementById('statsView');
-        const goalsView = document.getElementById('goalsView');
-        const settingsView = document.getElementById('settingsView');
-        const viewStatsBtn = document.getElementById('viewStatsBtn');
-        const viewGoalsBtn = document.getElementById('viewGoalsBtn');
-        const settingsBtn = document.getElementById('settingsBtn');
-
-        currentViewMode = mode || null;
-
-        if (appRoot) {
-            appRoot.classList.toggle('stats-mode', mode === 'stats');
-            appRoot.classList.toggle('goals-mode', mode === 'goals');
-            appRoot.classList.toggle('settings-mode', mode === 'settings');
-        }
-
-        const isViewMode = !!mode;
-        if (elements.categoryTabs) elements.categoryTabs.style.display = isViewMode ? 'none' : '';
-
-        if (viewStatsBtn) {
-            viewStatsBtn.classList.toggle('is-active', mode === 'stats');
-            viewStatsBtn.setAttribute('aria-pressed', mode === 'stats' ? 'true' : 'false');
-        }
-        if (viewGoalsBtn) {
-            viewGoalsBtn.classList.toggle('is-active', mode === 'goals');
-            viewGoalsBtn.setAttribute('aria-pressed', mode === 'goals' ? 'true' : 'false');
-        }
-        if (settingsBtn) {
-            settingsBtn.classList.toggle('is-active', mode === 'settings');
-            settingsBtn.setAttribute('aria-pressed', mode === 'settings' ? 'true' : 'false');
-        }
-
-        if (mode === 'stats' && statsView) {
-            statsView.removeAttribute('hidden');
-            try {
-                window.AnimeTracker?.StatsView?.render(statsView, animeData);
-            } catch (e) {
-                PopupLogger.error('StatsView', 'render failed:', e);
-                statsView.textContent = 'Stats unavailable.';
-            }
-        } else if (mode === 'goals') {
-            if (goalsView) goalsView.removeAttribute('hidden');
-            renderGoalsView();
-        } else if (mode === 'settings') {
-            if (mainContent) mainContent.scrollTop = 0;
-            if (settingsView) settingsView.scrollTop = 0;
-            if (settingsView) settingsView.removeAttribute('hidden');
-            renderSettingsView();
-        }
-    }
-
-    async function renderSettingsView() {
-        const container = document.getElementById('settingsView');
-        const mainContent = document.querySelector('.main-content');
-        if (!container) return;
-        container.removeAttribute('hidden');
-        container.scrollTop = 0;
-        if (mainContent) mainContent.scrollTop = 0;
-
-        const SettingsView = window.AnimeTracker?.SettingsView;
-        if (!SettingsView) {
-            container.textContent = 'Settings unavailable.';
-            return;
-        }
-
-        const user = AT?.FirebaseSync?.getUser?.() || null;
-
-        let storedSettings = {};
-        let passwordIsSet = false;
-        let needsReauth = false;
-        try {
-            const stored = await chrome.storage.local.get([
-                COPY_GUARD_STORAGE_KEY,
-                SMART_NOTIF_STORAGE_KEY,
-                AUTO_SKIP_FILLER_STORAGE_KEY,
-                SKIPTIME_HELPER_KEY,
-                PASSWORD_SET_MARKER_KEY
-            ]);
-            storedSettings = {
-                copyGuard: stored[COPY_GUARD_STORAGE_KEY] !== false,
-                smartNotif: stored[SMART_NOTIF_STORAGE_KEY] === true,
-                autoSkipFiller: stored[AUTO_SKIP_FILLER_STORAGE_KEY] === true,
-                skiptimeHelper: stored[SKIPTIME_HELPER_KEY] === true
-            };
-            const marker = stored[PASSWORD_SET_MARKER_KEY];
-
-            passwordIsSet = !!(marker?.uid && user?.uid && marker.uid === user.uid && marker.setAt);
-            needsReauth = await window.FirebaseLib?.isReauthNeeded?.() || false;
-        } catch (e) {
-            PopupLogger.warn('Settings', 'Failed to load toggle state for view:', e);
-        }
-
-        SettingsView.render(container, {
-            user,
-            settings: storedSettings,
-            passwordIsSet,
-            isMobile: !detectHasGoogleAuth(),
-            needsReauth
-        });
-
-        container.scrollTop = 0;
-        if (mainContent) mainContent.scrollTop = 0;
-        requestAnimationFrame(() => {
-            container.scrollTop = 0;
-            if (mainContent) mainContent.scrollTop = 0;
-        });
-    }
-
-    function renderGoalsView() {
-        const container = document.getElementById('goalsView');
-        if (!container) return;
-        container.removeAttribute('hidden');
-
-        const StatsEngine = window.AnimeTracker?.StatsEngine;
-        const AchievementsEngine = window.AnimeTracker?.AchievementsEngine;
-        const GoalsView = window.AnimeTracker?.GoalsView;
-        if (!StatsEngine || !AchievementsEngine || !GoalsView) {
-            container.textContent = 'Goals engine not loaded.';
-            return;
-        }
-
-        try {
-            const index = StatsEngine.buildWatchIndex(animeData);
-            const hourIndex = AchievementsEngine.buildHourIndex(animeData);
-            GoalsView.render(container, {
-                animeData,
-                index,
-                hourIndex,
-                goalSettings,
-                badgeState,
-                onGoalsChanged: (next) => { goalSettings = next; }
-            });
-
-            const nextSnapshot = GoalsView.getLastBadgeEvaluation();
-            const newlyUnlocked = AchievementsEngine.diffUnlocks(lastBadgeSnapshot, nextSnapshot);
-            lastBadgeSnapshot = nextSnapshot;
-            if (newlyUnlocked.length > 0) {
-                persistBadgeUnlocks(newlyUnlocked);
-            }
-        } catch (e) {
-            PopupLogger.error('Goals', 'render failed:', e);
-            container.textContent = 'Goals unavailable.';
-        }
     }
 
     let _autoSyncCount = 0;
@@ -1344,218 +1094,7 @@
         clearDeletedAnimeSlug
     } = AT.StatusService;
 
-    function setMetadataRepairStatus(label, synced = false) {
-        if (!elements.syncStatus || !elements.syncText) return;
-
-        if (metadataRepairStatusResetTimer) {
-            clearTimeout(metadataRepairStatusResetTimer);
-            metadataRepairStatusResetTimer = null;
-        }
-
-        elements.syncStatus.classList.remove('synced', 'syncing');
-        if (synced) {
-            elements.syncStatus.classList.add('synced');
-        } else {
-            elements.syncStatus.classList.add('syncing');
-        }
-        elements.syncText.textContent = label;
-    }
-
-    function restoreDefaultSyncStatus() {
-        if (!elements.syncStatus || !elements.syncText) return;
-
-        if (metadataRepairStatusResetTimer) {
-            clearTimeout(metadataRepairStatusResetTimer);
-            metadataRepairStatusResetTimer = null;
-        }
-
-        const user = AT.FirebaseSync?.getUser?.();
-        elements.syncStatus.classList.remove('syncing', 'synced');
-        if (user) elements.syncStatus.classList.add('synced');
-        elements.syncText.textContent = user ? 'Cloud Synced' : 'Local Only';
-    }
-
-    function scheduleDefaultSyncStatusRestore(delayMs = 2500) {
-        if (metadataRepairStatusResetTimer) clearTimeout(metadataRepairStatusResetTimer);
-        metadataRepairStatusResetTimer = setTimeout(() => {
-            metadataRepairStatusResetTimer = null;
-            restoreDefaultSyncStatus();
-        }, delayMs);
-    }
-
-    function applyAnimeInfoCacheChange(storageKey, value) {
-        const slug = storageKey.replace('animeinfo_', '');
-        if (!slug) return;
-
-        if (value) {
-            AT.AnilistService.cache[slug] = value;
-        } else {
-            delete AT.AnilistService.cache[slug];
-        }
-
-        if (animeData?.[slug] && repairAiringCompletedEntries(animeData, { slugs: [slug] })) {
-            const payload = { animeData };
-            markInternalSave(payload);
-            AT.Storage.set(payload).catch((error) => {
-                PopupLogger.warn('AnimeInfo', 'Failed to persist repaired completion state:', error);
-            });
-        }
-    }
-
-    function applyEpisodeTypesCacheChange(storageKey, value) {
-        const slug = storageKey.replace('episodeTypes_', '');
-        if (!slug) return;
-
-        const { FillerService } = AT;
-        if (value) {
-            FillerService.episodeTypesCache[slug] = value;
-            FillerService.updateFromEpisodeTypes(slug, value);
-        } else {
-            delete FillerService.episodeTypesCache[slug];
-        }
-    }
-
-    async function applyMetadataRepairState(state, options = {}) {
-        const {
-            ensureOpen = false,
-            autoOpenRunning = false
-        } = options;
-
-        const previousStatus = lastMetadataRepairState?.status || null;
-        lastMetadataRepairState = state || null;
-        const { FillerFetchUI } = AT;
-
-        if (!state) {
-            if (FillerFetchUI.state.isOpen) FillerFetchUI.applyBackgroundState(null);
-            restoreDefaultSyncStatus();
-            return null;
-        }
-
-        const shouldOpen = ensureOpen || (autoOpenRunning && state.status === 'running');
-        if (shouldOpen && !FillerFetchUI.state.isOpen) {
-            await FillerFetchUI.open();
-        }
-        if (FillerFetchUI.state.isOpen || shouldOpen) {
-            FillerFetchUI.applyBackgroundState(state);
-        }
-
-        if (state.status === 'running') {
-            const total = Number(state.total) || 0;
-            const processed = Number(state.processed) || 0;
-            const nextStep = total > 0 ? Math.min(total, processed + 1) : 0;
-            setMetadataRepairStatus(
-                total > 0
-                    ? `Importing ${nextStep}/${total}...`
-                    : 'Importing data...'
-            );
-            return state;
-        }
-
-        if (state.status === 'completed') {
-            const label = state.failed > 0
-                ? `Import Complete (${state.failed} failed)`
-                : 'Import Complete';
-            setMetadataRepairStatus(label, true);
-            if (previousStatus !== 'completed') {
-                scheduleDeferredListRefresh({ delayMs: 0 });
-                await updateStats();
-            }
-            scheduleDefaultSyncStatusRestore();
-            return state;
-        }
-
-        if (state.status === 'error') {
-            if (elements.syncStatus && elements.syncText) {
-                elements.syncStatus.classList.remove('syncing', 'synced');
-                elements.syncText.textContent = 'Import Error';
-            }
-            return state;
-        }
-
-        return state;
-    }
-
-    async function syncMetadataRepairStateFromStorage(options = {}) {
-        const { Storage } = AT;
-        const result = await Storage.get(['metadataRepairState']);
-        return applyMetadataRepairState(result.metadataRepairState || null, options);
-    }
-
-    async function maybePromptPostUpdateFetch() {
-        const { Storage } = AT;
-        try {
-            const stored = await Storage.get([
-                'postUpdateFetchTriggeredAt',
-                'postUpdateFetchToVersion',
-                'metadataRepairState'
-            ]);
-
-            if (stored.postUpdateFetchTriggeredAt) {
-
-                await Storage.remove([
-                    'postUpdateFetchTriggeredAt',
-                    'postUpdateFetchFromVersion',
-                    'postUpdateFetchToVersion'
-                ]);
-            }
-
-            if (stored.metadataRepairState?.status === 'running') {
-                await applyMetadataRepairState(stored.metadataRepairState, { autoOpenRunning: false });
-            }
-        } catch (e) {
-            PopupLogger.warn('Init', 'Post-update silent sync failed:', e);
-        }
-    }
-
-    async function fetchAllFillers(options = {}) {
-        const {
-            autoStart = true,
-            forceInfoRefresh = false,
-            forceFillerRefresh = false,
-            autoMode = false
-        } = options;
-
-        const { FillerFetchUI } = AT;
-
-        await FillerFetchUI.open({ autoMode });
-
-        if (!autoStart) {
-            return syncMetadataRepairStateFromStorage({ ensureOpen: true });
-        }
-
-        if (metadataRepairPromise) {
-            return metadataRepairPromise;
-        }
-
-        metadataRepairPromise = (async () => {
-            setMetadataRepairStatus('Importing data...');
-            FillerFetchUI.showPendingStart('Starting import…');
-
-            const response = await sendRuntimeMessage({
-                type: 'START_LIBRARY_REPAIR',
-                forceInfoRefresh,
-                forceFillerRefresh,
-                isMobile: !detectHasGoogleAuth()
-            }, 30000);
-
-            if (!response?.success) {
-                throw new Error(response?.error || 'Failed to start import');
-            }
-
-            return applyMetadataRepairState(response.state || null, { ensureOpen: true });
-        })().catch((error) => {
-            PopupLogger.error('RepairAll', 'Error:', error);
-            if (elements.syncStatus && elements.syncText) {
-                elements.syncStatus.classList.remove('syncing');
-                elements.syncText.textContent = 'Import Error';
-            }
-            throw error;
-        }).finally(() => {
-            metadataRepairPromise = null;
-        });
-
-        return metadataRepairPromise;
-    }
+    // Metadata-repair → src/popup/lib/metadata-repair.js
 
     // Auth UI (Google/email sign-in, forgot-password) → src/popup/lib/auth-ui.js
 

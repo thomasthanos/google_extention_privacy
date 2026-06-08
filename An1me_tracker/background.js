@@ -2,9 +2,7 @@
 
 
 importScripts(
-    'src/common/cloud/firebase-config.js',
-    'src/common/cloud/auth-classifier.js',
-    'src/common/cloud/auth-tokens.js',
+    'src/common/cloud.js',
     'src/background/fetchers/aniskip.js',
     'src/background/fetchers/filler-discovery.js',
     'src/background/fetchers/an1me-scraper.js',
@@ -22,7 +20,7 @@ const FIRESTORE_DATABASE = `projects/${FIREBASE_PROJECT_ID}/databases/(default)`
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/${FIRESTORE_DATABASE}`;
 const CLOUD_CONSUMER_POLL_MIN_GAP_MS = 3 * 60 * 1000;
 
-importScripts('src/common/data/merge-utils.js', 'src/common/cloud/firestore-codec.js');
+importScripts('src/common/data/merge-utils.js');
 
 
 
