@@ -323,6 +323,28 @@
                 </button>
             </div>
             <div class="dialog-body add-anime-body">
+                <!-- ─── Auto-detect from the open watch tab (filled by add-anime-dialog.js) ─── -->
+                <div class="watch-detect" id="watchDetectBanner" style="display:none">
+                    <div class="watch-detect-top">
+                        <span class="watch-detect-eyebrow">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                            Watching now
+                        </span>
+                        <a class="watch-detect-link" id="watchDetectLink" href="#" target="_blank" rel="noopener" title="Open this episode on an1me.to">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                        </a>
+                    </div>
+                    <div class="watch-detect-title">
+                        <span id="watchDetectTitle"></span>
+                        <span class="watch-detect-ep" id="watchDetectEp"></span>
+                    </div>
+                    <div class="watch-detect-existing" id="watchDetectExisting" style="display:none"></div>
+                    <div class="watch-detect-actions">
+                        <button class="ep-chip watch-detect-chip" id="watchDetectOnly" type="button"></button>
+                        <button class="ep-chip watch-detect-chip watch-detect-chip-primary" id="watchDetectAll" type="button"></button>
+                    </div>
+                </div>
+
                 <!-- ─── Slug section ─────────────────────────────────────── -->
                 <div class="form-group">
                     <label for="animeSlug">Anime URL or Slug</label>

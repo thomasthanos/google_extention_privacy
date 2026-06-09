@@ -3821,6 +3821,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .slug-meta-stats .stat-airing { color: var(--cyan) }
 .slug-meta-stats .stat-finished { color: var(--green) }
+.slug-meta-stats .stat-watched { color: var(--cyan); font-weight: 600 }
 
 .slug-input-wrap input {
   width: 100%;
@@ -4065,6 +4066,91 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   font-weight: 500;
   opacity: 0.7;
   font-variant-numeric: tabular-nums
+}
+
+/* ─── "Watching now" auto-detect banner (Add Anime dialog) ─── */
+.watch-detect {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(79,195,247,0.10), rgba(79,195,247,0.03));
+  border: 1px solid rgba(79,195,247,0.22);
+  animation: fadeIn 0.18s ease
+}
+.watch-detect-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px
+}
+.watch-detect-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cyan)
+}
+.watch-detect-eyebrow svg { width: 12px; height: 12px }
+.watch-detect-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--t2);
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  transition: all var(--tf)
+}
+.watch-detect-link:hover {
+  color: var(--cyan);
+  border-color: rgba(79,195,247,0.35);
+  background: rgba(79,195,247,0.1)
+}
+.watch-detect-link svg { width: 13px; height: 13px }
+.watch-detect-title {
+  margin-top: 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--t1);
+  line-height: 1.2
+}
+.watch-detect-ep {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cyan);
+  white-space: nowrap
+}
+.watch-detect-existing {
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--t2)
+}
+.watch-detect-actions {
+  margin-top: 9px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap
+}
+.watch-detect-chip { font-size: 12px; padding: 6px 12px }
+.watch-detect-chip-primary {
+  background: rgba(79,195,247,0.14);
+  border-color: rgba(79,195,247,0.32);
+  color: var(--cyan)
+}
+.watch-detect-chip-primary:hover {
+  background: rgba(79,195,247,0.2);
+  border-color: rgba(79,195,247,0.5);
+  color: var(--cyan)
 }
 
 /* Live counter + progress bar */

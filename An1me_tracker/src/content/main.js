@@ -1128,4 +1128,28 @@
     };
 
     setupNavigationObserver();
+
+    // Answer the popup's "Add Anime" auto-detect: report the anime/episode on this watch page.
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+        if (!message || message.type !== 'GET_CURRENT_WATCH_INFO') return false;
+        try {
+            const info = animeInfo || AnimeParser.extractAnimeInfo({ silent: true });
+            if (info && info.animeSlug) {
+                sendResponse({
+                    slug: info.animeSlug,
+                    title: info.animeTitle || null,
+                    episode: info.episodeNumber || null,
+                    secondEpisode: info.secondEpisodeNumber || null,
+                    totalEpisodes: info.totalEpisodes || null,
+                    coverImage: info.coverImage || null,
+                    link: info.url || window.location.href
+                });
+            } else {
+                sendResponse(null);
+            }
+        } catch {
+            sendResponse(null);
+        }
+        return true;
+    });
 })();
