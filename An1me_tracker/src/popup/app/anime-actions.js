@@ -4,6 +4,7 @@
     // Anime action handlers (delete progress/anime, toggle completed/dropped/favorite/on-hold,
     // clear all). Extracted from popup/main.js. State via AT.PopupState; a few callbacks via _init.
     const AT = window.AnimeTracker;
+    const { showToast } = AT;   // toast helper (loaded before this module)
 
     const { inlineConfirm: showInlineConfirm } = AT.Dialogs;
     const { setManualListState, clearDeletedAnimeSlug } = AT.StatusService;

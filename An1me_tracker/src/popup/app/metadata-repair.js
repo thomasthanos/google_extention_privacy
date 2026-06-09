@@ -60,7 +60,7 @@
             delete AT.AnilistService.cache[slug];
         }
 
-        if (AT.PopupState.animeData?.[slug] && repairAiringCompletedEntries(AT.PopupState.animeData, { slugs: [slug] })) {
+        if (AT.PopupState.animeData?.[slug] && AT.StatusService.repairAiringCompleted(AT.PopupState.animeData, { slugs: [slug] })) {
             const payload = { animeData: AT.PopupState.animeData };
             markInternalSave(payload);
             AT.Storage.set(payload).catch((error) => {

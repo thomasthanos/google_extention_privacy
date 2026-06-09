@@ -1,11 +1,181 @@
 
 
+// ── Donate dropdown UI (merged from app/donate-dropdown.js) ──
+(function () {
+    'use strict';
+
+    // Donate dropdown UI — extracted from popup/main.js.
+    // Self-contained: only touches its own DOM nodes (no popup state).
+    const AT = (window.AnimeTracker = window.AnimeTracker || {});
+
+    function getSettingsDonateButton() {
+        return document.getElementById('settingsDonate');
+    }
+
+    function closeDonateDropdown() {
+        const donateDropdown = document.getElementById('donateDropdown');
+        if (!donateDropdown) return;
+        donateDropdown.classList.remove('visible');
+        delete donateDropdown.dataset.placement;
+    }
+
+    function positionDonateDropdown() {
+        const dropdown = document.getElementById('donateDropdown');
+        const trigger = getSettingsDonateButton();
+        const content = dropdown?.querySelector('.donate-dropdown-content');
+        if (!dropdown || !trigger || !content) return;
+
+        const triggerRect = trigger.getBoundingClientRect();
+        const dropdownWidth = Math.ceil(content.offsetWidth || 220);
+        const dropdownHeight = Math.ceil(content.offsetHeight || 132);
+        const gap = 8;
+        const viewportPadding = 10;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        let left = triggerRect.right - dropdownWidth;
+        left = Math.max(viewportPadding, Math.min(left, viewportWidth - dropdownWidth - viewportPadding));
+
+        let top = triggerRect.top - dropdownHeight - gap;
+        let placement = 'above';
+
+        if (top < viewportPadding) {
+            top = Math.min(triggerRect.bottom + gap, viewportHeight - dropdownHeight - viewportPadding);
+            placement = 'below';
+        }
+
+        const arrowOffset = triggerRect.left + (triggerRect.width / 2) - left;
+        const clampedArrow = Math.max(22, Math.min(arrowOffset, dropdownWidth - 22));
+
+        dropdown.style.left = `${Math.round(left)}px`;
+        dropdown.style.top = `${Math.round(top)}px`;
+        dropdown.style.setProperty('--donate-arrow-offset', `${Math.round(clampedArrow)}px`);
+        dropdown.dataset.placement = placement;
+    }
+
+    function openDonateDropdown() {
+        const donateDropdown = document.getElementById('donateDropdown');
+        if (!donateDropdown || !getSettingsDonateButton()) return;
+        positionDonateDropdown();
+        donateDropdown.classList.add('visible');
+        requestAnimationFrame(positionDonateDropdown);
+    }
+
+    AT.DonateDropdown = {
+        open: openDonateDropdown,
+        close: closeDonateDropdown,
+        position: positionDonateDropdown,
+        getButton: getSettingsDonateButton
+    };
+})();
+
+// ── Library backup/export (merged from lib/library-backup.js) ──
+(function () {
+    'use strict';
+
+    const BACKUP_FORMAT_VERSION = 1;
+
+    function buildPayload(snapshot) {
+        const version = (typeof chrome !== 'undefined' && chrome.runtime?.getManifest?.()?.version) || null;
+        return {
+            version: BACKUP_FORMAT_VERSION,
+            exportedAt: new Date().toISOString(),
+            extensionVersion: version,
+            animeData: snapshot?.animeData || {},
+            videoProgress: snapshot?.videoProgress || {},
+            deletedAnime: snapshot?.deletedAnime || {},
+            groupCoverImages: snapshot?.groupCoverImages || {},
+            goalSettings: snapshot?.goalSettings || null,
+            badgeUnlocks: snapshot?.badgeUnlocks || {}
+        };
+    }
+
+    function triggerDownload(payload, filenameOverride = null) {
+        const json = JSON.stringify(payload, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace(/T.*/, '');
+        const filename = filenameOverride || `an1me-tracker-backup-${stamp}.json`;
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        setTimeout(() => { try { URL.revokeObjectURL(url); } catch {              } }, 1500);
+    }
+
+    function parseAndValidate(text) {
+        let parsed;
+        try {
+            parsed = JSON.parse(text);
+        } catch {
+            throw new Error('Invalid JSON file');
+        }
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            throw new Error('Backup file is malformed');
+        }
+
+        if (!parsed.animeData || typeof parsed.animeData !== 'object') {
+            throw new Error('Backup is missing animeData');
+        }
+        return parsed;
+    }
+
+
+    function mergeImported(local, parsed) {
+        const Merge = globalThis.AnimeTrackerMergeUtils;
+        if (!Merge?.mergeAnimeData) throw new Error('Merge utils unavailable');
+        const AT = (typeof window !== 'undefined' && window.AnimeTracker) || {};
+        const ProgressManager = AT.ProgressManager;
+
+        let mergedAnime = Merge.mergeAnimeData(local?.animeData || {}, parsed?.animeData || {});
+        let mergedDeleted = Merge.mergeDeletedAnime(local?.deletedAnime || {}, parsed?.deletedAnime || {});
+        mergedDeleted = Merge.pruneStaleDeletedAnime(mergedAnime, mergedDeleted);
+        Merge.applyDeletedAnime(mergedAnime, mergedDeleted);
+
+        const mergedProgress = Merge.mergeVideoProgress(local?.videoProgress || {}, parsed?.videoProgress || {});
+        const mergedGroup = Merge.mergeGroupCoverImages(local?.groupCoverImages || {}, parsed?.groupCoverImages || {});
+        const mergedGoals = Merge.mergeGoalSettings
+            ? Merge.mergeGoalSettings(local?.goalSettings || null, parsed?.goalSettings || null)
+            : (parsed?.goalSettings || local?.goalSettings || null);
+        const mergedBadges = Merge.mergeBadgeUnlocks
+            ? Merge.mergeBadgeUnlocks(local?.badgeUnlocks || {}, parsed?.badgeUnlocks || {})
+            : { ...(local?.badgeUnlocks || {}), ...(parsed?.badgeUnlocks || {}) };
+
+
+        if (ProgressManager?.removeDuplicateEpisodes) {
+            mergedAnime = ProgressManager.removeDuplicateEpisodes(mergedAnime);
+        }
+
+        return {
+            animeData: mergedAnime,
+            videoProgress: mergedProgress,
+            deletedAnime: mergedDeleted,
+            groupCoverImages: mergedGroup,
+            goalSettings: mergedGoals,
+            badgeUnlocks: mergedBadges
+        };
+    }
+
+    window.AnimeTracker = window.AnimeTracker || {};
+    window.AnimeTracker.LibraryBackup = {
+        buildPayload,
+        triggerDownload,
+        parseAndValidate,
+        mergeImported
+    };
+})();
+
 (function () {
     'use strict';
 
     const AT = window.AnimeTracker;
 
-    // Donate dropdown UI lives in src/popup/lib/donate-dropdown.js
+    // Donate dropdown UI is defined at the top of this file (merged in from app/donate-dropdown.js)
     const {
         open: openDonateDropdown,
         close: closeDonateDropdown,
@@ -13,36 +183,36 @@
         getButton: getSettingsDonateButton
     } = AT.DonateDropdown;
 
-    // Toasts live in src/popup/lib/toasts.js
+    // Toasts live in src/popup/app/toasts.js
     const { showToast, showAuthToast } = AT;
 
-    // Auth UI lives in src/popup/lib/auth-ui.js
+    // Auth UI lives in src/popup/app/auth-ui.js
     const { signInWithGoogle, handleEmailAuth, handleForgotPassword } = AT.AuthUI;
 
-    // Add/edit-anime dialogs live in src/popup/lib/add-anime-dialog.js
+    // Add/edit-anime dialogs live in src/popup/app/add-anime-dialog.js
     const {
         showAddAnimeDialog, onSlugInputChange, hideAddAnimeDialog, syncWatchlistFromPopup,
         addAnimeWithEpisodes, showEditTitleDialog, hideEditTitleDialog, saveEditedTitle,
         editAnimeTitle, fetchFillerForAnime
     } = AT.AddAnimeDialog;
 
-    // Anime actions live in src/popup/lib/anime-actions.js
+    // Anime actions live in src/popup/app/anime-actions.js
     const {
         deleteProgress, deleteAnime, toggleAnimeCompleted, toggleAnimeDropped,
         toggleAnimeFavorite, toggleAnimeOnHold, clearAllData
     } = AT.AnimeActions;
 
-    // Render pipeline lives in src/popup/lib/render-list.js
+    // Render pipeline lives in src/popup/app/render-list.js
     const {
         captureExpansionState, restoreExpansionState, renderEntryGroupsHtml, renderCompactSectionHtml, partitionEntriesByStatus, buildLatestActivityMap, attachSlugIndex, renderAnimeList, refreshCompactChevrons, installCardEventListeners, setupCardEventListeners
     } = AT.RenderList;
 
-    // Metadata-repair lives in src/popup/lib/metadata-repair.js
+    // Metadata-repair lives in src/popup/app/metadata-repair.js
     const {
         setMetadataRepairStatus, restoreDefaultSyncStatus, scheduleDefaultSyncStatusRestore, applyAnimeInfoCacheChange, applyEpisodeTypesCacheChange, applyMetadataRepairState, syncMetadataRepairStateFromStorage, maybePromptPostUpdateFetch, fetchAllFillers
     } = AT.MetadataRepair;
 
-    // Stats / goals / views live in src/popup/lib/stats-views.js
+    // Stats / goals / views live in src/popup/app/stats-views.js
     const {
         updateStats, loadGoalAndBadgeState, persistBadgeUnlocks, setViewMode, renderSettingsView, renderGoalsView
     } = AT.StatsViews;
@@ -196,7 +366,7 @@
     const POPUP_CLOUD_REFRESH_MS = 30 * 1000;
     let popupCloudRefreshTimer = null;
 
-    // ─── Donate dropdown → src/popup/lib/donate-dropdown.js ───
+    // ─── Donate dropdown → defined at top of this file (was app/donate-dropdown.js) ───
     // (aliased near the top as AT.DonateDropdown)
 
     let _lastRenderedListMarkup = null;
@@ -553,7 +723,7 @@
         }
     }
 
-    // Render pipeline → src/popup/lib/render-list.js
+    // Render pipeline → src/popup/app/render-list.js
 
     async function exportLibraryToJson() {
         const { Storage, LibraryBackup } = AT;
@@ -615,7 +785,7 @@
         });
     }
 
-    // Stats / goals / views → src/popup/lib/stats-views.js
+    // Stats / goals / views → src/popup/app/stats-views.js
 
     let _hoverSuppressionActive = false;
     function suppressHoverUntilMouseMove() {
@@ -1058,7 +1228,7 @@
         }, POPUP_CLOUD_REFRESH_MS);
     }
 
-    // Anime actions (delete/toggle/clear) → src/popup/lib/anime-actions.js
+    // Anime actions (delete/toggle/clear) → src/popup/app/anime-actions.js
 
     const {
         open: openDialogA11y,
@@ -1069,7 +1239,7 @@
     function showDialog() { openDialogA11y(elements.confirmDialog); }
     function hideDialog() { closeDialogA11y(elements.confirmDialog); }
 
-    // Add/edit-anime dialogs → src/popup/lib/add-anime-dialog.js
+    // Add/edit-anime dialogs → src/popup/app/add-anime-dialog.js
 
     let _addDialogDetectedTitle = null;
     let _addDialogKnownTotal = null;
@@ -1094,14 +1264,14 @@
         clearDeletedAnimeSlug
     } = AT.StatusService;
 
-    // Metadata-repair → src/popup/lib/metadata-repair.js
+    // Metadata-repair → src/popup/app/metadata-repair.js
 
-    // Auth UI (Google/email sign-in, forgot-password) → src/popup/lib/auth-ui.js
+    // Auth UI (Google/email sign-in, forgot-password) → src/popup/app/auth-ui.js
 
-    // Set-password modal lives in src/popup/lib/set-password-modal.js (AT.openSetPasswordModal)
+    // Set-password modal lives in src/popup/app/set-password-modal.js (AT.openSetPasswordModal)
     AT.refreshSettingsViewIfOpen = () => { if (currentViewMode === 'settings') renderSettingsView(); };
 
-    // Toasts (showToast / showAuthToast) live in src/popup/lib/toasts.js
+    // Toasts (showToast / showAuthToast) live in src/popup/app/toasts.js
 
     async function signOut(preserveLocalData = true) {
         const { Storage, FirebaseSync } = AT;

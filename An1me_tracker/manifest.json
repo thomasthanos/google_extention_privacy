@@ -74,6 +74,7 @@
         "src/content/player/skiptime-utils.js",
         "src/content/player/skiptime-styles.js",
         "src/content/player/skiptime-helper.js",
+        "src/content/player/episode-highlight.js",
         "src/content/main.js",
         "src/common/data/merge-utils.js",
         "src/common/cloud.js"
@@ -83,7 +84,11 @@
     },
     {
       "matches": ["https://an1me.to/", "https://*.an1me.to/"],
-      "js": ["src/content/page/continue-watching.js"],
+      "js": [
+        "src/content/page/continue-watching-utils.js",
+        "src/content/page/continue-watching-styles.js",
+        "src/content/page/continue-watching.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     }

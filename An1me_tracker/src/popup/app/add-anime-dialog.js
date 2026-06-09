@@ -5,6 +5,7 @@
     // Extracted from popup/main.js. State via AT.PopupState; elements + a few main
     // callbacks injected through _init(). AT aliases re-derived below.
     const AT = window.AnimeTracker;
+    const { showToast } = AT;   // toast helper (loaded before this module)
 
     const { open: openDialogA11y, close: closeDialogA11y } = AT.Dialogs;
     const {
