@@ -666,7 +666,7 @@
         const emailForm = document.getElementById('authEmailForm');
         const orDivider = document.querySelector('.auth-or-divider');
         if (emailForm) emailForm.style.display = hasGoogleAuth ? 'none' : '';
-        if (orDivider) orDivider.style.display = hasGoogleAuth ? 'none' : '';
+        if (orDivider) orDivider.style.display = 'none';
     }
 
     function detectHasGoogleAuth() {

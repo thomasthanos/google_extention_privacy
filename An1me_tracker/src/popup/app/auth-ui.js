@@ -18,6 +18,113 @@
             <span>Sign in with Google</span>
         </span>`;
 
+    function enhanceAuthMarkup() {
+        const jpText = document.querySelector('.auth-anime-title .jp-text');
+        const jpSubtitle = document.querySelector('.jp-subtitle');
+        const torii = document.querySelector('.torii-gate');
+        if (jpText) jpText.textContent = 'アニメトラッカー';
+        if (jpSubtitle) jpSubtitle.textContent = 'ー あなたのアニメ記録 ー';
+        if (torii && !torii.dataset.enhanced) {
+            torii.dataset.enhanced = 'true';
+            torii.innerHTML = `
+                <svg viewBox="0 0 96 78" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M18 14c18 7 42 7 60 0v10c-17 8-43 8-60 0V14z" fill="#ff6a2f"/>
+                    <path d="M24 30h48v9H24z" fill="#f25a24"/>
+                    <path d="M30 39h9v31h-9zM57 39h9v31h-9z" fill="#ff6a2f"/>
+                    <path d="M16 21c20 8 44 8 64 0" stroke="#ff9a58" stroke-width="2" stroke-linecap="round" opacity=".7"/>
+                </svg>
+            `;
+        }
+
+        const email = document.getElementById('authEmailInput');
+        if (email && !email.closest('.auth-input-shell')) {
+            email.insertAdjacentHTML('beforebegin', `
+                <div class="auth-input-shell" data-auth-shell="email">
+                    <svg class="auth-input-icon" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                         stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="5" width="18" height="14" rx="2"/>
+                        <path d="m3 7 9 6 9-6"/>
+                    </svg>
+                </div>
+            `);
+            email.previousElementSibling?.appendChild(email);
+        }
+
+        const password = document.getElementById('authPasswordInput');
+        if (password && !password.closest('.auth-input-shell')) {
+            password.placeholder = '••••••••';
+            password.insertAdjacentHTML('beforebegin', `
+                <div class="auth-input-shell" data-auth-shell="password">
+                    <svg class="auth-input-icon" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                         stroke-linejoin="round" aria-hidden="true">
+                        <rect x="5" y="11" width="14" height="10" rx="2"/>
+                        <path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+                    </svg>
+                    <button class="auth-password-toggle" id="authPasswordToggle"
+                            type="button" aria-label="Show password" aria-pressed="false">
+                        <svg class="auth-eye auth-eye-on" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                             stroke-linejoin="round" aria-hidden="true">
+                            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                        <svg class="auth-eye auth-eye-off" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                             stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3 3l18 18"/>
+                            <path d="M10.6 10.6A3 3 0 0 0 12 15a3 3 0 0 0 2.4-4.8"/>
+                            <path d="M9.9 4.2A10.7 10.7 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-3.2 4.3"/>
+                            <path d="M6.6 6.6A18.7 18.7 0 0 0 2 12s3.5 8 10 8a10.9 10.9 0 0 0 4.1-.8"/>
+                        </svg>
+                    </button>
+                </div>
+            `);
+            const shell = password.previousElementSibling;
+            const toggle = shell?.querySelector('#authPasswordToggle');
+            shell?.insertBefore(password, toggle);
+            toggle?.addEventListener('click', () => {
+                const reveal = password.type === 'password';
+                password.type = reveal ? 'text' : 'password';
+                toggle.setAttribute('aria-pressed', reveal ? 'true' : 'false');
+                toggle.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+                shell.classList.toggle('is-revealed', reveal);
+            });
+        }
+
+        const signInBtn = document.getElementById('emailSignInBtn');
+        if (signInBtn && !signInBtn.querySelector('.btn-auth-arrow')) {
+            signInBtn.insertAdjacentHTML('beforeend', `
+                <svg class="btn-auth-arrow" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="3" stroke-linecap="round"
+                     stroke-linejoin="round" aria-hidden="true">
+                    <path d="M9 18l6-6-6-6"/>
+                </svg>
+            `);
+        }
+
+        const forgot = document.getElementById('authForgotPasswordBtn');
+        if (forgot && !forgot.querySelector('.auth-link-icon')) {
+            forgot.innerHTML = `
+                <span class="auth-link-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="5" y="11" width="14" height="10" rx="2"/>
+                        <path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+                    </svg>
+                </span>
+                <span>Forgot password?</span>
+            `;
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', enhanceAuthMarkup, { once: true });
+    } else {
+        enhanceAuthMarkup();
+    }
+
     async function signInWithGoogle() {
         const { FirebaseSync } = AT;
         try {
@@ -226,6 +333,7 @@
             if (forgotBtn) {
                 forgotBtn.disabled = false;
                 forgotBtn.textContent = originalText;
+                enhanceAuthMarkup();
             }
         }
     }
