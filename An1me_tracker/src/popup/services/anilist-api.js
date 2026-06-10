@@ -319,6 +319,12 @@
             <div class="anilist-status" id="anilistStatus"></div>
         `;
 
+        const progressArea = `
+            <div class="anilist-progress" id="anilistProgress" hidden>
+                <div class="anilist-progress-fill" id="anilistProgressFill"></div>
+            </div>
+        `;
+
 
         const importInputRow = `
             <div class="anilist-import-row">
@@ -343,23 +349,23 @@
                         <span class="anilist-head-name">${name}</span>
                         <span class="anilist-head-sub">Auto-sync enabled</span>
                     </div>
-                    <span class="anilist-pill" title="Connected">Connected</span>
+                    <div class="anilist-status anilist-status--inline" id="anilistStatus"></div>
                 </div>
-                ${statusArea}
+                ${progressArea}
                 <div class="anilist-actions-row">
                     <button class="anilist-btn anilist-btn--sync" id="anilistSyncBtn" type="button">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                         <span>Sync now</span>
                     </button>
                     <button class="anilist-btn anilist-btn--ghost" id="anilistDisconnectBtn" type="button">Disconnect</button>
+                    <details class="anilist-collapsible">
+                        <summary>Advanced import<span class="anilist-collapsible-arrow"></span></summary>
+                        <div class="anilist-collapsible-body">
+                            ${importInputRow}
+                            <div class="anilist-hint">Pulls public AniList entries into your library. Existing entries stay untouched.</div>
+                        </div>
+                    </details>
                 </div>
-                <details class="anilist-collapsible">
-                    <summary><span class="anilist-collapsible-arrow"></span>Advanced import</summary>
-                    <div class="anilist-collapsible-body">
-                        ${importInputRow}
-                        <div class="anilist-hint">Pulls public AniList entries into your library. Existing entries stay untouched.</div>
-                    </div>
-                </details>
             `;
         }
 
@@ -501,17 +507,11 @@
         }
 
         if (st && st.state === 'idle') {
-            const bits = [];
-
-
-            if (st.finishedAt) bits.push(relativeTime(st.finishedAt));
-            if (typeof st.ok === 'number') bits.push(`${st.ok} updated`);
-            if (typeof st.skipped === 'number') bits.push(`${st.skipped} unchanged`);
-            if (st.failed) bits.push(`${st.failed} unmatched`);
-            if (bits.length) {
-                setStatus(`Last sync · ${bits.join(' · ')}`, 'ok');
-                return;
-            }
+            const when = st.finishedAt ? relativeTime(st.finishedAt) : '';
+            const updated = Number.isFinite(Number(st.ok)) ? Number(st.ok) : 0;
+            const bits = [when, `${updated} updated`].filter(Boolean);
+            setStatus(`Last sync · ${bits.join(' · ')}`, 'ok');
+            return;
         }
 
 
@@ -571,7 +571,6 @@
     function doSyncNow() {
         if (!isConnected()) { setStatus('Connect AniList first', 'err'); return; }
         setSyncing(true);
-        setProgress(0, 1, 'Starting AniList sync');
         let responded = false;
         const swTimeout = setTimeout(() => {
             if (!responded) {
@@ -665,8 +664,16 @@
         if (!body) return;
         body.innerHTML = renderCardBody();
         bindCard();
+        updateConnectionsCount();
 
         if (isConnected()) applySyncStatus(_syncStatus);
+    }
+
+    function updateConnectionsCount() {
+        const pill = document.querySelector('#settingsConnectionsSection .settings-connections-status-pill');
+        if (!pill) return;
+        if (isConnected()) pill.removeAttribute('hidden');
+        else pill.setAttribute('hidden', '');
     }
 
     function injectCard() {
@@ -675,11 +682,17 @@
         if (!inner) return;
 
         injectStyles();
-        const card = document.createElement('section');
-        card.className = 'settings-card';
+        const mount = document.getElementById('settingsConnectionsMount');
+        const card = document.createElement(mount ? 'div' : 'section');
+        card.className = mount ? 'anilist-connection-panel' : 'settings-card';
         card.id = CARD_ID;
         card.innerHTML = '<div id="anilistBody"></div>';
 
+        if (mount) {
+            mount.replaceChildren(card);
+            renderCard();
+            return;
+        }
 
         const heads = inner.querySelectorAll('.settings-head');
         let connectionsHead = null;

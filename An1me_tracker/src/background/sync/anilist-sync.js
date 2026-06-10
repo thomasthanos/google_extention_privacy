@@ -68,22 +68,28 @@
         let lastAdvancedAt = Date.now();
         let lastDone = -1;
         let lastSlug = '';
+        let wroteRunningStatus = false;
         let heartbeatTimer = null;
         try {
-
-
             const existing = await sget([STATUS_KEY]);
             const last = existing[STATUS_KEY];
-            if (last && last.state === 'running') {
-                await writeStatus({ ...last, reason });
-            } else {
-                await writeStatus({ state: 'running', done: last?.done || 0, total: last?.total || 0, reason });
-            }
+            const publishRunningStatus = async (progress = null) => {
+                wroteRunningStatus = true;
+                if (progress) {
+                    await writeStatus({ state: 'running', ...progress });
+                    return;
+                }
+                if (last && last.state === 'running') {
+                    await writeStatus({ ...last, reason });
+                } else {
+                    await writeStatus({ state: 'running', done: last?.done || 0, total: last?.total || 0, reason });
+                }
+            };
 
 
             heartbeatTimer = setInterval(() => {
                 if (!lastProgress) return;
-                writeStatus({ state: 'running', ...lastProgress });
+                if (wroteRunningStatus) writeStatus({ state: 'running', ...lastProgress });
             }, 10000);
 
             const result = await Core.runPush({
@@ -110,10 +116,11 @@
                     };
 
 
-                    const isNewSlug = !!p.currentSlug;
-                    if (!isNewSlug && now - lastWrite < PROGRESS_WRITE_GAP_MS) return;
+                    const isWorkProgress = !!p.currentSlug || p.phase === 'resolving' || p.ok > 0;
+                    if (!isWorkProgress && !wroteRunningStatus) return;
+                    if (!isWorkProgress && now - lastWrite < PROGRESS_WRITE_GAP_MS) return;
                     lastWrite = now;
-                    writeStatus({ state: 'running', ...lastProgress });
+                    publishRunningStatus(lastProgress);
                 }
             });
 

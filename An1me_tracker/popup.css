@@ -8793,3 +8793,725 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   -webkit-user-select: all;
   user-select: all
 }
+
+/* Settings reference skin */
+.app.settings-mode {
+  background: linear-gradient(180deg, rgba(5, 12, 22, 0.98) 0%, rgba(6, 14, 26, 1) 100%);
+}
+
+.app.settings-mode .main-content {
+  padding: 6px 0 7px;
+  background:
+    radial-gradient(circle at 18% 5%, rgba(47, 183, 255, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(3, 10, 20, 0.94), rgba(7, 16, 29, 0.98));
+}
+
+.app.settings-mode .footer {
+  padding: 7px 22px calc(7px + env(safe-area-inset-bottom, 0px));
+  background: rgba(6, 16, 30, 0.95);
+  border-top: 1px solid rgba(72, 103, 140, 0.28);
+  color: rgba(130, 151, 190, 0.58);
+  font-size: 10px;
+}
+
+.app.settings-mode .sync-status {
+  gap: 6px;
+  font-size: 11px;
+  color: #52e28d;
+}
+
+.app.settings-mode .sync-status svg {
+  width: 13px;
+  height: 13px;
+}
+
+#settingsView.settings-view {
+  padding: 0;
+}
+
+#settingsView [hidden] {
+  display: none !important;
+}
+
+#settingsView .settings-view-inner {
+  width: 100%;
+  max-width: 560px;
+  padding: 0 18px;
+  gap: 5px !important;
+}
+
+#settingsView .settings-header {
+  display: block;
+  padding: 0;
+  margin: 0 0 5px;
+}
+
+#settingsView .settings-account-pill {
+  min-height: 48px;
+  padding: 6px 8px 6px 9px;
+  gap: 9px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(11, 25, 43, 0.94), rgba(9, 19, 34, 0.96));
+  border: 1px solid rgba(74, 105, 145, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 32px rgba(0, 0, 0, 0.25);
+}
+
+#settingsView .settings-account-pill:hover {
+  background: linear-gradient(135deg, rgba(13, 30, 50, 0.96), rgba(10, 22, 38, 0.98));
+  border-color: rgba(91, 130, 178, 0.52);
+}
+
+#settingsView .settings-pill-avatar {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(126, 160, 204, 0.36);
+  box-shadow: 0 0 0 2px rgba(7, 13, 24, 0.7);
+}
+
+#settingsView .settings-pill-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #edf3ff;
+  letter-spacing: 0;
+}
+
+#settingsView .settings-pill-signout {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: rgba(157, 178, 216, 0.95);
+  background: rgba(18, 31, 52, 0.78);
+  border: 1px solid rgba(97, 124, 165, 0.34);
+}
+
+#settingsView .settings-pill-signout .settings-icon {
+  width: 17px;
+  height: 17px;
+}
+
+#settingsView .settings-account-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(16, 28, 47, 0.9);
+  border-color: rgba(85, 116, 158, 0.32);
+  color: rgba(166, 185, 220, 0.82);
+}
+
+#settingsView .settings-card {
+  border-radius: 14px;
+  padding: 8px 10px 9px;
+  gap: 6px;
+  background: linear-gradient(135deg, rgba(10, 24, 42, 0.94), rgba(8, 18, 32, 0.96));
+  border: 1px solid rgba(69, 100, 138, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 12px 34px rgba(0, 0, 0, 0.24);
+}
+
+#settingsView .settings-card--preferences {
+  padding-bottom: 6px;
+}
+
+#settingsView .settings-head {
+  min-height: 24px;
+  gap: 8px;
+  padding: 0 0 5px;
+  border-bottom: 1px solid rgba(100, 130, 171, 0.18);
+}
+
+#settingsView .settings-head-icon .settings-icon {
+  width: 16px;
+  height: 16px;
+}
+
+#settingsView .settings-head-title {
+  font-size: 10.8px;
+  letter-spacing: 0.08em;
+  color: rgba(158, 177, 213, 0.82);
+}
+
+#settingsView .settings-head-pill {
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 9px;
+  border-radius: 8px;
+  font-size: 10.5px;
+  color: rgba(188, 202, 232, 0.92);
+  background: rgba(21, 33, 55, 0.92);
+  border: 1px solid rgba(95, 123, 163, 0.38);
+}
+
+#settingsView .settings-view-inner > .settings-head {
+  padding: 0;
+}
+
+#settingsView .settings-card .settings-toggle-list {
+  gap: 0;
+}
+
+#settingsView .settings-card .settings-toggle-row {
+  min-height: 42px;
+  padding: 5px 2px;
+  gap: 10px;
+  border-radius: 0 !important;
+  border-bottom: 1px solid rgba(100, 130, 171, 0.14) !important;
+  background: transparent !important;
+}
+
+#settingsView .settings-card .settings-toggle-row::before {
+  display: none;
+}
+
+#settingsView .settings-card .settings-toggle-row:hover {
+  padding-left: 0;
+  background: rgba(79, 195, 247, 0.035) !important;
+}
+
+#settingsView .settings-toggle-icon-wrap {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: #24c7ff;
+  background: rgba(14, 27, 47, 0.86);
+  border: 1px solid rgba(82, 111, 153, 0.46);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+#settingsView .settings-toggle-icon-svg {
+  width: 17px;
+  height: 17px;
+}
+
+#settingsView .settings-toggle-title {
+  font-size: 12.4px;
+  font-weight: 700;
+  color: #f0f4ff;
+}
+
+#settingsView .settings-toggle-subtitle {
+  font-size: 10.8px;
+  line-height: 1.25;
+  color: rgba(157, 174, 210, 0.92);
+}
+
+#settingsView .settings-toggle-control {
+  width: 32px;
+  height: 18px;
+  border-color: rgba(83, 111, 153, 0.46);
+  background: rgba(13, 25, 43, 0.98);
+}
+
+#settingsView .settings-toggle-control::after {
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  background: #93a4c6;
+}
+
+#settingsView .settings-toggle-row[data-enabled="true"] .settings-toggle-control {
+  background: linear-gradient(135deg, rgba(39, 188, 255, 0.9), rgba(31, 151, 213, 0.9));
+  border-color: rgba(70, 207, 255, 0.85);
+}
+
+#settingsView .settings-toggle-row[data-enabled="true"] .settings-toggle-control::after {
+  transform: translateX(14px);
+  background: #f5fbff;
+}
+
+#settingsView .settings-connections-card {
+  gap: 6px;
+}
+
+#settingsView .settings-connections-mount {
+  min-width: 0;
+}
+
+#settingsView .settings-connections-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 23px;
+  padding: 0 9px;
+  border-radius: 9px;
+  border: 1px solid rgba(76, 175, 130, 0.32);
+  background: rgba(76, 175, 130, 0.1);
+  color: #7be0ac;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+#settingsView .settings-connections-status-pill::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4caf82;
+  box-shadow: 0 0 0 3px rgba(76, 175, 130, 0.16);
+}
+
+#settingsView #anilistCard {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+#settingsView #anilistCard .anilist-head {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  margin: 0 0 5px;
+}
+
+#settingsView #anilistCard .anilist-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+#settingsView #anilistCard .anilist-head-name {
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+#settingsView #anilistCard .anilist-head-sub {
+  font-size: 11px;
+  color: rgba(157, 174, 210, 0.92);
+}
+
+#settingsView #anilistCard .anilist-pill {
+  min-height: 23px;
+  padding: 0 9px;
+  border-radius: 9px;
+  font-size: 10.5px;
+}
+
+#settingsView #anilistCard .anilist-progress {
+  height: 4px;
+  margin: 1px 4px 5px;
+  background: rgba(73, 96, 133, 0.32);
+}
+
+#settingsView #anilistCard .anilist-status {
+  position: relative;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 5px 10px 5px 24px;
+  margin: 0 0 6px;
+  border: 1px solid rgba(47, 183, 255, 0.24);
+  border-radius: 9px;
+  background: linear-gradient(135deg, rgba(47, 183, 255, 0.09), rgba(76, 175, 130, 0.055));
+  color: rgba(181, 205, 238, 0.94);
+  font-size: 10.5px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+#settingsView #anilistCard .anilist-status:empty {
+  display: none;
+}
+
+#settingsView #anilistCard .anilist-status--inline {
+  justify-self: end;
+  max-width: 205px;
+  min-height: 24px;
+  margin: 0 8px 0 0;
+  padding: 4px 9px 4px 22px;
+  font-size: 10px;
+}
+
+#settingsView #anilistCard .anilist-status::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #24c7ff;
+  transform: translateY(-50%);
+  box-shadow: 0 0 0 3px rgba(47, 183, 255, 0.13);
+}
+
+#settingsView #anilistCard .anilist-status[data-kind="ok"],
+#settingsView #anilistCard .anilist-status[data-kind="err"],
+#settingsView #anilistCard .anilist-status[data-kind="warn"] {
+  padding: 5px 10px 5px 24px;
+  border: 1px solid rgba(76, 175, 130, 0.28);
+  background: linear-gradient(135deg, rgba(76, 175, 130, 0.12), rgba(47, 183, 255, 0.045));
+  color: #a9e8c5;
+}
+
+#settingsView #anilistCard .anilist-status[data-kind="ok"]::before {
+  background: #54df95;
+  box-shadow: 0 0 0 3px rgba(76, 175, 130, 0.16);
+}
+
+#settingsView #anilistCard .anilist-status[data-kind="err"] {
+  border-color: rgba(255, 107, 107, 0.3);
+  background: linear-gradient(135deg, rgba(255, 107, 107, 0.12), rgba(64, 22, 34, 0.18));
+  color: #ffacac;
+}
+
+#settingsView #anilistCard .anilist-status[data-kind="err"]::before {
+  background: #ff6b6b;
+  box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.15);
+}
+
+#settingsView #anilistCard .anilist-status[data-kind="warn"] {
+  border-color: rgba(255, 193, 87, 0.3);
+  background: linear-gradient(135deg, rgba(255, 193, 87, 0.12), rgba(64, 48, 22, 0.16));
+  color: #ffd99a;
+}
+
+#settingsView #anilistCard .anilist-status[data-kind="warn"]::before {
+  background: #ffc157;
+  box-shadow: 0 0 0 3px rgba(255, 193, 87, 0.15);
+}
+
+#settingsView #anilistCard .anilist-actions-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) auto;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+}
+
+#settingsView #anilistCard .anilist-btn {
+  min-height: 29px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+#settingsView #anilistCard .anilist-btn--sync {
+  background: rgba(33, 169, 239, 0.1);
+  border-color: rgba(33, 169, 239, 0.46);
+  color: #22c7ff;
+}
+
+#settingsView #anilistCard .anilist-btn--ghost {
+  background: rgba(8, 15, 28, 0.22);
+  border-color: rgba(98, 121, 160, 0.28);
+  color: #edf3ff;
+}
+
+#settingsView #anilistCard .anilist-collapsible {
+  width: auto;
+  grid-column: auto;
+  margin: 0 2px 0 auto;
+  justify-self: end;
+  transition: margin 0.18s ease, width 0.18s ease, opacity 0.18s ease;
+}
+
+#settingsView #anilistCard .anilist-collapsible[open] {
+  width: 100%;
+  grid-column: 1 / -1;
+  justify-self: stretch;
+  margin: 1px 0 0;
+}
+
+#settingsView #anilistCard .anilist-collapsible summary {
+  gap: 8px;
+  padding: 4px 1px 4px 8px;
+  color: rgba(160, 178, 214, 0.9);
+  font-size: 10.5px;
+  width: fit-content;
+  margin-left: auto;
+  transition: color 0.16s ease, transform 0.18s ease;
+}
+
+#settingsView #anilistCard .anilist-collapsible[open] summary {
+  margin-left: auto;
+  width: fit-content;
+}
+
+#settingsView #anilistCard .anilist-collapsible-arrow {
+  border-left-width: 6px;
+  border-top-width: 5px;
+  border-bottom-width: 5px;
+}
+
+#settingsView #anilistCard .anilist-collapsible-body {
+  position: static;
+  z-index: auto;
+  margin-top: 5px;
+  padding: 9px;
+  border-radius: 10px;
+  border: 1px solid rgba(76, 108, 150, 0.45);
+  background: linear-gradient(135deg, rgba(8, 19, 35, 0.92), rgba(10, 23, 40, 0.82));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transform-origin: top center;
+  animation: settings-import-expand 0.18s ease-out both;
+}
+
+#settingsView #anilistCard .anilist-collapsible[open] .anilist-import-row,
+#settingsView #anilistCard .anilist-collapsible[open] .anilist-hint {
+  animation: settings-import-controls-in 0.2s ease-out both;
+}
+
+#settingsView #anilistCard .anilist-collapsible[open] .anilist-hint {
+  animation-delay: 0.04s;
+}
+
+@keyframes settings-import-expand {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scaleY(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+@keyframes settings-import-controls-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #settingsView #anilistCard .anilist-collapsible-body {
+    animation: none;
+  }
+
+  #settingsView #anilistCard .anilist-collapsible[open] .anilist-import-row,
+  #settingsView #anilistCard .anilist-collapsible[open] .anilist-hint {
+    animation: none;
+  }
+}
+
+#settingsView .settings-data-card {
+  gap: 6px;
+}
+
+#settingsView .settings-data-top {
+  gap: 7px;
+}
+
+#settingsView .settings-data-action {
+  min-height: 40px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  background: rgba(13, 25, 43, 0.72);
+  border-color: rgba(76, 108, 150, 0.42);
+}
+
+#settingsView .settings-data-action--primary {
+  background: linear-gradient(135deg, rgba(31, 178, 244, 0.18), rgba(11, 33, 49, 0.78));
+  border-color: rgba(48, 188, 255, 0.66);
+}
+
+#settingsView .settings-data-action .settings-icon {
+  width: 18px;
+  height: 18px;
+}
+
+#settingsView .settings-data-action-title {
+  font-size: 11.5px;
+  letter-spacing: 0;
+}
+
+#settingsView .settings-data-action-subtitle {
+  font-size: 10px;
+  color: rgba(157, 174, 210, 0.9);
+}
+
+#settingsView .settings-backup-card {
+  padding: 8px 9px 8px !important;
+  border-radius: 9px;
+  border: 1px solid rgba(76, 108, 150, 0.36);
+  background: rgba(8, 16, 29, 0.26);
+}
+
+#settingsView .settings-backup-title {
+  font-size: 11.5px;
+}
+
+#settingsView .settings-backup-head {
+  padding: 0 4px 2px;
+}
+
+#settingsView .settings-backup-sub {
+  font-size: 10.5px;
+  color: rgba(157, 174, 210, 0.88);
+}
+
+#settingsView .settings-btn-outline {
+  min-height: 29px;
+  border-radius: 8px;
+  background: rgba(11, 20, 36, 0.34);
+  border-color: rgba(102, 126, 166, 0.34);
+  font-size: 11px;
+}
+
+#settingsView .settings-card--pw {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+#settingsView .settings-card--password[hidden] {
+  display: none !important;
+}
+
+#settingsView .settings-danger-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+}
+
+#settingsView .settings-danger-row[data-has-password="false"] {
+  grid-template-columns: 1fr;
+}
+
+#settingsView .settings-card--danger {
+  padding: 0;
+  overflow: hidden;
+  border-radius: 11px;
+  background: linear-gradient(135deg, rgba(31, 20, 34, 0.96), rgba(11, 18, 31, 0.96));
+  border: 1px solid rgba(240, 80, 80, 0.74);
+  box-shadow: none;
+}
+
+#settingsView .settings-card--password {
+  width: auto;
+  min-width: 154px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 11px;
+  background: linear-gradient(135deg, rgba(10, 22, 39, 0.96), rgba(8, 16, 29, 0.96));
+  border: 1px solid rgba(105, 132, 176, 0.44);
+  box-shadow: none;
+}
+
+#settingsView .settings-action--full {
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+#settingsView .settings-action--danger {
+  color: #ff7d8c;
+}
+
+#settingsView .settings-action--danger .settings-action-title {
+  color: #ff7d8c;
+}
+
+#settingsView .settings-action--set {
+  color: #b7efd0;
+  background: transparent;
+}
+
+#settingsView .settings-card--password .settings-action {
+  width: auto;
+  min-width: 154px;
+  height: 100%;
+  color: #edf3ff;
+}
+
+#settingsView .settings-action--set .settings-action-title {
+  color: #b7efd0;
+}
+
+#settingsView .settings-action--set .settings-action-subtitle {
+  color: rgba(168, 206, 188, 0.86);
+}
+
+#settingsView .settings-action .settings-icon {
+  width: 20px;
+  height: 20px;
+}
+
+#settingsView .settings-action--danger .settings-icon {
+  color: #ff4f66;
+}
+
+#settingsView .settings-action-title {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+#settingsView .settings-action-subtitle {
+  font-size: 10.5px;
+  color: rgba(157, 174, 210, 0.9);
+}
+
+#settingsView .settings-card--support {
+  padding: 8px 10px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, rgba(48, 29, 58, 0.88), rgba(24, 26, 48, 0.94));
+  border-color: rgba(255, 122, 158, 0.5);
+}
+
+#settingsView .settings-about-title {
+  font-size: 12.5px;
+}
+
+#settingsView .settings-about-note {
+  font-size: 10.5px;
+  color: rgba(172, 187, 220, 0.92);
+}
+
+#settingsView .settings-about-donate {
+  min-height: 34px;
+  padding: 0 15px;
+  border-radius: 10px;
+  font-size: 11.5px;
+}
+
+@media (max-width: 390px) {
+  #settingsView .settings-view-inner {
+    padding: 0 14px;
+  }
+
+  #settingsView .settings-data-top,
+  #settingsView .settings-backup-actions {
+    grid-template-columns: 1fr;
+  }
+
+  #settingsView #anilistCard .anilist-actions-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  #settingsView #anilistCard .anilist-collapsible {
+    grid-column: 1 / -1;
+    justify-self: start;
+    margin-left: 0;
+  }
+
+  #settingsView .settings-danger-actions {
+    grid-template-columns: 1fr;
+  }
+
+  #settingsView .settings-danger-row {
+    grid-template-columns: 1fr;
+  }
+
+  #settingsView .settings-about-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  #settingsView .settings-about-donate {
+    justify-content: center;
+  }
+}
