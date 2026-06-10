@@ -642,46 +642,6 @@ const FirebaseLib = (function () {
     }
   }
 
-  async function setDocument(collection, docId, data, options = {}) {
-    const idToken = await getIdToken();
-    if (!idToken) {
-      const err = new Error("No auth token");
-      err.code = "NO_AUTH";
-      throw err;
-    }
-
-    let url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collection}/${docId}`;
-    if (Array.isArray(options.fields) && options.fields.length > 0) {
-      const mask = options.fields
-        .map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`)
-        .join("&");
-      url += `?${mask}`;
-    }
-
-    const body = JSON.stringify({ fields: jsonToFirestoreFields(data) });
-    const useKeepalive = !!options.keepalive && body.length < 63000;
-
-    const response = await fetchWithTimeout(url, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${idToken}`,
-        "Content-Type": "application/json",
-      },
-      body,
-      keepalive: useKeepalive,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "");
-      const err = new Error(`Firestore set error: ${response.status}`);
-      err.status = response.status;
-      err.body = errorText;
-      throw err;
-    }
-
-    return true;
-  }
-
   const _fsCodec =
     (typeof window !== "undefined" && window.AnimeTrackerFirestoreCodec) ||
     null;
@@ -692,9 +652,6 @@ const FirebaseLib = (function () {
     if (!_fsCodec || !doc?.fields) return {};
     return _fsCodec.decodeFields(doc.fields);
   };
-  const jsonToFirestoreFields = (obj) =>
-    _fsCodec ? _fsCodec.encodeFields(obj) : {};
-
   async function _identityToolkitPost(path, body) {
     const url = `https://identitytoolkit.googleapis.com/v1/${path}?key=${API_KEY}`;
     let response, data;
@@ -987,7 +944,6 @@ const FirebaseLib = (function () {
     signOut,
     onAuthStateChanged,
     getDocument,
-    setDocument,
 
     getIdToken,
     isReauthNeeded,

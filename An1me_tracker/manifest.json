@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "An1me.to Tracker",
-  "version": "6.8.1",
+  "version": "6.8.2",
   "description": "Track your anime watching progress on an1me.to with cloud sync across all browsers",
   "author": "ThomasThanos",
   "permissions": [
@@ -21,7 +21,9 @@
     "https://graphql.anilist.co/*",
     "https://www.animefillerlist.com/*",
     "https://api.jikan.moe/*",
-    "https://api.aniskip.com/*"
+    "https://api.aniskip.com/*",
+    "https://myanimelist.net/*",
+    "https://cdn.myanimelist.net/*"
   ],
   "action": {
     "default_popup": "popup.html",

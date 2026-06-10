@@ -220,7 +220,6 @@ function pruneDeletedAnime(deletedAnime) {
 
 
 const DAILY_CLEANUP_ALARM = 'dailyCleanup';
-const DAILY_CLEANUP_USAGE_THRESHOLD = 0.70;
 const DAILY_CLEANUP_TARGET = 0.70;
 const QUOTA_BYTES_BG = 10 * 1024 * 1024;
 
@@ -698,6 +697,9 @@ async function getFirebaseToken() {
 }
 
 let _bgRefreshInflight = null;
+// Set when the popup signs out — blocks an in-flight token refresh from silently
+// re-writing firebase_tokens and restoring the session. Lifted on the next sign-in.
+let _bgSignedOut = false;
 
 
 
@@ -769,6 +771,13 @@ async function refreshFirebaseToken(refreshToken) {
 
 
 
+
+        // Guard against a sign-out during an in-flight refresh: re-writing
+        // firebase_tokens here would silently restore the session the user just left.
+        if (_bgSignedOut || !(await bgStorageGet(['firebase_tokens'])).firebase_tokens) {
+            dlog('[BG] Token refresh finished after sign-out — discarding refreshed tokens');
+            return { tokens: null, permanent: false, error: 'signed_out' };
+        }
 
         const tokensHelper = self.AnimeTrackerAuthTokens;
         if (tokensHelper) {
@@ -1868,6 +1877,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     if (Object.prototype.hasOwnProperty.call(changes, 'firebase_user')) {
         const newUid = changes.firebase_user?.newValue?.uid || null;
         const oldUid = changes.firebase_user?.oldValue?.uid || null;
+        if (newUid) _bgSignedOut = false;   // a fresh sign-in lifts the sign-out guard
         if (newUid !== oldUid) {
             invalidateBgCloudDocCache();
         }
@@ -2325,11 +2335,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
 
     if (message.type === 'SIGNED_OUT') {
-
-
-
+        _bgSignedOut = true;
         invalidateBgCloudDocCache();
-        clearAuthAndSyncAlarms()
+        // Belt-and-suspenders: make sure the session is really gone even if the popup's
+        // own removal didn't persist (e.g. it was killed mid-sign-out on mobile).
+        Promise.all([
+            bgStorageRemove(['firebase_tokens', 'firebase_user']),
+            clearAuthAndSyncAlarms()
+        ])
             .then(() => sendResponse({ ok: true }))
             .catch((e) => sendResponse({ ok: false, error: e?.message }));
         return true;
@@ -2679,27 +2692,6 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 
 
-
-async function clearMetadataCachesOnce() {
-    try {
-        const all = await new Promise((resolve, reject) => {
-            chrome.storage.local.get(null, (result) => {
-                if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-                else resolve(result || {});
-            });
-        });
-        const keysToClear = Object.keys(all).filter((k) =>
-            k.startsWith('animeinfo_') || k.startsWith('episodeTypes_')
-        );
-        if (keysToClear.length === 0) return;
-        await bgStorageRemove(keysToClear);
-        invalidateBgCloudDocCache();
-        dlog(`[BG] Wiped ${keysToClear.length} metadata cache entries for post-update refresh`);
-    } catch (e) {
-        console.warn('[BG] clearMetadataCachesOnce failed:', e);
-        throw e;
-    }
-}
 
 chrome.runtime.onStartup.addListener(() => {
     dlog('[Anime Tracker] Extension started');

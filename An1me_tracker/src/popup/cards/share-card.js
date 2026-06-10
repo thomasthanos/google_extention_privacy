@@ -22,16 +22,30 @@
     function loadImg(url) {
         return new Promise(resolve => {
             if (!url) return resolve(null);
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
+            const timer = setTimeout(() => resolve(null), 6000);
+            const finish = (result) => { clearTimeout(timer); resolve(result); };
 
+            // CORS image (works for hosts that send CORS headers, e.g. AniList).
+            const viaCrossOrigin = () => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => finish(img);
+                img.onerror = () => finish(null);
+                img.src = url;
+            };
 
-
-
-            const timer = setTimeout(() => resolve(null), 4000);
-            img.onload = () => { clearTimeout(timer); resolve(img); };
-            img.onerror = () => { clearTimeout(timer); resolve(null); };
-            img.src = url;
+            // Preferred: privileged extension fetch → object URL. Bypasses CORS for hosts
+            // in host_permissions (e.g. myanimelist.net) and object URLs don't taint the
+            // canvas — so MAL covers can be drawn. Falls back to a CORS image otherwise.
+            fetch(url, { cache: 'force-cache' })
+                .then(r => (r.ok ? r.blob() : Promise.reject(new Error('http ' + r.status))))
+                .then(blob => {
+                    const img = new Image();
+                    img.onload = () => finish(img);
+                    img.onerror = () => viaCrossOrigin();
+                    img.src = URL.createObjectURL(blob);
+                })
+                .catch(() => viaCrossOrigin());
         });
     }
 
@@ -496,15 +510,9 @@
 
 
 
-        const finalCanvas = document.createElement('canvas');
-        finalCanvas.width = OUT_W;
-        finalCanvas.height = OUT_H;
-        const finalCtx = finalCanvas.getContext('2d');
-        finalCtx.imageSmoothingEnabled = true;
-        finalCtx.imageSmoothingQuality = 'high';
-        finalCtx.drawImage(canvasHi, 0, 0, RENDER_W, RENDER_H, 0, 0, OUT_W, OUT_H);
-
-        return finalCanvas;
+        // Export at the full supersampled resolution (RENDER_W × RENDER_H = 2400×1260,
+        // i.e. 2× the old 1200×630) for a sharper, higher-resolution image — no downscale.
+        return canvasHi;
     }
 
     function _toast(msg, type) {
@@ -517,29 +525,23 @@
     async function generateAndOpen(animeData, index) {
         try {
             const canvas = await render(animeData, index);
-            const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-            if (!blob) { _toast('Could not generate share card.', 'error'); return; }
-            const url = URL.createObjectURL(blob);
-            let clipboardCopied = false;
+            const dataUrl = canvas.toDataURL('image/png');
+            if (!dataUrl || dataUrl === 'data:,') { _toast('Could not generate share card.', 'error'); return; }
+            const fileName = `anime-tracker-${new Date().toISOString().slice(0, 10)}.png`;
+
+            // Open the card in the extension's own local viewer page — a stable
+            // chrome-extension:// URL, full size, no server and no random blob: link.
             try {
-                if (navigator.clipboard?.write && window.ClipboardItem) {
-                    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-                    clipboardCopied = true;
-                }
+                const store = chrome.storage.session || chrome.storage.local;
+                await store.set({ _shareCardView: { dataUrl, fileName, ts: Date.now() } });
+                const viewUrl = chrome.runtime.getURL('src/share/view.html');
+                if (chrome?.tabs?.create) chrome.tabs.create({ url: viewUrl });
+                else window.open(viewUrl, '_blank');
             } catch (e) {
-                try { window.PopupLogger?.debug?.('ShareCard', 'Clipboard copy unavailable:', e?.message || e); } catch {}
-            }
-            if (clipboardCopied) {
-                try { _toast('Card image copied to clipboard', 'success', 1500); } catch {}
-            }
-            try {
-                chrome?.tabs?.create ? chrome.tabs.create({ url }) : window.open(url, '_blank');
-            } catch {
-                const a = Object.assign(document.createElement('a'), {
-                    href: url,
-                    download: `anime-tracker-${new Date().toISOString().slice(0, 10)}.png`
-                });
+                try { window.PopupLogger?.warn?.('ShareCard', 'Could not open viewer, saving instead:', e?.message || e); } catch {}
+                const a = Object.assign(document.createElement('a'), { href: dataUrl, download: fileName });
                 document.body.appendChild(a); a.click(); a.remove();
+                _toast('Card image saved', 'success');
             }
         } catch (e) {
             (window.PopupLogger || console).error?.('ShareCard', e);

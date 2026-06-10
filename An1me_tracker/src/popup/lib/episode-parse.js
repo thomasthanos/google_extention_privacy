@@ -87,7 +87,6 @@
 
 
     function renderEpisodesPreview(input) {
-        const fillerLabel = document.getElementById('includeFillerLabel');
         const includeFillerText = document.getElementById('includeFillerText');
         const counter = document.getElementById('episodesCounter');
         const counterText = document.getElementById('episodesCounterText');

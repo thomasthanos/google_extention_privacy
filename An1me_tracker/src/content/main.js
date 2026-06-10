@@ -581,7 +581,7 @@
 
     // Episode-list highlighting lives in content/player/episode-highlight.js
     const {
-        getBaseSlug, clearHighlightStorageListener, highlightWatchedEpisodes, injectEpisodeBadgeStyles, decorateCurrentEpisode, highlightFillerEpisodes, detectPageMaxEpisode, bumpLatestEpisodeFromPage
+        getBaseSlug, clearHighlightStorageListener, highlightWatchedEpisodes, injectEpisodeBadgeStyles, decorateCurrentEpisode, highlightFillerEpisodes, bumpLatestEpisodeFromPage
     } = AT.EpisodeHighlight;
 
     async function init() {

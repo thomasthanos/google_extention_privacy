@@ -6,7 +6,6 @@
     const AT = window.AnimeTracker;
 
     const { AnimeStatus, getStatus: getAnimeStatus, isCompleted: isAnimeCompleted } = AT.StatusService;
-    const { inlineConfirm: showInlineConfirm } = AT.Dialogs;
     const { deleteAnime } = AT.AnimeActions;
     const { editAnimeTitle } = AT.AddAnimeDialog;
 

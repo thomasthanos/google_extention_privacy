@@ -716,23 +716,6 @@
         }
     }
 
-    async function fetchFillerForAnime(slug, btn) {
-        const { FillerService } = AT;
-        if (btn) { btn.disabled = true; btn.textContent = '...'; }
-        try {
-            const episodeTypes = await FillerService.fetchEpisodeTypes(slug);
-            if (episodeTypes) {
-                FillerService.updateFromEpisodeTypes(slug, episodeTypes);
-                renderAnimeList(elements.searchInput?.value || '');
-                updateStats();
-            }
-        } catch (error) {
-            PopupLogger.error('FetchFiller', 'Error:', error);
-        } finally {
-            if (btn) { btn.disabled = false; btn.textContent = '🎭'; }
-        }
-    }
-
     AT.AddAnimeDialog = {
         _init(d) {
             elements = d.elements;

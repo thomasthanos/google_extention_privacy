@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Anime Tracker — Share Card</title>
+    <style>
+        :root { color-scheme: dark; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; min-height: 100vh;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 14px; padding: 14px;
+            background: radial-gradient(1200px 600px at 50% -10%, #131a2b 0%, #0a0e17 60%);
+            color: #e8edf8;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        }
+        img#card {
+            max-width: 100%; max-height: 88vh;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
+        }
+        .actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        .btn {
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 11px 20px; font-size: 14px; font-weight: 600;
+            border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.14);
+            background: rgba(255, 255, 255, 0.06); color: #e8edf8;
+            cursor: pointer; text-decoration: none; transition: all 0.15s ease;
+        }
+        .btn:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.24); transform: translateY(-1px); }
+        .btn--primary { background: #4fc3f7; border-color: #4fc3f7; color: #04121d; }
+        .btn--primary:hover { filter: brightness(1.08); }
+        .empty { font-size: 15px; color: #6b7694; }
+    </style>
+</head>
+<body>
+    <img id="card" alt="Your anime stats card" hidden>
+    <div class="empty" id="empty" hidden>Nothing to show — generate a card from the extension.</div>
+    <div class="actions" id="actions" hidden>
+        <a class="btn btn--primary" id="save" download>Save image</a>
+        <button class="btn" id="copy" type="button">Copy</button>
+    </div>
+    <script src="view.js"></script>
+</body>
+</html>

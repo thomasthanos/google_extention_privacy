@@ -335,6 +335,10 @@ const AnimeCardRenderer = {
             <div class="meta-time-row">
                 <span class="meta-time">${timeAgoText}</span>
                 ${inlineEtaHtml}
+                <span class="meta-time-progress" title="${Math.round(canonProgressWidth)}% watched">
+                    <span class="meta-time-progress-bar" aria-hidden="true"><span class="meta-time-progress-fill" style="width:${canonProgressWidth}%"></span></span>
+                    <span class="meta-time-progress-pct">${Math.round(canonProgressWidth)}%</span>
+                </span>
             </div>`;
 
         return `
@@ -349,7 +353,6 @@ const AnimeCardRenderer = {
                         ${metaRowHtml}
                     </div>
                 </div>
-                <div class="anime-card-progress" aria-hidden="true"><span class="anime-card-progress-fill" style="width:${canonProgressWidth}%"></span></div>
                 <div class="anime-card-content">
                     <div class="progress-container header-progress">
                         <div class="progress-info">

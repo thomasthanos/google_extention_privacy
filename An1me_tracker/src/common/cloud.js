@@ -71,26 +71,8 @@ const firebaseConfig = {
     }
 
 
-    function isTransientNetworkError(err) {
-        if (!err) return false;
-        if (err.isTimeout) return true;
-        const name = String(err.name || '').toLowerCase();
-        if (name === 'aborterror' || name === 'timeouterror' || name === 'typeerror') return true;
-        const msg = String(err.message || err).toLowerCase();
-        return (
-            msg.includes('failed to fetch') ||
-            msg.includes('network') ||
-            msg.includes('offline') ||
-            msg.includes('aborted') ||
-            msg.includes('timeout') ||
-            msg.includes('timed out') ||
-            msg.includes('load failed')
-        );
-    }
-
     const api = Object.freeze({
         classify,
-        isTransientNetworkError,
         PERMANENT_REFRESH_ERRORS
     });
 

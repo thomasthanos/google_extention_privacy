@@ -191,8 +191,8 @@
 
     // Add/edit-anime dialogs live in src/popup/app/add-anime-dialog.js
     const {
-        showAddAnimeDialog, onSlugInputChange, hideAddAnimeDialog, syncWatchlistFromPopup,
-        addAnimeWithEpisodes, showEditTitleDialog, hideEditTitleDialog, saveEditedTitle,
+        showAddAnimeDialog, onSlugInputChange, hideAddAnimeDialog,
+        addAnimeWithEpisodes, hideEditTitleDialog, saveEditedTitle,
         editAnimeTitle, fetchFillerForAnime
     } = AT.AddAnimeDialog;
 
@@ -203,18 +203,16 @@
     } = AT.AnimeActions;
 
     // Render pipeline lives in src/popup/app/render-list.js
-    const {
-        captureExpansionState, restoreExpansionState, renderEntryGroupsHtml, renderCompactSectionHtml, partitionEntriesByStatus, buildLatestActivityMap, attachSlugIndex, renderAnimeList, refreshCompactChevrons, installCardEventListeners, setupCardEventListeners
-    } = AT.RenderList;
+    const { renderAnimeList } = AT.RenderList;
 
     // Metadata-repair lives in src/popup/app/metadata-repair.js
     const {
-        setMetadataRepairStatus, restoreDefaultSyncStatus, scheduleDefaultSyncStatusRestore, applyAnimeInfoCacheChange, applyEpisodeTypesCacheChange, applyMetadataRepairState, syncMetadataRepairStateFromStorage, maybePromptPostUpdateFetch, fetchAllFillers
+        setMetadataRepairStatus, scheduleDefaultSyncStatusRestore, applyAnimeInfoCacheChange, applyEpisodeTypesCacheChange, applyMetadataRepairState, syncMetadataRepairStateFromStorage, maybePromptPostUpdateFetch, fetchAllFillers
     } = AT.MetadataRepair;
 
     // Stats / goals / views live in src/popup/app/stats-views.js
     const {
-        updateStats, loadGoalAndBadgeState, persistBadgeUnlocks, setViewMode, renderSettingsView, renderGoalsView
+        updateStats, loadGoalAndBadgeState, setViewMode, renderSettingsView, renderGoalsView
     } = AT.StatsViews;
 
     let animeData = {};
@@ -644,9 +642,6 @@
     }
 
     const {
-        AnimeStatus,
-        getStatus: getAnimeStatus,
-        isCompleted: isAnimeCompleted,
         repairAiringCompleted: repairAiringCompletedEntries,
         persistDetectedCompletions
     } = AT.StatusService;
@@ -654,11 +649,6 @@
     const { normalizeMovieDurations, cleanupPhantomMovies, scrubAnilistImportDates } = AT.Maintenance;
 
     function showAuthScreen() {
-        // // Paused auth as requested: immediately bypass login and load local app dashboard
-        // showMainApp(null);
-        // loadData();
-        // return;
-
         elements.authSection.style.display = 'flex';
         elements.mainApp.style.display = 'none';
 
@@ -1253,16 +1243,8 @@
     const {
         parseRanges: parseEpisodeRanges,
         splitCanonAndFillers,
-        extractSlugFromInput,
-        generateTitleFromSlug,
         renderEpisodesPreview: updateEpisodesPreview
     } = AT.EpisodeParse;
-
-    const {
-        setManualListState,
-        markTitleEdited,
-        clearDeletedAnimeSlug
-    } = AT.StatusService;
 
     // Metadata-repair → src/popup/app/metadata-repair.js
 

@@ -1672,39 +1672,55 @@ body {
      already shows the same data with percentages + canon/filler split
    • the Completed list — 100% is implied by the section itself, the bar
      just adds visual noise once the anime is finished. */
-.anime-card-progress {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 0;             /* card's overflow:hidden does the masking */
-  pointer-events: none;
-  overflow: hidden;
-  transition: opacity 0.18s ease
+/* Compact inline watch-progress — lives at the right edge of the meta-time row */
+.meta-time-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;                      /* fill the row from after the ETA to the edge */
+  margin-left: 4px;
+  min-width: 64px
 }
 
-.anime-card.expanded .anime-card-progress,
-.completed-list-cards .anime-card-progress {
-  opacity: 0;
-  visibility: hidden
+/* Hidden once the card is expanded — the detailed bar inside takes over */
+.anime-card.expanded .meta-time-progress {
+  display: none
 }
 
-.anime-card-progress-fill {
+.meta-time-progress-bar {
+  flex: 1;                      /* bar stretches to fill the available space */
+  min-width: 30px;
+  height: 5px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden
+}
+
+.meta-time-progress-fill {
   display: block;
   height: 100%;
-  /* Subtle teal → cyan gradient — gives a hint of motion/depth without
-     screaming for attention. Right edge keeps a small radius so the cyan
-     stop "glides" into the dark track instead of cutting at 90°, like a
-     slider thumb at the leading edge. */
+  border-radius: var(--r-pill);
+  /* Subtle teal → cyan gradient (same accent as before, now rounded). */
   background: linear-gradient(90deg, oklch(0.62 0.11 215) 0%, var(--primary) 100%);
-  border-radius: 0 4px 4px 0;
   transition: width 0.25s ease
 }
 
-.anime-card.in-progress-only .anime-card-progress-fill {
+.meta-time-progress-pct {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 26px;
+  text-align: right
+}
+
+.anime-card.in-progress-only .meta-time-progress-fill {
   background: linear-gradient(90deg, oklch(0.66 0.11 75) 0%, var(--warning) 100%)
+}
+
+.anime-card.in-progress-only .meta-time-progress-pct {
+  color: var(--warning)
 }
 
 .anime-card:hover {

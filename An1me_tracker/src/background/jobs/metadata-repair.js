@@ -9,7 +9,6 @@ const METADATA_REPAIR_INFO_TTL_AIRING_MS = 60 * 60 * 1000;
 const METADATA_REPAIR_EPISODE_TYPES_TTL_MS = 24 * 60 * 60 * 1000;
 const METADATA_REPAIR_NOT_FOUND_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 const METADATA_REPAIR_RETRYABLE_TTL_MS = 15 * 60 * 1000;
-const METADATA_REPAIR_ITEMS_PER_TICK = 3;
 const METADATA_REPAIR_INTER_ITEM_DELAY_MS = 250;
 const METADATA_REPAIR_MAX_LOGS = 60;
 const isMobileUA = typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPad|iPod|Orion/i.test(navigator.userAgent || '');
