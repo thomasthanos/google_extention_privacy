@@ -681,16 +681,17 @@
         card.innerHTML = '<div id="anilistBody"></div>';
 
 
-        const labels = inner.querySelectorAll('.settings-section-label');
-        let connectionsLabel = null;
-        for (const lbl of labels) {
-            if ((lbl.textContent || '').trim().toUpperCase() === 'CONNECTIONS') {
-                connectionsLabel = lbl;
+        const heads = inner.querySelectorAll('.settings-head');
+        let connectionsHead = null;
+        for (const h of heads) {
+            const title = (h.querySelector('.settings-head-title')?.textContent || h.textContent || '').trim().toUpperCase();
+            if (title === 'CONNECTIONS') {
+                connectionsHead = h;
                 break;
             }
         }
-        if (connectionsLabel) {
-            connectionsLabel.insertAdjacentElement('afterend', card);
+        if (connectionsHead) {
+            connectionsHead.insertAdjacentElement('afterend', card);
         } else {
             const danger = inner.querySelector('.settings-card--danger');
             if (danger) inner.insertBefore(card, danger);

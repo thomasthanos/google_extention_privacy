@@ -8203,6 +8203,71 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   line-height: 1.35
 }
 
+/* ─── Settings restyle: card headers, full-width actions, profile row ─── */
+.settings-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 1px 2px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06)
+}
+.settings-head-icon { display: inline-flex; align-items: center; color: var(--cyan) }
+.settings-head-icon .settings-icon { width: 16px; height: 16px }
+.settings-head-title {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--t2)
+}
+.settings-head-pill {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(170, 190, 215, 0.9);
+  background: rgba(79, 195, 247, 0.08);
+  border: 1px solid rgba(79, 195, 247, 0.18);
+  border-radius: 999px;
+  padding: 3px 9px
+}
+/* Standalone heads (Connections / Data Tools) — above their content, no card box */
+.settings-view-inner > .settings-head {
+  border-bottom: none;
+  padding: 12px 6px 1px
+}
+
+/* Full-width action rows — Clear all data / Set password never sit side by side */
+.settings-card--danger,
+.settings-card--pw {
+  padding: 0;
+  border: none;
+  background: none;
+  gap: 0
+}
+.settings-card--pw[hidden] { display: none }
+.settings-action--full {
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: 12px
+}
+.settings-action-arrow {
+  display: inline-flex;
+  align-items: center;
+  color: rgba(160, 175, 200, 0.45);
+  flex-shrink: 0
+}
+.settings-action-arrow .settings-icon { width: 17px; height: 17px }
+.settings-action--danger .settings-action-arrow { color: rgba(255, 138, 138, 0.55) }
+.settings-action--set .settings-action-arrow { color: rgba(120, 220, 170, 0.6) }
+
+/* Profile row: rounded rectangle + rounded-square sign-out (was pill + circle) */
+.settings-account-pill {
+  border-radius: 14px;
+  padding: 8px 8px 8px 9px
+}
+.settings-pill-avatar { width: 34px; height: 34px }
+.settings-pill-signout { border-radius: 9px; width: 34px; height: 34px }
+
 /* Backup card */
 .settings-backup-card {
   padding: 14px 14px 12px !important;

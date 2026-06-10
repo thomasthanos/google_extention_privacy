@@ -24,8 +24,22 @@
         skipFwd:  '<polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/>',
         skipMark: '<polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/>',
         sparkles: '<path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><path d="M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/><circle cx="12" cy="12" r="4"/>',
-        check:    '<polyline points="20 6 9 17 4 12"/>'
+        check:    '<polyline points="20 6 9 17 4 12"/>',
+        gear:     '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+        link:     '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+        database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>',
+        chevron:  '<polyline points="9 18 15 12 9 6"/>'
     };
+
+    // Card header: left icon + uppercase title + optional right pill.
+    function sectionHead(iconKey, title, pill = '') {
+        return `
+            <div class="settings-head">
+                <span class="settings-head-icon">${svg(iconKey)}</span>
+                <span class="settings-head-title">${escapeHtml(title)}</span>
+                ${pill ? `<span class="settings-head-pill">${escapeHtml(pill)}</span>` : ''}
+            </div>`;
+    }
 
     function svg(iconKey, extraClass = '') {
         const paths = ICONS[iconKey];
@@ -66,11 +80,6 @@
                 ${bannerHtml}
             </header>
         `;
-    }
-
-
-    function sectionLabel(text) {
-        return `<div class="settings-section-label">${escapeHtml(text)}</div>`;
     }
 
 
@@ -124,8 +133,8 @@
         ].join('');
 
         return `
-            ${sectionLabel('PREFERENCES')}
             <section class="settings-card">
+                ${sectionHead('gear', 'PREFERENCES', '5 settings')}
                 <div class="settings-toggle-list">${items}</div>
             </section>
         `;
@@ -133,13 +142,13 @@
 
 
     function renderConnectionsSection() {
-        return `${sectionLabel('CONNECTIONS')}`;
+        return sectionHead('link', 'CONNECTIONS');
     }
 
 
     function renderDataSection() {
         return `
-            ${sectionLabel('DATA')}
+            ${sectionHead('database', 'DATA TOOLS')}
             <div class="settings-data-top">
                 <button class="settings-data-action settings-data-action--primary" id="settingsFetchFillers" type="button">
                     ${svg('sparkles')}
@@ -176,33 +185,44 @@
     }
 
 
+    function _setPasswordInner(passwordIsSet) {
+        return passwordIsSet ? `
+            <button class="settings-action settings-action--set settings-action--full" id="settingsSetPassword" type="button">
+                ${svg('check')}
+                <span class="settings-action-text">
+                    <span class="settings-action-title">Password set</span>
+                    <span class="settings-action-subtitle">Tap to update — same email, new password</span>
+                </span>
+                <span class="settings-action-arrow">${svg('chevron')}</span>
+            </button>` : `
+            <button class="settings-action settings-action--full" id="settingsSetPassword" type="button">
+                ${svg('key')}
+                <span class="settings-action-text">
+                    <span class="settings-action-title">Set password for mobile</span>
+                    <span class="settings-action-subtitle">Sign in on Orion / Safari with email + password</span>
+                </span>
+                <span class="settings-action-arrow">${svg('chevron')}</span>
+            </button>`;
+    }
+
     function renderDangerCard(user, passwordIsSet, isMobile) {
-        const setPasswordBtn = (!user || isMobile) ? '' : (passwordIsSet ? `
-                    <button class="settings-action settings-action--set" id="settingsSetPassword" type="button">
-                        ${svg('check')}
-                        <span class="settings-action-text">
-                            <span class="settings-action-title">Password set</span>
-                            <span class="settings-action-subtitle">Tap to update — same email, new password</span>
-                        </span>
-                    </button>` : `
-                    <button class="settings-action" id="settingsSetPassword" type="button">
-                        ${svg('key')}
-                        <span class="settings-action-text">
-                            <span class="settings-action-title">Set password for mobile</span>
-                            <span class="settings-action-subtitle">Sign in on Orion / Safari with email + password</span>
-                        </span>
-                    </button>`);
+        const showSetPw = !(!user || isMobile);
+        // Set-password lives in its OWN full-width card so it never sits beside "Clear all data".
+        const setPwCard = `
+            <section class="settings-card settings-card--pw" id="settingsSetPwCard"${showSetPw ? '' : ' hidden'}>
+                ${showSetPw ? _setPasswordInner(passwordIsSet) : ''}
+            </section>`;
         return `
+            ${setPwCard}
             <section class="settings-card settings-card--danger">
-                <div class="settings-action-grid">
-                    <button class="settings-action settings-action--danger" id="settingsClear" type="button">
-                        ${svg('trash')}
-                        <span class="settings-action-text">
-                            <span class="settings-action-title">Clear all data</span>
-                            <span class="settings-action-subtitle">Delete all tracking data on this device</span>
-                        </span>
-                    </button>${setPasswordBtn}
-                </div>
+                <button class="settings-action settings-action--danger settings-action--full" id="settingsClear" type="button">
+                    ${svg('trash')}
+                    <span class="settings-action-text">
+                        <span class="settings-action-title">Clear all data</span>
+                        <span class="settings-action-subtitle">Delete all tracking data on this device</span>
+                    </span>
+                    <span class="settings-action-arrow">${svg('chevron')}</span>
+                </button>
             </section>
         `;
     }
@@ -305,33 +325,17 @@
         }
 
 
-        const dangerCard = container.querySelector('.settings-card--danger .settings-action-grid');
-        const existingSetPwBtn = dangerCard?.querySelector('#settingsSetPassword');
-        const expectedState = (!user || isMobile) ? 'absent' : (passwordIsSet ? 'set' : 'unset');
-        const currentState = !existingSetPwBtn ? 'absent' :
-            (existingSetPwBtn.classList.contains('settings-action--set') ? 'set' : 'unset');
-        if (dangerCard && expectedState !== currentState) {
-            existingSetPwBtn?.remove();
-            if (expectedState === 'set') {
-                dangerCard.insertAdjacentHTML('beforeend', `
-                    <button class="settings-action settings-action--set" id="settingsSetPassword" type="button">
-                        ${svg('check')}
-                        <span class="settings-action-text">
-                            <span class="settings-action-title">Password set</span>
-                            <span class="settings-action-subtitle">Tap to update — same email, new password</span>
-                        </span>
-                    </button>
-                `);
-            } else if (expectedState === 'unset') {
-                dangerCard.insertAdjacentHTML('beforeend', `
-                    <button class="settings-action" id="settingsSetPassword" type="button">
-                        ${svg('key')}
-                        <span class="settings-action-text">
-                            <span class="settings-action-title">Set password for mobile</span>
-                            <span class="settings-action-subtitle">Sign in on Orion / Safari with email + password</span>
-                        </span>
-                    </button>
-                `);
+        const setPwCard = container.querySelector('#settingsSetPwCard');
+        if (setPwCard) {
+            const showSetPw = !(!user || isMobile);
+            const existingBtn = setPwCard.querySelector('#settingsSetPassword');
+            const expectedState = !showSetPw ? 'absent' : (passwordIsSet ? 'set' : 'unset');
+            const currentState = !existingBtn ? 'absent' :
+                (existingBtn.classList.contains('settings-action--set') ? 'set' : 'unset');
+            if (expectedState !== currentState) {
+                setPwCard.innerHTML = showSetPw ? _setPasswordInner(passwordIsSet) : '';
+                if (showSetPw) setPwCard.removeAttribute('hidden');
+                else setPwCard.setAttribute('hidden', '');
             }
         }
 
