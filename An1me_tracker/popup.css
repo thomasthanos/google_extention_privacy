@@ -232,12 +232,6 @@ body {
   text-transform: uppercase
 }
 
-.jp-subtitle {
-  font-size: 10px;
-  color: var(--t3);
-  margin-top: 6px
-}
-
 .btn-google-primary {
   width: 100%;
   padding: 0;
@@ -410,15 +404,6 @@ body {
   -webkit-user-select: text
 }
 
-.auth-input::placeholder {
-  color: var(--t3)
-}
-
-.auth-input:focus {
-  border-color: rgba(79, 195, 247, 0.3);
-  box-shadow: 0 0 0 3px rgba(79, 195, 247, 0.07)
-}
-
 .auth-input:disabled {
   opacity: 0.55;
   cursor: not-allowed
@@ -461,12 +446,6 @@ body {
   transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.12s ease
 }
 
-.btn-auth-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  filter: brightness(1.12);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset, 0 -1px 0 rgba(0, 0, 0, 0.3) inset, 0 4px 0 #032d44, 0 8px 18px rgba(0, 0, 0, 0.5)
-}
-
 .btn-auth-primary:active:not(:disabled) {
   transform: translateY(2px);
   filter: brightness(0.9);
@@ -500,11 +479,6 @@ body {
   cursor: pointer;
   transition: color var(--tf);
   text-decoration: none
-}
-
-.auth-link:hover:not(:disabled) {
-  color: rgba(79, 195, 247, 0.85);
-  text-decoration: underline
 }
 
 .auth-link:disabled {
@@ -1715,14 +1689,6 @@ body {
   text-align: right
 }
 
-.anime-card.in-progress-only .meta-time-progress-fill {
-  background: linear-gradient(90deg, oklch(0.66 0.11 75) 0%, var(--warning) 100%)
-}
-
-.anime-card.in-progress-only .meta-time-progress-pct {
-  color: var(--warning)
-}
-
 .anime-card:hover {
   border-color: rgba(255, 255, 255, 0.15);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.06)
@@ -1756,7 +1722,6 @@ body.is-suppressing-hover #animeList .anime-season-group:hover,
 body.is-suppressing-hover #animeList .anime-movie-group:hover,
 body.is-suppressing-hover #animeList .ip-card:hover,
 body.is-suppressing-hover #animeList .ip-card.ip-card-untracked:hover,
-body.is-suppressing-hover #animeList .anime-card.in-progress-only:hover,
 body.is-suppressing-hover #animeList .completed-list-cards .anime-card:hover,
 body.is-suppressing-hover #animeList .completed-list-cards .anime-season-group:hover,
 body.is-suppressing-hover #animeList .completed-list-cards .anime-movie-group:hover,
@@ -1768,7 +1733,7 @@ body.is-suppressing-hover #animeList .onhold-list-cards .anime-season-group:hove
 body.is-suppressing-hover #animeList .onhold-list-cards .anime-movie-group:hover,
 body.is-suppressing-hover #animeList .airing-list-cards .anime-card:hover,
 body.is-suppressing-hover #animeList .airing-list-cards .anime-season-group:hover,
-body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover {
+body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover{
   border-color: rgba(255, 255, 255, 0.06) !important;
   border-top-color: rgba(255, 255, 255, 0.06) !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
@@ -1807,10 +1772,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   padding-right: 0;
   gap: 3px;
   box-sizing: border-box
-}
-
-.anime-card.expanded .anime-header-main {
-  padding-right: 56px
 }
 
 .anime-title-row {
@@ -2069,11 +2030,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .anime-card-actions .anime-drop-toggle[data-dropped="true"] {
-  color: #ffc4c8;
-  background: rgba(255, 119, 125, 0.20)
-}
-
-.anime-card-actions .anime-drop-toggle[data-dropped="true"] {
   color: #ffd0d2;
   background: linear-gradient(180deg, rgba(255, 119, 125, 0.24), rgba(255, 119, 125, 0.13));
   border-color: rgba(255, 119, 125, 0.54);
@@ -2268,20 +2224,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .anime-card.expanded .anime-in-progress.collapsed {
-  max-height: 30px;
-  padding: 6px 9px;
-  border-color: rgba(240, 192, 64, 0.22);
-  border-bottom: none
-}
-
-.anime-card.in-progress-only .anime-in-progress {
-  max-height: 200px;
-  opacity: 1;
-  margin-bottom: 7px;
-  padding: 7px 9px
-}
-
-.anime-card.in-progress-only .anime-in-progress.collapsed {
   max-height: 30px;
   padding: 6px 9px;
   border-color: rgba(240, 192, 64, 0.22);
@@ -2900,21 +2842,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   opacity: 1
 }
 
-.anime-card.in-progress-only {
-  border-color: rgba(240, 192, 64, 0.18);
-  background: rgba(240, 192, 64, 0.02)
-}
-
-.anime-card.in-progress-only:hover {
-  border-color: rgba(240, 192, 64, 0.3)
-}
-
-.anime-card.in-progress-only .progress-container {
-  max-height: 80px;
-  opacity: 1;
-  margin-bottom: 8px
-}
-
 .empty-state {
   display: none;
   flex-direction: column;
@@ -2949,15 +2876,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .empty-illustration svg {
   width: 36px;
   height: 36px
-}
-
-/* Legacy alias — old callsites may still reference .empty-icon. */
-.empty-icon {
-  width: 52px;
-  height: 52px;
-  color: var(--t3);
-  margin-bottom: 16px;
-  opacity: 0.3
 }
 
 .empty-state h3 {
@@ -3457,12 +3375,12 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .add-anime-dialog .dialog-actions {
-  padding: 13px 18px 16px;
+  padding: 16px 20px 18px;
   margin: 0;
-  background: rgba(0, 0, 0, 0.2);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  background: linear-gradient(180deg, rgba(10,14,24,0.85) 0%, rgba(8,11,20,0.97) 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
   display: flex;
-  gap: 8px
+  gap: 12px
 }
 
 .form-group {
@@ -3514,14 +3432,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   box-shadow: 0 0 0 3px rgba(240, 69, 69, 0.07)
 }
 
-.form-hint,
-.episodes-hint {
-  display: block;
-  font-size: 10px;
-  color: rgba(130, 160, 190, 0.55);
-  line-height: 1.5
-}
-
 /* ── Add Anime dialog v2 redesign ─────────────────────────────────── */
 
 /* Container — glass-morphism, larger radius, larger max-width.
@@ -3532,21 +3442,22 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
    (flex-shrink:0). max-height keeps the whole dialog within the popup
    viewport so the header is never clipped behind the popup chrome. */
 .add-anime-dialog {
-  width: min(95vw, 380px) !important;
-  max-width: 380px !important;
-  max-height: 85vh;
+  width: min(94vw, 360px) !important;
+  max-width: 360px !important;
+  max-height: 88vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, rgba(22,27,42,0.92) 0%, rgba(15,20,32,0.94) 100%) !important;
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-  border: 1px solid rgba(255,255,255,0.08) !important;
-  border-top-color: rgba(255,255,255,0.14) !important;
+  background: linear-gradient(180deg, rgba(13,18,30,0.96) 0%, rgba(8,11,20,0.98) 100%) !important;
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  border: 1px solid rgba(120,170,235,0.1) !important;
+  border-top-color: rgba(150,190,245,0.16) !important;
   border-radius: var(--r-lg) !important;
   box-shadow:
-    0 24px 60px rgba(0,0,0,0.7),
-    0 0 0 1px rgba(79,195,247,0.04),
-    inset 0 1px 0 rgba(255,255,255,0.04);
+    0 26px 60px rgba(0,0,0,0.78),
+    0 0 44px rgba(47,115,240,0.13),
+    0 0 0 1px rgba(79,150,247,0.06),
+    inset 0 1px 0 rgba(255,255,255,0.05);
   overflow: hidden /* let .dialog-body own the scrolling */
 }
 
@@ -3562,9 +3473,9 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   flex: 0 0 auto;            /* pinned — never shrinks, always visible */
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 20px !important;
-  background: linear-gradient(180deg, rgba(22,27,42,0.96) 0%, rgba(20,25,38,0.94) 100%);
+  gap: 11px;
+  padding: 13px 16px !important;
+  background: linear-gradient(180deg, rgba(16,22,36,0.96) 0%, rgba(11,15,26,0.94) 100%);
   position: relative;
   z-index: 2
 }
@@ -3572,8 +3483,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .add-anime-header::after {
   content: '';
   position: absolute;
-  left: 20px;
-  right: 20px;
+  left: 16px;
+  right: 16px;
   bottom: 0;
   height: 1px;
   background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 30%, rgba(255,255,255,0.08) 70%, transparent 100%)
@@ -3581,18 +3492,42 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .add-anime-header-icon {
   flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
   border-radius: var(--r-sm);
-  background: linear-gradient(135deg, rgba(79,195,247,0.18) 0%, rgba(79,195,247,0.06) 100%);
-  border: 1px solid rgba(79,195,247,0.28);
-  color: var(--cyan);
-  box-shadow: 0 0 14px rgba(79,195,247,0.15)
+  background: linear-gradient(135deg, rgba(79,170,245,0.22) 0%, rgba(47,115,240,0.08) 100%);
+  border: 1.5px solid rgba(90,175,255,0.6);
+  color: #6cc0ff;
+  box-shadow:
+    0 0 18px rgba(60,150,255,0.35),
+    inset 0 0 10px rgba(80,170,255,0.14)
 }
 
 .add-anime-header-icon svg {
+  width: 22px;
+  height: 22px
+}
+
+/* Round, dark, softly-outlined close button (target style) */
+.add-anime-header .dialog-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: var(--t2);
+  align-self: center
+}
+
+.add-anime-header .dialog-close:hover {
+  background: rgba(240,69,69,0.12);
+  border-color: rgba(240,69,69,0.3);
+  color: #f47
+}
+
+.add-anime-header .dialog-close svg {
   width: 14px;
   height: 14px
 }
@@ -3604,20 +3539,20 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .add-anime-header-text h3 {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
   color: var(--t1);
   margin: 0 0 1px 0;
-  letter-spacing: 0
+  letter-spacing: 0.1px
 }
 
 .add-anime-subtitle {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--t2);
   margin: 0;
   line-height: 1.35;
   font-weight: 400;
-  opacity: 0.75
+  opacity: 0.8
 }
 
 /* ── Body — compact rhythm, scrollable middle region ─────────────── */
@@ -3626,9 +3561,9 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   min-height: 0;             /* required for child overflow to engage */
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 14px 18px !important;
+  padding: 14px 16px !important;
   padding-bottom: 14px !important;
-  gap: 10px !important;
+  gap: 14px !important;
   /* Subtle scrollbar so it doesn't dominate the panel visually */
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.12) transparent
@@ -3647,14 +3582,14 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   background: rgba(255,255,255,0.2)
 }
 
-/* Labels — uppercase tracking-wider, muted */
+/* Labels — Title Case, primary text, readable */
 .add-anime-dialog .form-group label {
-  font-size: 10.5px;
+  font-size: 13px;
   font-weight: 700;
-  color: var(--t2);
-  text-transform: uppercase;
-  letter-spacing: 1.1px;
-  margin-bottom: 6px;
+  color: var(--t1);
+  text-transform: none;
+  letter-spacing: 0.1px;
+  margin-bottom: 7px;
   display: flex;
   align-items: baseline;
   gap: 4px
@@ -3662,26 +3597,26 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .add-anime-dialog .form-group input[type="text"] {
   font-size: 13px;
-  padding: 8px 12px;
-  height: 36px;
-  border-radius: var(--r-sm);
-  background: rgba(255,255,255,0.035);
-  border: 1px solid rgba(255,255,255,0.08);
+  padding: 10px 14px;
+  height: 44px;
+  border-radius: var(--r-md);
+  background: rgba(5,9,18,0.55);
+  border: 1px solid rgba(120,170,235,0.16);
   color: var(--t1);
-  transition: all var(--tn);
+  transition: border-color var(--tn), box-shadow var(--tn), background var(--tn);
   font-family: inherit
 }
 
 .add-anime-dialog .form-group input[type="text"]::placeholder {
-  color: rgba(133,147,176,0.5);
-  font-size: 12px
+  color: rgba(133,147,176,0.55);
+  font-size: 12.5px
 }
 
 .add-anime-dialog .form-group input[type="text"]:focus {
   outline: none;
-  border-color: rgba(79,195,247,0.5);
-  background: rgba(79,195,247,0.04);
-  box-shadow: 0 0 0 3px var(--primary-ring)
+  border-color: #4aa6f5;
+  background: rgba(5,9,18,0.7);
+  box-shadow: 0 0 0 3px rgba(74,166,245,0.22), 0 0 18px rgba(74,166,245,0.25)
 }
 
 .add-anime-dialog .form-group input[type="text"].error,
@@ -3689,6 +3624,141 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   border-color: rgba(240,69,69,0.5);
   background: rgba(240,69,69,0.04);
   box-shadow: 0 0 0 3px rgba(240,69,69,0.18)
+}
+
+/* ── Leading icons inside inputs ─────────────────────────────────── */
+.input-leading-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #5aacff;
+  pointer-events: none;
+  z-index: 2;
+  display: grid;
+  place-items: center
+}
+
+.input-leading-icon svg {
+  width: 100%;
+  height: 100%
+}
+
+.episodes-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center
+}
+
+/* High-specificity override so text clears the leading list icon */
+.add-anime-dialog .form-group .episodes-input-wrap input[type="text"].episodes-input {
+  padding-left: 40px
+}
+
+/* Slug input lives in a card: offset its text past the leading link icon */
+.slug-input-wrap .input-leading-icon {
+  color: var(--cyan)
+}
+
+/* ── Per-input helper text ───────────────────────────────────────── */
+.input-helper {
+  display: block;
+  font-size: 11.5px;
+  color: #7c8aa8;
+  line-height: 1.4;
+  margin-top: 6px;
+  white-space: normal
+}
+
+/* ── Boxed example chips ─────────────────────────────────────────── */
+.episodes-examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px
+}
+
+.episodes-examples .examples-label {
+  font-size: 12px;
+  color: #7c8aa8
+}
+
+.example-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid rgba(120,170,235,0.2);
+  border-radius: var(--r-xs);
+  background: rgba(255,255,255,0.025);
+  color: var(--t1);
+  font-size: 11.5px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace
+}
+
+/* ── Primary button: circular plus container ─────────────────────── */
+#confirmAddAnime .btn-icon-circle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #ffffff !important;
+  color: #000000 !important;
+  flex: 0 0 auto;
+  box-shadow: none !important
+}
+
+/* Center the plus inside the circle, thin black strokes */
+#confirmAddAnime .btn-icon-circle .btn-icon-plus {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  stroke: #000000 !important;
+  stroke-width: 2;
+  fill: none !important;
+  background: transparent !important;
+  opacity: 1
+}
+
+/* Kill the spinner/check (and their inner shapes) while idle so no dark disc shows */
+#confirmAddAnime .btn-icon-circle .btn-icon-spinner,
+#confirmAddAnime .btn-icon-circle .btn-icon-check {
+  display: none !important
+}
+
+#confirmAddAnime.btn-with-icon[data-state="loading"] .btn-icon-circle .btn-icon-plus,
+#confirmAddAnime.btn-with-icon[data-state="success"] .btn-icon-circle .btn-icon-plus {
+  display: none
+}
+
+#confirmAddAnime.btn-with-icon[data-state="loading"] .btn-icon-circle .btn-icon-spinner {
+  display: block !important;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  opacity: 1
+}
+
+#confirmAddAnime.btn-with-icon[data-state="success"] .btn-icon-circle .btn-icon-check {
+  display: block !important;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  opacity: 1
 }
 
 .form-hint {
@@ -3710,30 +3780,23 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   color: rgba(180,210,235,0.85)
 }
 
-.form-hint-inline {
-  font-size: 10px;
-  color: var(--t2);
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: 0;
-  opacity: 0.75
-}
-
 /* ── Slug input with inline status indicator (unified card) ──────── */
 .slug-card {
   display: flex;
   align-items: stretch;
   gap: 0;
-  padding: 8px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.015) 100%);
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 10px;
-  transition: border-color var(--tn), background var(--tn)
+  padding: 5px 8px;
+  min-height: 44px;
+  background: rgba(5,9,18,0.55);
+  border: 1px solid rgba(120,170,235,0.2);
+  border-radius: var(--r-md);
+  transition: border-color var(--tn), background var(--tn), box-shadow var(--tn)
 }
 
 .slug-card:focus-within {
-  border-color: rgba(79,195,247,0.4);
-  background: linear-gradient(180deg, rgba(79,195,247,0.04) 0%, rgba(255,255,255,0.015) 100%)
+  border-color: #4aa6f5;
+  background: rgba(5,9,18,0.7);
+  box-shadow: 0 0 0 3px rgba(74,166,245,0.22), 0 0 18px rgba(74,166,245,0.25)
 }
 
 .slug-card[data-has-meta="true"] {
@@ -3790,7 +3853,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
      a card so it shouldn't have its own border. */
   background: transparent !important;
   border: none !important;
-  padding: 4px 32px 4px 4px !important;
+  padding: 8px 32px 8px 38px !important;
   height: auto !important;
   font-size: 13px !important;
   box-shadow: none !important;
@@ -4010,30 +4073,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   width: 100%
 }
 
-.episodes-hint {
-  display: block;
-  font-size: 11px;
-  color: var(--t2);
-  line-height: 1.4;
-  margin-top: 4px;
-  opacity: 0.75;
-  /* Single-line: truncate so long examples never wrap into a second row */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis
-}
-
-.episodes-hint code {
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 10px;
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.06);
-  color: rgba(180,210,235,0.85);
-  font-weight: 500
-}
-
 .ep-chip {
   display: inline-flex;
   align-items: center;
@@ -4074,8 +4113,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   color: var(--purple);
   box-shadow: 0 2px 8px rgba(155,106,255,0.12)
 }
-
-.ep-chip-label { font-weight: 600 }
 
 .ep-chip-sub {
   font-size: 10px;
@@ -4346,13 +4383,13 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 /* ── Footer — pinned, solid background so content doesn't bleed under ── */
 .add-anime-actions {
   flex: 0 0 auto;
-  padding: 10px 20px 12px !important;
+  padding: 13px 16px 15px !important;
   margin: 0;
   display: flex !important;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(180deg, rgba(15,20,32,0.85) 0%, rgba(15,20,32,0.96) 100%);
-  border-top: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(180deg, rgba(10,14,24,0.85) 0%, rgba(8,11,20,0.97) 100%);
+  border-top: 1px solid rgba(255,255,255,0.07);
   box-shadow: 0 -1px 0 rgba(0,0,0,0.3) inset, 0 -8px 16px -10px rgba(0,0,0,0.3);
   position: relative;
   z-index: 2
@@ -4360,44 +4397,36 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .add-anime-actions-buttons {
   display: flex;
-  gap: 8px
-}
-
-.add-anime-actions-buttons {
-  display: flex;
-  gap: 8px;
+  gap: 10px;
   margin-left: auto
 }
 
-.kbd-hint {
-  font-size: 9.5px;
-  color: var(--t2);
-  opacity: 0.38;
+/* Cancel — clean dark outline button, matched height to the primary action */
+#cancelAddAnime.btn-ghost {
+  min-height: 46px;
+  height: 46px;
+  padding: 0 22px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
-  gap: 3px
+  justify-content: center;
+  transition: all var(--tn)
 }
 
-.kbd-hint kbd {
-  display: inline-block;
-  padding: 1px 4px;
-  font-family: inherit;
-  font-size: 9px;
-  font-weight: 600;
-  border-radius: 3px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-bottom-width: 2px;
-  color: rgba(255,255,255,0.55);
-  min-width: 16px;
-  text-align: center
+#cancelAddAnime.btn-ghost:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.2)
 }
 
 /* Hide keyboard hint when there isn't room for it without crowding the
    action buttons. Below 400px the popup is squeezed (mobile side-panel),
    so keep only the buttons visible and let them have full footer width. */
 @media (max-width: 400px) {
-  .kbd-hint { display: none }
   .add-anime-actions-buttons { margin-left: 0; width: 100% }
   .add-anime-actions-buttons .btn { flex: 1 }
   .add-anime-dialog {
@@ -4442,29 +4471,44 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   cursor: not-allowed
 }
 
-.add-anime-dialog .btn-primary {
-  background: linear-gradient(135deg, #4fc3f7 0%, #2196f3 100%);
-  color: #051018;
-  border: none;
+#confirmAddAnime.btn-primary {
+  background: linear-gradient(135deg, #4aa6f5 0%, #2f7cf0 52%, #2563eb 100%);
+  color: #ffffff;
+  border: 1px solid rgba(120,190,255,0.55);
   font-weight: 700;
-  padding: 7px 16px;
-  border-radius: var(--r-sm);
-  font-size: 12px;
-  box-shadow: 0 2px 12px rgba(79,195,247,0.25);
+  min-height: 46px;
+  height: 46px;
+  padding: 0 22px;
+  border-radius: 12px;
+  font-size: 14.5px;
+  letter-spacing: 0.01em;
+  box-shadow:
+    0 4px 16px rgba(47,115,240,0.45),
+    0 0 18px rgba(74,166,245,0.28),
+    inset 0 1px 0 rgba(255,255,255,0.25);
   transition: all var(--tn);
   position: relative
 }
 
-.add-anime-dialog .btn-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow:
-    0 4px 20px rgba(79,195,247,0.45),
-    0 0 0 1px rgba(79,195,247,0.4)
+#confirmAddAnime.btn-with-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px
 }
 
-.add-anime-dialog .btn-primary:active:not(:disabled) {
+#confirmAddAnime.btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+  box-shadow:
+    0 6px 22px rgba(47,115,240,0.6),
+    0 0 26px rgba(74,166,245,0.42),
+    inset 0 1px 0 rgba(255,255,255,0.3)
+}
+
+#confirmAddAnime.btn-primary:active:not(:disabled) {
   transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(79,195,247,0.25)
+  filter: brightness(0.98)
 }
 
 .add-anime-dialog .btn-primary:disabled {
@@ -4535,8 +4579,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   .add-anime-dialog,
   .filler-action-bar,
   .episodes-counter,
-  .slug-detected-hint,
-  .slug-meta {
+  .slug-detected-hint {
     animation: none !important;
     transition: none !important
   }
@@ -6155,11 +6198,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.34, 1.2, 0.64, 1)
 }
 
-.at-toast--visible {
-  opacity: 1;
-  transform: translate(-50%, 0)
-}
-
 .at-toast--leaving {
   opacity: 0;
   transform: translate(-50%, 8px);
@@ -7061,19 +7099,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   line-height: 1.4
 }
 
-.badge-next-up-meta {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end
-}
-
-.badge-next-up-target {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--t2);
-  font-variant-numeric: tabular-nums
-}
-
 /* ─── Goals empty-state banner ──────────────────────────────────────── */
 .goals-empty-banner {
   display: flex;
@@ -7487,10 +7512,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   padding: 8px 12px
 }
 
-.settings-card--danger {
-  border-color: rgba(240, 80, 80, 0.28)
-}
-
 .settings-card--support {
   background:
     radial-gradient(circle at top right, rgba(255, 122, 158, 0.1), transparent 34%),
@@ -7499,91 +7520,10 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   border-color: rgba(255, 255, 255, 0.09)
 }
 
-.settings-card-title {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--t2)
-}
-
 .settings-icon {
   width: 16px;
   height: 16px;
   flex-shrink: 0
-}
-
-/* Account row */
-.settings-account-row {
-  display: flex;
-  align-items: center;
-  gap: 10px
-}
-
-.settings-account-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid var(--b1);
-  flex-shrink: 0
-}
-
-.settings-account-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px
-}
-
-.settings-account-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--t1);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis
-}
-
-.settings-account-email {
-  font-size: 11px;
-  color: var(--t2);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis
-}
-
-.settings-account-uid {
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 10px;
-  color: rgba(160, 175, 200, 0.6);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 4px;
-  padding: 2px 6px;
-  margin-top: 3px;
-  display: inline-block;
-  width: fit-content;
-  max-width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  cursor: pointer;
-  user-select: all;
-  transition: all var(--tf)
-}
-
-.settings-account-uid:hover {
-  background: rgba(79, 195, 247, 0.08);
-  border-color: rgba(79, 195, 247, 0.2);
-  color: var(--cyan)
-}
-
-.settings-account-uid.copied {
-  background: rgba(76, 175, 130, 0.15);
-  border-color: rgba(76, 175, 130, 0.4);
-  color: var(--green)
 }
 
 .settings-account-status {
@@ -7594,29 +7534,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   padding: 4px 8px;
   border-radius: 999px;
   border: 1px solid var(--b1)
-}
-
-.settings-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 8px;
-  cursor: pointer;
-  border: 1px solid var(--b1);
-  background: var(--bg-2);
-  color: var(--t1);
-  transition: background var(--tf), border-color var(--tf)
-}
-
-.settings-btn:hover {
-  background: var(--bg-3)
-}
-
-.settings-btn-secondary {
-  flex-shrink: 0
 }
 
 /* Toggle list */
@@ -7648,23 +7565,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .settings-toggle-row[data-enabled="true"] {
   border-color: rgba(79, 195, 247, 0.42);
   background: rgba(79, 195, 247, 0.06)
-}
-
-.settings-toggle-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: var(--bg-3);
-  color: var(--t2);
-  flex-shrink: 0
-}
-
-.settings-toggle-row[data-enabled="true"] .settings-toggle-icon {
-  background: rgba(79, 195, 247, 0.18);
-  color: var(--cyan)
 }
 
 .settings-toggle-text {
@@ -7718,13 +7618,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .settings-toggle-row[data-enabled="true"] .settings-toggle-control::after {
   transform: translateX(14px);
   background: #fff
-}
-
-/* Action grid */
-.settings-action-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 6px
 }
 
 .settings-action {
@@ -7828,27 +7721,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   gap: 4px
 }
 
-.settings-about-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  width: fit-content;
-  padding: 4px 8px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 122, 158, 0.24);
-  background: rgba(255, 122, 158, 0.08);
-  color: #ff9bbb;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase
-}
-
-.settings-about-badge .settings-icon {
-  width: 13px;
-  height: 13px
-}
-
 .settings-about-title {
   font-size: 13px;
   font-weight: 700;
@@ -7890,21 +7762,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 /* Tighten container — section labels create rhythm so card gap goes down */
 .settings-view-inner {
   gap: 6px !important
-}
-
-/* Section label — 11px uppercase tracking-wider muted, 8px below = mt-3 */
-.settings-section-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: rgba(133, 147, 176, 0.7);
-  margin: 12px 4px 4px;
-  user-select: none
-}
-
-.settings-section-label:first-child {
-  margin-top: 4px
 }
 
 /* Header bar — full-width account pill */
@@ -8237,14 +8094,12 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 /* Full-width action rows — Clear all data / Set password never sit side by side */
-.settings-card--danger,
-.settings-card--pw {
+.settings-card--danger{
   padding: 0;
   border: none;
   background: none;
   gap: 0
 }
-.settings-card--pw[hidden] { display: none }
 .settings-action--full {
   width: 100%;
   padding: 13px 14px;
@@ -8336,11 +8191,10 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 /* Keyboard focus on settings interactive elements */
 .settings-toggle-row:focus-visible,
 .settings-action:focus-visible,
-.settings-btn:focus-visible,
 .settings-data-action:focus-visible,
 .settings-btn-outline:focus-visible,
 .settings-pill-signout:focus-visible,
-.settings-about-donate:focus-visible {
+.settings-about-donate:focus-visible{
   outline: 2px solid rgba(79, 195, 247, 0.7);
   outline-offset: 2px
 }
@@ -8481,317 +8335,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important
   }
-}
-
-
-/* ── In-popup Debug Console ────────────────────────────────────────── */
-.debug-console-overlay {
-  position: fixed;
-  inset: 0;
-  background: #0a0d14;
-  z-index: 99998;
-  display: flex;
-  align-items: stretch;
-  justify-content: stretch;
-  padding: 0;
-  animation: fadeIn 0.18s ease
-}
-
-.debug-console-panel {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: #0a0d14;
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace
-}
-
-.dbg-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 10px 12px;
-  background: linear-gradient(180deg, #1a2030 0%, #0e1218 100%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  flex-shrink: 0
-}
-
-.dbg-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #e8edf8;
-  letter-spacing: 0.2px;
-  font-family: inherit
-}
-
-.dbg-count {
-  color: var(--t2);
-  font-weight: 500;
-  font-size: 12px
-}
-
-.dbg-btn-close {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  color: var(--t1);
-  font-size: 16px;
-  cursor: pointer;
-  transition: all var(--tf);
-  font-family: inherit;
-  flex-shrink: 0
-}
-
-.dbg-btn-close:hover {
-  background: rgba(240, 69, 69, 0.15);
-  border-color: rgba(240, 69, 69, 0.3);
-  color: #ffb3b3
-}
-
-.dbg-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.02);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  flex-shrink: 0
-}
-
-.dbg-filter {
-  flex: 1;
-  min-width: 0;
-  padding: 8px 10px;
-  font-size: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  color: var(--t1);
-  font-family: inherit
-}
-
-.dbg-filter:focus {
-  outline: none;
-  border-color: rgba(79, 195, 247, 0.5);
-  background: rgba(79, 195, 247, 0.04)
-}
-
-.dbg-btn-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 12px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: all var(--tf);
-  font-family: inherit;
-  white-space: nowrap;
-  flex-shrink: 0
-}
-
-.dbg-btn-copy {
-  background: linear-gradient(135deg, #4fc3f7 0%, #2196f3 100%);
-  color: #051018;
-  font-weight: 700;
-  box-shadow: 0 2px 8px rgba(79, 195, 247, 0.25)
-}
-
-.dbg-btn-copy:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(79, 195, 247, 0.4)
-}
-
-.dbg-btn-copy:active {
-  transform: translateY(0)
-}
-
-.dbg-btn-action-success {
-  background: linear-gradient(135deg, var(--green) 0%, #2e9e6a 100%) !important;
-  color: #051018 !important;
-  box-shadow: 0 0 16px rgba(76, 175, 130, 0.45) !important
-}
-
-.dbg-btn-clear {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.1);
-  color: var(--t2)
-}
-
-.dbg-btn-clear:hover {
-  background: rgba(240, 69, 69, 0.1);
-  border-color: rgba(240, 69, 69, 0.3);
-  color: #ffb3b3
-}
-
-.dbg-btn-icon {
-  font-size: 14px
-}
-
-.dbg-list {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  padding: 6px 8px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
-  -webkit-overflow-scrolling: touch
-}
-
-.dbg-empty {
-  text-align: center;
-  color: var(--t2);
-  font-size: 12px;
-  padding: 24px
-}
-
-.dbg-entry {
-  margin-bottom: 4px;
-  padding: 6px 9px;
-  border-radius: 5px;
-  border-left: 2px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.02);
-  font-size: 11px;
-  line-height: 1.45;
-  word-break: break-word;
-  white-space: pre-wrap
-}
-
-.dbg-entry.dbg-lvl-error {
-  border-left-color: #f04545;
-  background: rgba(240, 69, 69, 0.06)
-}
-
-.dbg-entry.dbg-lvl-warn {
-  border-left-color: var(--amber);
-  background: rgba(240, 192, 64, 0.05)
-}
-
-.dbg-entry.dbg-lvl-success {
-  border-left-color: var(--green);
-  background: rgba(76, 175, 130, 0.04)
-}
-
-.dbg-entry.dbg-lvl-debug {
-  opacity: 0.65
-}
-
-.dbg-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 2px;
-  font-size: 10px;
-  color: var(--t2)
-}
-
-.dbg-time {
-  color: rgba(160, 175, 200, 0.6);
-  font-variant-numeric: tabular-nums
-}
-
-.dbg-level {
-  font-weight: 700;
-  font-size: 9.5px;
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--t1);
-  letter-spacing: 0.5px
-}
-
-.dbg-lvl-error .dbg-level { background: rgba(240, 69, 69, 0.25); color: #ffb3b3 }
-.dbg-lvl-warn  .dbg-level { background: rgba(240, 192, 64, 0.22); color: #f5dc8e }
-.dbg-lvl-success .dbg-level { background: rgba(76, 175, 130, 0.22); color: #a3e7c2 }
-
-.dbg-tag {
-  font-weight: 600;
-  color: var(--cyan);
-  font-size: 10px
-}
-
-.dbg-msg {
-  color: var(--t1);
-  font-size: 11px
-}
-
-.dbg-extras {
-  color: rgba(180, 195, 215, 0.6);
-  font-size: 10px;
-  margin-top: 2px;
-  padding-left: 6px;
-  border-left: 1px dashed rgba(255, 255, 255, 0.08)
-}
-
-.dbg-footer {
-  flex-shrink: 0;
-  padding: 6px 10px;
-  font-size: 10px;
-  color: rgba(160, 175, 200, 0.5);
-  background: rgba(0, 0, 0, 0.3);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  font-family: inherit;
-  text-align: center
-}
-
-/* Copy fallback — full-screen textarea for Orion / Safari where
-   navigator.clipboard is blocked. User long-presses + Select all + Copy. */
-.dbg-copy-fallback {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.92);
-  z-index: 99999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px
-}
-
-.dbg-copy-fallback-inner {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: #0a0d14;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  overflow: hidden
-}
-
-.dbg-copy-fallback-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  background: linear-gradient(180deg, #1a2030 0%, #0e1218 100%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 12px;
-  color: var(--t1);
-  flex-shrink: 0
-}
-
-.dbg-copy-fallback textarea {
-  flex: 1 1 auto;
-  width: 100%;
-  border: none;
-  outline: none;
-  background: #0a0d14;
-  color: #c0d4eb;
-  padding: 10px;
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 11px;
-  line-height: 1.5;
-  resize: none;
-  -webkit-user-select: all;
-  user-select: all
 }
 
 /* Settings reference skin */
@@ -9359,13 +8902,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   font-size: 11px;
 }
 
-#settingsView .settings-card--pw {
-  padding: 0;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-}
-
 #settingsView .settings-card--password[hidden] {
   display: none !important;
 }
@@ -9496,10 +9032,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
     grid-column: 1 / -1;
     justify-self: start;
     margin-left: 0;
-  }
-
-  #settingsView .settings-danger-actions {
-    grid-template-columns: 1fr;
   }
 
   #settingsView .settings-danger-row {

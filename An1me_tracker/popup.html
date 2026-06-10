@@ -352,6 +352,13 @@
                         <img class="slug-card-cover" id="slugMetaCover" alt="" />
                         <div class="slug-card-body">
                             <div class="slug-input-wrap" data-status="idle">
+                                <span class="input-leading-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                                    </svg>
+                                </span>
                                 <input type="text" id="animeSlug"
                                     placeholder="e.g., one-piece or https://an1me.to/anime/one-piece"
                                     autocomplete="off" spellcheck="false"
@@ -380,19 +387,34 @@
                             <span class="form-hint slug-detected-hint" id="slugDetectedHint" style="display:none"></span>
                         </div>
                     </div>
+                    <span class="input-helper">Enter an anime slug or full URL from an1me.to</span>
                 </div>
 
                 <!-- ─── Episodes section ──────────────────────────────────── -->
                 <div class="form-group">
                     <label for="episodesWatched">Episodes Watched</label>
-                    <input type="text" id="episodesWatched"
-                        class="episodes-input"
-                        placeholder="e.g. 1-56, 72-90, 113-122"
-                        autocomplete="off" spellcheck="false"
-                        aria-describedby="episodesHint episodesCounter">
-                    <span class="episodes-hint" id="episodesHint">
-                        Examples: <code>5</code> · <code>1-56</code> · <code>1-56, 72-90, 113</code>
-                    </span>
+                    <div class="episodes-input-wrap">
+                        <span class="input-leading-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+                                <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
+                                <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+                            </svg>
+                        </span>
+                        <input type="text" id="episodesWatched"
+                            class="episodes-input"
+                            placeholder="e.g. 1-56, 72-90, 113-122"
+                            autocomplete="off" spellcheck="false"
+                            aria-describedby="episodesHint episodesCounter">
+                    </div>
+                    <span class="input-helper">Enter episode numbers or ranges you've watched</span>
+                    <div class="episodes-examples" id="episodesHint" aria-hidden="true">
+                        <span class="examples-label">Examples:</span>
+                        <span class="example-chip">5</span>
+                        <span class="example-chip">1-56</span>
+                        <span class="example-chip">1-56, 72-90, 113</span>
+                    </div>
                     <!-- Merged filler info + quick chips (populated by main.js) -->
                     <div class="filler-action-bar" id="fillerActionBar" style="display:none"></div>
                     <div class="episodes-counter" id="episodesCounter" style="display:none">
@@ -417,6 +439,7 @@
                 <div class="add-anime-actions-buttons">
                     <button class="btn btn-ghost" id="cancelAddAnime" type="button">Cancel</button>
                     <button class="btn btn-primary btn-with-icon" id="confirmAddAnime" type="button">
+                        <span class="btn-icon-circle" aria-hidden="true">
                         <svg class="btn-icon btn-icon-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
                             <line x1="12" y1="5" x2="12" y2="19" />
@@ -431,6 +454,7 @@
                             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <polyline points="20 6 9 17 4 12" />
                         </svg>
+                        </span>
                         <span class="btn-label">Add Anime</span>
                     </button>
                 </div>
