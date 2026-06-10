@@ -61,8 +61,6 @@
   --warning:           oklch(0.82 0.155 88);    /* ~ #f0c040 */
   --success:           oklch(0.69 0.13 158);    /* ~ #4caf82 */
   --danger:            oklch(0.65 0.21 22);     /* ~ #f04545 */
-  --surface:           var(--bg-1);
-  --surface-elevated:  var(--bg-card);
 
   /* Soft fills (10–12% alpha) for chip backgrounds, hover states, focus rings */
   --primary-soft:      oklch(0.78 0.135 232 / 0.12);
@@ -70,11 +68,8 @@
   --success-soft:      oklch(0.69 0.13 158 / 0.14);
   --danger-soft:       oklch(0.65 0.21 22 / 0.12);
 
-  /* Stronger fills for active chip / selected tab state */
+  /* Stronger fill for active chip / selected tab state */
   --primary-fill:      oklch(0.78 0.135 232 / 0.20);
-  --warning-fill:      oklch(0.82 0.155 88 / 0.22);
-  --success-fill:      oklch(0.69 0.13 158 / 0.22);
-  --danger-fill:       oklch(0.65 0.21 22 / 0.20);
 
   /* Focus ring — translucent halo around inputs/buttons on keyboard nav */
   --primary-ring:      oklch(0.78 0.135 232 / 0.32);
@@ -83,7 +78,6 @@
      Use these instead of magic numbers when adding new layouts. Existing
      code keeps its current spacing — this is opt-in. */
   --gap-card:    10px;   /* card-to-card vertical gap inside lists */
-  --gap-section: 16px;   /* between Stats → Tabs → Search → List rows */
   --pad-h:       18px;   /* horizontal page padding (matches header.18px) */
 
   /* ── Typography stacks (Batch D) ───────────────────────────────────────
@@ -566,7 +560,7 @@ body {
 }
 
 .logo h1 {
-  font-family: 'PROXON', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-size: 22px;
   letter-spacing: 2px;
   background: var(--grad-cyan);
@@ -645,7 +639,7 @@ body {
 }
 
 #statsBar .stat-value {
-  font-family: 'ComicSans', 'Bebas Neue', sans-serif;
+  font-family: var(--font-stat);
   font-size: 24px;
   font-weight: 800;
   line-height: 1;
@@ -1291,18 +1285,32 @@ body {
   user-select: none
 }
 
-.completed-list-section {
+/* ── Collapsible status sections (Completed / Dropped / On-hold / Airing) ──
+   Identical structure across all four; the per-section --lc triplet (R, G, B)
+   drives every tint — border, gradient, label fill, hover, title colour. */
+.completed-list-section { --lc: 76, 175, 130 }
+.dropped-list-section   { --lc: 229, 115, 115 }
+.onhold-list-section    { --lc: 255, 183, 77 }
+.airing-list-section    { --lc: 100, 181, 246 }
+
+.completed-list-section,
+.dropped-list-section,
+.onhold-list-section,
+.airing-list-section {
   display: flex;
   flex-direction: column;
   gap: 0;
   margin-top: 4px;
   border-radius: var(--r-md);
-  border: 1px solid rgba(76, 175, 130, 0.18);
-  background: linear-gradient(180deg, rgba(76, 175, 130, 0.06) 0%, rgba(76, 175, 130, 0.02) 100%);
+  border: 1px solid rgba(var(--lc), 0.18);
+  background: linear-gradient(180deg, rgba(var(--lc), 0.06) 0%, rgba(var(--lc), 0.02) 100%);
   overflow: hidden
 }
 
-.completed-list-label {
+.completed-list-label,
+.dropped-list-label,
+.onhold-list-label,
+.airing-list-label {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1310,34 +1318,49 @@ body {
   padding: 9px 12px;
   cursor: pointer;
   user-select: none;
-  background: rgba(76, 175, 130, 0.04);
+  background: rgba(var(--lc), 0.04);
   transition: background var(--tf)
 }
 
-.completed-list-label:hover {
-  background: rgba(76, 175, 130, 0.1)
+.completed-list-label:hover,
+.dropped-list-label:hover,
+.onhold-list-label:hover,
+.airing-list-label:hover {
+  background: rgba(var(--lc), 0.1)
 }
 
-.completed-list-label-left {
+.completed-list-label-left,
+.dropped-list-label-left,
+.onhold-list-label-left,
+.airing-list-label-left {
   display: flex;
   align-items: baseline;
   gap: 8px
 }
 
-.completed-list-label-title {
+.completed-list-label-title,
+.dropped-list-label-title,
+.onhold-list-label-title,
+.airing-list-label-title {
   font-size: 10px;
   font-weight: 700;
-  color: var(--green);
+  color: rgb(var(--lc));
   letter-spacing: 0.08em;
   transition: color var(--tf)
 }
 
-.completed-list-label-sub {
+.completed-list-label-sub,
+.dropped-list-label-sub,
+.onhold-list-label-sub,
+.airing-list-label-sub {
   font-size: 10px;
   color: var(--t3)
 }
 
-.completed-chevron {
+.completed-chevron,
+.dropped-chevron,
+.onhold-chevron,
+.airing-chevron {
   width: 12px;
   height: 12px;
   color: var(--t3);
@@ -1357,20 +1380,11 @@ body {
   will-change: grid-template-rows
 }
 
-.completed-list-cards {
-  border-top: 1px solid rgba(76, 175, 130, 0.12)
-}
-
-.dropped-list-cards {
-  border-top: 1px solid rgba(229, 115, 115, 0.12)
-}
-
-.onhold-list-cards {
-  border-top: 1px solid rgba(255, 183, 77, 0.12)
-}
-
+.completed-list-cards,
+.dropped-list-cards,
+.onhold-list-cards,
 .airing-list-cards {
-  border-top: 1px solid rgba(100, 181, 246, 0.12)
+  border-top: 1px solid rgba(var(--lc), 0.12)
 }
 
 .completed-list-cards .list-inner,
@@ -1442,168 +1456,6 @@ body {
   border-color: rgba(79, 195, 247, 0.22);
   border-top-color: rgba(79, 195, 247, 0.32);
   box-shadow: var(--s3)
-}
-
-.dropped-list-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  margin-top: 4px;
-  border-radius: var(--r-md);
-  border: 1px solid rgba(229, 115, 115, 0.18);
-  background: linear-gradient(180deg, rgba(229, 115, 115, 0.06) 0%, rgba(229, 115, 115, 0.02) 100%);
-  overflow: hidden
-}
-
-.dropped-list-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 9px 12px;
-  cursor: pointer;
-  user-select: none;
-  background: rgba(229, 115, 115, 0.04);
-  transition: background var(--tf)
-}
-
-.dropped-list-label:hover {
-  background: rgba(229, 115, 115, 0.1)
-}
-
-.dropped-list-label-left {
-  display: flex;
-  align-items: baseline;
-  gap: 8px
-}
-
-.dropped-list-label-title {
-  font-size: 10px;
-  font-weight: 700;
-  color: #e57373;
-  letter-spacing: 0.08em;
-  transition: color var(--tf)
-}
-
-.dropped-list-label-sub {
-  font-size: 10px;
-  color: var(--t3)
-}
-
-.dropped-chevron {
-  width: 12px;
-  height: 12px;
-  color: var(--t3);
-  flex-shrink: 0;
-  transition: transform var(--tn)
-}
-
-.onhold-list-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  margin-top: 4px;
-  border-radius: var(--r-md);
-  border: 1px solid rgba(255, 183, 77, 0.18);
-  background: linear-gradient(180deg, rgba(255, 183, 77, 0.06) 0%, rgba(255, 183, 77, 0.02) 100%);
-  overflow: hidden
-}
-
-.onhold-list-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 9px 12px;
-  cursor: pointer;
-  user-select: none;
-  background: rgba(255, 183, 77, 0.04);
-  transition: background var(--tf)
-}
-
-.onhold-list-label:hover {
-  background: rgba(255, 183, 77, 0.1)
-}
-
-.onhold-list-label-left {
-  display: flex;
-  align-items: baseline;
-  gap: 8px
-}
-
-.onhold-list-label-title {
-  font-size: 10px;
-  font-weight: 700;
-  color: #ffb74d;
-  letter-spacing: 0.08em;
-  transition: color var(--tf)
-}
-
-.onhold-list-label-sub {
-  font-size: 10px;
-  color: var(--t3)
-}
-
-.onhold-chevron {
-  width: 12px;
-  height: 12px;
-  color: var(--t3);
-  flex-shrink: 0;
-  transition: transform var(--tn)
-}
-
-.airing-list-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  margin-top: 4px;
-  border-radius: var(--r-md);
-  border: 1px solid rgba(100, 181, 246, 0.18);
-  background: linear-gradient(180deg, rgba(100, 181, 246, 0.06) 0%, rgba(100, 181, 246, 0.02) 100%);
-  overflow: hidden
-}
-
-.airing-list-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 9px 12px;
-  cursor: pointer;
-  user-select: none;
-  background: rgba(100, 181, 246, 0.04);
-  transition: background var(--tf)
-}
-
-.airing-list-label:hover {
-  background: rgba(100, 181, 246, 0.1)
-}
-
-.airing-list-label-left {
-  display: flex;
-  align-items: baseline;
-  gap: 8px
-}
-
-.airing-list-label-title {
-  font-size: 10px;
-  font-weight: 700;
-  color: #64b5f6;
-  letter-spacing: 0.08em;
-  transition: color var(--tf)
-}
-
-.airing-list-label-sub {
-  font-size: 10px;
-  color: var(--t3)
-}
-
-.airing-chevron {
-  width: 12px;
-  height: 12px;
-  color: var(--t3);
-  flex-shrink: 0;
-  transition: transform var(--tn)
 }
 
 .anime-card {
@@ -1689,11 +1541,6 @@ body {
   text-align: right
 }
 
-.anime-card:hover {
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.06)
-}
-
 /* Hover suppression — applied for ~one mousemove after a click that mutates
    the list (status chip swap, sort change). Without it, whatever card lands
    under a stationary cursor immediately gets `:hover` styling, which looks
@@ -1752,26 +1599,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   opacity: 1;
   margin-top: 10px;
   transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease 0.05s, margin-top 0.3s cubic-bezier(0.4, 0, 0.2, 1)
-}
-
-.anime-card-header {
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  cursor: pointer;
-  gap: 10px;
-  position: relative;
-  min-height: 58px;
-  padding-right: 32px
-}
-
-.anime-header-main {
-  justify-content: center;
-  min-height: 58px;
-  margin-left: 0 !important;
-  padding-right: 0;
-  gap: 3px;
-  box-sizing: border-box
 }
 
 .anime-title-row {
@@ -1841,19 +1668,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   align-items: center;
   gap: 5px;
   overflow: hidden
-}
-
-.anime-title-text {
-  font-family: var(--font-body);
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  max-width: none;
-  font-size: 15px !important;
-  font-weight: 600 !important;
-  letter-spacing: 0
 }
 
 .anime-expand-icon {
@@ -4767,7 +4581,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   color: var(--cyan)
 }
 
-.part-item-content {
+.part-item-content,
+.season-item-content {
   max-height: 0;
   overflow: hidden;
   opacity: 0;
@@ -4875,7 +4690,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   background: rgba(76, 175, 130, 0.08)
 }
 
-.anime-season-group {
+.anime-season-group,
+.anime-movie-group {
   background: #161922;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--r-lg);
@@ -4889,58 +4705,13 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2)
 }
 
-.anime-season-group::before {
-  display: none
-}
-
-.anime-season-group:hover {
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.06)
-}
-
-.anime-season-group:hover::before {
-  opacity: 0
-}
-
-.season-group-header {
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  cursor: pointer;
-  gap: 10px;
-  position: relative;
-  min-height: 58px;
-  padding-right: 32px
-}
-
-.season-header-main,
-.movie-header-main {
-  justify-content: center;
-  min-height: 58px;
-  margin-left: 0 !important;
-  padding-right: 0;
-  gap: 3px;
-  box-sizing: border-box
-}
-
 .season-title-row,
 .movie-title-row {
   min-height: 19px
 }
 
-.season-group-name {
-  font-family: var(--font-body);
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 15px !important;
-  font-weight: 600 !important;
-  letter-spacing: 0
-}
-
-.season-group-actions {
+.season-group-actions,
+.movie-group-actions {
   display: flex;
   align-items: center;
   gap: 3px;
@@ -4951,7 +4722,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   transform: translateY(-50%)
 }
 
-.season-group-expand-icon {
+.season-group-expand-icon,
+.movie-group-expand-icon {
   width: 24px;
   height: 24px;
   color: var(--t3);
@@ -4974,7 +4746,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   color: var(--cyan)
 }
 
-.season-group-content {
+.season-group-content,
+.movie-group-content {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -5013,7 +4786,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   white-space: nowrap
 }
 
-.season-item {
+.season-item,
+.movie-item {
   display: flex;
   flex-direction: column;
   padding: 7px 9px;
@@ -5037,7 +4811,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   min-height: 22px
 }
 
-.season-item-left {
+.season-item-left,
+.movie-item-left {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -5045,7 +4820,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   min-width: 0
 }
 
-.season-status-icon {
+.season-status-icon,
+.movie-status-icon {
   width: 15px;
   height: 15px;
   display: flex;
@@ -5229,14 +5005,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   color: var(--cyan)
 }
 
-.season-item-content {
-  max-height: 0;
-  overflow: hidden;
-  opacity: 0;
-  transition: all var(--tn);
-  margin-top: 0
-}
-
 .season-item.expanded .season-item-content {
   max-height: 280px;
   opacity: 1;
@@ -5285,77 +5053,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .season-episodes::-webkit-scrollbar-thumb {
   background: var(--t3);
   border-radius: 3px
-}
-
-.anime-movie-group {
-  background: #161922;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--r-lg);
-  padding: 10px 12px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  position: relative;
-  overflow: hidden;
-  /* See .anime-card — native virtualization for offscreen items. */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 78px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2)
-}
-
-.anime-movie-group::before {
-  display: none
-}
-
-.anime-movie-group:hover {
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.06)
-}
-
-.anime-movie-group:hover::before {
-  opacity: 0
-}
-
-.movie-group-header {
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  cursor: pointer;
-  gap: 10px;
-  position: relative;
-  min-height: 58px;
-  padding-right: 32px
-}
-
-.movie-group-name {
-  font-family: var(--font-body);
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 15px !important;
-  font-weight: 600 !important;
-  letter-spacing: 0
-}
-
-.movie-group-actions {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  align-self: center;
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%)
-}
-
-.movie-group-expand-icon {
-  width: 24px;
-  height: 24px;
-  color: var(--t3);
-  transition: all var(--tf);
-  display: flex;
-  align-items: center;
-  justify-content: center
 }
 
 .movie-group-expand-icon svg {
@@ -5462,17 +5159,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   padding-right: 56px
 }
 
-.movie-group-content {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 0;
-  overflow: hidden;
-  opacity: 0;
-  margin-top: 0;
-  transition: all var(--tn)
-}
-
 .anime-movie-group.expanded .movie-group-content {
   max-height: min(460px, calc(var(--h) - 220px));
   opacity: 1;
@@ -5498,16 +5184,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   display: flex
 }
 
-.movie-item {
-  display: flex;
-  flex-direction: column;
-  padding: 7px 9px;
-  background: var(--bg-3);
-  border: 1px solid var(--b1);
-  border-radius: var(--r-sm);
-  transition: all var(--tf)
-}
-
 .movie-item:hover {
   background: var(--bg-4);
   border-color: var(--b2)
@@ -5519,26 +5195,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   justify-content: space-between;
   gap: 6px;
   min-height: 22px
-}
-
-.movie-item-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  min-width: 0
-}
-
-.movie-status-icon {
-  width: 15px;
-  height: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  font-weight: bold
 }
 
 .movie-item.not-started .movie-status-icon {
@@ -6198,7 +5854,10 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.34, 1.2, 0.64, 1)
 }
 
-.at-toast--leaving {
+/* Double class so the leaving state out-specifies .at-toast--visible, which
+   lives later in the file and would otherwise win (dismiss never removes
+   the --visible class). */
+.at-toast.at-toast--leaving {
   opacity: 0;
   transform: translate(-50%, 8px);
   transition-duration: 0.16s
@@ -6226,7 +5885,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   transform: translate(-50%, -2px);
   filter: brightness(1.08);
 }
-
 
 .at-toast-icon {
   flex-shrink: 0;
@@ -6481,7 +6139,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .streak-hero-num {
   font-size: 48px;
   font-weight: 800;
-  font-family: 'ComicSans', 'Bebas Neue', sans-serif;
+  font-family: var(--font-stat);
   color: #ff8a5c;
   letter-spacing: 1px;
   line-height: 0.9
@@ -6555,7 +6213,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .stats-tile-value {
   font-size: 22px;
   font-weight: 700;
-  font-family: 'ComicSans', 'Bebas Neue', sans-serif;
+  font-family: var(--font-stat);
   color: var(--t1);
   letter-spacing: 0.5px;
   line-height: 1
@@ -8187,7 +7845,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   height: 14px
 }
 
-
 /* Keyboard focus on settings interactive elements */
 .settings-toggle-row:focus-visible,
 .settings-action:focus-visible,
@@ -8281,8 +7938,12 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   color: #ffd166
 }
 
-/* ─── One-shot status toast (UIHelpers.showToast) ──────────────────────── */
-.at-toast {
+/* ─── One-shot status toast (UIHelpers.showToast) ────────────────────────
+   Plain text-only pill. The rich toast (toasts.js, styled further up) shares
+   the .at-toast class but always contains an .at-toast-icon child, so these
+   rules are scoped with :not(:has(.at-toast-icon)) to keep this older flat
+   design from overriding the rich gradient design via document order. */
+.at-toast:not(:has(.at-toast-icon)) {
   position: fixed;
   bottom: 16px;
   left: 50%;
@@ -8303,22 +7964,25 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   max-width: 80%
 }
 
-.at-toast--visible {
+/* First part serves the rich toast (lower specificity, wins by order over its
+   base); the :not(:has()) part out-specifies the scoped plain base above. */
+.at-toast--visible,
+.at-toast--visible:not(:has(.at-toast-icon)) {
   transform: translate(-50%, 0);
   opacity: 1
 }
 
-.at-toast--leaving {
+.at-toast--leaving:not(:has(.at-toast-icon)) {
   transform: translate(-50%, 14px);
   opacity: 0
 }
 
-.at-toast--success {
+.at-toast--success:not(:has(.at-toast-icon)) {
   border-color: rgba(54, 212, 116, 0.45);
   color: #d4f7e1
 }
 
-.at-toast--error {
+.at-toast--error:not(:has(.at-toast-icon)) {
   border-color: rgba(240, 80, 80, 0.45);
   color: #ffd0d0
 }
