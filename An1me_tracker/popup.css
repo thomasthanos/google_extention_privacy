@@ -1471,9 +1471,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   min-height: 19px
 }
 
-.anime-cover-container,
-.season-group-logo,
-.movie-group-logo {
+.anime-cover-container, .grp-logo {
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -1483,10 +1481,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .anime-cover-container img,
 .anime-cover-container>div,
-.season-group-logo img,
-.season-group-logo>div,
-.movie-group-logo img,
-.movie-group-logo>div {
+.grp-logo img,
+.grp-logo>div {
   width: 40px;
   height: 56px;
   border-radius: 8px;
@@ -1516,9 +1512,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 /* When the new cover lives inside the legacy logo containers we want it
    to override the older 50×66 rule above without touching that block. */
-.anime-cover-container .at-cover,
-.season-group-logo .at-cover,
-.movie-group-logo .at-cover {
+.anime-cover-container .at-cover, .grp-logo .at-cover {
   width: 40px;
   height: 56px
 }
@@ -3146,10 +3140,10 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .add-anime-header {
   flex: 0 0 auto;            /* pinned — never shrinks, always visible */
   display: grid;
-  grid-template-columns: 62px minmax(0, 1fr) 34px;
+  grid-template-columns: 50px minmax(0, 1fr) 30px;
   align-items: center;
-  column-gap: 10px;
-  padding: 13px 16px !important;
+  column-gap: 8px;
+  padding: 13px 14px !important;
   background: linear-gradient(180deg, rgba(16,22,36,0.96) 0%, rgba(11,15,26,0.94) 100%);
   position: relative;
   z-index: 2
@@ -3168,9 +3162,9 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .add-anime-header-icon {
   position: static;
   transform: none;
-  justify-self: start;
-  width: 46px;
-  height: 46px;
+  justify-self: center;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border-radius: var(--r-sm);
@@ -3183,8 +3177,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .add-anime-header-icon svg {
-  width: 27px;
-  height: 27px
+  width: 25px;
+  height: 25px
 }
 
 /* Round, dark, softly-outlined close button (target style) */
@@ -3217,7 +3211,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   transform: none;
   min-width: 0;
   max-width: 100%;
-  text-align: center;
+  text-align: left;
   justify-self: stretch;
   align-self: center;
   display: flex;
@@ -3229,7 +3223,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   font-size: 16px;
   font-weight: 700;
   color: var(--t1);
-  margin: 0 0 1px 0;
+  margin: 0 0 3px 0;
   letter-spacing: 0.1px;
   white-space: nowrap;
   overflow: hidden;
@@ -3237,10 +3231,10 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .add-anime-subtitle {
-  font-size: 10.8px;
+  font-size: 10px;
   color: var(--t2);
   margin: 0;
-  line-height: 1.35;
+  line-height: 1.2;
   font-weight: 400;
   opacity: 0.8;
   white-space: nowrap;
@@ -4582,13 +4576,14 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2)
 }
 
-.season-title-row,
-.movie-title-row {
-  min-height: 19px
+.grp-title-row {
+  min-height: 19px;
+  display: flex;
+  align-items: center;
+  overflow: hidden
 }
 
-.season-group-actions,
-.movie-group-actions {
+.grp-actions {
   display: flex;
   align-items: center;
   gap: 3px;
@@ -4599,8 +4594,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   transform: translateY(-50%)
 }
 
-.season-group-expand-icon,
-.movie-group-expand-icon {
+.grp-expand-icon {
   width: 24px;
   height: 24px;
   color: var(--t3);
@@ -4610,21 +4604,20 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   justify-content: center
 }
 
-.season-group-expand-icon svg {
+.grp-expand-icon svg {
   width: 15px;
   height: 15px
 }
 
-.anime-season-group:hover .season-group-expand-icon {
+.grp-card:hover .grp-expand-icon {
   color: var(--t2)
 }
 
-.anime-season-group.expanded .season-group-expand-icon {
+.anime-season-group.expanded .grp-expand-icon {
   color: var(--cyan)
 }
 
-.season-group-content,
-.movie-group-content {
+.grp-content {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -4635,7 +4628,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   transition: all var(--tn)
 }
 
-.anime-season-group.expanded .season-group-content {
+.anime-season-group.expanded .grp-content {
   max-height: 460px;
   opacity: 1;
   margin-top: 8px
@@ -4663,8 +4656,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   white-space: nowrap
 }
 
-.season-item,
-.movie-item {
+.grp-item {
   display: flex;
   flex-direction: column;
   padding: 7px 9px;
@@ -4674,7 +4666,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   transition: all var(--tf)
 }
 
-.season-item:hover {
+.grp-item:hover {
   background: var(--bg-4);
   border-color: var(--b2)
 }
@@ -4688,8 +4680,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   min-height: 22px
 }
 
-.season-item-left,
-.movie-item-left {
+.grp-item-left {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -4697,8 +4688,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   min-width: 0
 }
 
-.season-status-icon,
-.movie-status-icon {
+.grp-status-icon {
   width: 15px;
   height: 15px;
   display: flex;
@@ -4710,34 +4700,34 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   font-weight: bold
 }
 
-.season-item.not-started .season-status-icon {
+.grp-item.not-started .grp-status-icon {
   color: var(--t3);
   background: rgba(255, 255, 255, 0.04)
 }
 
-.season-item.in-progress .season-status-icon {
+.grp-item.in-progress .grp-status-icon {
   color: var(--amber);
   background: rgba(240, 192, 64, 0.12)
 }
 
-.season-item.in-progress {
+.grp-item.in-progress {
   border-color: rgba(240, 192, 64, 0.2)
 }
 
-.season-item.in-progress:hover {
+.grp-item.in-progress:hover {
   border-color: rgba(240, 192, 64, 0.38)
 }
 
-.season-item.complete .season-status-icon {
+.grp-item.complete .grp-status-icon {
   color: var(--green);
   background: rgba(76, 175, 130, 0.12)
 }
 
-.season-item.complete {
+.grp-item.complete {
   border-color: rgba(76, 175, 130, 0.2)
 }
 
-.season-item.complete:hover {
+.grp-item.complete:hover {
   border-color: rgba(76, 175, 130, 0.38)
 }
 
@@ -4932,16 +4922,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   border-radius: 3px
 }
 
-.movie-group-expand-icon svg {
-  width: 15px;
-  height: 15px
-}
-
-.anime-movie-group:hover .movie-group-expand-icon {
-  color: var(--t2)
-}
-
-.anime-movie-group.expanded .movie-group-expand-icon {
+.anime-movie-group.expanded .grp-expand-icon {
   transform: rotate(90deg);
   color: var(--cyan)
 }
@@ -5005,9 +4986,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   padding-right: 32px
 }
 
-.anime-header-main,
-.season-header-main,
-.movie-header-main {
+.anime-header-main {
   justify-content: center;
   min-height: 58px;
   margin-left: 0 !important;
@@ -5016,9 +4995,19 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   box-sizing: border-box
 }
 
-.anime-title-text,
-.season-group-name,
-.movie-group-name {
+.grp-header-main {
+  justify-content: center;
+  min-height: 58px;
+  padding-right: 0;
+  gap: 3px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0
+}
+
+.anime-title-text, .grp-name {
   font-family: var(--font-body);
   flex: 1;
   min-width: 0;
@@ -5036,7 +5025,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   padding-right: 56px
 }
 
-.anime-movie-group.expanded .movie-group-content {
+.anime-movie-group.expanded .grp-content {
   max-height: min(460px, calc(var(--h) - 220px));
   opacity: 1;
   margin-top: 8px;
@@ -5048,22 +5037,17 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   padding-right: 2px
 }
 
-.anime-movie-group.expanded .movie-group-content::-webkit-scrollbar {
+.anime-movie-group.expanded .grp-content::-webkit-scrollbar {
   width: 0;
   height: 0
 }
 
-.anime-movie-group.single-movie .movie-group-content {
+.anime-movie-group.single-movie .grp-content {
   display: none
 }
 
-.anime-movie-group.single-movie.expanded .movie-group-content {
+.anime-movie-group.single-movie.expanded .grp-content {
   display: flex
-}
-
-.movie-item:hover {
-  background: var(--bg-4);
-  border-color: var(--b2)
 }
 
 .movie-item-header {
@@ -5072,20 +5056,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   justify-content: space-between;
   gap: 6px;
   min-height: 22px
-}
-
-.movie-item.not-started .movie-status-icon {
-  color: var(--t3);
-  background: rgba(255, 255, 255, 0.04)
-}
-
-.movie-item.complete .movie-status-icon {
-  color: var(--green);
-  background: rgba(76, 175, 130, 0.12)
-}
-
-.movie-item.complete {
-  border-color: rgba(76, 175, 130, 0.2)
 }
 
 .movie-label {
@@ -5148,10 +5118,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   color: #f04545
 }
 
-.anime-meta-row,
-.season-group-meta-row,
-.movie-group-meta-row,
-.single-movie-meta-row {
+.anime-meta-row, .grp-meta-row {
   display: flex;
   font-size: 10px;
   color: var(--t2);
@@ -5193,10 +5160,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .anime-meta-row-wrap .anime-expand-icon {
   margin-left: 0
-}
-
-.season-group-meta-row {
-  font-size: 10px
 }
 
 .meta-badge {
@@ -8996,4 +8959,67 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
     height: 56px;
     font-size: 18px;
   }
+}
+
+/* Final scoped header alignment for Add Anime dialog. */
+#addAnimeDialog .add-anime-header {
+  display: grid !important;
+  grid-template-columns: 48px minmax(0, 1fr) 32px !important;
+  align-items: center !important;
+  column-gap: 12px !important;
+  min-height: 72px !important;
+  padding: 13px 18px !important;
+}
+
+#addAnimeDialog .add-anime-header-icon {
+  position: static !important;
+  justify-self: center !important;
+  align-self: center !important;
+  transform: none !important;
+  width: 44px !important;
+  height: 44px !important;
+}
+
+#addAnimeDialog .add-anime-header-icon svg {
+  width: 25px !important;
+  height: 25px !important;
+}
+
+#addAnimeDialog .add-anime-header-text {
+  position: static !important;
+  transform: none !important;
+  align-self: center !important;
+  justify-self: stretch !important;
+  display: flex !important;
+  min-width: 0 !important;
+  height: 44px !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  text-align: left !important;
+}
+
+#addAnimeDialog .add-anime-header-text h3,
+#addAnimeDialog .add-anime-subtitle {
+  max-width: 100% !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#addAnimeDialog .add-anime-header-text h3 {
+  margin: 0 0 3px !important;
+  line-height: 1.1 !important;
+}
+
+#addAnimeDialog .add-anime-subtitle {
+  margin: 0 !important;
+  font-size: 10px !important;
+  line-height: 1.2 !important;
+}
+
+#addAnimeDialog .add-anime-header .dialog-close {
+  position: static !important;
+  justify-self: end !important;
+  align-self: center !important;
+  transform: none !important;
 }

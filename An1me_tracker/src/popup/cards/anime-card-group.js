@@ -1,13 +1,78 @@
 
 
 
+
 (function () {
     'use strict';
 
     const AT = (window.AnimeTracker = window.AnimeTracker || {});
     const AnimeCardRenderer = (AT.AnimeCardRenderer = AT.AnimeCardRenderer || {});
 
+    // ─── Shared group-card chrome ────────────────────────────────────────────
+    // Season groups, movie groups and single-movie cards share the same DOM
+    // shape. The structural elements carry a neutral `grp-*` class (styled once
+    // in popup.css). Each variant ALSO keeps its semantic class where JS hooks
+    // it (capture/restore + click-delegation in render-list.js, edit/delete in
+    // main.js) or where the styling genuinely diverges (item rows, buttons).
+    const VARIANT = {
+        season: {
+            card: 'anime-season-group', header: 'season-group-header',
+            item: 'season-item', itemHeader: 'season-item-header',
+            itemRight: 'season-item-right', label: 'season-label',
+        },
+        movie: {
+            card: 'anime-movie-group', header: 'movie-group-header',
+            item: 'movie-item', itemHeader: 'movie-item-header',
+            itemRight: 'movie-item-right', label: 'movie-label',
+        },
+    };
+
     Object.assign(AnimeCardRenderer, {
+        // Outer shell for any grouped card. `title`/`metaRowHtml`/`coverHtml`/
+        // `itemsHtml` are pre-escaped HTML fragments built by the caller.
+        renderGroupShell({ variant, baseSlug, extraClass = '', coverHtml, title, metaRowHtml, itemsHtml }) {
+            const { UIHelpers } = window.AnimeTracker;
+            const v = VARIANT[variant];
+            return `
+                <div class="grp-card ${v.card}${extraClass ? ' ' + extraClass : ''}" data-base-slug="${baseSlug}">
+                    <div class="grp-header ${v.header}">
+                        <div class="grp-logo">${coverHtml}</div>
+                        <div class="grp-header-main">
+                            <div class="grp-title-row"><span class="grp-name">${title}</span></div>
+                            ${metaRowHtml}
+                        </div>
+                        <div class="grp-actions">
+                            <div class="grp-expand-icon">${UIHelpers.createIcon('chevron')}</div>
+                        </div>
+                    </div>
+                    <div class="grp-content">
+                        ${itemsHtml}
+                    </div>
+                </div>
+            `;
+        },
+
+        // One row inside a group. `rightHtml`/`contentHtml` are variant-built so
+        // each variant keeps its own badges / actions / expandable content.
+        renderGroupItem({ variant, slug, statusClass, statusIcon, label, rightHtml, contentHtml = '', extraItemClass = '' }) {
+            const { UIHelpers } = window.AnimeTracker;
+            const v = VARIANT[variant];
+            return `
+                <div class="grp-item ${v.item} ${statusClass}${extraItemClass ? ' ' + extraItemClass : ''}" data-slug="${UIHelpers.escapeHtml(slug)}">
+                    <div class="grp-item-header ${v.itemHeader}">
+                        <div class="grp-item-left">
+                            <span class="grp-status-icon">${statusIcon}</span>
+                            <span class="${v.label}">${label}</span>
+                        </div>
+                        <div class="${v.itemRight}">
+                            ${rightHtml}
+                        </div>
+                    </div>
+                    ${contentHtml}
+                </div>
+            `;
+        },
+
         createSeasonGroup(baseSlug, seasons, videoProgress = {}) {
             const { UIHelpers, SeasonGrouping, FillerService, ANIME_PARTS_CONFIG, SlugUtils } = window.AnimeTracker;
             const AnilistService = window.AnimeTracker.AnilistService;
@@ -361,20 +426,16 @@
                        </div>
                        ${expandIconHtml}`;
 
-                const html = `
-                    <div class="season-item ${statusClass}${isMovie ? ' season-item-movie' : ''}" data-slug="${UIHelpers.escapeHtml(slug)}">
-                        <div class="season-item-header">
-                            <div class="season-item-left">
-                                <span class="season-status-icon">${statusIcon}</span>
-                                <span class="season-label">${UIHelpers.escapeHtml(seasonLabel)}</span>
-                            </div>
-                            <div class="season-item-right">
-                                ${rightSideHtml}
-                            </div>
-                        </div>
-                        ${contentHtml}
-                    </div>
-                `;
+                const html = this.renderGroupItem({
+                    variant: 'season',
+                    slug,
+                    statusClass,
+                    statusIcon,
+                    label: UIHelpers.escapeHtml(seasonLabel),
+                    rightHtml: rightSideHtml,
+                    contentHtml,
+                    extraItemClass: isMovie ? 'season-item-movie' : ''
+                });
 
                 return { html, isComplete, separatorLabel };
             });
@@ -438,29 +499,16 @@
             const groupStatusClass = allSeasonsComplete ? 'meta-badge-complete' : (anyStarted ? 'meta-badge-watching' : 'meta-badge-notstarted');
             const groupStatusIcon = allSeasonsComplete ? '✓' : '⊙';
             const groupStatusBadge = `<span class="meta-badge ${groupStatusClass}">${groupStatusIcon} ${statusGroup}</span>`;
-            const metaRowHtmlGroup = `<div class="season-group-meta-row">${groupProgressBadge}${groupStatusBadge}</div><span class="meta-time">${lastWatchedText}</span>`;
+            const metaRowHtmlGroup = `<div class="grp-meta-row">${groupProgressBadge}${groupStatusBadge}</div><span class="meta-time">${lastWatchedText}</span>`;
 
-            return `
-                <div class="anime-season-group" data-base-slug="${baseSlug}">
-                    <div class="season-group-header">
-                        <div class="season-group-logo" style="flex-shrink:0;">
-                            ${coverHtmlGroup}
-                        </div>
-                        <div class="season-header-main" style="flex:1; display:flex; flex-direction:column; min-width:0; margin-left:8px;">
-                            <div class="season-title-row" style="display:flex; align-items:center; overflow:hidden;">
-                                <span class="season-group-name" style="font-size:14px;font-weight:600;color:var(--t1);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${UIHelpers.escapeHtml(baseTitle)}</span>
-                            </div>
-                            ${metaRowHtmlGroup}
-                        </div>
-                        <div class="season-group-actions">
-                            <div class="season-group-expand-icon">${UIHelpers.createIcon('chevron')}</div>
-                        </div>
-                    </div>
-                    <div class="season-group-content">
-                        ${seasonItemsHTML}
-                    </div>
-                </div>
-            `;
+            return this.renderGroupShell({
+                variant: 'season',
+                baseSlug,
+                coverHtml: coverHtmlGroup,
+                title: UIHelpers.escapeHtml(baseTitle),
+                metaRowHtml: metaRowHtmlGroup,
+                itemsHtml: seasonItemsHTML
+            });
         },
 
         extractBaseTitle(title) {
@@ -472,6 +520,153 @@
                 .replace(/\s*-?\s*Episode\s*$/i, '')
                 .replace(/\s*[-:]\s*$/, '')
                 .trim();
+        },
+
+        // ─── Movies ──────────────────────────────────────────────────────────
+        getRealMovieEpisodes(anime) {
+            return (anime?.episodes || []).filter(ep => ep?.durationSource !== 'anilist');
+        },
+
+        getRealMovieWatchTime(anime) {
+            return this.getRealMovieEpisodes(anime)
+                .reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
+        },
+
+        extractMovieBaseTitle(title) {
+            return title
+                .replace(/\s*-?\s*Movie\s*\d+.*$/i, '')
+                .replace(/\s*-?\s*Film[:\s].*$/i, '')
+                .replace(/\s*[-:]\s*$/, '')
+                .trim();
+        },
+
+        renderMovieItem(slug, label, formattedTime, isWatched) {
+            const { UIHelpers } = window.AnimeTracker;
+            const rightHtml = `<span class="movie-duration">${formattedTime}</span>
+                                <div class="movie-item-actions">
+                                    <button class="movie-edit-btn" data-slug="${UIHelpers.escapeHtml(slug)}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
+                                    <button class="movie-delete-btn" data-slug="${UIHelpers.escapeHtml(slug)}" title="Delete">${UIHelpers.createIcon('delete')}</button>
+                                </div>`;
+            return this.renderGroupItem({
+                variant: 'movie',
+                slug,
+                statusClass: isWatched ? 'complete' : 'not-started',
+                statusIcon: isWatched ? '✓' : '○',
+                label: UIHelpers.escapeHtml(label),
+                rightHtml
+            });
+        },
+
+        createMovieGroup(baseSlug, movies) {
+            const { UIHelpers, SeasonGrouping } = window.AnimeTracker;
+
+            const firstMovie = movies[0];
+            const baseTitle = this.extractMovieBaseTitle(firstMovie.anime.title);
+
+            let latestWatched = null;
+
+            movies.forEach(({ anime }) => {
+                if (anime.lastWatched) {
+                    const date = new Date(anime.lastWatched);
+                    if (!latestWatched || date > latestWatched) {
+                        latestWatched = date;
+                    }
+                }
+            });
+
+            const movieItemsHTML = movies.map(({ slug, anime }) => {
+                const movieLabel = SeasonGrouping.getMovieLabel(slug, anime.title);
+                const realEpisodes = this.getRealMovieEpisodes(anime);
+                const watchTime = this.getRealMovieWatchTime(anime);
+                const formattedTime = UIHelpers.formatDuration(watchTime);
+                const isWatched = realEpisodes.length > 0 || watchTime > 0;
+                return this.renderMovieItem(slug, movieLabel, formattedTime, isWatched);
+            }).join('');
+
+            const watchedCount = movies.filter(m => {
+                const realEpisodes = this.getRealMovieEpisodes(m.anime);
+                return realEpisodes.length > 0 || this.getRealMovieWatchTime(m.anime) > 0;
+            }).length;
+            const allMoviesWatchedForDate = watchedCount >= movies.length;
+            let lastWatchedText;
+            if (allMoviesWatchedForDate && watchedCount > 0) {
+                let earliestStart = null;
+                movies.forEach(({ anime }) => {
+                    const started = UIHelpers.getStartedDate(anime);
+                    if (started) {
+                        const t = new Date(started).getTime();
+                        if (earliestStart === null || t < earliestStart) earliestStart = t;
+                    }
+                });
+                const endedDate = latestWatched ? latestWatched.toISOString() : null;
+                if (earliestStart && endedDate) {
+                    lastWatchedText = `${UIHelpers.formatShortDate(new Date(earliestStart).toISOString())} / ${UIHelpers.formatShortDate(endedDate)}`;
+                } else {
+                    lastWatchedText = latestWatched ? UIHelpers.formatDate(latestWatched.toISOString()) : 'Never';
+                }
+            } else {
+                lastWatchedText = latestWatched ? UIHelpers.formatDate(latestWatched.toISOString()) : 'Never';
+            }
+
+            const groupImages = (window.AnimeTracker && window.AnimeTracker.groupCoverImages) || {};
+            const coverImageGroup = groupImages[baseSlug] || ((firstMovie?.anime && firstMovie.anime.coverImage) ? firstMovie.anime.coverImage : null);
+            const coverHtmlGroup = UIHelpers.renderCoverFigure(baseTitle, coverImageGroup);
+
+            const totalMovies = movies.length;
+            const statusGroup = (watchedCount === 0) ? 'Not started' : (watchedCount < totalMovies ? 'Watching' : 'Completed');
+            const allMoviesWatched = watchedCount >= totalMovies;
+            const movieTypeBadge = `<span class="meta-badge" style="color:#f4a261;background:rgba(244,162,97,0.12);border:1px solid rgba(244,162,97,0.35);">${totalMovies} Movies</span>`;
+            const movieStatusClass = allMoviesWatched ? 'meta-badge-complete' : (watchedCount > 0 ? 'meta-badge-watching' : 'meta-badge-notstarted');
+            const movieStatusIcon = allMoviesWatched ? '✓' : '⊙';
+            const movieStatusBadge = `<span class="meta-badge ${movieStatusClass}">${movieStatusIcon} ${statusGroup}</span>`;
+            const metaRowHtml = `<div class="grp-meta-row">${movieTypeBadge}${movieStatusBadge}</div><span class="meta-time">${lastWatchedText}</span>`;
+
+            return this.renderGroupShell({
+                variant: 'movie',
+                baseSlug,
+                coverHtml: coverHtmlGroup,
+                title: `${UIHelpers.escapeHtml(baseTitle)} Movies`,
+                metaRowHtml,
+                itemsHtml: movieItemsHTML
+            });
+        },
+
+        createSingleMovieCard(slug, anime) {
+            const { UIHelpers } = window.AnimeTracker;
+
+            const title = anime.title || slug;
+            const realEpisodes = this.getRealMovieEpisodes(anime);
+            const watchTime = this.getRealMovieWatchTime(anime);
+            const formattedTime = UIHelpers.formatDuration(watchTime);
+            const isWatched = realEpisodes.length > 0 || watchTime > 0;
+            let lastWatched;
+            if (isWatched) {
+                const startedDate = UIHelpers.getStartedDate(anime);
+                if (startedDate && anime.lastWatched) {
+                    lastWatched = `${UIHelpers.formatShortDate(startedDate)} / ${UIHelpers.formatShortDate(anime.lastWatched)}`;
+                } else {
+                    lastWatched = anime.lastWatched ? UIHelpers.formatDate(anime.lastWatched) : 'Never';
+                }
+            } else {
+                lastWatched = anime.lastWatched ? UIHelpers.formatDate(anime.lastWatched) : 'Never';
+            }
+
+            const coverHtml = UIHelpers.renderCoverFigure(title, anime.coverImage || null);
+
+            const singleStatusClass = isWatched ? 'meta-badge-complete' : 'meta-badge-notstarted';
+            const singleStatusIcon = isWatched ? '✓' : '⊙';
+            const singleStatusText = isWatched ? 'Watched' : 'Not watched';
+            const metaRowHtml = `<div class="grp-meta-row"><span class="meta-badge" style="color:#f4a261;background:rgba(244,162,97,0.12);border:1px solid rgba(244,162,97,0.35);">Movie</span><span class="meta-badge ${singleStatusClass}">${singleStatusIcon} ${singleStatusText}</span></div><span class="meta-time">${lastWatched}</span>`;
+
+            return this.renderGroupShell({
+                variant: 'movie',
+                baseSlug: slug,
+                extraClass: 'single-movie',
+                coverHtml,
+                title: UIHelpers.escapeHtml(title),
+                metaRowHtml,
+                itemsHtml: this.renderMovieItem(slug, title, formattedTime, isWatched)
+            });
         }
     });
 })();
