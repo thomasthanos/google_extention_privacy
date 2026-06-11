@@ -36,8 +36,8 @@
 
             const safeCoverImage = UIHelpers.sanitizeImageUrl(anime.coverImage);
             const coverHtml = safeCoverImage
-                ? `<img class="ip-cover" src="${UIHelpers.escapeHtml(safeCoverImage)}" alt="">`
-                : `<div class="ip-cover-placeholder">&#9654;</div>`;
+                ? `<span class="ip-cover-wrap"><img class="ip-cover" src="${UIHelpers.escapeHtml(safeCoverImage)}" alt=""></span>`
+                : `<span class="ip-cover-wrap"><span class="ip-cover-placeholder">&#9654;</span></span>`;
 
             const savedDate = latestEp.savedAt ? new Date(latestEp.savedAt) : null;
             const now = new Date();
@@ -91,7 +91,7 @@
                             </div>
                             <a class="ip-continue-btn" href="${continueUrl}" target="_blank" rel="noopener noreferrer" title="Continue watching Ep ${latestEp.number}">
                                 <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                                Continue Ep ${latestEp.number}
+                                Resume
                             </a>
                         </div>
                     </div>
@@ -114,13 +114,11 @@
                         <span class="ip-group-separator-line"></span>
                     </div>`
                 : '';
-
             const count = inProgressItems.length;
 
             return `
                 <div class="ip-group">
                     <div class="ip-group-header">
-                        <span class="ip-group-play">▶</span>
                         <span class="ip-group-label">In Progress</span>
                         <span class="ip-group-count">${count}</span>
                         <svg class="ip-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform:rotate(-90deg);">
@@ -128,9 +126,11 @@
                         </svg>
                     </div>
                     <div class="ip-group-content">
-                        ${trackedHtml}
-                        ${separatorHtml}
-                        ${resumeOnlyHtml}
+                        <div class="ip-group-content-inner">
+                            ${trackedHtml}
+                            ${separatorHtml}
+                            ${resumeOnlyHtml}
+                        </div>
                     </div>
                 </div>`;
         }

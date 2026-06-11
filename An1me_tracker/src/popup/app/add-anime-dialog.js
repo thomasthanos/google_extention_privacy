@@ -152,8 +152,26 @@
             onlyBtn.onclick = () => _applyDetectChoice(isDouble ? `${epLo}-${epHi}` : String(epLo));
         }
         if (allBtn) {
-            allBtn.textContent = `Episodes 1–${epHi}`;
-            allBtn.onclick = () => _applyDetectChoice(`1-${epHi}`);
+            // Only the episodes (1..epHi) that aren't already saved, so we never
+            // re-add the whole anime when the user has already watched part of it.
+            const watchedSet = new Set(watchedNums);
+            const missing = [];
+            for (let n = 1; n <= epHi; n++) {
+                if (!watchedSet.has(n)) missing.push(n);
+            }
+            if (missing.length === 0) {
+                // Everything up to the current episode is already tracked.
+                allBtn.textContent = 'All caught up';
+                allBtn.disabled = true;
+                allBtn.onclick = null;
+            } else {
+                const missingStr = AT.EpisodeParse.buildRangeString(missing);
+                allBtn.disabled = false;
+                allBtn.textContent = watchedNums.length > 0
+                    ? `Add missing ${missingStr}`
+                    : `Episodes 1–${epHi}`;
+                allBtn.onclick = () => _applyDetectChoice(missingStr);
+            }
         }
 
         banner.style.display = '';

@@ -603,6 +603,266 @@ const Notifications = {
             `
         });
         (doc.head || doc.documentElement).appendChild(style);
+    },
+
+    // Bottom-right pop-out asking whether the user has already watched a small
+    // number of earlier (non-filler) episodes they skipped past. `missing` is a
+    // sorted array of episode numbers. onConfirm()/onDismiss() are callbacks.
+    showBacklogPrompt(animeTitle, missing, onConfirm, onDismiss) {
+        if (!Array.isArray(missing) || missing.length === 0) return;
+
+        this.ensureFont();
+        this.injectRootStyles();
+
+        const { doc, container } = this._resolveTarget();
+        this._ensureRootStyles(doc);
+        this.injectBacklogStyles(doc);
+
+        // Never stack two backlog prompts.
+        try {
+            doc.querySelectorAll('.at-backlog-prompt').forEach(el => el.remove());
+        } catch { }
+
+        const rawTitle = animeTitle || '';
+        const safeTitle = typeof rawTitle === 'string'
+            ? rawTitle.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;')
+            : '';
+
+        const buildRange = (nums) => {
+            const ranges = [];
+            let start = nums[0], end = nums[0];
+            for (let i = 1; i < nums.length; i++) {
+                if (nums[i] === end + 1) { end = nums[i]; }
+                else { ranges.push(start === end ? `${start}` : `${start}–${end}`); start = end = nums[i]; }
+            }
+            ranges.push(start === end ? `${start}` : `${start}–${end}`);
+            return ranges.join(', ');
+        };
+
+        const epWord = missing.length === 1 ? 'episode' : 'episodes';
+        const rangeStr = buildRange(missing);
+
+        const prompt = doc.createElement('div');
+        prompt.className = 'at-backlog-prompt';
+        prompt.setAttribute('role', 'dialog');
+        prompt.setAttribute('aria-live', 'polite');
+        prompt.innerHTML = `
+            <div class="at-backlog-shine"></div>
+            <button class="at-backlog-close" type="button" aria-label="Dismiss" title="Dismiss">×</button>
+            <div class="at-backlog-head">
+                <div class="at-backlog-icon">
+                    ${this._icons.checkCircle('atGradBacklog')}
+                </div>
+                <div class="at-backlog-text">
+                    <strong>Caught up early?</strong>
+                    <span class="at-backlog-title">${safeTitle}</span>
+                </div>
+            </div>
+            <div class="at-backlog-body">
+                You skipped past ${epWord} <strong>${rangeStr}</strong>. Have you already watched ${missing.length === 1 ? 'it' : 'them'}?
+            </div>
+            <div class="at-backlog-buttons">
+                <button class="at-backlog-btn at-backlog-yes" type="button">
+                    Yes, mark watched
+                </button>
+                <button class="at-backlog-btn at-backlog-no" type="button">
+                    Not yet
+                </button>
+            </div>
+        `;
+
+        container.appendChild(prompt);
+
+        const yes = prompt.querySelector('.at-backlog-yes');
+        const no = prompt.querySelector('.at-backlog-no');
+        const closeBtn = prompt.querySelector('.at-backlog-close');
+
+        let settled = false;
+        let autoTimer = null;
+        const remove = () => this.removeElement(prompt);
+        const finish = (cb) => {
+            if (settled) return;
+            settled = true;
+            if (autoTimer) clearTimeout(autoTimer);
+            try { document.removeEventListener('fullscreenchange', onFsChange); } catch { }
+            try { document.removeEventListener('webkitfullscreenchange', onFsChange); } catch { }
+            remove();
+            try { cb && cb(); } catch { }
+        };
+        const onYes = () => finish(onConfirm);
+        const onNo = () => finish(onDismiss);
+
+        yes?.addEventListener('click', onYes);
+        no?.addEventListener('click', onNo);
+        closeBtn?.addEventListener('click', onNo);
+
+        // ─── Fullscreen handling ─────────────────────────────────────────
+        // When a cross-origin <iframe> player is in native fullscreen, the
+        // browser paints ONLY that iframe, so a fixed-position pop-out on the
+        // top document is invisible. To avoid the user silently missing it, we
+        // detect that case, hide the prompt, and reveal it (re-arming the
+        // auto-dismiss timer) once they exit fullscreen.
+        const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+        const promptIsInsideFs = () => {
+            const fe = fsEl();
+            return !!fe && fe.contains(prompt);
+        };
+        // True when something is fullscreen but our prompt is NOT a descendant
+        // of it (i.e. it would be hidden behind the fullscreen surface).
+        const hiddenByFullscreen = () => {
+            const fe = fsEl();
+            return !!fe && !promptIsInsideFs();
+        };
+
+        const startAutoDismiss = () => {
+            if (autoTimer) clearTimeout(autoTimer);
+            // Auto-dismiss (treated as "not yet") after 15s of being visible.
+            autoTimer = setTimeout(onNo, 15000);
+        };
+
+        const onFsChange = () => {
+            if (settled) return;
+            if (hiddenByFullscreen()) {
+                // Park it: hide and stop the countdown so it can't expire unseen.
+                prompt.style.display = 'none';
+                if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+            } else {
+                prompt.style.display = '';
+                startAutoDismiss();
+            }
+        };
+
+        try { document.addEventListener('fullscreenchange', onFsChange); } catch { }
+        try { document.addEventListener('webkitfullscreenchange', onFsChange); } catch { }
+
+        if (hiddenByFullscreen()) {
+            // Already in a fullscreen that would hide us — wait for exit.
+            prompt.style.display = 'none';
+        } else {
+            startAutoDismiss();
+        }
+
+        this.addCleanup(() => {
+            if (autoTimer) clearTimeout(autoTimer);
+            try { document.removeEventListener('fullscreenchange', onFsChange); } catch { }
+            try { document.removeEventListener('webkitfullscreenchange', onFsChange); } catch { }
+            prompt.remove();
+        });
+    },
+
+    injectBacklogStyles(doc = document) {
+        if (doc.querySelector('#anime-tracker-backlog-styles')) return;
+        const style = Object.assign(doc.createElement('style'), {
+            id: 'anime-tracker-backlog-styles',
+            textContent: `
+                .at-backlog-prompt {
+                    position: fixed;
+                    bottom: 30px;
+                    right: 30px;
+                    z-index: 2147483647;
+                    width: 340px;
+                    max-width: calc(100vw - 40px);
+                    background: var(--at-bg-secondary);
+                    backdrop-filter: blur(24px) saturate(200%);
+                    -webkit-backdrop-filter: blur(24px) saturate(200%);
+                    border: 1px solid var(--at-border-accent);
+                    border-radius: 22px;
+                    padding: 20px 22px 18px;
+                    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+                    box-shadow:
+                        var(--at-shadow-3d),
+                        0 0 0 1px var(--at-inset-top) inset,
+                        0 -1px 2px var(--at-inset-bottom) inset,
+                        0 1px 0 var(--at-inset-top) inset;
+                    opacity: 0;
+                    animation: atNotifIn .5s cubic-bezier(.16,1.11,.3,1) forwards;
+                    overflow: hidden;
+                    user-select: none;
+                }
+                .at-backlog-prompt.at-hiding { animation: atNotifOut .35s cubic-bezier(.4,0,1,1) forwards; }
+                .at-backlog-prompt * { user-select: none; font-family: inherit; box-sizing: border-box; }
+
+                .at-backlog-shine {
+                    position: absolute;
+                    top: 0; left: -100%; width: 50%; height: 100%;
+                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.03), transparent);
+                    animation: atShineSweep2 4s ease-in-out 0.5s infinite;
+                    pointer-events: none;
+                }
+
+                .at-backlog-close {
+                    position: absolute;
+                    top: 8px; right: 10px;
+                    width: 22px; height: 22px;
+                    background: transparent; border: none;
+                    color: var(--at-text-secondary);
+                    font-size: 18px; line-height: 1;
+                    cursor: pointer; border-radius: 50%;
+                    display: flex; align-items: center; justify-content: center;
+                    padding: 0; transition: background 120ms ease, color 120ms ease;
+                    z-index: 2;
+                }
+                .at-backlog-close:hover { background: var(--at-bg-no-hover); color: var(--at-text-primary); }
+
+                .at-backlog-head { display: flex; align-items: center; gap: 14px; position: relative; z-index: 1; }
+                .at-backlog-icon {
+                    width: 46px; height: 46px; flex-shrink: 0;
+                    background: var(--at-bg-accent-complete);
+                    border-radius: 14px;
+                    display: flex; align-items: center; justify-content: center;
+                    box-shadow: var(--at-shadow-accent-complete), 0 1px 0 rgba(255,255,255,0.08) inset;
+                }
+                .at-backlog-icon .at-notif-icon { width: 26px; height: 26px; filter: var(--at-glow-complete); }
+                .at-backlog-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+                .at-backlog-text strong {
+                    font-size: 15px; font-weight: 800; letter-spacing: -.3px;
+                    background: linear-gradient(135deg, #66bb9a, #4caf82);
+                    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+                }
+                .at-backlog-title {
+                    color: var(--at-text-primary); font-size: 13px; font-weight: 500;
+                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px;
+                }
+                .at-backlog-body {
+                    position: relative; z-index: 1;
+                    margin: 14px 0 16px;
+                    color: var(--at-text-primary);
+                    font-size: 13.5px; line-height: 1.5; font-weight: 500;
+                }
+                .at-backlog-body strong { color: var(--at-accent-complete-light); font-weight: 800; }
+
+                .at-backlog-buttons { display: flex; gap: 10px; position: relative; z-index: 1; }
+                .at-backlog-btn {
+                    flex: 1;
+                    padding: 11px 14px;
+                    border-radius: 13px;
+                    font-size: 13px; font-weight: 700;
+                    cursor: pointer; border: none;
+                    transition: all .25s cubic-bezier(.2,0,0,1);
+                    white-space: nowrap; letter-spacing: -.2px;
+                }
+                .at-backlog-yes {
+                    background: var(--at-accent-complete-gradient);
+                    color: var(--at-text-white);
+                    box-shadow: var(--at-shadow-accent-complete), 0 1px 0 rgba(255,255,255,0.15) inset;
+                }
+                .at-backlog-yes:hover { transform: translateY(-2px) scale(1.02); }
+                .at-backlog-no {
+                    background: var(--at-bg-no);
+                    color: var(--at-text-secondary);
+                    border: 1px solid var(--at-border-medium);
+                }
+                .at-backlog-no:hover { background: var(--at-bg-no-hover); color: var(--at-text-primary); transform: translateY(-2px) scale(1.02); }
+                .at-backlog-btn:active { transform: translateY(1px) scale(0.97); transition-duration: .1s; }
+
+                @media (prefers-reduced-motion: reduce) {
+                    .at-backlog-prompt,
+                    .at-backlog-prompt.at-hiding { animation: none !important; transition: opacity .18s linear; }
+                    .at-backlog-shine { animation: none !important; }
+                }
+            `
+        });
+        (doc.head || doc.documentElement).appendChild(style);
     }
 };
 

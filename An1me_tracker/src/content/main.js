@@ -23,6 +23,126 @@
         if (completionNotificationShown) return;
         completionNotificationShown = true;
         AT.Notifications.showCompletion(animeInfo);
+        maybePromptBacklog();
+    }
+
+    // ─── Backlog prompt: when the user jumps ahead, offer to mark the 1–2
+    // earlier NON-filler episodes they skipped as already watched. ───────────
+    let backlogPromptHandled = false;
+
+    async function maybePromptBacklog() {
+        const { Storage, Logger, Notifications } = AT;
+        if (backlogPromptHandled) return;
+        if (!animeInfo || !animeInfo.animeSlug || !animeInfo.episodeNumber) return;
+
+        const currentEp = Number(animeInfo.episodeNumber) || 0;
+        if (currentEp <= 1) return;            // nothing comes before episode 1
+        backlogPromptHandled = true;
+
+        try {
+            const result = await Storage.get(['animeData']);
+            if (result?.__timedOut) return;
+            const animeData = result.animeData || {};
+            const entry = animeData[animeInfo.animeSlug];
+            if (!entry || !Array.isArray(entry.episodes)) return;
+
+            const watched = new Set(
+                entry.episodes.map(ep => Number(ep?.number)).filter(n => Number.isFinite(n))
+            );
+
+            // Pull the filler list so gaps that are fillers don't count.
+            let fillers = [];
+            try {
+                const resp = await chrome.runtime.sendMessage({
+                    type: 'GET_FILLER_EPISODES',
+                    animeSlug: animeInfo.animeSlug,
+                    animeTitle: animeInfo.animeTitle || null
+                });
+                if (Array.isArray(resp?.fillers)) fillers = resp.fillers;
+            } catch { }
+            const fillerSet = new Set(fillers.map(n => Number(n)));
+
+            const missing = [];
+            for (let n = 1; n < currentEp; n++) {
+                if (watched.has(n)) continue;
+                if (fillerSet.has(n)) continue;
+                missing.push(n);
+            }
+
+            // Only nudge for a small backlog (1–2 episodes) — bigger gaps are
+            // probably intentional, so we don't pester the user.
+            if (missing.length === 0 || missing.length > 2) return;
+
+            Notifications.showBacklogPrompt(
+                animeInfo.animeTitle,
+                missing,
+                () => { void markEpisodesWatched(animeInfo.animeSlug, missing); },
+                () => { Logger.debug(`Backlog prompt dismissed for ${missing.join(', ')}`); }
+            );
+        } catch (e) {
+            Logger.warn('Backlog prompt check failed:', e?.message || e);
+        }
+    }
+
+    async function markEpisodesWatched(slug, episodeNumbers) {
+        const { Storage, Logger, EpisodeWriter } = AT;
+        if (!slug || !Array.isArray(episodeNumbers) || episodeNumbers.length === 0) return;
+
+        try {
+            let changed = false;
+            const mutateResult = await Storage.mutate(['animeData', 'deletedAnime'], (data) => {
+                const animeData = data.animeData = data.animeData || {};
+                const del = data.deletedAnime = data.deletedAnime || {};
+                const entry = animeData[slug];
+
+                // Reuse a real video duration from this anime when we have one,
+                // otherwise fall back to a neutral placeholder.
+                let inferredDuration = 1440;
+                if (entry && Array.isArray(entry.episodes)) {
+                    const realDurs = entry.episodes
+                        .filter(ep => ep?.durationSource === 'video' && Number(ep.duration) > 0)
+                        .map(ep => Number(ep.duration))
+                        .sort((a, b) => a - b);
+                    if (realDurs.length > 0) {
+                        inferredDuration = realDurs[Math.floor(realDurs.length / 2)];
+                    }
+                }
+
+                for (const num of episodeNumbers) {
+                    const info = {
+                        animeSlug: slug,
+                        animeTitle: (entry && entry.title) || animeInfo?.animeTitle || slug,
+                        episodeNumber: num,
+                        siteAnimeId: entry?.siteAnimeId || animeInfo?.siteAnimeId || null,
+                        coverImage: entry?.coverImage || animeInfo?.coverImage || null,
+                        totalEpisodes: entry?.totalEpisodes ?? animeInfo?.totalEpisodes ?? null
+                    };
+                    const r = EpisodeWriter.writeEpisode(info, inferredDuration, animeData, { logPrefix: 'BacklogMark' });
+                    if (r?.changed) { changed = true; delete del[slug]; }
+                }
+            });
+
+            if (mutateResult?.__timedOut) {
+                Logger.warn('Backlog mark skipped: storage read timed out');
+                return;
+            }
+            if (!changed) return;
+
+            // Invalidate the ProgressTracker animeData cache so it re-reads.
+            try {
+                AT.ProgressTracker._adCache = null;
+                AT.ProgressTracker._adCacheTime = 0;
+            } catch { }
+
+            Logger.success(`Backlog: marked episode(s) ${episodeNumbers.join(', ')} as watched`);
+
+            try { highlightWatchedEpisodes(slug); } catch { }
+            try {
+                chrome.runtime.sendMessage({ type: 'SYNC_TO_FIREBASE_IMMEDIATE' }, () => { void chrome.runtime.lastError; });
+            } catch { }
+        } catch (e) {
+            Logger.warn('Backlog mark failed:', e?.message || e);
+        }
     }
 
     let cachedOutroStartSec = null;
@@ -160,6 +280,7 @@
         durationRefreshAttempted = false;
         durationRefreshAttempts = 0;
         completionNotificationShown = false;
+        backlogPromptHandled = false;
     }
 
     function syncVideoSourceEpisodeBoundary(videoElement) {
@@ -412,6 +533,7 @@
             try {
                 await Promise.race([trackingOperation(), timeoutPromise]);
                 Logger.success('Auto-tracked on timeupdate');
+                maybePromptBacklog();
             } catch (error) {
                 if (error.message === 'handleTimeUpdate timeout') Logger.warn('Tracking operation timed out, will retry');
                 else Logger.error('Track failed', error);
@@ -467,6 +589,7 @@
                     await ProgressTracker.saveWatchedEpisode(animeInfo, videoElement.duration);
                     await ProgressTracker.clearSavedProgress(animeInfo.uniqueId);
                     trackingState = TrackingState.COMPLETED;
+                    maybePromptBacklog();
                 } catch (error) {
                     Logger.error('End track failed', error);
                     trackingState = TrackingState.IDLE;
@@ -506,6 +629,7 @@
                         await ProgressTracker.clearSavedProgress(animeInfo.uniqueId);
                         trackingState = TrackingState.COMPLETED;
                         Logger.success('Auto-tracked on visibility change');
+                        maybePromptBacklog();
                     } catch (error) {
                         Logger.error('Auto-track failed on visibility change', error);
                         trackingState = TrackingState.IDLE;
