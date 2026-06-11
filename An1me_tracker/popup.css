@@ -19,24 +19,24 @@
 }
 
 :root {
-  --bg-0: #0e1117;
-  --bg-1: #111520;
-  --bg-2: #141926;
-  --bg-3: #181e2e;
-  --bg-4: #1c2236;
-  --bg-card: #161b2a;
-  --cyan: #4fc3f7;
-  --amber: #f0c040;
-  --green: #4caf82;
-  --purple: #9b6aff;
-  --grad-cyan: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
-  --grad-amber: linear-gradient(135deg, #f0c040 0%, #e6a817 100%);
-  --t1: #e8edf8;
-  --t2: #8593b0;  /* WCAG AA: ~5.0:1 against --bg-0 (#0e1117). Was #6b7694 ≈4.16:1, just below AA. */
-  --t3: #353d55;
-  --b0: rgba(255, 255, 255, 0.04);
-  --b1: rgba(255, 255, 255, 0.07);
-  --b2: rgba(255, 255, 255, 0.11);
+  --bg-0: #090d15;
+  --bg-1: #0f1420;
+  --bg-2: #141b2a;
+  --bg-3: #192234;
+  --bg-4: #202b41;
+  --bg-card: #121a2a;
+  --cyan: #45caff;
+  --amber: #f0c84b;
+  --green: #4fd18f;
+  --purple: #a477ff;
+  --grad-cyan: linear-gradient(135deg, #45caff 0%, #21a8f2 100%);
+  --grad-amber: linear-gradient(135deg, #f0c84b 0%, #e0a72c 100%);
+  --t1: #eef3ff;
+  --t2: #9aa8c3;
+  --t3: #63718d;
+  --b0: rgba(255, 255, 255, 0.045);
+  --b1: rgba(255, 255, 255, 0.075);
+  --b2: rgba(255, 255, 255, 0.13);
   --r-xl: 22px;
   --r-lg: 18px;
   --r-md: 14px;
@@ -57,22 +57,22 @@
      hue/chroma in one place. Existing --cyan / --amber / --green stay as
      hex aliases so rules that already reference them keep their exact
      visual without a mass refactor. */
-  --primary:           oklch(0.78 0.135 232);   /* ~ #4fc3f7 */
-  --warning:           oklch(0.82 0.155 88);    /* ~ #f0c040 */
-  --success:           oklch(0.69 0.13 158);    /* ~ #4caf82 */
-  --danger:            oklch(0.65 0.21 22);     /* ~ #f04545 */
+  --primary:           var(--cyan);
+  --warning:           var(--amber);
+  --success:           var(--green);
+  --danger:            #ff6675;
 
   /* Soft fills (10–12% alpha) for chip backgrounds, hover states, focus rings */
-  --primary-soft:      oklch(0.78 0.135 232 / 0.12);
-  --warning-soft:      oklch(0.82 0.155 88 / 0.14);
-  --success-soft:      oklch(0.69 0.13 158 / 0.14);
-  --danger-soft:       oklch(0.65 0.21 22 / 0.12);
+  --primary-soft:      rgba(69, 202, 255, 0.11);
+  --warning-soft:      rgba(240, 200, 75, 0.12);
+  --success-soft:      rgba(79, 209, 143, 0.12);
+  --danger-soft:       rgba(255, 102, 117, 0.11);
 
   /* Stronger fill for active chip / selected tab state */
-  --primary-fill:      oklch(0.78 0.135 232 / 0.20);
+  --primary-fill:      rgba(69, 202, 255, 0.18);
 
   /* Focus ring — translucent halo around inputs/buttons on keyboard nav */
-  --primary-ring:      oklch(0.78 0.135 232 / 0.32);
+  --primary-ring:      rgba(69, 202, 255, 0.32);
 
   /* ── Spacing rhythm (Batch A) ──────────────────────────────────────────
      Use these instead of magic numbers when adding new layouts. Existing
@@ -407,7 +407,7 @@ body {
   width: 22px;
   height: 22px;
   color: var(--cyan);
-  filter: drop-shadow(0 0 5px rgba(79, 195, 247, 0.5));
+  filter: drop-shadow(0 0 4px rgba(69, 202, 255, 0.36));
   animation: pulse-glow 3s ease-in-out infinite
 }
 
@@ -415,11 +415,11 @@ body {
 
   0%,
   100% {
-    filter: drop-shadow(0 0 4px rgba(79, 195, 247, 0.4))
+    filter: drop-shadow(0 0 4px rgba(69, 202, 255, 0.32))
   }
 
   50% {
-    filter: drop-shadow(0 0 9px rgba(79, 195, 247, 0.65))
+    filter: drop-shadow(0 0 7px rgba(69, 202, 255, 0.52))
   }
 }
 
@@ -469,14 +469,14 @@ body {
 }
 
 .btn-icon.view-toggle.is-active {
-  background: rgba(79, 195, 247, 0.18);
-  border-color: rgba(79, 195, 247, 0.55);
+  background: rgba(69, 202, 255, 0.13);
+  border-color: rgba(69, 202, 255, 0.42);
   color: var(--cyan);
-  box-shadow: 0 0 0 1px rgba(79, 195, 247, 0.2) inset, 0 0 8px rgba(79, 195, 247, 0.12)
+  box-shadow: 0 0 0 1px rgba(69, 202, 255, 0.16) inset
 }
 
 .btn-icon.view-toggle.is-active svg {
-  filter: drop-shadow(0 0 3px rgba(79, 195, 247, 0.45))
+  filter: drop-shadow(0 0 3px rgba(69, 202, 255, 0.36))
 }
 
 #statsBar {
@@ -507,7 +507,7 @@ body {
   font-size: 24px;
   font-weight: 800;
   line-height: 1;
-  color: var(--cyan);
+  color: #6fd6ff;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1, "lnum" 1;
   letter-spacing: 0;
@@ -529,7 +529,7 @@ body {
 
 #statsBar .stat-label {
   font-size: 8px;
-  color: var(--t2);
+  color: var(--t3);
   text-transform: uppercase;
   letter-spacing: 2px;
   font-weight: 600;
@@ -617,7 +617,7 @@ body {
 }
 
 .main-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(79, 195, 247, 0.25)
+  background: rgba(69, 202, 255, 0.2)
 }
 
 /* ── Category tabs (Batch B) ────────────────────────────────────────────
@@ -717,9 +717,9 @@ body {
   align-items: center;
   justify-content: center;
   background: transparent;
-  border: 1px solid rgba(79, 195, 247, 0.15);
+  border: 1px solid rgba(69, 202, 255, 0.14);
   border-radius: var(--r-md);
-  color: rgba(79, 195, 247, 0.55);
+  color: rgba(69, 202, 255, 0.58);
   cursor: pointer;
   flex-shrink: 0;
   position: relative;
@@ -745,17 +745,17 @@ body {
 }
 
 .btn-add-anime:hover {
-  background: rgba(14, 90, 120, 0.18);
-  border-color: rgba(30, 180, 230, 0.6);
-  color: #7dd8f5;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 0 0 1px rgba(30, 180, 230, 0.15), 0 0 16px rgba(30, 180, 230, 0.1)
+  background: rgba(69, 202, 255, 0.08);
+  border-color: rgba(69, 202, 255, 0.38);
+  color: #7ddcff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.045) inset
 }
 
 .btn-add-anime:active {
-  background: rgba(14, 90, 120, 0.1);
-  border-color: rgba(30, 180, 230, 0.35);
-  color: rgba(30, 180, 230, 0.7);
-  box-shadow: 0 0 0 1px rgba(30, 180, 230, 0.08)
+  background: rgba(69, 202, 255, 0.06);
+  border-color: rgba(69, 202, 255, 0.3);
+  color: rgba(125, 220, 255, 0.74);
+  box-shadow: none
 }
 
 /* ── Search bar (Batch B) ───────────────────────────────────────────────
@@ -796,7 +796,7 @@ body {
 }
 
 .search-input::placeholder {
-  color: rgba(133, 147, 176, 0.6)   /* muted-foreground 60% */
+  color: rgba(154, 168, 195, 0.58)   /* muted-foreground 60% */
 }
 
 .search-input:focus {
@@ -928,8 +928,8 @@ body {
 
 .sort-option.active {
   color: var(--cyan);
-  background: rgba(79, 195, 247, 0.07);
-  border-color: rgba(79, 195, 247, 0.18);
+  background: rgba(69, 202, 255, 0.07);
+  border-color: rgba(69, 202, 255, 0.18);
   font-weight: 600
 }
 
@@ -1099,14 +1099,14 @@ body {
 }
 
 .status-chip:hover {
-  background: rgba(255,255,255,0.05);
+  background: rgba(255,255,255,0.035);
   opacity: 1
 }
 
-.status-chip.airing:hover   { background: rgba(79,195,247,0.08) }
-.status-chip.on-hold:hover  { background: rgba(240,192,64,0.08) }
-.status-chip.completed:hover{ background: rgba(76,175,130,0.08) }
-.status-chip.dropped:hover  { background: rgba(240,69,69,0.08) }
+.status-chip.airing:hover   { background: rgba(69,202,255,0.07) }
+.status-chip.on-hold:hover  { background: rgba(240,200,75,0.07) }
+.status-chip.completed:hover{ background: rgba(79,209,143,0.07) }
+.status-chip.dropped:hover  { background: rgba(255,102,117,0.07) }
 
 .status-chip.active {
   background: transparent;
@@ -1119,7 +1119,7 @@ body {
 }
 
 .status-chip-count {
-  color: var(--t3);
+  color: rgba(99, 113, 141, 0.72);
   font-weight: 700
 }
 
@@ -1136,7 +1136,7 @@ body {
   height: 6px;
   border-radius: 50%;
   background: var(--primary);
-  box-shadow: 0 0 6px var(--primary);
+  box-shadow: 0 0 7px rgba(69, 202, 255, 0.65);
   flex-shrink: 0
 }
 
@@ -1154,10 +1154,10 @@ body {
 /* ── Collapsible status sections (Completed / Dropped / On-hold / Airing) ──
    Identical structure across all four; the per-section --lc triplet (R, G, B)
    drives every tint — border, gradient, label fill, hover, title colour. */
-.completed-list-section { --lc: 76, 175, 130 }
-.dropped-list-section   { --lc: 229, 115, 115 }
-.onhold-list-section    { --lc: 255, 183, 77 }
-.airing-list-section    { --lc: 100, 181, 246 }
+.completed-list-section { --lc: 79, 209, 143 }
+.dropped-list-section   { --lc: 255, 102, 117 }
+.onhold-list-section    { --lc: 240, 200, 75 }
+.airing-list-section    { --lc: 69, 202, 255 }
 
 .completed-list-section,
 .dropped-list-section,
@@ -1168,8 +1168,8 @@ body {
   gap: 0;
   margin-top: 4px;
   border-radius: var(--r-md);
-  border: 1px solid rgba(var(--lc), 0.18);
-  background: linear-gradient(180deg, rgba(var(--lc), 0.06) 0%, rgba(var(--lc), 0.02) 100%);
+  border: 1px solid rgba(var(--lc), 0.14);
+  background: linear-gradient(180deg, rgba(var(--lc), 0.035) 0%, rgba(var(--lc), 0.012) 100%);
   overflow: hidden
 }
 
@@ -1184,7 +1184,7 @@ body {
   padding: 9px 12px;
   cursor: pointer;
   user-select: none;
-  background: rgba(var(--lc), 0.04);
+  background: rgba(var(--lc), 0.025);
   transition: background var(--tf)
 }
 
@@ -1192,7 +1192,7 @@ body {
 .dropped-list-label:hover,
 .onhold-list-label:hover,
 .airing-list-label:hover {
-  background: rgba(var(--lc), 0.1)
+  background: rgba(var(--lc), 0.065)
 }
 
 .completed-list-label-left,
@@ -1210,7 +1210,7 @@ body {
 .airing-list-label-title {
   font-size: 10px;
   font-weight: 700;
-  color: rgb(var(--lc));
+  color: rgba(var(--lc), 0.88);
   letter-spacing: 0.08em;
   transition: color var(--tf)
 }
@@ -1220,7 +1220,7 @@ body {
 .onhold-list-label-sub,
 .airing-list-label-sub {
   font-size: 10px;
-  color: var(--t3)
+  color: rgba(99, 113, 141, 0.82)
 }
 
 .completed-chevron,
@@ -1250,7 +1250,7 @@ body {
 .dropped-list-cards,
 .onhold-list-cards,
 .airing-list-cards {
-  border-top: 1px solid rgba(var(--lc), 0.12)
+  border-top: 1px solid rgba(var(--lc), 0.09)
 }
 
 .completed-list-cards .list-inner,
@@ -1301,7 +1301,7 @@ body {
 .airing-list-cards .anime-movie-group {
   width: 100%;
   box-sizing: border-box;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E"), linear-gradient(180deg, rgba(28, 34, 54, 0.6) 0%, rgba(20, 25, 38, 0.8) 100%), var(--bg-card);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.026'/%3E%3C/svg%3E"), linear-gradient(180deg, rgba(18, 26, 42, 0.9) 0%, rgba(13, 19, 31, 0.96) 100%), var(--bg-card);
   border: 1px solid var(--b1);
   border-top-color: var(--b2);
   box-shadow: var(--s2)
@@ -1319,20 +1319,20 @@ body {
 .airing-list-cards .anime-card:hover,
 .airing-list-cards .anime-season-group:hover,
 .airing-list-cards .anime-movie-group:hover {
-  border-color: rgba(79, 195, 247, 0.22);
-  border-top-color: rgba(79, 195, 247, 0.32);
+  border-color: rgba(69, 202, 255, 0.18);
+  border-top-color: rgba(69, 202, 255, 0.26);
   box-shadow: var(--s3)
 }
 
 .anime-card {
-  background: #161922;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #111826;
+  border: 1px solid rgba(255, 255, 255, 0.075);
   border-radius: var(--r-lg);
   padding: 10px 12px 10px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
   /* Native browser-level virtualization: skip layout/paint for offscreen
      cards. contain-intrinsic-size hints the unrendered height so the
      scrollbar still represents the full list. ~78px is the collapsed-card
@@ -1384,7 +1384,7 @@ body {
   min-width: 30px;
   height: 5px;
   border-radius: var(--r-pill);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.075);
   overflow: hidden
 }
 
@@ -1393,7 +1393,7 @@ body {
   height: 100%;
   border-radius: var(--r-pill);
   /* Subtle teal → cyan gradient (same accent as before, now rounded). */
-  background: linear-gradient(90deg, oklch(0.62 0.11 215) 0%, var(--primary) 100%);
+  background: linear-gradient(90deg, #24abc8 0%, var(--primary) 100%);
   transition: width 0.25s ease
 }
 
@@ -1668,45 +1668,45 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
    ghost so the row reads as one calm unit instead of four loud chips. */
 
 .anime-card-actions .anime-favorite-toggle:hover {
-  color: #ffd88a;
-  background: rgba(247, 185, 85, 0.10)
+  color: #ffd77f;
+  background: rgba(240, 200, 75, 0.10)
 }
 
 .anime-card-actions .anime-favorite-toggle.is-favorite,
 .anime-card-actions .anime-favorite-toggle.is-favorite:hover {
-  color: #ffd88a;
-  background: rgba(247, 185, 85, 0.18)
+  color: #ffe2a0;
+  background: rgba(240, 200, 75, 0.17)
 }
 
 .anime-card-actions .anime-onhold-toggle:hover {
-  color: #a6c7ff;
-  background: rgba(116, 167, 255, 0.10)
+  color: var(--warning);
+  background: var(--warning-soft)
 }
 
 .anime-card-actions .anime-onhold-toggle[data-onhold="true"] {
-  color: #d6e5ff;
-  background: rgba(116, 167, 255, 0.20)
+  color: #ffe2a0;
+  background: rgba(240, 200, 75, 0.18)
 }
 
 .anime-card-actions .anime-complete-toggle:hover {
-  color: #79f0a1;
-  background: rgba(78, 219, 130, 0.10)
+  color: #7ee9ad;
+  background: var(--success-soft)
 }
 
 .anime-card-actions .anime-complete-toggle[data-completed="true"] {
-  color: #b6ffd0;
-  background: rgba(78, 219, 130, 0.20)
+  color: #b9f6d3;
+  background: rgba(79, 209, 143, 0.18)
 }
 
 .anime-card-actions .anime-drop-toggle:hover {
-  color: #ffa0a4;
-  background: rgba(255, 119, 125, 0.10)
+  color: #ff9da8;
+  background: var(--danger-soft)
 }
 
 .anime-card-actions .anime-drop-toggle[data-dropped="true"] {
-  color: #ffd0d2;
-  background: linear-gradient(180deg, rgba(255, 119, 125, 0.24), rgba(255, 119, 125, 0.13));
-  border-color: rgba(255, 119, 125, 0.54);
+  color: #ffd2d7;
+  background: linear-gradient(180deg, rgba(255, 102, 117, 0.22), rgba(255, 102, 117, 0.12));
+  border-color: rgba(255, 102, 117, 0.48);
   box-shadow: inset 0 0 0 1px rgba(255, 208, 210, 0.08)
 }
 
@@ -1716,7 +1716,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .anime-card-actions .anime-edit-title:hover {
   color: var(--cyan);
-  border-color: rgba(79, 195, 247, 0.2)
+  border-color: rgba(69, 202, 255, 0.18)
 }
 
 .anime-card-actions .anime-delete {
@@ -1724,9 +1724,9 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .anime-card-actions .anime-delete:hover {
-  color: #f04545;
-  border-color: rgba(240, 69, 69, 0.2);
-  background: rgba(240, 69, 69, 0.08)
+  color: var(--danger);
+  border-color: rgba(255, 102, 117, 0.2);
+  background: var(--danger-soft)
 }
 
 .anime-fetch-filler {
@@ -1734,7 +1734,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .anime-fetch-filler:hover {
-  background: rgba(240, 192, 64, 0.1);
+  background: var(--warning-soft);
   color: var(--amber)
 }
 
@@ -1811,10 +1811,10 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--cyan), rgba(0, 207, 232, 0.7));
+  background: linear-gradient(90deg, #24abc8, rgba(69, 202, 255, 0.82));
   border-radius: 9999px;
   transition: width 0.6s ease-out;
-  box-shadow: 0 0 6px rgba(0, 207, 232, 0.3)
+  box-shadow: 0 0 5px rgba(69, 202, 255, 0.24)
 }
 
 .progress-bar.size-small {
@@ -1855,8 +1855,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   display: block;
   height: 100%;
   opacity: 1;
-  background: linear-gradient(90deg, #c084fc 0%, #a855f7 45%, #7c3aed 100%);
-  box-shadow: 0 0 6px rgba(168, 85, 247, 0.3)
+  background: linear-gradient(90deg, #b58aff 0%, #925cff 52%, #7136d7 100%);
+  box-shadow: 0 0 5px rgba(164, 119, 255, 0.24)
 }
 
 .skipped-fillers-badge {
@@ -2095,8 +2095,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .episode-tag.in-progress {
   padding: 3px 22px 3px 8px;
-  background: rgba(240, 192, 64, 0.08);
-  border-color: rgba(240, 192, 64, 0.25);
+  background: var(--warning-soft);
+  border-color: rgba(240, 200, 75, 0.24);
   color: var(--amber);
   font-weight: 600;
   border-radius: 10px;
@@ -2115,7 +2115,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(240, 69, 69, 0.65);
+  background: rgba(255, 102, 117, 0.62);
   border: none;
   border-radius: 50%;
   color: #fff;
@@ -2131,20 +2131,20 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .progress-delete-btn:hover {
-  background: #f04545;
+  background: var(--danger);
   opacity: 1
 }
 
 .episode-tag.filler {
-  background: rgba(155, 106, 255, 0.08);
-  border-color: rgba(155, 106, 255, 0.2);
+  background: rgba(164, 119, 255, 0.08);
+  border-color: rgba(164, 119, 255, 0.18);
   color: var(--purple)
 }
 
 .episode-tag.filler.unwatched-filler {
   background: transparent;
-  border: 1px dashed rgba(155, 106, 255, 0.2);
-  color: rgba(155, 106, 255, 0.45);
+  border: 1px dashed rgba(164, 119, 255, 0.18);
+  color: rgba(164, 119, 255, 0.48);
   opacity: 0.65
 }
 
@@ -4935,7 +4935,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .anime-card,
 .anime-season-group,
 .anime-movie-group {
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E"), linear-gradient(180deg, rgba(28, 34, 54, 0.6) 0%, rgba(20, 25, 38, 0.8) 100%), var(--bg-card);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.026'/%3E%3C/svg%3E"), linear-gradient(180deg, rgba(18, 26, 42, 0.9) 0%, rgba(13, 19, 31, 0.96) 100%), var(--bg-card);
   border: 1px solid var(--b1);
   border-top-color: var(--b2);
   border-radius: var(--r-lg);
@@ -4951,8 +4951,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .anime-card:hover,
 .anime-season-group:hover,
 .anime-movie-group:hover {
-  border-color: rgba(79, 195, 247, 0.22);
-  border-top-color: rgba(79, 195, 247, 0.32);
+  border-color: rgba(69, 202, 255, 0.18);
+  border-top-color: rgba(69, 202, 255, 0.26);
   box-shadow: var(--s3)
 }
 
@@ -4975,7 +4975,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .anime-card:hover::before,
 .anime-season-group:hover::before,
 .anime-movie-group:hover::before {
-  opacity: 0.6
+  opacity: 0.42
 }
 
 .anime-card-header,
@@ -5208,8 +5208,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .meta-badge-onhold {
-  --badge-fg: #ffb74d;
-  --badge-bg: rgba(255, 183, 77, 0.10)
+  --badge-fg: var(--warning);
+  --badge-bg: var(--warning-soft)
 }
 
 .meta-badge-dropped {
@@ -5220,8 +5220,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 /* Airing carries a leading pulsing dot — the only badge with an icon
    beyond the inline emoji glyphs that come from JS. */
 .meta-badge-airing {
-  --badge-fg: #ff6b6b;
-  --badge-bg: rgba(255, 107, 107, 0.10)
+  --badge-fg: var(--primary);
+  --badge-bg: var(--primary-soft)
 }
 .meta-badge-airing::before {
   content: '';
@@ -5245,7 +5245,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .meta-time {
   display: block;
   font-size: 9px;
-  color: var(--t3);
+  color: rgba(154, 168, 195, 0.72);
   white-space: nowrap
 }
 
