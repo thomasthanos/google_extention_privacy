@@ -229,7 +229,12 @@ async function buildLibraryRepairPlan(animeData, options = {}) {
     }
 
     return {
-        total: entries.length,
+        // Count only the entries we actually account for: those already
+        // resolved from cache (processed) plus those queued for fetching
+        // (items). Entries skipped entirely (e.g. completed/dropped on mobile)
+        // are excluded so the progress bar fills smoothly to 100% instead of
+        // jumping when the run completes.
+        total: processed + items.length,
         processed,
         cached,
         skipped,

@@ -208,6 +208,11 @@ const AnimeCardRenderer = {
             && highestCompletedEp >= _latestAvail
             && (anilistStatusForProgress === 'RELEASING' || _isPartiallyUploaded);
 
+        // Hide progress bars for cards in the airing (caught up), completed,
+        // dropped, and on-hold lists — the percentage bar is only meaningful
+        // while actively progressing through a series.
+        const showProgressBar = !isDropped && !isOnHold && !isCardComplete && !_isCaughtUpAiring;
+
         let statusTextCard = '';
         if (isDropped) {
             statusTextCard = 'Dropped';
@@ -335,10 +340,10 @@ const AnimeCardRenderer = {
             <div class="meta-time-row">
                 <span class="meta-time">${timeAgoText}</span>
                 ${inlineEtaHtml}
-                <span class="meta-time-progress" title="${Math.round(canonProgressWidth)}% watched">
+                ${showProgressBar ? `<span class="meta-time-progress" title="${Math.round(canonProgressWidth)}% watched">
                     <span class="meta-time-progress-bar" aria-hidden="true"><span class="meta-time-progress-fill" style="width:${canonProgressWidth}%"></span></span>
                     <span class="meta-time-progress-pct">${Math.round(canonProgressWidth)}%</span>
-                </span>
+                </span>` : ''}
             </div>`;
 
         return `
@@ -354,7 +359,7 @@ const AnimeCardRenderer = {
                     </div>
                 </div>
                 <div class="anime-card-content">
-                    <div class="progress-container header-progress">
+                    ${showProgressBar ? `<div class="progress-container header-progress">
                         <div class="progress-info">
                             ${progressInfoText}
                             <span>${canonProgressLabel}</span>
@@ -362,7 +367,7 @@ const AnimeCardRenderer = {
                         <div class="progress-bar ${sizeClass}">
                             <div class="progress-fill" style="width: ${canonProgressWidth}%"></div>
                         </div>
-                    </div>
+                    </div>` : ''}
                     ${fillerProgressSection}
                     ${partsSection}
                     <div class="anime-meta">

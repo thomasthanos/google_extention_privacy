@@ -139,59 +139,11 @@ body {
 }
 
 .auth-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  padding: 20px;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-  background: radial-gradient(ellipse at 20% 80%, rgba(79, 195, 247, 0.08) 0%, transparent 55%), radial-gradient(ellipse at 80% 20%, rgba(94, 168, 255, 0.08) 0%, transparent 55%), var(--bg-0)
-}
-
-.auth-section::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: linear-gradient(rgba(79, 195, 247, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(79, 195, 247, 0.02) 1px, transparent 1px);
-  background-size: 40px 40px;
-  pointer-events: none
+  justify-content: center
 }
 
 .auth-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  width: 320px;
-  max-width: calc(100% - 40px);
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 1;
-  background: rgba(14, 17, 23, 0.92);
-  backdrop-filter: blur(24px);
-  border: 1px solid var(--b1);
-  border-top-color: var(--b2);
-  border-radius: var(--r-xl);
-  padding: 28px 24px 24px;
-  box-shadow: var(--s4), inset 0 1px 0 var(--b1)
-}
-
-.japanese-header {
-  text-align: center;
-  margin-bottom: 4px
-}
-
-.torii-gate {
-  width: 58px;
-  height: 50px;
-  margin: 0 auto 10px;
-  display: block;
-  filter: drop-shadow(0 0 8px rgba(79, 195, 247, 0.3))
+  display: flex
 }
 
 .torii-gate svg {
@@ -203,27 +155,6 @@ body {
   display: block;
   margin-bottom: 2px;
   text-align: center
-}
-
-.jp-text {
-  display: block;
-  font-size: 26px;
-  font-weight: 700;
-  background: var(--grad-cyan);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  letter-spacing: 2px
-}
-
-.en-text {
-  display: block;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 4px;
-  color: var(--t2);
-  margin-top: 4px;
-  text-transform: uppercase
 }
 
 .btn-google-primary {
@@ -361,41 +292,7 @@ body {
    group rather than two glued-together widgets. */
 
 .auth-email-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%
-}
-
-.auth-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  text-align: left
-}
-
-.auth-field-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  color: var(--t3);
-  padding-left: 2px
-}
-
-.auth-input {
-  width: 100%;
-  padding: 10px 13px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--b1);
-  border-radius: var(--r-md);
-  color: var(--t1);
-  font-size: 13px;
-  font-family: inherit;
-  outline: none;
-  transition: border-color var(--tn), box-shadow var(--tn);
-  user-select: text;
-  -webkit-user-select: text
+  display: flex
 }
 
 .auth-input:disabled {
@@ -404,15 +301,14 @@ body {
 }
 
 .auth-error {
-  color: #f04545;
+  color: #f04545;   /* overridden by .auth-error--success below */
   font-size: 11px;
   text-align: center;
   margin: 0;
   padding: 6px 10px;
   background: rgba(240, 69, 69, 0.08);
   border: 1px solid rgba(240, 69, 69, 0.22);
-  border-radius: var(--r-sm);
-  line-height: 1.4
+  border-radius: var(--r-sm)
 }
 
 .auth-error--success {
@@ -422,22 +318,8 @@ body {
 }
 
 .btn-auth-primary {
-  width: 100%;
-  padding: 0;
-  height: 42px;
-  background: linear-gradient(160deg, #1a7fa8 0%, #0e6690 45%, #074f72 100%);
-  border: none;
-  border-radius: var(--r-pill);
   cursor: pointer;
-  color: #d0eeff;
-  font-family: inherit;
-  font-weight: 700;
-  font-size: 13px;
-  letter-spacing: 0.3px;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset, 0 -1px 0 rgba(0, 0, 0, 0.3) inset, 0 3px 0 #032d44, 0 5px 14px rgba(0, 0, 0, 0.45);
-  transform: translateY(0);
-  transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.12s ease
+  transform: translateY(0)
 }
 
 .btn-auth-primary:active:not(:disabled) {
@@ -453,26 +335,8 @@ body {
   filter: grayscale(0.2)
 }
 
-.auth-secondary-links {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 2px;
-  font-size: 11px
-}
-
 .auth-link {
-  background: none;
-  border: none;
-  padding: 4px 6px;
-  color: var(--t2);
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: color var(--tf);
-  text-decoration: none
+  cursor: pointer
 }
 
 .auth-link:disabled {
@@ -731,11 +595,7 @@ body {
 }
 
 .app.settings-mode .main-content {
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 12px 0 18px;
-  scrollbar-width: none;
-  -ms-overflow-style: none
+  overflow-y: auto
 }
 
 .app.settings-mode .main-content::-webkit-scrollbar {
@@ -916,8 +776,8 @@ body {
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  width: 15px;
-  height: 15px;
+  width: 17px;
+  height: 17px;
   color: var(--t3);
   pointer-events: none;
   z-index: 1
@@ -983,6 +843,12 @@ body {
   width: 14px;
   height: 14px;
   stroke-width: 2.2
+}
+
+.search-actions .btn-add-anime svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.6
 }
 
 .search-actions .btn-add-anime:hover,
@@ -3129,14 +2995,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .add-anime-dialog {
-  max-width: 340px;
-  text-align: left;
-  padding: 0;
-  overflow: hidden;
-  background: #0f1520;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-top-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(79, 195, 247, 0.05)
+  padding: 0
 }
 
 .dialog-header {
@@ -3256,6 +3115,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
    (flex-shrink:0). max-height keeps the whole dialog within the popup
    viewport so the header is never clipped behind the popup chrome. */
 .add-anime-dialog {
+  text-align: left;
   width: min(94vw, 360px) !important;
   max-width: 360px !important;
   max-height: 88vh;
@@ -3285,9 +3145,10 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 /* ── Header with icon + subtitle ─────────────────────────────────── */
 .add-anime-header {
   flex: 0 0 auto;            /* pinned — never shrinks, always visible */
-  display: flex;
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) 34px;
   align-items: center;
-  gap: 11px;
+  column-gap: 10px;
   padding: 13px 16px !important;
   background: linear-gradient(180deg, rgba(16,22,36,0.96) 0%, rgba(11,15,26,0.94) 100%);
   position: relative;
@@ -3305,9 +3166,11 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .add-anime-header-icon {
-  flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
+  position: static;
+  transform: none;
+  justify-self: start;
+  width: 46px;
+  height: 46px;
   display: grid;
   place-items: center;
   border-radius: var(--r-sm);
@@ -3320,12 +3183,15 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .add-anime-header-icon svg {
-  width: 22px;
-  height: 22px
+  width: 27px;
+  height: 27px
 }
 
 /* Round, dark, softly-outlined close button (target style) */
 .add-anime-header .dialog-close {
+  position: static;
+  transform: none;
+  justify-self: end;
   width: 30px;
   height: 30px;
   border-radius: 50%;
@@ -3347,9 +3213,16 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .add-anime-header-text {
-  flex: 1;
+  position: static;
+  transform: none;
   min-width: 0;
-  text-align: left
+  max-width: 100%;
+  text-align: center;
+  justify-self: stretch;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center
 }
 
 .add-anime-header-text h3 {
@@ -3357,16 +3230,22 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   font-weight: 700;
   color: var(--t1);
   margin: 0 0 1px 0;
-  letter-spacing: 0.1px
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis
 }
 
 .add-anime-subtitle {
-  font-size: 11.5px;
+  font-size: 10.8px;
   color: var(--t2);
   margin: 0;
   line-height: 1.35;
   font-weight: 400;
-  opacity: 0.8
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis
 }
 
 /* ── Body — compact rhythm, scrollable middle region ─────────────── */
@@ -3533,8 +3412,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 12px;
-  height: 12px;
+  width: 15px;
+  height: 15px;
   stroke: #000000 !important;
   stroke-width: 2;
   fill: none !important;
@@ -3559,8 +3438,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 12px;
-  height: 12px;
+  width: 15px;
+  height: 15px;
   opacity: 1
 }
 
@@ -3570,8 +3449,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 12px;
-  height: 12px;
+  width: 15px;
+  height: 15px;
   opacity: 1
 }
 
@@ -3663,15 +3542,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .slug-input-wrap input {
-  /* Override the dialog's default input styling — this one lives inside
-     a card so it shouldn't have its own border. */
-  background: transparent !important;
-  border: none !important;
-  padding: 8px 32px 8px 38px !important;
-  height: auto !important;
-  font-size: 13px !important;
-  box-shadow: none !important;
-  color: var(--t1)
+  box-shadow: none !important
 }
 
 .slug-input-wrap input:focus {
@@ -3717,6 +3588,14 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .slug-meta-stats .stat-watched { color: var(--cyan); font-weight: 600 }
 
 .slug-input-wrap input {
+  /* Override the dialog's default input styling — this one lives inside
+     a card so it shouldn't have its own border. */
+  background: transparent !important;
+  border: none !important;
+  padding: 8px 32px 8px 38px !important;
+  height: auto !important;
+  font-size: 13px !important;
+  color: var(--t1);
   width: 100%;
   padding-right: 34px !important
 }
@@ -4353,19 +4232,17 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .btn-with-icon[data-state="idle"]    .btn-icon-plus    { opacity: 1; position: static; transform: none }
 .btn-with-icon[data-state="loading"] .btn-icon-spinner { opacity: 1; position: static; transform: none; animation: spin 0.9s linear infinite }
 .btn-with-icon[data-state="success"] .btn-icon-check   { opacity: 1; position: static; transform: none }
-
-.btn-with-icon[data-state="loading"] .btn-label::before { content: 'Adding…' }
 .btn-with-icon[data-state="loading"] .btn-label         { font-size: 0 }
-.btn-with-icon[data-state="loading"] .btn-label::before { font-size: 12px }
+.btn-with-icon[data-state="loading"] .btn-label::before {
+  content: 'Adding…'; font-size: 12px }
 
 .btn-with-icon[data-state="success"] {
   background: linear-gradient(135deg, var(--green) 0%, #2e9e6a 100%) !important;
   box-shadow: 0 0 24px rgba(76,175,130,0.5) !important
 }
-
-.btn-with-icon[data-state="success"] .btn-label::before { content: 'Added!' }
 .btn-with-icon[data-state="success"] .btn-label         { font-size: 0 }
-.btn-with-icon[data-state="success"] .btn-label::before { font-size: 12px }
+.btn-with-icon[data-state="success"] .btn-label::before {
+  content: 'Added!'; font-size: 12px }
 
 @keyframes spin {
   from { transform: rotate(0deg) }
@@ -7144,18 +7021,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   gap: 10px
 }
 
-.settings-view-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-  max-width: 520px;
-  min-width: 0;
-  margin: 0 auto;
-  padding: 0 14px;
-  box-sizing: border-box
-}
-
 .settings-card {
   background: var(--bg-card);
   border: 1px solid var(--b1);
@@ -7419,6 +7284,14 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 /* Tighten container — section labels create rhythm so card gap goes down */
 .settings-view-inner {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 520px;
+  min-width: 0;
+  margin: 0 auto;
+  padding: 0 14px;
+  box-sizing: border-box;
   gap: 6px !important
 }
 
@@ -7434,31 +7307,12 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 /* Account pill spans the full header width — avatar + name on the left,
    sign-out icon on the right, with name flexing to fill the space. */
 .settings-account-pill {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  flex: 1;
-  padding: 5px 6px 5px 5px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  position: relative;
-  transition: background var(--tf), border-color var(--tf)
+  background: rgba(255, 255, 255, 0.05)
 }
 
 .settings-account-pill:hover {
   background: rgba(255, 255, 255, 0.07);
   border-color: rgba(255, 255, 255, 0.16)
-}
-
-.settings-pill-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.08)
 }
 
 .settings-pill-name {
@@ -7481,19 +7335,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 /* Sign-out icon button — subtle; turns red on hover */
 .settings-pill-signout {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 50%;
-  color: rgba(133, 147, 176, 0.85);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all var(--tf);
-  padding: 0
+  color: rgba(133, 147, 176, 0.85)
 }
 
 .settings-pill-signout:hover {
@@ -7775,11 +7618,31 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 /* Profile row: rounded rectangle + rounded-square sign-out (was pill + circle) */
 .settings-account-pill {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  flex: 1;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  transition: background var(--tf), border-color var(--tf);
   border-radius: 14px;
   padding: 8px 8px 8px 9px
 }
-.settings-pill-avatar { width: 34px; height: 34px }
-.settings-pill-signout { border-radius: 9px; width: 34px; height: 34px }
+.settings-pill-avatar {
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.08); width: 34px; height: 34px }
+.settings-pill-signout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--tf);
+  padding: 0; border-radius: 9px; width: 34px; height: 34px }
 
 /* Backup card */
 .settings-backup-card {
@@ -8007,6 +7870,9 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .app.settings-mode .main-content {
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   padding: 6px 0 7px;
   background:
     radial-gradient(circle at 18% 5%, rgba(47, 183, 255, 0.08), transparent 28%),
@@ -8714,6 +8580,13 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 /* Auth redesign: desktop email/password card matching the neon reference. */
 .auth-section {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  text-align: center;
+  overflow: hidden;
   padding: 14px;
   background:
     radial-gradient(circle at 50% -12%, rgba(55, 132, 255, 0.18), transparent 38%),
@@ -8722,6 +8595,10 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .auth-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
   background-image:
     url("data:image/svg+xml,%3Csvg width='520' height='520' viewBox='0 0 520 520' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%236aa8ff' stroke-opacity='.28' stroke-width='1.25'%3E%3Cpath d='M-30 120C55 78 115 174 206 129S353 67 550 122'/%3E%3Cpath d='M-30 172C65 132 119 218 218 176S376 119 550 171'/%3E%3Cpath d='M-30 224C73 183 133 267 238 226S386 171 550 224'/%3E%3Cpath d='M-30 276C83 235 145 318 260 276S397 225 550 274'/%3E%3Cpath d='M-30 328C95 289 159 370 282 329S412 278 550 326'/%3E%3Cpath d='M-30 380C108 342 176 422 303 381S429 333 550 379'/%3E%3C/g%3E%3Cg fill='none' stroke='%2339d4ff' stroke-opacity='.13' stroke-width='1.05'%3E%3Cpath d='M36 -20C64 66 5 106 53 178S118 290 69 540'/%3E%3Cpath d='M444 -20C408 68 466 120 420 192S360 306 452 540'/%3E%3C/g%3E%3C/svg%3E"),
     linear-gradient(rgba(96, 150, 230, 0.075) 1px, transparent 1px),
@@ -8745,6 +8622,14 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .auth-content {
+  flex-direction: column;
+  align-items: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  backdrop-filter: blur(24px);
   width: min(374px, calc(100% - 26px));
   max-width: min(374px, calc(100% - 26px));
   gap: 11px;
@@ -8770,16 +8655,14 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   display: none !important;
 }
 
-.auth-content:not(.auth-mobile) .btn-google-primary {
-  display: block;
-}
-
 .japanese-header {
+  text-align: center;
   width: 100%;
   margin-bottom: 6px;
 }
 
 .torii-gate {
+  display: block;
   width: 68px;
   height: 56px;
   margin: 0 auto 8px;
@@ -8789,6 +8672,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .jp-text {
+  display: block;
+  -webkit-text-fill-color: transparent;
   font-size: 31px;
   font-weight: 900;
   line-height: 1.05;
@@ -8800,6 +8685,9 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .en-text {
+  display: block;
+  font-weight: 700;
+  text-transform: uppercase;
   margin-top: 10px;
   font-size: 11px;
   letter-spacing: 7px;
@@ -8814,14 +8702,20 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .auth-email-form {
+  flex-direction: column;
+  width: 100%;
   gap: 12px;
 }
 
 .auth-field {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
   gap: 6px;
 }
 
 .auth-field-label {
+  text-transform: uppercase;
   padding-left: 2px;
   color: rgba(142, 172, 225, 0.92);
   font-size: 12px;
@@ -8865,6 +8759,12 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .auth-input {
+  width: 100%;
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--tn), box-shadow var(--tn);
+  user-select: text;
+  -webkit-user-select: text;
   height: 52px;
   padding: 0 48px 0 52px;
   border: 0;
@@ -8918,6 +8818,12 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .btn-auth-primary {
+  width: 100%;
+  padding: 0;
+  border: none;
+  font-family: inherit;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.12s ease;
   position: relative;
   height: 54px;
   margin-top: 4px;
@@ -8972,6 +8878,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .auth-content:not(.auth-mobile) .btn-google-primary {
+  display: block;
   height: 56px;
   width: 100%;
   border-radius: 27px;
@@ -9011,10 +8918,20 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .auth-secondary-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 11px;
   margin-top: 2px;
 }
 
 .auth-link {
+  background: none;
+  border: none;
+  font-family: inherit;
+  transition: color var(--tf);
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
   gap: 9px;
@@ -9045,6 +8962,10 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .auth-error {
+  /* color intentionally NOT set here: it lives in the base .auth-error rule
+     near the top so .auth-error--success (which sits between) can override
+     it for the green success state. */
+  line-height: 1.4;
   margin-top: -4px;
 }
 
