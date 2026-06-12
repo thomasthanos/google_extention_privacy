@@ -589,21 +589,118 @@
         return summary;
     }
 
-    function buildSmartGoalNote(key, context, profile, windows) {
+    // ── Airing-supply analysis ───────────────────────────────────────────
+    // Looks at the AniList/an1me info cache (slug → { latestEpisode,
+    // nextEpisodeAt, status, totalEpisodes }) to estimate how many episodes are
+    // realistically *available to watch* in the near future for the shows the
+    // user is actively following. This is what makes the smart goals
+    // schedule-aware: goals should track real supply, not just past pace.
+    //
+    //   backlog        → episodes already out but not yet watched (catch-up).
+    //   dropsNext7/30  → expected NEW episodes within 7 / 30 days, projected
+    //                    from each show's weekly release cadence + the known
+    //                    nextEpisodeAt countdown.
+    //   airingCount    → how many followed shows are currently releasing.
+    function analyzeUpcomingReleases(animeData, now = Date.now()) {
+        const result = {
+            airingCount: 0,
+            backlog: 0,
+            dropsNext7: 0,
+            dropsNext30: 0,
+            hasSchedule: false
+        };
+
+        const anilist = (typeof window !== 'undefined')
+            ? window.AnimeTracker?.AnilistService
+            : null;
+        const cache = anilist?.cache;
+        if (!cache || !animeData) return result;
+
+        const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+        for (const slug in animeData) {
+            if (!Object.prototype.hasOwnProperty.call(animeData, slug)) continue;
+            const anime = animeData[slug];
+            if (!anime) continue;
+            // Only shows the user is actively following count toward supply.
+            if (anime.droppedAt || anime.completedAt || anime.onHoldAt) continue;
+
+            const info = cache[slug];
+            if (!info || info.status !== 'RELEASING') continue;
+
+            result.airingCount++;
+
+            const latestAvail = Math.max(0, Number(info.latestEpisode) || 0);
+            const highestWatched = Math.max(
+                0,
+                ...((Array.isArray(anime.episodes) ? anime.episodes : [])
+                    .map(ep => Number(ep.number) || 0))
+            );
+
+            // Catch-up backlog: already-aired episodes the user hasn't watched.
+            if (latestAvail > highestWatched) {
+                result.backlog += (latestAvail - highestWatched);
+            }
+
+            // Projected future drops from the countdown to the next episode.
+            // Weekly cadence is the norm for seasonal anime, so a show yields at
+            // most ~1 new episode per 7 days. Overdue/aired episodes are already
+            // counted in `backlog`, so here we only project genuinely future drops.
+            const nextAtMs = info.nextEpisodeAt ? new Date(info.nextEpisodeAt).getTime() : NaN;
+            if (Number.isFinite(nextAtMs)) {
+                result.hasSchedule = true;
+                const startMs = Math.max(nextAtMs, now);
+                const end7 = now + 7 * 24 * 60 * 60 * 1000;
+                const end30 = now + 30 * 24 * 60 * 60 * 1000;
+                if (startMs <= end7) result.dropsNext7 += 1;
+                if (startMs <= end30) {
+                    // First drop at startMs, then one per week until the horizon.
+                    const extraWeeks = Math.floor((end30 - startMs) / WEEK_MS);
+                    result.dropsNext30 += Math.min(1 + extraWeeks, 5);
+                }
+            } else {
+                // No countdown known but the show is releasing — assume the
+                // typical one-episode-per-week cadence as a conservative guess.
+                result.dropsNext7 += 1;
+                result.dropsNext30 += 4;
+            }
+        }
+
+        return result;
+    }
+
+    function buildSmartGoalNote(key, context, profile, windows, releases) {
         const watchingCount = Math.max(0, Number(context?.watching) || 0);
         const holdingCount = Math.max(0, Number(context?.onHold) || 0);
         const droppedCount = Math.max(0, Number(context?.dropped) || 0);
         const remainingEpisodes = Math.max(0, Number(context?.remainingEpisodes) || 0);
         const consistency = Number(profile?.consistency) || 0;
 
+        const backlog = Math.max(0, Number(releases?.backlog) || 0);
+        const drops7 = Math.max(0, Number(releases?.dropsNext7) || 0);
+        const drops30 = Math.max(0, Number(releases?.dropsNext30) || 0);
+
+        // Prefer an airing-supply explanation when there's a meaningful signal —
+        // it's the most concrete reason for the target.
+        const supplyPhrase = (drops) => {
+            const bits = [];
+            if (backlog > 0) bits.push(`${backlog} waiting`);
+            if (drops > 0) bits.push(`${drops} airing soon`);
+            return bits.join(' + ');
+        };
+
         if (key === 'daily') {
             if ((windows?.recent14?.activeDays || 0) <= 3) return 'Auto: kept lighter around your current rhythm';
+            if (backlog + drops7 >= 5 && consistency >= 0.5) return `Auto: episodes lined up this week (${supplyPhrase(drops7)})`;
             if (watchingCount >= 4) return `Auto: recent watch time + ${watchingCount} active shows`;
             if (consistency >= 0.7) return 'Auto: recent watch time with your steady pace';
             return 'Auto: based on your recent watch time';
         }
 
         if (key === 'weekly') {
+            if (backlog + drops7 > 0 && (backlog + drops7) >= Math.max(2, watchingCount)) {
+                return `Auto: tuned to what's watchable this week (${supplyPhrase(drops7)})`;
+            }
             if (watchingCount >= 4) return `Auto: recent pace + ${watchingCount} active shows`;
             if (holdingCount >= Math.max(2, watchingCount)) return 'Auto: adjusted to stay realistic right now';
             if ((Number(profile?.recent7Rate) || 0) > (Number(profile?.recent30Rate) || 0) * 1.18) {
@@ -612,17 +709,26 @@
             return 'Auto: based on your recent weekly pace';
         }
 
+        if (backlog + drops30 > 0 && (backlog + drops30) >= 4) {
+            return `Auto: scaled to your airing schedule (${supplyPhrase(drops30)})`;
+        }
         if (remainingEpisodes >= 60) return 'Auto: scaled from weekly pace + current backlog';
         if (droppedCount >= 3) return 'Auto: slightly lighter to match your library flow';
         return 'Auto: scaled from weekly pace and library size';
     }
 
-    function buildSmartGoalsSummary(context, profile, autoAdjusted) {
+    function buildSmartGoalsSummary(context, profile, autoAdjusted, releases) {
         const parts = ['recent pace'];
         const watchingCount = Math.max(0, Number(context?.watching) || 0);
         const consistency = Number(profile?.consistency) || 0;
 
-        if (watchingCount > 0) {
+        const airingCount = Math.max(0, Number(releases?.airingCount) || 0);
+        const backlog = Math.max(0, Number(releases?.backlog) || 0);
+        const drops7 = Math.max(0, Number(releases?.dropsNext7) || 0);
+
+        if (airingCount > 0 && (backlog + drops7) > 0) {
+            parts.push(`${airingCount} airing show${airingCount === 1 ? '' : 's'}`);
+        } else if (watchingCount > 0) {
             parts.push(`${watchingCount} active show${watchingCount === 1 ? '' : 's'}`);
         }
         parts.push(consistency >= 0.68 ? 'steady consistency' : (consistency >= 0.45 ? 'mixed consistency' : 'light consistency'));
@@ -643,6 +749,7 @@
         const profile = index?.userProfile || {};
         const byDay = index?.byDay;
         const context = analyzeGoalContext(animeData);
+        const releases = analyzeUpcomingReleases(animeData);
         const hasWatchHistory = (Number(index?.totals?.episodes) || 0) > 0;
         const recent7 = getWindowTotals(byDay, 7);
         const recent14 = getWindowTotals(byDay, 14);
@@ -676,6 +783,24 @@
             weeklyEpisodes += context.notStarted >= 8 ? 0.35 : 0;
             weeklyEpisodes -= context.onHold >= Math.max(2, context.watching) ? 0.6 : 0;
             weeklyEpisodes -= consistency < 0.42 ? 0.45 : 0;
+
+            // Airing-supply nudge: episodes you can realistically watch in the
+            // next 7 days = catch-up backlog + expected new drops. We pull the
+            // pace-based target a fraction of the way toward this supply, but
+            // only UPWARD (more episodes are available than your pace assumes)
+            // and weighted by consistency so flaky watchers aren't over-promised.
+            const weeklySupply = releases.backlog + releases.dropsNext7;
+            if (weeklySupply > 0) {
+                const pullStrength = 0.18 + clampNumber(consistency, 0, 1) * 0.32; // 0.18..0.50
+                if (weeklySupply > weeklyEpisodes) {
+                    const gap = weeklySupply - weeklyEpisodes;
+                    // Cap how much supply alone can add, so a huge backlog can't
+                    // spike the goal to something demotivating.
+                    const maxAdd = 2 + Math.round(clampNumber(consistency, 0, 1) * 4); // 2..6
+                    weeklyEpisodes += Math.min(gap * pullStrength, maxAdd);
+                }
+            }
+
             weeklyEpisodes = clampNumber(roundToStep(weeklyEpisodes, 1), 1, 60);
         }
 
@@ -684,6 +809,18 @@
             monthlyEpisodes = ((recent30Rate * 30) * 0.65) + ((weeklyEpisodes * 4.2) * 0.35);
             monthlyEpisodes += Math.min(context.remainingEpisodes / 60, 3);
             monthlyEpisodes -= context.dropped >= 3 ? 1 : 0;
+
+            // Airing-supply nudge for the month: backlog + projected 30-day drops.
+            const monthlySupply = releases.backlog + releases.dropsNext30;
+            if (monthlySupply > 0) {
+                const pullStrength = 0.18 + clampNumber(consistency, 0, 1) * 0.30; // 0.18..0.48
+                if (monthlySupply > monthlyEpisodes) {
+                    const gap = monthlySupply - monthlyEpisodes;
+                    const maxAdd = 6 + Math.round(clampNumber(consistency, 0, 1) * 12); // 6..18
+                    monthlyEpisodes += Math.min(gap * pullStrength, maxAdd);
+                }
+            }
+
             monthlyEpisodes = clampNumber(roundToStep(monthlyEpisodes, 1), Math.max(4, weeklyEpisodes * 3), 240);
         }
 
@@ -699,19 +836,19 @@
                 field: 'targetMinutes',
                 target: dailyMinutes,
                 display: `${dailyMinutes} min`,
-                note: hasWatchHistory ? buildSmartGoalNote('daily', context, profile, windows) : 'Auto: starter default until you build watch history'
+                note: hasWatchHistory ? buildSmartGoalNote('daily', context, profile, windows, releases) : 'Auto: starter default until you build watch history'
             },
             weekly: {
                 field: 'targetEpisodes',
                 target: weeklyEpisodes,
                 display: `${weeklyEpisodes} ep`,
-                note: hasWatchHistory ? buildSmartGoalNote('weekly', context, profile, windows) : 'Auto: starter default until your pace is clearer'
+                note: hasWatchHistory ? buildSmartGoalNote('weekly', context, profile, windows, releases) : 'Auto: starter default until your pace is clearer'
             },
             monthly: {
                 field: 'targetEpisodes',
                 target: monthlyEpisodes,
                 display: `${monthlyEpisodes} ep`,
-                note: hasWatchHistory ? buildSmartGoalNote('monthly', context, profile, windows) : 'Auto: starter default until your library flow is clearer'
+                note: hasWatchHistory ? buildSmartGoalNote('monthly', context, profile, windows, releases) : 'Auto: starter default until your library flow is clearer'
             }
         };
 
@@ -762,9 +899,10 @@
             shouldPersist,
             autoAdjusted,
             context,
+            releases,
             summary: {
                 text: hasWatchHistory
-                    ? buildSmartGoalsSummary(context, profile, autoAdjusted)
+                    ? buildSmartGoalsSummary(context, profile, autoAdjusted, releases)
                     : 'Smart goals will adapt automatically once you build a little watch history.'
             }
         };
