@@ -1562,15 +1562,28 @@
         const _mainContentScroll = document.querySelector('.main-content');
         const _mainAppRoot = document.querySelector('.main-app');
         if (_mainContentScroll && _mainAppRoot) {
-            const THRESHOLD_ON  = 12;
-            const THRESHOLD_OFF = 4;
+            // Scroll-linked compaction: map scrollTop over a short range to a
+            // 0→1 progress and expose it as --sc. CSS shrinks the header/stats
+            // height proportionally (bottom spacing only — the top offset stays
+            // fixed). A binary `is-scrolled` flag still drives the shadow/border.
+            const COMPACT_RANGE = 64;
+            const SHADOW_ON  = 12;
+            const SHADOW_OFF = 4;
             let _scrollDebounce = null;
+            let _lastProgress = -1;
             const updateScrolledClass = () => {
                 const top = _mainContentScroll.scrollTop;
+
+                const progress = Math.max(0, Math.min(1, top / COMPACT_RANGE));
+                if (progress !== _lastProgress) {
+                    _lastProgress = progress;
+                    _mainAppRoot.style.setProperty('--sc', progress.toFixed(3));
+                }
+
                 const isScrolled = _mainAppRoot.classList.contains('is-scrolled');
-                if (!isScrolled && top > THRESHOLD_ON) {
+                if (!isScrolled && top > SHADOW_ON) {
                     _mainAppRoot.classList.add('is-scrolled');
-                } else if (isScrolled && top <= THRESHOLD_OFF) {
+                } else if (isScrolled && top <= SHADOW_OFF) {
                     _mainAppRoot.classList.remove('is-scrolled');
                 }
             };

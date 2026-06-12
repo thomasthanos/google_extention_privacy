@@ -165,8 +165,15 @@ async function migratePerKeyCachesOnce() {
 
         const all = await new Promise((resolve, reject) => {
             chrome.storage.local.get(null, (result) => {
-                if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError.message));
+                const err = chrome.runtime.lastError;
+                if (err) {
+                    // Benign MV3 teardown errors ("No SW", etc.) — resolve empty
+                    // so boot migration silently no-ops and retries next wake.
+                    const benign = (typeof isBenignSwLifecycleError === 'function')
+                        ? isBenignSwLifecycleError(err.message)
+                        : /No SW|Service worker|context invalidated/i.test(String(err.message || ''));
+                    if (benign) resolve({});
+                    else reject(new Error(err.message));
                 } else {
                     resolve(result || {});
                 }

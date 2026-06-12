@@ -245,8 +245,11 @@ async function bgIterativeQuotaRecovery(reason = 'daily-alarm') {
         }
         const all = await new Promise((resolve, reject) => {
             chrome.storage.local.get(null, (result) => {
-                if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-                else resolve(result || {});
+                const err = chrome.runtime.lastError;
+                if (err) {
+                    if (isBenignSwLifecycleError(err.message)) resolve({});
+                    else reject(new Error(err.message));
+                } else resolve(result || {});
             });
         });
 
@@ -345,39 +348,85 @@ async function ensureDailyCleanupAlarmScheduled() {
     }
 }
 
+// MV3 service workers can be torn down mid-flight; when that happens a pending
+// chrome.* callback fires with chrome.runtime.lastError set to a lifecycle
+// message like "No SW" / "The message port closed..." / "Extension context
+// invalidated". These are benign — there's nothing to do while the context is
+// dying, and the work resumes on the next wake — so we must NOT surface them as
+// hard rejections (they cause noisy "Uncaught (in promise)" logs on boot).
+function isBenignSwLifecycleError(message) {
+    if (!message) return false;
+    const m = String(message);
+    return /No SW|Service worker|context invalidated|message port closed|message channel closed|before a response was received/i
+        .test(m);
+}
+
 function bgStorageGet(keys) {
     return new Promise((resolve, reject) => {
-        chrome.storage.local.get(keys, (result) => {
-            if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-            } else {
-                resolve(result);
-            }
-        });
+        try {
+            chrome.storage.local.get(keys, (result) => {
+                const err = chrome.runtime.lastError;
+                if (err) {
+                    if (isBenignSwLifecycleError(err.message)) {
+                        dlog('[BG] storage.get ignored during SW teardown:', err.message);
+                        resolve({});
+                    } else {
+                        reject(new Error(err.message));
+                    }
+                } else {
+                    resolve(result || {});
+                }
+            });
+        } catch (e) {
+            if (isBenignSwLifecycleError(e?.message)) resolve({});
+            else reject(e);
+        }
     });
 }
 
 function bgStorageSet(data) {
     return new Promise((resolve, reject) => {
-        chrome.storage.local.set(data, () => {
-            if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-            } else {
-                resolve();
-            }
-        });
+        try {
+            chrome.storage.local.set(data, () => {
+                const err = chrome.runtime.lastError;
+                if (err) {
+                    if (isBenignSwLifecycleError(err.message)) {
+                        dlog('[BG] storage.set ignored during SW teardown:', err.message);
+                        resolve();
+                    } else {
+                        reject(new Error(err.message));
+                    }
+                } else {
+                    resolve();
+                }
+            });
+        } catch (e) {
+            if (isBenignSwLifecycleError(e?.message)) resolve();
+            else reject(e);
+        }
     });
 }
 
 function bgStorageRemove(keys) {
     return new Promise((resolve, reject) => {
-        chrome.storage.local.remove(keys, () => {
-            if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-            } else {
-                resolve();
-            }
-        });
+        try {
+            chrome.storage.local.remove(keys, () => {
+                const err = chrome.runtime.lastError;
+                if (err) {
+                    if (isBenignSwLifecycleError(err.message)) {
+                        dlog('[BG] storage.remove ignored during SW teardown:', err.message);
+                        resolve();
+                    } else {
+                        reject(new Error(err.message));
+                    }
+                } else {
+                    resolve();
+                }
+            });
+        } catch (e) {
+            if (isBenignSwLifecycleError(e?.message)) resolve();
+            else reject(e);
+        }
     });
 }
 

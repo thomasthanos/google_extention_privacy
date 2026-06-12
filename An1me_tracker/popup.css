@@ -364,42 +364,19 @@ body {
   flex-shrink: 0;
   position: relative;
   z-index: 20;
-  transition: padding 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease
+  transition: box-shadow 0.18s ease, border-color 0.18s ease
 }
 
-/* Compact-header signal — when the library scrolls, header tightens its
-   padding and gains a subtle drop shadow so it feels anchored to the top
-   instead of floating. statsBar follows the same compaction so the visual
-   stays cohesive. JS toggles `.is-scrolled` on `.main-app` (Batch D). */
 .main-app.is-scrolled .header {
-  padding-top: 8px;
   border-bottom-color: var(--b1);
   box-shadow: 0 6px 12px -8px rgba(var(--shadow-rgb), 0.55)
-}
-
-.main-app.is-scrolled #statsBar {
-  padding: 6px 0
-}
-
-.main-app.is-scrolled #statsBar .stat-value {
-  font-size: 20px
-}
-
-.main-app #statsBar,
-.main-app .header {
-  /* Smooth the compaction so the user sees a transition, not a snap. */
-  transition: padding 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, font-size 0.18s ease
-}
-
-.main-app #statsBar .stat-value {
-  transition: font-size 0.18s ease
 }
 
 .header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 14px
+  margin-bottom: calc(14px - 6px * var(--sc, 0))
 }
 
 .logo {
@@ -612,11 +589,34 @@ body {
   grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(0, 1fr);
   align-items: center;
   width: 100%;
-  padding: 10px 0;
-  background: var(--bg-1);
-  border-bottom: 1px solid var(--b0);
+  padding: calc(9px - 3px * var(--sc, 0)) 0;
+  background:
+    radial-gradient(circle at 86% 0%, rgba(var(--primary-rgb), 0.035), transparent 30%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='90' filter='url(%23n)' opacity='0.014'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, rgba(8, 15, 27, 0.98), rgba(4, 9, 17, 0.98));
+  border-bottom: 1px solid rgba(var(--primary-rgb), 0.075);
   flex-shrink: 0;
-  box-sizing: border-box
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(14px) saturate(135%);
+  -webkit-backdrop-filter: blur(14px) saturate(135%);
+  box-shadow:
+    inset 0 1px 0 rgba(var(--ink-rgb), 0.035),
+    inset 0 -1px 0 rgba(var(--shadow-rgb), 0.26)
+}
+
+#statsBar::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(var(--primary-rgb), 0.18),
+    rgba(var(--ink-rgb), 0.08),
+    transparent);
+  pointer-events: none
 }
 
 #statsBar .stat {
@@ -624,18 +624,21 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 2px;
   width: 100%;
   min-width: 0;
-  overflow: hidden
+  overflow: hidden;
+  position: relative
 }
 
 #statsBar .stat-value {
   font-family: var(--font-stat);
-  font-size: 24px;
+  font-size: 21px;
   font-weight: 800;
-  line-height: 1;
-  color: #6fd6ff;
+  line-height: 1.05;
+  text-box-trim: trim-both;
+  text-box-edge: cap alphabetic;
+  color: rgba(116, 212, 250, 0.92);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1, "lnum" 1;
   letter-spacing: 0;
@@ -647,19 +650,25 @@ body {
   display: block
 }
 
-#statsBar .stat-value.stat-value-long {
-  font-size: 22px
+@supports not (text-box-trim: trim-both) {
+  #statsBar .stat-value {
+    line-height: 1.1
+  }
 }
 
-#statsBar .stat-value.stat-value-xlong {
+#statsBar .stat-value.stat-value-long {
   font-size: 19px
 }
 
+#statsBar .stat-value.stat-value-xlong {
+  font-size: 17px
+}
+
 #statsBar .stat-label {
-  font-size: 8px;
-  color: var(--t3);
+  font-size: 7.5px;
+  color: rgba(113, 128, 156, 0.82);
   text-transform: uppercase;
-  letter-spacing: 2px;
+  letter-spacing: 1.6px;
   font-weight: 600;
   white-space: nowrap;
   width: 100%;
@@ -672,8 +681,8 @@ body {
 #statsBar .stat-divider {
   width: 1px;
   align-self: stretch;
-  background: var(--b1);
-  margin: 4px 0
+  background: linear-gradient(180deg, transparent, rgba(var(--ink-rgb), 0.09), transparent);
+  margin: 3px 0
 }
 
 .main-content {
@@ -6417,7 +6426,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   }
 
   .stats-bar {
-    padding: 12px 16px
+    padding: 7px 16px 6px
   }
 }
 
