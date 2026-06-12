@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "An1me.to Tracker",
   "version": "6.9.0",
-  "description": "Auto-track your an1me.to anime — saves progress, filler-aware, resume & new-episode alerts, with cloud sync.",
+  "description": "Auto-track an1me.to progress, resume episodes, sync your library, manage fillers, AniList, stats, goals and alerts.",
   "author": "ThomasThanos",
   "permissions": [
     "storage",
