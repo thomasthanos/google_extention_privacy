@@ -74,8 +74,6 @@
     let _familyStateById = new Map();
 
 
-    const MANUAL_OVERRIDE_MS = 60 * 60 * 1000;
-
     function escapeHtml(value) {
         return String(value ?? '').replace(/[&<>"']/g, (c) => ({
             '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -134,15 +132,19 @@
             const currentTarget = goalSettings?.[key]?.[meta.field]
                 ?? (meta.field === 'targetMinutes' ? 60 : (key === 'weekly' ? 5 : 20));
             const smart = smartPlan?.suggestions?.[key] || null;
+            const biasPct = Number(smart?.biasPct) || 0;
+            const hasBias = !!smart && Math.abs(biasPct) >= 5; // ignore rounding noise
             const smartLabel = smart
-                ? (smart.manualHold ? 'Suggest' : 'Auto')
+                ? (hasBias ? (biasPct > 0 ? `Tuned +${biasPct}%` : `Tuned ${biasPct}%`) : 'Auto')
                 : '';
-            const smartLabelClass = smart?.manualHold
+            const smartLabelClass = hasBias
                 ? 'goal-card-chip goal-card-chip--suggested'
                 : 'goal-card-chip';
             const smartNote = smart
-                ? (smart.manualHold
-                    ? `Manual hold active. Suggested ${smart.display}.`
+                ? (hasBias
+                    ? (biasPct > 0
+                        ? `Smart keeps this ${biasPct}% harder, the way you set it — adapting to your pace.`
+                        : `Smart keeps this ${Math.abs(biasPct)}% lighter, the way you set it — adapting to your pace.`)
                     : smart.note)
                 : '';
             return `
@@ -466,6 +468,9 @@
 
         const persist = async (key, field, value) => {
             const now = new Date();
+            // Record the manual choice as a learning signal rather than a lock.
+            // The smart engine compares this against what it would have suggested
+            // and derives a difficulty bias, then keeps adapting around it.
             const nextSettings = {
                 ...(params.goalSettings || {}),
                 [key]: {
@@ -473,9 +478,8 @@
                     [field]: value,
                     smartManaged: true,
                     updatedAt: now.toISOString(),
-
-
-                    manualOverrideUntil: new Date(now.getTime() + MANUAL_OVERRIDE_MS).toISOString()
+                    manualTarget: value,
+                    manualTargetAt: now.toISOString()
                 }
             };
             params.goalSettings = nextSettings;

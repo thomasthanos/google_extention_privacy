@@ -3031,32 +3031,108 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 18px calc(8px + env(safe-area-inset-bottom, 0px));
-  background: var(--bg-1);
-  border-top: 1px solid var(--b0);
+  gap: 10px;
+  min-height: 30px;
+  padding: 5px 18px calc(5px + env(safe-area-inset-bottom, 0px));
+  background:
+    radial-gradient(circle at 14% 0%, rgba(var(--ink-rgb), 0.035), transparent 34%),
+    radial-gradient(circle at 88% 18%, rgba(var(--primary-rgb), 0.035), transparent 32%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='90' filter='url(%23n)' opacity='0.018'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.024), rgba(var(--ink-rgb), 0.006)),
+    rgba(3, 7, 14, 0.96);
+  border-top: 1px solid rgba(var(--ink-rgb), 0.055);
   font-size: 10px;
   color: var(--t3);
-  flex-shrink: 0
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+  box-shadow:
+    inset 0 1px 0 rgba(var(--ink-rgb), 0.08),
+    0 -10px 26px rgba(var(--shadow-rgb), 0.22)
+}
+
+.footer::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 52%;
+  background: linear-gradient(180deg, rgba(var(--ink-rgb), 0.06), transparent);
+  pointer-events: none;
+  z-index: 0
+}
+
+.footer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px 0 0;
+  pointer-events: none;
+  z-index: 2;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(var(--ink-rgb), 0.12) 16%,
+    rgba(var(--primary-rgb), 0.08) 50%,
+    rgba(var(--ink-rgb), 0.07) 84%,
+    transparent 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude
+}
+
+.footer > * {
+  position: relative;
+  z-index: 1
+}
+
+#versionText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+  color: rgba(156, 171, 202, 0.70)
 }
 
 .sync-status {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-weight: 600
+  gap: 5px;
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 58%;
+  font-weight: 700;
+  line-height: 1.1
 }
 
 .sync-status svg {
   width: 11px;
-  height: 11px
+  height: 11px;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 0 5px currentColor)
+}
+
+#syncText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap
 }
 
 .sync-status.synced {
-  color: var(--green)
+  color: rgba(127, 232, 169, 0.86);
 }
 
 .sync-status.syncing {
-  color: var(--amber)
+  color: var(--amber);
+  border-color: rgba(var(--warning-rgb), 0.28);
+  background:
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.07), rgba(var(--ink-rgb), 0.014)),
+    rgba(var(--warning-rgb), 0.10),
+    rgba(5, 12, 22, 0.72)
 }
 
 .donate-dropdown {
@@ -6326,8 +6402,9 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
   .footer {
     flex-shrink: 0;
-    padding: 10px 18px;
-    font-size: 11px
+    min-height: 30px;
+    padding: 5px 18px;
+    font-size: 10px
   }
 
   .anime-card {
@@ -8430,9 +8507,14 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .app.settings-mode .footer {
-  padding: 7px 22px calc(7px + env(safe-area-inset-bottom, 0px));
-  background: rgba(6, 16, 30, 0.95);
-  border-top: 1px solid rgba(72, 103, 140, 0.28);
+  min-height: 30px;
+  padding: 5px 22px calc(5px + env(safe-area-inset-bottom, 0px));
+  background:
+    radial-gradient(circle at 14% 0%, rgba(var(--ink-rgb), 0.06), transparent 36%),
+    radial-gradient(circle at 88% 18%, rgba(var(--primary-rgb), 0.06), transparent 34%),
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.035), rgba(var(--ink-rgb), 0.008)),
+    rgba(5, 11, 20, 0.94);
+  border-top: 1px solid rgba(var(--ink-rgb), 0.08);
   color: rgba(130, 151, 190, 0.58);
   font-size: 10px;
 }

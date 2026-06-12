@@ -516,6 +516,49 @@
 
     const SMART_GOAL_AUTO_INTERVAL_MS = 2 * 60 * 60 * 1000;
 
+    // When the user manually overrides a target, we don't lock it forever and we
+    // don't throw it away after an hour. Instead we LEARN a "difficulty bias":
+    // how much harder/easier they wanted the goal versus what smart suggested at
+    // that moment. Smart then keeps adapting to their real pace + airing supply,
+    // scaled by this bias. Clamped so an extreme manual value can't produce an
+    // impossible (or trivial) goal.
+    const SMART_BIAS_MIN = 0.5;
+    const SMART_BIAS_MAX = 2.0;
+
+    // Given a freshly-computed raw smart target and the stored goal entry, return
+    // the bias-adjusted target plus whether a *new* manual edit was just detected.
+    //   • On a fresh manual edit we honour the user's EXACT number immediately
+    //     (immediateTarget) and learn a clamped bias for future adaptation.
+    //   • Afterwards, smart keeps suggesting rawTarget × bias so it tracks the
+    //     user's pace while preserving the harder/easier preference they set.
+    function applyManualBias(rawTarget, entry, bounds) {
+        let bias = Number(entry?.smartBias);
+        if (!Number.isFinite(bias) || bias <= 0) bias = 1;
+
+        const manualTarget = Number(entry?.manualTarget) || 0;
+        const manualAt = toMillis(entry?.manualTargetAt);
+        const biasLearnedAt = toMillis(entry?.smartBiasUpdatedAt);
+
+        const step = bounds?.step || 1;
+        const min = bounds?.min ?? 0;
+        const max = bounds?.max ?? Number.MAX_SAFE_INTEGER;
+        const clampTarget = (v) => clampNumber(roundToStep(v, step), min, max);
+
+        let justLearned = false;
+        let immediateTarget = null;
+        if (manualTarget > 0 && manualAt > biasLearnedAt && rawTarget > 0) {
+            // Learn the user's intent as a multiplier on future suggestions
+            // (clamped so an extreme value can't later create an impossible
+            // goal), but apply their exact number right now.
+            bias = clampNumber(manualTarget / rawTarget, SMART_BIAS_MIN, SMART_BIAS_MAX);
+            justLearned = true;
+            immediateTarget = clampTarget(manualTarget);
+        }
+
+        const target = justLearned ? immediateTarget : clampTarget(rawTarget * bias);
+        return { target, bias, justLearned };
+    }
+
     function toMillis(value) {
         if (!value) return 0;
         const millis = new Date(value).getTime();
@@ -863,31 +906,63 @@
         let shouldPersist = false;
         let autoAdjusted = 0;
 
+        // Per-goal UI bounds (mirror the stepper limits in goals-view.js) so the
+        // bias-adjusted target is always a value the user could have dialed in.
+        const SMART_BOUNDS = {
+            daily:   { field: 'targetMinutes',  min: 5, max: 480, step: 5 },
+            weekly:  { field: 'targetEpisodes', min: 1, max: 100, step: 1 },
+            monthly: { field: 'targetEpisodes', min: 1, max: 400, step: 1 }
+        };
+
         for (const key of Object.keys(suggestions)) {
             const suggestion = suggestions[key];
             const entry = nextSettings[key];
             const field = suggestion.field;
+            const bounds = SMART_BOUNDS[key] || { step: 1, min: 0, max: Number.MAX_SAFE_INTEGER };
+
             const currentTarget = Math.max(0, Number(entry[field]) || defaults[key][field]);
-            const manualOverrideUntil = toMillis(entry.manualOverrideUntil);
+
+            // Fold any learned manual preference into the raw smart suggestion.
+            const rawTarget = suggestion.target;
+            const { target: biasedTarget, bias, justLearned } = applyManualBias(rawTarget, entry, bounds);
+            suggestion.target = biasedTarget;
+            suggestion.rawTarget = rawTarget;
+            suggestion.bias = bias;
+
             const smartUpdatedAt = toMillis(entry.smartUpdatedAt);
-            const isManualHold = manualOverrideUntil > nowMs;
             const cooldownPassed = !smartUpdatedAt || ((nowMs - smartUpdatedAt) >= SMART_GOAL_AUTO_INTERVAL_MS);
-            const targetChanged = currentTarget !== suggestion.target;
-            const canAutoApply = (entry.smartManaged !== false) && !isManualHold && targetChanged && cooldownPassed;
+            const targetChanged = currentTarget !== biasedTarget;
+            // Two reasons to write back:
+            //  • justLearned → persist the newly-learned bias (even if the
+            //    numeric target is unchanged, since biasedTarget ≈ manualTarget).
+            //  • normal adaptation → the smart target drifted and the cooldown
+            //    has elapsed.
+            const canAutoApply = (entry.smartManaged !== false)
+                && (justLearned || (targetChanged && cooldownPassed));
 
             suggestion.current = currentTarget;
-            suggestion.manualHold = isManualHold;
+            suggestion.manualHold = false;
+            suggestion.biasPct = Math.round((bias - 1) * 100);
             suggestion.autoApplied = canAutoApply;
-            suggestion.status = isManualHold ? 'manual-hold' : (targetChanged ? 'suggested' : 'aligned');
+            suggestion.status = justLearned
+                ? 'bias-learned'
+                : (targetChanged ? 'suggested' : 'aligned');
 
             if (canAutoApply) {
-                entry[field] = suggestion.target;
+                entry[field] = biasedTarget;
                 entry.smartManaged = true;
+                entry.smartBias = bias;
                 entry.smartUpdatedAt = nowIso;
                 entry.updatedAt = nowIso;
                 entry.smartReason = suggestion.note;
-                suggestion.current = suggestion.target;
-                suggestion.status = 'auto-applied';
+                if (justLearned) {
+                    // Consume the manual edit: remember when we learned from it,
+                    // and clear the legacy hold so it can't double-apply.
+                    entry.smartBiasUpdatedAt = nowIso;
+                    entry.manualOverrideUntil = null;
+                }
+                suggestion.current = biasedTarget;
+                suggestion.status = justLearned ? 'bias-applied' : 'auto-applied';
                 shouldPersist = true;
                 autoAdjusted++;
             }
@@ -963,9 +1038,9 @@
 
     function getDefaultGoalSettings() {
         return {
-            daily:   { targetMinutes: 60, updatedAt: null, smartManaged: true, smartUpdatedAt: null, manualOverrideUntil: null, smartReason: null },
-            weekly:  { targetEpisodes: 5, updatedAt: null, smartManaged: true, smartUpdatedAt: null, manualOverrideUntil: null, smartReason: null },
-            monthly: { targetEpisodes: 20, updatedAt: null, smartManaged: true, smartUpdatedAt: null, manualOverrideUntil: null, smartReason: null }
+            daily:   { targetMinutes: 60, updatedAt: null, smartManaged: true, smartUpdatedAt: null, manualOverrideUntil: null, smartReason: null, smartBias: 1, smartBiasUpdatedAt: null, manualTarget: null, manualTargetAt: null },
+            weekly:  { targetEpisodes: 5, updatedAt: null, smartManaged: true, smartUpdatedAt: null, manualOverrideUntil: null, smartReason: null, smartBias: 1, smartBiasUpdatedAt: null, manualTarget: null, manualTargetAt: null },
+            monthly: { targetEpisodes: 20, updatedAt: null, smartManaged: true, smartUpdatedAt: null, manualOverrideUntil: null, smartReason: null, smartBias: 1, smartBiasUpdatedAt: null, manualTarget: null, manualTargetAt: null }
         };
     }
 
