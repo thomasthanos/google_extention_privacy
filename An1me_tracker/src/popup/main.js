@@ -359,7 +359,6 @@
     }
     let deferredListRefresh = null;
     let realignCategoryTabs = () => {};
-    let categorySwitchTimer = null;
 
     const POPUP_CLOUD_REFRESH_MS = 30 * 1000;
     let popupCloudRefreshTimer = null;
@@ -614,26 +613,10 @@
     }
 
     function renderCategorySwitch(filter = '') {
-        if (!elements.animeList) {
-            renderAnimeList(filter);
-            return;
-        }
-
-        if (categorySwitchTimer) {
-            clearTimeout(categorySwitchTimer);
-            categorySwitchTimer = null;
-        }
-
-        elements.animeList.classList.add('category-switching');
-        categorySwitchTimer = setTimeout(() => {
-            categorySwitchTimer = null;
-            renderAnimeList(filter);
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    elements.animeList?.classList.remove('category-switching');
-                });
-            });
-        }, 90);
+        // Covers are reused across the re-render (see render-list.js), so the
+        // switch no longer flickers — render synchronously for an instant,
+        // jank-free category change instead of the old blur/fade masking pass.
+        renderAnimeList(filter);
     }
 
     function normalizeCompactStatus(value) {

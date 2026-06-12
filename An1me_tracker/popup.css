@@ -1358,22 +1358,9 @@ body {
   transition: none !important
 }
 
-.anime-list.category-switching {
-  opacity: 0.42;
-  transform: translateY(4px) scale(0.997);
-  filter: blur(0.35px);
-  pointer-events: none
-}
-
 @media (prefers-reduced-motion: reduce) {
   .anime-list {
     transition: none
-  }
-
-  .anime-list.category-switching {
-    opacity: 1;
-    transform: none;
-    filter: none
   }
 }
 

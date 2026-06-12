@@ -177,6 +177,39 @@
         });
     }
 
+    // Cover images are remote `<img src>`; rebuilding the list with
+    // replaceChildren() destroys them and forces a re-decode, which flickers
+    // (most visible when switching category tabs). To avoid that, harvest the
+    // live, already-decoded image nodes before the swap and re-insert them into
+    // the freshly-built fragment, matched by src — so covers that survive the
+    // re-render are reused instead of recreated.
+    function harvestImages(listEl) {
+        const pool = new Map();
+        listEl.querySelectorAll('img[src]').forEach(img => {
+            const src = img.getAttribute('src');
+            if (!src) return;
+            let bucket = pool.get(src);
+            if (!bucket) { bucket = []; pool.set(src, bucket); }
+            bucket.push(img);
+        });
+        return pool;
+    }
+
+    function reuseImages(fragment, pool) {
+        if (!pool.size) return;
+        fragment.querySelectorAll('img[src]').forEach(freshImg => {
+            const src = freshImg.getAttribute('src');
+            const bucket = pool.get(src);
+            if (!bucket || !bucket.length) return;
+            const liveImg = bucket.shift();
+            // Keep the fresh node's structural attributes (class/alt may differ
+            // between card contexts), but reuse the decoded pixels.
+            liveImg.className = freshImg.className;
+            liveImg.alt = freshImg.alt;
+            freshImg.replaceWith(liveImg);
+        });
+    }
+
     function renderAnimeList(filter = '') {
         const { AnimeCardRenderer, ProgressManager, SeasonGrouping } = AT;
 
@@ -342,6 +375,7 @@
         const range = document.createRange();
         range.selectNodeContents(elements.animeList);
         const fragment = range.createContextualFragment(combinedHtml);
+        reuseImages(fragment, harvestImages(elements.animeList));
         elements.animeList.replaceChildren(fragment);
         AT.PopupState.lastRenderedListMarkup = combinedHtml;
 
