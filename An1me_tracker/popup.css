@@ -405,37 +405,102 @@ body {
 .logo {
   display: flex;
   align-items: center;
-  gap: 10px
+  gap: 9px;
+  min-width: 0
+}
+
+.logo-mark {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+  isolation: isolate;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 28% 0%, rgba(var(--ink-rgb), 0.14), transparent 42%),
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.06), rgba(var(--ink-rgb), 0.012)),
+    rgba(8, 13, 23, 0.94);
+  border: 1px solid rgba(var(--ink-rgb), 0.065);
+  box-shadow:
+    inset 0 1px 0 rgba(var(--ink-rgb), 0.08),
+    inset 0 -1px 0 rgba(var(--shadow-rgb), 0.28)
+}
+
+.logo-mark::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(145deg,
+    rgba(var(--ink-rgb), 0.28) 0%,
+    rgba(var(--ink-rgb), 0.08) 28%,
+    transparent 56%,
+    rgba(var(--primary-rgb), 0.10) 76%,
+    rgba(var(--primary-rgb), 0.24) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  z-index: 2
 }
 
 .logo-icon {
-  width: 22px;
-  height: 22px;
-  color: var(--cyan);
-  filter: drop-shadow(0 0 4px rgba(var(--primary-rgb), 0.36));
-  animation: pulse-glow 3s ease-in-out infinite
+  width: 24px;
+  height: 24px;
+  position: relative;
+  z-index: 1
 }
 
-@keyframes pulse-glow {
-
-  0%,
-  100% {
-    filter: drop-shadow(0 0 4px rgba(var(--primary-rgb), 0.32))
-  }
-
-  50% {
-    filter: drop-shadow(0 0 7px rgba(var(--primary-rgb), 0.52))
-  }
+.logo-mark-panel {
+  fill: rgba(var(--primary-rgb), 0.08);
+  stroke: rgba(var(--primary-rgb), 0.28);
+  stroke-width: 1
 }
 
-.logo h1 {
+.logo-mark-play {
+  fill: rgba(125, 220, 255, 0.95);
+  filter: drop-shadow(0 0 4px rgba(var(--primary-rgb), 0.26))
+}
+
+.logo-mark-shine {
+  stroke: rgba(var(--ink-rgb), 0.28);
+  stroke-width: 1.2;
+  stroke-linecap: round
+}
+
+.logo-wordmark {
   font-family: var(--font-display);
-  font-size: 22px;
-  letter-spacing: 2px;
-  background: var(--grad-cyan);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  line-height: 0.88;
+  margin: 0;
+  min-width: 0
+}
+
+.logo-wordmark-main {
+  font-size: 20px;
+  letter-spacing: 1.4px;
+  color: #e8f4ff;
+  text-shadow: 0 1px 0 rgba(var(--shadow-rgb), 0.5)
+}
+
+.logo-wordmark-main span {
+  color: rgba(125, 220, 255, 0.96)
+}
+
+.logo-wordmark-sub {
+  margin-top: 2px;
+  font-family: var(--font-body);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 2.2px;
+  color: rgba(170, 182, 208, 0.68)
 }
 
 .header-actions {
