@@ -6644,11 +6644,16 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   gap: 5px;
   margin-bottom: 10px;
   padding: 9px 10px;
-  border-radius: 11px;
+  border-radius: var(--r-md);
   border: 1px solid rgba(var(--primary-rgb), 0.18);
+  border-top-color: rgba(var(--ink-rgb), 0.12);
   background:
-    radial-gradient(circle at top right, rgba(var(--primary-rgb), 0.08), transparent 38%),
-    rgba(16, 23, 36, 0.72)
+    radial-gradient(circle at top right, rgba(var(--primary-rgb), 0.11), transparent 40%),
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.045), rgba(var(--ink-rgb), 0.012)),
+    rgba(16, 23, 36, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(var(--ink-rgb), 0.06),
+    0 8px 22px rgba(var(--shadow-rgb), 0.18)
 }
 
 .goals-smart-banner--empty {
@@ -6692,13 +6697,44 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .goal-card {
-  background: var(--bg-card);
+  background:
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.05) 0%, transparent 18%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, rgba(16, 24, 39, 0.88) 0%, rgba(10, 15, 26, 0.94) 100%),
+    var(--bg-card);
   border: 1px solid var(--b1);
-  border-radius: 10px;
+  border-top-color: var(--b2);
+  border-radius: var(--r-md);
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 5px
+  gap: 5px;
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 7px 18px rgba(var(--shadow-rgb), 0.22),
+    inset 0 1px 0 rgba(var(--ink-rgb), 0.055),
+    inset 0 -15px 24px -22px rgba(var(--shadow-rgb), 0.62)
+}
+
+.goal-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  z-index: 1;
+  background: linear-gradient(150deg,
+    rgba(var(--ink-rgb), 0.30) 0%,
+    rgba(var(--ink-rgb), 0.07) 20%,
+    transparent 46%,
+    transparent 60%,
+    rgba(var(--primary-rgb), 0.13) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude
 }
 
 .goal-card-head {
@@ -6758,15 +6794,22 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .goal-progress-track {
   width: 100%;
   height: 4px;
-  background: rgba(var(--ink-rgb), 0.06);
+  background:
+    linear-gradient(180deg, rgba(var(--shadow-rgb), 0.30), rgba(var(--ink-rgb), 0.055));
   border-radius: 999px;
-  overflow: hidden
+  overflow: hidden;
+  box-shadow:
+    inset 0 1px 1px rgba(var(--shadow-rgb), 0.42),
+    0 1px 0 rgba(var(--ink-rgb), 0.045)
 }
 
 .goal-progress-bar {
   height: 100%;
   background: linear-gradient(90deg, oklch(0.62 0.11 215) 0%, var(--primary) 100%);
   border-radius: 999px;
+  box-shadow:
+    0 0 10px rgba(var(--primary-rgb), 0.32),
+    inset 0 1px 0 rgba(var(--ink-rgb), 0.24);
   transition: width 300ms ease
 }
 
@@ -6790,17 +6833,57 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   display: inline-flex;
   align-items: center;
   height: 24px;
-  background: var(--bg-2);
-  border: 1px solid var(--b1);
+  background:
+    radial-gradient(circle at 24% 0%, rgba(var(--ink-rgb), 0.16), transparent 44%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.018'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.075), rgba(var(--ink-rgb), 0.018)),
+    rgba(10, 16, 28, 0.68);
+  border: 1px solid rgba(var(--ink-rgb), 0.11);
   border-radius: 999px;
   padding: 1px;
   gap: 0;
   user-select: none;
-  transition: border-color var(--tf), box-shadow var(--tf)
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px) saturate(135%);
+  -webkit-backdrop-filter: blur(10px) saturate(135%);
+  box-shadow:
+    0 3px 10px rgba(var(--shadow-rgb), 0.18),
+    inset 0 1px 0 rgba(var(--ink-rgb), 0.12),
+    inset 0 -1px 0 rgba(var(--shadow-rgb), 0.30)
 }
 
-.goal-stepper:hover {
-  border-color: rgba(var(--primary-rgb), 0.4)
+.goal-stepper::before {
+  content: '';
+  position: absolute;
+  inset: 1px 1px auto;
+  height: 48%;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(var(--ink-rgb), 0.10), transparent);
+  pointer-events: none
+}
+
+.goal-stepper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(145deg,
+    rgba(var(--ink-rgb), 0.34) 0%,
+    rgba(var(--ink-rgb), 0.08) 28%,
+    transparent 56%,
+    rgba(var(--primary-rgb), 0.18) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude
+}
+
+.goal-stepper > * {
+  position: relative;
+  z-index: 1
 }
 
 .goal-stepper-btn {
@@ -6815,17 +6898,12 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   color: var(--t2);
   cursor: pointer;
   padding: 0;
-  transition: background var(--tf), color var(--tf), transform 60ms ease
+  transition: transform 60ms ease
 }
 
 .goal-stepper-btn svg {
   width: 11px;
   height: 11px
-}
-
-.goal-stepper-btn:hover {
-  background: rgba(var(--primary-rgb), 0.15);
-  color: var(--cyan)
 }
 
 .goal-stepper-btn:active {
@@ -6867,23 +6945,45 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .badge-tile {
   background:
-    linear-gradient(180deg, rgba(var(--ink-rgb), 0.015), transparent 42%),
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.042), transparent 36%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.018'/%3E%3C/svg%3E"),
     var(--bg-card);
   border: 1px solid var(--b1);
-  border-radius: 12px;
+  border-top-color: var(--b2);
+  border-radius: var(--r-md);
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 8px;
   text-align: left;
-  transition: transform 150ms ease, border-color 150ms ease, box-shadow 180ms ease
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 6px 16px rgba(var(--shadow-rgb), 0.18),
+    inset 0 1px 0 rgba(var(--ink-rgb), 0.045)
 }
 
-.badge-tile:hover {
-  transform: translateY(-1px);
-  border-color: rgba(var(--primary-rgb), 0.35);
-  box-shadow: 0 6px 16px rgba(var(--shadow-rgb), 0.18)
+.badge-tile::after,
+.badge-next-up-item::after,
+.goals-empty-banner::after,
+.badge-group-section::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  z-index: 1;
+  background: linear-gradient(150deg,
+    rgba(var(--ink-rgb), 0.24) 0%,
+    rgba(var(--ink-rgb), 0.055) 22%,
+    transparent 48%,
+    rgba(var(--primary-rgb), 0.11) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude
 }
 
 .badge-tile--locked {
@@ -6974,14 +7074,21 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .badge-next-up-item {
   background:
-    linear-gradient(135deg, rgba(var(--primary-rgb), 0.05), transparent 45%),
+    radial-gradient(circle at top right, rgba(var(--primary-rgb), 0.095), transparent 38%),
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.042), transparent 38%),
     var(--bg-card);
   border: 1px solid rgba(var(--primary-rgb), 0.16);
-  border-radius: 14px;
+  border-top-color: rgba(var(--ink-rgb), 0.12);
+  border-radius: var(--r-md);
   padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 8px 20px rgba(var(--shadow-rgb), 0.20),
+    inset 0 1px 0 rgba(var(--ink-rgb), 0.052)
 }
 
 .badge-next-up-head {
@@ -7031,9 +7138,17 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   align-items: center;
   gap: 12px;
   padding: 14px;
-  background: linear-gradient(145deg, rgba(var(--primary-rgb), 0.08), var(--bg-card));
+  background:
+    radial-gradient(circle at 14% 0%, rgba(var(--ink-rgb), 0.075), transparent 34%),
+    linear-gradient(145deg, rgba(var(--primary-rgb), 0.08), var(--bg-card));
   border: 1px solid rgba(var(--primary-rgb), 0.25);
-  border-radius: 12px
+  border-top-color: rgba(var(--ink-rgb), 0.13);
+  border-radius: var(--r-md);
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 10px 24px rgba(var(--shadow-rgb), 0.22),
+    inset 0 1px 0 rgba(var(--ink-rgb), 0.065)
 }
 
 .goals-empty-icon {
@@ -7071,15 +7186,22 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .badge-group-section {
   margin-bottom: 4px;
   border: 1px solid var(--b1);
-  border-radius: 12px;
+  border-top-color: var(--b2);
+  border-radius: var(--r-md);
   background:
-    linear-gradient(180deg, rgba(var(--ink-rgb), 0.02), transparent 28%),
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.04), transparent 30%),
     var(--bg-2);
-  overflow: hidden
+  overflow: hidden;
+  position: relative;
+  box-shadow:
+    0 6px 18px rgba(var(--shadow-rgb), 0.18),
+    inset 0 1px 0 rgba(var(--ink-rgb), 0.045)
 }
 
 .badge-group-section[open] {
-  background: var(--bg-2)
+  background:
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.035), transparent 24%),
+    var(--bg-2)
 }
 
 .badge-group-summary {
@@ -7097,10 +7219,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .badge-group-summary::-webkit-details-marker {
   display: none
-}
-
-.badge-group-summary:hover {
-  background: var(--bg-3)
 }
 
 .badge-group-icon {
@@ -7210,9 +7328,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   color: #f5b890
 }
 
-.badge-tile:hover .badge-tile-icon-wrap {
-  transform: scale(1.05)
-}
 
 /* ─── Locked tile mini progress bar — uniform 4px height matches the
    goal-progress-track + the bottom-of-card bar so every progress bar in
