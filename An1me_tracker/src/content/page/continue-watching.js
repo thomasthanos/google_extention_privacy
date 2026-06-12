@@ -167,7 +167,13 @@
         close.className = 'at-cw-close';
         close.type = 'button';
         close.setAttribute('aria-label', 'Hide Continue Watching');
-        close.textContent = '×';
+        close.innerHTML =
+            '<span class="at-cw-close-glyph" aria-hidden="true">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">' +
+                    '<line x1="7" y1="7" x2="17" y2="17"/>' +
+                    '<line x1="17" y1="7" x2="7" y2="17"/>' +
+                '</svg>' +
+            '</span>';
         close.addEventListener('click', () => {
             dismissed = true;
             section.remove();
