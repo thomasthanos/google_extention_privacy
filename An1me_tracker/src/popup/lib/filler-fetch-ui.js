@@ -100,8 +100,9 @@ const FillerFetchUI = {
 
         .ffui-overlay {
             position:fixed; inset:0;
-            background:rgba(7,9,14,.92);
-            backdrop-filter:blur(6px);
+            background:rgba(var(--shadow-rgb), 0.62);
+            backdrop-filter:blur(10px) saturate(1.1);
+            -webkit-backdrop-filter:blur(10px) saturate(1.1);
             z-index:100000;
             display:flex; align-items:center; justify-content:center;
             padding:20px;
@@ -111,20 +112,21 @@ const FillerFetchUI = {
 
 
         .ffui-box {
-            background: #111520;
-            background-image: radial-gradient(ellipse at 50% 0%, rgba(79,195,247,0.06) 0%, transparent 65%);
-            border: 1px solid rgba(255,255,255,0.07);
-            border-top-color: rgba(79,195,247,0.18);
-            border-radius: 18px;
+            background:
+                radial-gradient(120% 78% at 50% -12%, rgba(var(--primary-rgb),0.10) 0%, transparent 58%),
+                var(--bg-card);
+            border: 1px solid var(--b1);
+            border-top-color: rgba(var(--primary-rgb),0.30);
+            border-radius: 20px;
             box-shadow:
-                0 0 0 1px rgba(0,0,0,0.6),
-                0 8px 40px rgba(0,0,0,0.7),
-                0 1px 0 rgba(79,195,247,0.08) inset;
+                0 0 0 1px rgba(var(--shadow-rgb),0.5),
+                0 24px 60px -14px rgba(var(--shadow-rgb),0.78),
+                0 1px 0 rgba(var(--ink-rgb),0.05) inset;
             width:100%; max-width:400px;
             display:flex; flex-direction:column;
             overflow:hidden;
             animation:ffui-up .28s cubic-bezier(.4,0,.2,1);
-            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            font-family: var(--font-body, 'Inter', 'Segoe UI', system-ui, sans-serif);
         }
         @keyframes ffui-up {
             from{transform:translateY(16px);opacity:0}
@@ -133,22 +135,27 @@ const FillerFetchUI = {
 
 
         .ffui-header {
-            padding: 16px 18px 15px;
-            background: linear-gradient(180deg, rgba(79,195,247,0.07) 0%, transparent 100%);
-            border-bottom: 1px solid rgba(255,255,255,0.06);
+            padding: 16px 18px 14px;
+            background: linear-gradient(180deg, rgba(var(--primary-rgb),0.06) 0%, transparent 100%);
+            border-bottom: 1px solid var(--b0);
             display:flex; align-items:center; justify-content:space-between;
         }
         .ffui-title {
             font-size:14px; font-weight:700;
-            color:#e8edf8;
-            display:flex; align-items:center; gap:8px;
+            color:var(--t1);
+            display:flex; align-items:center; gap:9px;
             letter-spacing:.2px;
         }
         .ffui-title-dot {
-            width:7px; height:7px; border-radius:50%;
-            background: linear-gradient(135deg,#4fc3f7,#29b6f6);
-            box-shadow: 0 0 8px rgba(79,195,247,0.7);
+            width:8px; height:8px; border-radius:50%;
+            background: var(--primary);
+            box-shadow: 0 0 10px rgba(var(--primary-rgb),0.85), 0 0 0 3px rgba(var(--primary-rgb),0.13);
             flex-shrink:0;
+            animation: ffui-pulse 2.4s ease-in-out infinite;
+        }
+        @keyframes ffui-pulse {
+            0%,100% { box-shadow: 0 0 10px rgba(var(--primary-rgb),0.80), 0 0 0 3px rgba(var(--primary-rgb),0.11); }
+            50%     { box-shadow: 0 0 15px rgba(var(--primary-rgb),1),    0 0 0 4px rgba(var(--primary-rgb),0.20); }
         }
 
 
@@ -159,65 +166,71 @@ const FillerFetchUI = {
             display:flex; justify-content:space-between; align-items:center;
             margin-bottom:7px;
         }
-        .ffui-progress-label { font-size:11px; color:#6b7694; font-weight:500; }
+        .ffui-progress-label { font-size:11px; color:var(--t2); font-weight:500; }
         .ffui-pct {
             font-size:11px; font-weight:700;
-            color:#4fc3f7;
-            text-shadow: 0 0 10px rgba(79,195,247,0.5);
+            color:var(--primary);
+            text-shadow: 0 0 12px rgba(var(--primary-rgb),0.45);
+            font-variant-numeric:tabular-nums;
         }
         .ffui-bar {
-            height:5px;
-            background:rgba(255,255,255,0.05);
+            height:6px;
+            background:rgba(var(--ink-rgb),0.06);
             border-radius:999px;
             overflow:hidden;
         }
         .ffui-bar-fill {
             height:100%;
-            background: linear-gradient(90deg,#4fc3f7,#29b6f6);
+            background: linear-gradient(90deg, var(--primary) 0%, #2aa8ee 100%);
             border-radius:999px;
             width:0%;
             transition:width .35s ease;
-            box-shadow: 0 0 8px rgba(79,195,247,0.4);
+            box-shadow: 0 0 10px rgba(var(--primary-rgb),0.5);
         }
 
 
         .ffui-stats {
-            display:grid; grid-template-columns:repeat(4,1fr); gap:7px;
+            display:grid; grid-template-columns:repeat(4,1fr); gap:8px;
         }
         .ffui-stat {
-            background: rgba(255,255,255,0.03);
-            border: 1px solid rgba(255,255,255,0.06);
-            border-top-color: rgba(255,255,255,0.09);
-            border-radius: 10px;
-            padding: 9px 4px 8px;
+            background: linear-gradient(180deg, rgba(var(--ink-rgb),0.05) 0%, rgba(var(--ink-rgb),0.018) 100%);
+            border: 1px solid var(--b1);
+            border-top-color: var(--b2);
+            border-radius: 13px;
+            padding: 10px 4px 9px;
             text-align:center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05);
+            box-shadow: 0 2px 10px rgba(var(--shadow-rgb),0.35), inset 0 1px 0 rgba(var(--ink-rgb),0.05);
         }
         .ffui-stat-val {
-            display:block; font-size:20px; font-weight:800;
-            color:#e8edf8; margin-bottom:3px; line-height:1;
+            display:block; font-size:21px; font-weight:800;
+            color:var(--t1); margin-bottom:3px; line-height:1;
+            font-variant-numeric:tabular-nums;
         }
         .ffui-stat-val.ffui-stat-cyan {
-            color:#4fc3f7;
-            text-shadow: 0 0 12px rgba(79,195,247,0.5);
+            color:var(--primary);
+            text-shadow: 0 0 14px rgba(var(--primary-rgb),0.45);
         }
-        .ffui-stat-val.ffui-stat-err { color:#f07070; }
+        .ffui-stat-val.ffui-stat-err { color:var(--danger); }
         .ffui-stat-lbl {
-            display:block; font-size:9px; color:#353d55;
-            text-transform:uppercase; letter-spacing:.6px; font-weight:600;
+            display:block; font-size:9px; color:var(--t3);
+            text-transform:uppercase; letter-spacing:.7px; font-weight:600;
         }
 
 
         .ffui-log {
-            background: rgba(0,0,0,0.3);
-            border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 10px;
+            background: rgba(var(--shadow-rgb),0.28);
+            border: 1px solid var(--b0);
+            border-radius: 13px;
             padding: 8px 10px;
             max-height: 148px;
             overflow-y: auto;
             display:flex; flex-direction:column; gap:2px;
             scrollbar-width:thin;
-            scrollbar-color:rgba(79,195,247,.15) transparent;
+            scrollbar-color:rgba(var(--primary-rgb),.18) transparent;
+        }
+        .ffui-log::-webkit-scrollbar { width:6px; }
+        .ffui-log::-webkit-scrollbar-thumb {
+            background:rgba(var(--primary-rgb),.20); border-radius:999px;
         }
         .ffui-log-row {
             display:flex; align-items:center; gap:7px;
@@ -231,27 +244,27 @@ const FillerFetchUI = {
         }
         .ffui-log-icon { flex-shrink:0; width:14px; text-align:center; font-size:10px; }
         .ffui-log-name {
-            color:#9aa3bb; flex:1; min-width:0;
+            color:var(--t2); flex:1; min-width:0;
             overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
             font-weight:500;
         }
         .ffui-log-detail {
             flex-shrink:0; font-size:10px; font-weight:600;
-            padding: 1px 6px; border-radius:999px; white-space:nowrap;
+            padding: 1px 7px; border-radius:999px; white-space:nowrap;
         }
 
-        .ffui-log-row.is-fetch   .ffui-log-name  { color:#e8edf8; }
-        .ffui-log-row.is-fetch   .ffui-log-detail { background:rgba(79,195,247,0.12); color:#4fc3f7; }
-        .ffui-log-row.is-cached  .ffui-log-detail { background:rgba(107,118,148,0.12); color:#6b7694; }
-        .ffui-log-row.is-nofill  .ffui-log-detail { background:rgba(107,118,148,0.08); color:#4a5168; }
-        .ffui-log-row.is-movie   .ffui-log-detail { background:rgba(155,106,255,0.1); color:#9b6aff; }
-        .ffui-log-row.is-error   .ffui-log-detail { background:rgba(240,112,112,0.12); color:#f07070; }
+        .ffui-log-row.is-fetch   .ffui-log-name  { color:var(--t1); }
+        .ffui-log-row.is-fetch   .ffui-log-detail { background:var(--primary-soft); color:var(--primary); }
+        .ffui-log-row.is-cached  .ffui-log-detail { background:rgba(var(--ink-rgb),0.05); color:var(--t2); }
+        .ffui-log-row.is-nofill  .ffui-log-detail { background:rgba(var(--ink-rgb),0.035); color:var(--t3); }
+        .ffui-log-row.is-movie   .ffui-log-detail { background:rgba(var(--purple-rgb),0.13); color:var(--purple); }
+        .ffui-log-row.is-error   .ffui-log-detail { background:var(--danger-soft); color:var(--danger); }
         .ffui-log-row.is-summary {
             margin-top:5px; padding-top:6px;
-            border-top:1px solid rgba(255,255,255,0.06);
-            font-weight:700; color:#e8edf8;
+            border-top:1px solid var(--b1);
+            font-weight:700; color:var(--t1);
         }
-        .ffui-log-row.is-summary .ffui-log-name { color:#e8edf8; }
+        .ffui-log-row.is-summary .ffui-log-name { color:var(--t1); }
         </style>`;
         document.head.insertAdjacentHTML('beforeend', css);
     },

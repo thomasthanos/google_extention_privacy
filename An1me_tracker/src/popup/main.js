@@ -665,8 +665,12 @@
 
         const emailForm = document.getElementById('authEmailForm');
         const orDivider = document.querySelector('.auth-or-divider');
-        if (emailForm) emailForm.style.display = hasGoogleAuth ? 'none' : '';
-        if (orDivider) orDivider.style.display = 'none';
+        // Always offer email/password: it's the only method that works on mobile
+        // browsers where Google sign-in can't complete, and a universal fallback if
+        // the Google capability check misfires. The Google button stays gated on
+        // hasGoogleAuth; the OR divider only shows when both methods are present.
+        if (emailForm) emailForm.style.display = '';
+        if (orDivider) orDivider.style.display = hasGoogleAuth ? '' : 'none';
     }
 
     function detectHasGoogleAuth() {
@@ -826,15 +830,19 @@
     }
 
     function runAutoFetch(service, animeData, extraCallback) {
-        startAutoSync();
+        // Only surface the sync indicator once we're actually fetching something — a
+        // no-op refresh (nothing due per the cache TTLs) stays silent, so opening the
+        // popup no longer looks like it's "updating" when nothing has changed.
+        let started = false;
         service.autoFetchMissing(animeData, () => {
             if (extraCallback) extraCallback();
         }, (done, total, title) => {
+            if (!started) { started = true; startAutoSync(); }
             setMetadataRepairStatus(`${done}/${total} — ${_truncTitle(title, 18)}`);
         }).then(() => {
-            endAutoSync();
+            if (started) endAutoSync();
         }).catch(() => {
-            endAutoSync();
+            if (started) endAutoSync();
         });
     }
 
@@ -849,6 +857,24 @@
             return !!c && !c.retryable;
         });
         return { allFillersCached, allAnilistCached };
+    }
+
+    // Count of anime that still need a filler-type or AniList-info fetch (union).
+    // Lets a manual "Fetch Fillers" skip the full-screen modal when there's
+    // little or nothing to do.
+    function countPendingFetch(slugs) {
+        const { FillerService, AnilistService } = AT;
+        let count = 0;
+        for (const slug of slugs) {
+            const fillerMissing = !FillerService.isLikelyMovie(slug) && !FillerService.episodeTypesCache[slug];
+            const c = AnilistService.cache?.[slug];
+            // Only count genuinely-uncached anime (these get fetched immediately).
+            // `retryable` entries are skipped — they're retried on their own TTL, so
+            // they shouldn't make the button claim there's work to do.
+            const anilistMissing = !c;
+            if (fillerMissing || anilistMissing) count++;
+        }
+        return count;
     }
 
     function isQuotaExceededError(error) {
@@ -1498,11 +1524,28 @@
                 setSettingsDataToolsExpanded(false);
                 setSettingsPreferencesExpanded(false);
 
-                await fetchAllFillers({
-                    autoStart: true,
-                    forceInfoRefresh: false,
-                    forceFillerRefresh: false
-                });
+                // Route by how many anime actually need a fetch: nothing → a quiet
+                // "No new updates"; a few → inline status in #syncStatus; many →
+                // the full import modal.
+                const SMALL_FETCH_MAX = 6;
+                const pendingSlugs = Object.keys(animeData);
+                const pendingCount = countPendingFetch(pendingSlugs);
+
+                if (pendingCount === 0) {
+                    setMetadataRepairStatus('No new updates', true);
+                    scheduleDefaultSyncStatusRestore();
+                } else if (pendingCount <= SMALL_FETCH_MAX) {
+                    setMetadataRepairStatus(`Checking updates for ${pendingCount} anime…`);
+                    const { allFillersCached, allAnilistCached } = checkAllCached(pendingSlugs);
+                    if (!allFillersCached) runAutoFetch(AT.FillerService, animeData, () => scheduleDeferredListRefresh());
+                    if (!allAnilistCached) runAutoFetch(AT.AnilistService, animeData, () => scheduleDeferredListRefresh());
+                } else {
+                    await fetchAllFillers({
+                        autoStart: true,
+                        forceInfoRefresh: false,
+                        forceFillerRefresh: false
+                    });
+                }
                 return;
             }
         });

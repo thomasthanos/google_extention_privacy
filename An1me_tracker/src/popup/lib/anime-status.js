@@ -114,6 +114,36 @@
         );
     }
 
+    // For a still-releasing (or partially-uploaded) anime the user has essentially
+    // caught up on, returns how many fresh episodes are now available beyond their
+    // highest watched (plus the latest episode number); otherwise null. Drives the
+    // "New Episode" badge. Gated to a small gap (default 3) so it fires for a recent
+    // drop, not for a show the user is actively far behind on.
+    function getNewEpisodeInfo(slug, anime, maxGap = 3) {
+        const AT = window.AnimeTracker;
+        const { AnilistService } = AT;
+        if (!anime || !slug) return null;
+
+        const listState = String(anime.listState || '').toLowerCase();
+        if (anime.droppedAt || anime.onHoldAt ||
+            listState === AnimeStatus.DROPPED || listState === AnimeStatus.ON_HOLD) return null;
+
+        const lowerSlug = String(slug).toLowerCase();
+        const status = AnilistService?.getStatus(lowerSlug);
+        const latest = Number(AnilistService?.getLatestEpisode(lowerSlug)) || 0;
+        const metaTotal = Number(AnilistService?.getTotalEpisodes(lowerSlug)) || 0;
+        const partiallyUploaded = metaTotal > 0 && latest > 0 && latest < metaTotal;
+        if (latest <= 0 || (status !== 'RELEASING' && !partiallyUploaded)) return null;
+
+        const eps = Array.isArray(anime.episodes) ? anime.episodes : [];
+        if (eps.length === 0) return null;
+        const highestWatched = Math.max(0, ...eps.map(ep => Number(ep.number) || 0));
+
+        const count = latest - highestWatched;
+        if (count <= 0 || count > maxGap) return null;
+        return { count, latest, highestWatched };
+    }
+
     function setManualListState(entry, state, at = new Date().toISOString(), isManual = false) {
         if (!entry) return;
         entry.listState = state;
@@ -260,6 +290,7 @@
         AnimeStatus,
         getStatus,
         isCompleted,
+        getNewEpisodeInfo,
         getCalendarDayDiff,
         getKnownTotalEpisodesForRepair,
         repairAiringCompleted,

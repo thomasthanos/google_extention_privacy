@@ -193,6 +193,20 @@
                 background: linear-gradient(90deg, #4fc3f7 0%, #81d4fa 100%);
                 box-shadow: 0 0 6px rgba(79,195,247,0.55);
             }
+            .at-cw-new-badge {
+                position: absolute; top: 5px; right: 5px; z-index: 2;
+                padding: 1px 5px; border-radius: 4px;
+                font-size: 8px; font-weight: 800; letter-spacing: 0.6px;
+                text-transform: uppercase; color: #06121c;
+                background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
+                box-shadow: 0 1px 4px rgba(0,0,0,0.45), 0 0 8px rgba(79,195,247,0.6);
+                animation: at-cw-new-pulse 2s ease-in-out infinite;
+            }
+            @keyframes at-cw-new-pulse {
+                0%,100% { box-shadow: 0 1px 4px rgba(0,0,0,0.45), 0 0 7px rgba(79,195,247,0.5); }
+                50%     { box-shadow: 0 1px 4px rgba(0,0,0,0.45), 0 0 12px rgba(79,195,247,0.9); }
+            }
+            .at-cw-card-new .at-cw-sub { color: #7fd4ff; font-weight: 700; }
 
             .at-cw-meta { padding: 6px 8px 4px; }
             .at-cw-title {

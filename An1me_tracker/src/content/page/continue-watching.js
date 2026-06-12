@@ -75,6 +75,14 @@
         bar.appendChild(fill);
         thumb.appendChild(bar);
 
+        if (item.isNewEpisode) {
+            card.classList.add('at-cw-card-new');
+            const newBadge = document.createElement('span');
+            newBadge.className = 'at-cw-new-badge';
+            newBadge.textContent = 'NEW';
+            thumb.appendChild(newBadge);
+        }
+
         const meta = document.createElement('div');
         meta.className = 'at-cw-meta';
         const titleEl = document.createElement('div');

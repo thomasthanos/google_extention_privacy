@@ -418,6 +418,11 @@
     function mergeAnimeData(localData, cloudData) {
         const merged = { ...(cloudData || {}), ...(localData || {}) };
 
+        // DIAGNOSTIC (#5): track episodes the cloud copy re-adds to an anime that
+        // already exists locally — surfaces "phantom updates" seen on open. Remove
+        // once the root cause is confirmed/fixed.
+        const _diffAdded = [];
+
 
 
 
@@ -524,7 +529,29 @@
 
             mergedMetadata.episodes = Array.from(episodesByNumber.values()).sort((a, b) => a.number - b.number);
             mergedMetadata.totalWatchTime = mergedMetadata.episodes.reduce((sum, ep) => sum + (ep.duration || 0), 0);
+
+            // DIAGNOSTIC (#5): episode numbers present after merge but NOT in the
+            // local copy = re-added from cloud (possible phantom update on open).
+            const _localNums = new Set(
+                (Array.isArray(localAnime.episodes) ? localAnime.episodes : [])
+                    .map(e => Number(e && e.number)).filter(n => !isNaN(n))
+            );
+            const _added = mergedMetadata.episodes
+                .map(e => e.number).filter(n => !_localNums.has(n));
+            if (_added.length) _diffAdded.push({ slug, added: _added });
+
             merged[slug] = mergedMetadata;
+        }
+
+        if (_diffAdded.length) {
+            try {
+                const _log = (typeof self !== 'undefined' && self.PopupLogger) ||
+                             (typeof window !== 'undefined' && window.PopupLogger) || null;
+                const _total = _diffAdded.reduce((s, d) => s + d.added.length, 0);
+                const _summary = _diffAdded.map(d => `${d.slug}: +[${d.added.join(',')}]`).join(' | ');
+                (_log?.warn || console.warn).call(_log || console, 'MergeDiff',
+                    `Cloud re-added ${_total} episode(s) to ${_diffAdded.length} existing anime → ${_summary}`);
+            } catch {}
         }
 
         return merged;

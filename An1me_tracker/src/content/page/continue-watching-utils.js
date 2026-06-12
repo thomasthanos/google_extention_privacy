@@ -73,6 +73,19 @@
         return `${WATCH_BASE}${slug}-episode-${next}`;
     }
 
+    // A "Start" card is a NEW episode when the anime is still airing and only a few
+    // fresh episodes exist beyond the user's highest watched — i.e. they were caught
+    // up and a new drop appeared. Drives the "New Episode" tag on the page widget.
+    function isNewEpisodeStart(anime, animeInfo, highestWatched, maxGap = 3) {
+        const latestEp = Number((animeInfo && animeInfo.latestEpisode) || (anime && anime.latestEpisode)) || 0;
+        const totalEp = Number((animeInfo && animeInfo.totalEpisodes) || (anime && anime.totalEpisodes)) || 0;
+        const status = String((animeInfo && animeInfo.status) || (anime && anime.status) || '').toUpperCase();
+        const partiallyUploaded = totalEp > 0 && latestEp > 0 && latestEp < totalEp;
+        if (latestEp <= 0 || (status !== 'RELEASING' && !partiallyUploaded)) return false;
+        const freshGap = latestEp - Number(highestWatched || 0);
+        return freshGap >= 1 && freshGap <= maxGap;
+    }
+
     function formatSubline(episode, currentTime, duration, percentage) {
         const parts = [`Ep ${episode}`];
         const remaining = duration - currentTime;
@@ -144,6 +157,7 @@
                 const nextUrl = computeNextEpisodeUrl(anime, slug, baseEpisode, animeInfo);
                 if (nextUrl) {
                     const nextEpisode = baseEpisode + 1;
+                    const newEp = isNewEpisodeStart(anime, animeInfo, baseEpisode);
                     addItem({
                         slug,
                         episode: nextEpisode,
@@ -151,11 +165,12 @@
                         savedAt,
                         title,
                         cover: safeCover(entry.coverImage) || safeCover(anime && anime.coverImage),
-                        subline: `Ep ${nextEpisode} · Start`,
+                        subline: `Ep ${nextEpisode} · ${newEp ? 'New Episode' : 'Start'}`,
                         url: nextUrl,
                         nextUrl: computeNextEpisodeUrl(anime, slug, nextEpisode, animeInfo),
                         nextNumber: nextEpisode + 1,
-                        isStart: true
+                        isStart: true,
+                        isNewEpisode: newEp
                     });
                 }
             } else {
@@ -184,6 +199,7 @@
             const nextUrl = computeNextEpisodeUrl(anime, slug, maxCompleted, animeInfo);
             if (nextUrl) {
                 const nextEpisode = maxCompleted + 1;
+                const newEp = isNewEpisodeStart(anime, animeInfo, maxCompleted);
                 const savedAt = anime.lastWatched ? new Date(anime.lastWatched).getTime() : 0;
                 const title = (typeof anime.title === 'string' && anime.title.trim())
                     ? anime.title.trim()
@@ -196,11 +212,12 @@
                     savedAt,
                     title,
                     cover: safeCover(anime.coverImage),
-                    subline: `Ep ${nextEpisode} · Start`,
+                    subline: `Ep ${nextEpisode} · ${newEp ? 'New Episode' : 'Start'}`,
                     url: nextUrl,
                     nextUrl: computeNextEpisodeUrl(anime, slug, nextEpisode, animeInfo),
                     nextNumber: nextEpisode + 1,
-                    isStart: true
+                    isStart: true,
+                    isNewEpisode: newEp
                 });
             }
         }
