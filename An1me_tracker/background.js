@@ -2247,8 +2247,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         showBadgeNotification({
             id: message.id,
             title: message.title,
-            desc: message.desc,
-            icon: message.icon
+            desc: message.desc
         });
         return true;
     }

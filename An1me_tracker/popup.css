@@ -6931,43 +6931,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   letter-spacing: 0.04em
 }
 
-.badges-section {
-  display: flex;
-  flex-direction: column;
-  gap: 4px
-}
-
-.badges-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 4px
-}
-
-.badge-tile {
-  background:
-    linear-gradient(180deg, rgba(var(--ink-rgb), 0.042), transparent 36%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.018'/%3E%3C/svg%3E"),
-    var(--bg-card);
-  border: 1px solid var(--b1);
-  border-top-color: var(--b2);
-  border-radius: var(--r-md);
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  text-align: left;
-  position: relative;
-  overflow: hidden;
-  box-shadow:
-    0 6px 16px rgba(var(--shadow-rgb), 0.18),
-    inset 0 1px 0 rgba(var(--ink-rgb), 0.045)
-}
-
-.badge-tile::after,
-.badge-next-up-item::after,
-.goals-empty-banner::after,
-.badge-group-section::after {
+.goals-empty-banner::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -6984,152 +6948,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
           mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
           mask-composite: exclude
-}
-
-.badge-tile--locked {
-  opacity: 1
-}
-
-.badge-tile--locked .badge-tile-icon-wrap {
-  filter: grayscale(0.7);
-  opacity: 0.88
-}
-
-.badge-tile-main {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
-  grid-template-rows: auto auto;
-  align-items: start;
-  column-gap: 10px;
-  row-gap: 5px
-}
-
-.badge-tier-gold.badge-tile--unlocked {
-  border-color: rgba(255, 197, 61, 0.5);
-  background: linear-gradient(145deg, rgba(255, 197, 61, 0.08), var(--bg-card))
-}
-
-.badge-tier-platinum.badge-tile--unlocked {
-  border-color: rgba(147, 225, 255, 0.58);
-  background: linear-gradient(145deg, rgba(147, 225, 255, 0.1), rgba(255, 161, 214, 0.05), var(--bg-card))
-}
-
-.badge-tier-silver.badge-tile--unlocked {
-  border-color: rgba(180, 195, 220, 0.45);
-  background: linear-gradient(145deg, rgba(180, 195, 220, 0.06), var(--bg-card))
-}
-
-.badge-tier-bronze.badge-tile--unlocked {
-  border-color: rgba(205, 127, 50, 0.45)
-}
-
-.badge-title {
-  grid-column: 2;
-  grid-row: 1;
-  min-width: 0;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--t1);
-  line-height: 1.2;
-  align-self: center
-}
-
-.badge-progress {
-  font-size: 10px;
-  color: var(--t2);
-  font-variant-numeric: tabular-nums;
-  margin-left: auto;
-  font-weight: 700
-}
-
-.badge-progress--unlocked {
-  color: var(--t1)
-}
-
-.badge-progress--top {
-  grid-column: 3;
-  grid-row: 1;
-  align-self: center;
-  text-align: right
-}
-
-.badge-track-row {
-  grid-column: 2 / 4;
-  grid-row: 2;
-  display: flex;
-  align-items: center;
-  align-self: start
-}
-
-.next-up-section {
-  display: flex;
-  flex-direction: column
-}
-
-.next-up-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px
-}
-
-.badge-next-up-item {
-  background:
-    radial-gradient(circle at top right, rgba(var(--primary-rgb), 0.095), transparent 38%),
-    linear-gradient(180deg, rgba(var(--ink-rgb), 0.042), transparent 38%),
-    var(--bg-card);
-  border: 1px solid rgba(var(--primary-rgb), 0.16);
-  border-top-color: rgba(var(--ink-rgb), 0.12);
-  border-radius: var(--r-md);
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  position: relative;
-  overflow: hidden;
-  box-shadow:
-    0 8px 20px rgba(var(--shadow-rgb), 0.20),
-    inset 0 1px 0 rgba(var(--ink-rgb), 0.052)
-}
-
-.badge-next-up-head {
-  display: flex;
-  align-items: center;
-  gap: 8px
-}
-
-.badge-next-up-title-wrap {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap
-}
-
-.badge-next-up-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--t1)
-}
-
-.badge-next-up-pct {
-  font-size: 11px;
-  color: var(--t2);
-  font-variant-numeric: tabular-nums
-}
-
-.badge-next-up-fraction {
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--t3);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.1px
-}
-
-.badge-next-up-desc {
-  font-size: 11px;
-  color: var(--t2);
-  line-height: 1.4
 }
 
 /* ─── Goals empty-state banner ──────────────────────────────────────── */
@@ -7182,99 +7000,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   line-height: 1.4
 }
 
-/* ─── Badge group sections (collapsible) ────────────────────────────── */
-.badge-group-section {
-  margin-bottom: 4px;
-  border: 1px solid var(--b1);
-  border-top-color: var(--b2);
-  border-radius: var(--r-md);
-  background:
-    linear-gradient(180deg, rgba(var(--ink-rgb), 0.04), transparent 30%),
-    var(--bg-2);
-  overflow: hidden;
-  position: relative;
-  box-shadow:
-    0 6px 18px rgba(var(--shadow-rgb), 0.18),
-    inset 0 1px 0 rgba(var(--ink-rgb), 0.045)
-}
-
-.badge-group-section[open] {
-  background:
-    linear-gradient(180deg, rgba(var(--ink-rgb), 0.035), transparent 24%),
-    var(--bg-2)
-}
-
-.badge-group-summary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  cursor: pointer;
-  list-style: none;
-  user-select: none;
-  font-size: 12px;
-  color: var(--t1);
-  transition: background var(--tf)
-}
-
-.badge-group-summary::-webkit-details-marker {
-  display: none
-}
-
-.badge-group-icon {
-  font-size: 16px;
-  line-height: 1
-}
-
-.badge-group-title {
-  flex: 1;
-  font-weight: 700;
-  letter-spacing: 0.02em
-}
-
-.badge-group-count {
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--t1);
-  background: rgba(var(--ink-rgb), 0.05);
-  padding: 2px 6px;
-  border-radius: 999px;
-  border: 1px solid rgba(var(--ink-rgb), 0.08);
-  font-variant-numeric: tabular-nums
-}
-
-.badge-group-chevron {
-  width: 14px;
-  height: 14px;
-  color: var(--t2);
-  transition: transform 200ms ease
-}
-
-.badge-group-section[open] .badge-group-chevron {
-  transform: rotate(180deg)
-}
-
-.badge-group-section .badges-grid {
-  padding: 0 8px 8px
-}
-
-/* ─── Badge tile icon wrap (custom SVG + tier ring) ─────────────────── */
-.badge-tile-icon-wrap {
-  grid-column: 1;
-  grid-row: 1 / 3;
-  width: 38px;
-  height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 14px;
-  margin-bottom: 0;
-  align-self: flex-start;
-  background: var(--bg-3);
-  border: 1px solid var(--b1);
-  transition: transform 150ms ease, box-shadow 200ms ease
-}
-
 .badge-svg {
   width: 18px;
   height: 18px;
@@ -7287,144 +7012,412 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   line-height: 1
 }
 
-/* Tier-colored gradient rings for unlocked badges */
-.badge-tile--unlocked.badge-tier-platinum .badge-tile-icon-wrap {
-  background: radial-gradient(circle at 30% 30%, rgba(191, 243, 255, 0.28), rgba(147, 225, 255, 0.06), rgba(255, 161, 214, 0.08));
-  border-color: rgba(147, 225, 255, 0.78);
-  box-shadow: 0 0 12px rgba(147, 225, 255, 0.24), inset 0 0 0 1px rgba(255, 196, 227, 0.24)
+/* Tier accent palette — one source of truth for ring, glow, label, dot. */
+[data-tier="bronze"]   { --ach-accent: #f5b890; --ach-rgb: 245, 184, 144 }
+[data-tier="silver"]   { --ach-accent: #e3eaf5; --ach-rgb: 227, 234, 245 }
+[data-tier="gold"]     { --ach-accent: #ffd166; --ach-rgb: 255, 209, 102 }
+[data-tier="platinum"] { --ach-accent: #bff3ff; --ach-rgb: 191, 243, 255 }
+/* Completed stays on its tier colour (platinum for full ladders) — PS5-style,
+   never green. The `is-completed` state only adds glow, not a colour swap. */
+
+/* Progress ring (shared by featured + grid cards) */
+.ach-ring {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center
+}
+/* Only the progress-ring circle (direct child) is rotated — NOT the trophy
+   svg nested inside .ach-ring-icon, which must stay upright. */
+.ach-ring > svg { display: block; transform: rotate(-90deg) }
+.ach-ring-track { stroke: rgba(var(--ink-rgb), 0.10) }
+.ach-ring-fill {
+  stroke: var(--ach-accent, var(--primary));
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px rgba(var(--ach-rgb, var(--primary-rgb)), 0.55));
+  transition: stroke-dashoffset 600ms cubic-bezier(0.22, 1, 0.36, 1)
+}
+.ach-ring-icon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ach-accent, var(--t2))
+}
+.ach-ring-icon .ach-trophy {
+  width: 60%;
+  height: 60%;
+  color: inherit;
+  filter: drop-shadow(0 1px 3px rgba(var(--shadow-rgb), 0.55))
+}
+/* Higher ranks glow more — adds to the sense of prestige. */
+.ach-ring-icon .ach-trophy--gold {
+  filter: drop-shadow(0 1px 3px rgba(var(--shadow-rgb), 0.5)) drop-shadow(0 0 4px rgba(var(--ach-rgb), 0.55))
+}
+.ach-ring-icon .ach-trophy--platinum {
+  filter: drop-shadow(0 1px 3px rgba(var(--shadow-rgb), 0.5)) drop-shadow(0 0 6px rgba(var(--ach-rgb), 0.8))
+}
+/* Engraved emblem on the cup (silver+) — a darker recess for contrast. */
+.ach-trophy .ach-emblem { fill: rgba(var(--shadow-rgb), 0.5) }
+.ach-ring-check {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--ach-accent, var(--primary));
+  color: rgba(var(--shadow-rgb), 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 2px rgba(var(--shadow-rgb), 0.6), 0 0 8px rgba(var(--ach-rgb, var(--primary-rgb)), 0.6)
+}
+.ach-ring-check svg { width: 9px; height: 9px; transform: none }
+.ach-ring-pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--t1);
+  font-variant-numeric: tabular-nums
 }
 
-.badge-tile--unlocked.badge-tier-platinum .badge-svg {
-  color: #bff3ff
-}
-
-.badge-tile--unlocked.badge-tier-gold .badge-tile-icon-wrap {
-  background: radial-gradient(circle at 30% 30%, rgba(255, 215, 100, 0.25), rgba(255, 197, 61, 0.05));
-  border-color: rgba(255, 197, 61, 0.7);
-  box-shadow: 0 0 10px rgba(255, 197, 61, 0.25), inset 0 0 0 1px rgba(255, 215, 100, 0.3)
-}
-
-.badge-tile--unlocked.badge-tier-gold .badge-svg {
-  color: #ffd166
-}
-
-.badge-tile--unlocked.badge-tier-silver .badge-tile-icon-wrap {
-  background: radial-gradient(circle at 30% 30%, rgba(220, 230, 245, 0.25), rgba(180, 195, 220, 0.05));
-  border-color: rgba(200, 215, 235, 0.7);
-  box-shadow: 0 0 8px rgba(200, 215, 235, 0.2), inset 0 0 0 1px rgba(220, 230, 245, 0.3)
-}
-
-.badge-tile--unlocked.badge-tier-silver .badge-svg {
-  color: #e3eaf5
-}
-
-.badge-tile--unlocked.badge-tier-bronze .badge-tile-icon-wrap {
-  background: radial-gradient(circle at 30% 30%, rgba(245, 175, 110, 0.25), rgba(205, 127, 50, 0.05));
-  border-color: rgba(225, 150, 80, 0.7);
-  box-shadow: 0 0 8px rgba(205, 127, 50, 0.2), inset 0 0 0 1px rgba(245, 175, 110, 0.3)
-}
-
-.badge-tile--unlocked.badge-tier-bronze .badge-svg {
-  color: #f5b890
-}
-
-
-/* ─── Locked tile mini progress bar — uniform 4px height matches the
-   goal-progress-track + the bottom-of-card bar so every progress bar in
-   the app reads as the same primitive. */
-.badge-tile-mini-track {
-  width: 100%;
-  height: 4px;
-  background: rgba(var(--ink-rgb), 0.06);
-  border-radius: 999px;
+/* Featured Next-Up (single hero) */
+.ach-featured {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 14px;
+  border-radius: var(--r-lg);
+  cursor: pointer;
+  position: relative;
   overflow: hidden;
-  margin-top: 0
+  /* PS5 frosted glass */
+  background:
+    radial-gradient(circle at top right, rgba(var(--ach-rgb, var(--primary-rgb)), 0.18), transparent 50%),
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.08), rgba(var(--ink-rgb), 0.02)),
+    rgba(13, 19, 33, 0.55);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid rgba(var(--ach-rgb, var(--primary-rgb)), 0.3);
+  border-top-color: rgba(var(--ink-rgb), 0.18);
+  box-shadow:
+    0 12px 30px rgba(var(--shadow-rgb), 0.3),
+    0 0 22px -6px rgba(var(--ach-rgb, var(--primary-rgb)), 0.4),
+    inset 0 1px 0 rgba(var(--ink-rgb), 0.1);
+  transition: transform var(--tf), border-color var(--tn)
 }
-
-.badge-tile-mini-bar {
-  height: 100%;
-  background: linear-gradient(90deg, oklch(0.62 0.11 215) 0%, var(--primary) 100%);
+.ach-featured:hover { border-color: rgba(var(--ach-rgb, var(--primary-rgb)), 0.5) }
+.ach-featured:active { transform: scale(0.99) }
+.ach-featured-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px }
+.ach-featured-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ach-accent, var(--cyan))
+}
+.ach-featured-eyebrow::before {
+  content: '';
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor
+}
+.ach-featured-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--t1);
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis
+}
+.ach-featured-desc {
+  font-size: 11px;
+  color: var(--t2);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden
+}
+.ach-featured-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px
+}
+.ach-featured-tier {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ach-accent);
+  padding: 2px 7px;
   border-radius: 999px;
-  transition: width 300ms ease
+  background: rgba(var(--ach-rgb), 0.12);
+  border: 1px solid rgba(var(--ach-rgb), 0.3)
+}
+.ach-featured-stats {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t2);
+  font-variant-numeric: tabular-nums
 }
 
-/* ─── Newly unlocked pulse animation ────────────────────────────────── */
-@keyframes badgePulse {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 rgba(var(--primary-rgb), 0)
-  }
-  35% {
-    transform: scale(1.06);
-    box-shadow: 0 0 14px rgba(var(--primary-rgb), 0.6)
-  }
-  70% {
-    transform: scale(1.02);
-    box-shadow: 0 0 8px rgba(var(--primary-rgb), 0.3)
-  }
+/* Section header */
+.ach-section { display: flex; flex-direction: column; gap: 10px }
+/* Card grid */
+.ach-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px
+}
+.ach-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  text-align: left;
+  /* PS5 frosted glass */
+  background:
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.07), rgba(var(--ink-rgb), 0.015)),
+    rgba(14, 20, 34, 0.5);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(var(--ink-rgb), 0.1);
+  border-top-color: rgba(var(--ink-rgb), 0.16);
+  box-shadow:
+    0 6px 16px rgba(var(--shadow-rgb), 0.2),
+    inset 0 1px 0 rgba(var(--ink-rgb), 0.07);
+  transition: transform var(--tf), border-color var(--tn)
+}
+.ach-card:active { transform: scale(0.98) }
+/* Completed = tier colour (platinum for full ladders), glowing — never green */
+.ach-card.is-completed {
+  border-color: rgba(var(--ach-rgb, var(--primary-rgb)), 0.5);
+  background:
+    radial-gradient(circle at top right, rgba(var(--ach-rgb, var(--primary-rgb)), 0.14), transparent 46%),
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.07), rgba(var(--ink-rgb), 0.015)),
+    rgba(14, 20, 34, 0.5);
+  box-shadow:
+    0 6px 16px rgba(var(--shadow-rgb), 0.2),
+    0 0 18px -6px rgba(var(--ach-rgb, var(--primary-rgb)), 0.45),
+    inset 0 1px 0 rgba(var(--ink-rgb), 0.08)
+}
+.ach-card.is-close { border-color: rgba(var(--ach-rgb), 0.42) }
+.ach-card.is-locked { opacity: 0.6 }
+.ach-card.is-locked .ach-ring-icon { color: var(--t3); filter: grayscale(0.6) }
+.ach-card.is-locked .ach-ring-fill { stroke: var(--t3); filter: none }
+.ach-card-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px }
+.ach-card-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--t1);
+  line-height: 1.18;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis
+}
+.ach-card-tier {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ach-accent, var(--t3))
+}
+.ach-card.is-locked .ach-card-tier { color: var(--t3) }
+.ach-card-stats {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--t2);
+  font-variant-numeric: tabular-nums
 }
 
-.badge-tile.is-newly-unlocked .badge-tile-icon-wrap {
-  animation: badgePulse 1.4s ease-out 1
+/* Tier-breakdown modal — PS5 frosted glass (reuses .dialog-overlay / .dialog) */
+.ach-detail {
+  max-width: 320px;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(var(--ink-rgb), 0.1), transparent 60%),
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.09), rgba(var(--ink-rgb), 0.015)),
+    rgba(13, 19, 33, 0.6);
+  backdrop-filter: blur(34px) saturate(160%);
+  -webkit-backdrop-filter: blur(34px) saturate(160%);
+  border: 1px solid rgba(var(--ink-rgb), 0.14);
+  border-top-color: rgba(var(--ink-rgb), 0.24);
+  box-shadow: var(--s4), inset 0 1px 0 rgba(var(--ink-rgb), 0.1)
 }
+.ach-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid rgba(var(--ink-rgb), 0.06)
+}
+.ach-detail-titles { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px }
+.ach-detail-group {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ach-accent, var(--cyan))
+}
+.ach-detail-title { font-size: 15px; font-weight: 700; color: var(--t1); line-height: 1.1 }
+.ach-detail-sub { font-size: 11px; color: var(--t2) }
 
-/* ─── Next-up icon override (small SVG) ─────────────────────────────── */
-.badge-next-up-icon {
+/* Next-tier highlight block — glass panel */
+.ach-detail-next {
+  margin: 12px 14px 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background:
+    radial-gradient(circle at top right, rgba(var(--ach-rgb, var(--primary-rgb)), 0.16), transparent 62%),
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.08), rgba(var(--ink-rgb), 0.02));
+  border: 1px solid rgba(var(--ach-rgb, var(--primary-rgb)), 0.24);
+  border-top-color: rgba(var(--ink-rgb), 0.16);
+  box-shadow: inset 0 1px 0 rgba(var(--ink-rgb), 0.08)
+}
+.ach-detail-next-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px
+}
+.ach-detail-next-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ach-accent, var(--cyan))
+}
+.ach-detail-next-val {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t1);
+  font-variant-numeric: tabular-nums
+}
+.ach-detail-next .goal-progress-bar.ach-bar {
+  background: linear-gradient(90deg, rgba(var(--ach-rgb, var(--primary-rgb)), 0.6), var(--ach-accent, var(--primary)));
+  box-shadow: 0 0 8px rgba(var(--ach-rgb, var(--primary-rgb)), 0.5)
+}
+.ach-detail-next-desc { font-size: 11px; color: var(--t2); line-height: 1.35; margin-top: 6px }
+.ach-detail-next.is-complete {
+  display: flex;
+  align-items: center;
+  gap: 8px
+}
+.ach-detail-next-icon {
+  width: 22px; height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  background: var(--ach-accent, var(--primary));
+  color: rgba(var(--shadow-rgb), 0.85)
+}
+.ach-detail-next-icon svg { width: 13px; height: 13px }
+.ach-detail-next-main { font-size: 12px; font-weight: 700; color: var(--t1) }
+
+.ach-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 10px 12px
+}
+.ach-stage-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--r-sm);
+  /* glass panel */
+  background: linear-gradient(180deg, rgba(var(--ink-rgb), 0.07), rgba(var(--ink-rgb), 0.018));
+  border: 1px solid rgba(var(--ink-rgb), 0.07);
+  border-top-color: rgba(var(--ink-rgb), 0.11);
+  box-shadow: inset 0 1px 0 rgba(var(--ink-rgb), 0.05)
+}
+.ach-stage-row.is-done {
+  background:
+    linear-gradient(180deg, rgba(var(--ach-rgb, var(--primary-rgb)), 0.15), rgba(var(--ach-rgb, var(--primary-rgb)), 0.04)),
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.04), transparent);
+  border-color: rgba(var(--ach-rgb, var(--primary-rgb)), 0.22);
+  border-top-color: rgba(var(--ach-rgb, var(--primary-rgb)), 0.32)
+}
+.ach-stage-row.is-current {
+  background:
+    radial-gradient(120% 120% at 0% 50%, rgba(var(--ach-rgb, var(--primary-rgb)), 0.2), transparent 70%),
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.07), rgba(var(--ink-rgb), 0.02));
+  border-color: rgba(var(--ach-rgb, var(--primary-rgb)), 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(var(--ink-rgb), 0.08),
+    0 0 16px -5px rgba(var(--ach-rgb, var(--primary-rgb)), 0.55)
+}
+/* One trophy per tier — coloured when earned, greyed silhouette when not. */
+.ach-stage-trophy {
   width: 26px;
   height: 26px;
-  border-radius: 50%;
-  background: var(--bg-3);
-  border: 1px solid var(--b1);
-  color: var(--t2)
+  flex-shrink: 0;
+  display: inline-flex;
+  color: var(--ach-accent, var(--t3));
+  filter: drop-shadow(0 0 4px rgba(var(--ach-rgb, var(--primary-rgb)), 0.4))
+}
+.ach-stage-trophy svg { width: 100%; height: 100% }
+.ach-stage-row:not(.is-done) .ach-stage-trophy {
+  color: var(--t3);
+  opacity: 0.5;
+  filter: none
+}
+.ach-stage-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px }
+.ach-stage-name { font-size: 12px; font-weight: 700; color: var(--t1); line-height: 1.15 }
+.ach-stage-desc {
+  font-size: 10px;
+  color: var(--t3);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis
+}
+.ach-stage-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0 }
+.ach-stage-tier { font-size: 8.5px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ach-accent, var(--t3)) }
+.ach-stage-row:not(.is-done) .ach-stage-tier { color: var(--t3) }
+.ach-stage-val {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t2);
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px
+}
+.ach-stage-val .ach-check { color: var(--ach-accent, var(--primary)); display: inline-flex }
+.ach-stage-val .ach-check svg { width: 14px; height: 14px }
+
+@media (prefers-reduced-motion: reduce) {
+  .ach-ring-fill { transition: none }
+  .ach-card, .ach-featured { transition: none }
+  .ach-card:active, .ach-featured:active { transform: none }
 }
 
-.badge-next-up-icon .badge-svg {
-  width: 14px;
-  height: 14px
-}
-
-.badge-next-up-icon.badge-tier-gold {
-  color: #ffd166;
-  border-color: rgba(255, 197, 61, 0.5)
-}
-
-.badge-next-up-icon.badge-tier-platinum {
-  color: #bff3ff;
-  border-color: rgba(147, 225, 255, 0.52);
-  background: linear-gradient(135deg, rgba(147, 225, 255, 0.14), rgba(255, 161, 214, 0.08))
-}
-
-.badge-next-up-icon.badge-tier-silver {
-  color: #e3eaf5;
-  border-color: rgba(200, 215, 235, 0.5)
-}
-
-.badge-next-up-icon.badge-tier-bronze {
-  color: #f5b890;
-  border-color: rgba(225, 150, 80, 0.5)
-}
-
-@media (max-width: 520px) {
-  .badge-tile-main {
-    grid-template-columns: 38px minmax(0, 1fr) auto;
-    grid-template-rows: auto auto;
-    align-items: start
-  }
-
-  .badge-tile-icon-wrap {
-    grid-row: 1 / 3;
-    width: 34px;
-    height: 34px
-  }
-
-  .badge-track-row {
-    grid-column: 2 / 4;
-    grid-row: 2
-  }
-}
 
 /* ─── Inline confirm toast (deleteAnime, future destructive actions) ───── */
 .at-confirm-toast {

@@ -114,7 +114,7 @@ function showBadgeNotification(badge) {
             type: 'basic',
             iconUrl: 'src/icons/icon128.png',
             title: 'Badge unlocked!',
-            message: `${badge.icon || '🏅'} ${badge.title} — ${badge.desc || ''}`.trim(),
+            message: `${badge.title}${badge.desc ? ` — ${badge.desc}` : ''}`.trim(),
             priority: 1
         });
     } catch (e) {

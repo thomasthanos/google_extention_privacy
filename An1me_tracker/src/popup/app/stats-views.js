@@ -127,8 +127,7 @@
                         type: 'BADGE_UNLOCKED',
                         id: badge.id,
                         title: badge.title,
-                        desc: badge.desc,
-                        icon: badge.icon
+                        desc: badge.desc
                     }, () => { if (chrome.runtime.lastError) { } });
                 } catch { }
             }

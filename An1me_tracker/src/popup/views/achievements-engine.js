@@ -58,6 +58,14 @@
         return _hourCache;
     }
 
+    function countWatchedInHours(hourIndex, hours) {
+        let count = 0;
+        for (const hour of hours || []) {
+            count += hourIndex?.hours?.get(hour) || 0;
+        }
+        return count;
+    }
+
     const _hcCountMovies = { animeData: null, value: 0 };
     function countMovies(animeData) {
         if (_hcCountMovies.animeData === animeData) return _hcCountMovies.value;
@@ -190,6 +198,32 @@
         return found;
     }
 
+    const _hcMaxComebackGap = { animeData: null, value: 0 };
+    function maxComebackGapDays(animeData) {
+        if (_hcMaxComebackGap.animeData === animeData) return _hcMaxComebackGap.value;
+        let best = 0;
+        for (const slug in animeData || {}) {
+            if (!Object.prototype.hasOwnProperty.call(animeData, slug)) continue;
+            const a = animeData[slug];
+            if (!a || !Array.isArray(a.episodes) || a.episodes.length < 2) continue;
+            const times = [];
+            for (const ep of a.episodes) {
+                if (ep?.durationSource === 'anilist') continue;
+                if (!ep?.watchedAt) continue;
+                const t = Date.parse(ep.watchedAt);
+                if (Number.isFinite(t)) times.push(t);
+            }
+            times.sort((x, y) => x - y);
+            for (let i = 1; i < times.length; i++) {
+                const days = Math.floor((times[i] - times[i - 1]) / 86400000);
+                if (days > best) best = days;
+            }
+        }
+        _hcMaxComebackGap.animeData = animeData;
+        _hcMaxComebackGap.value = best;
+        return best;
+    }
+
     function bestDailyEpisodeCount(index) {
         let best = 0;
         if (!index?.byDay) return 0;
@@ -202,165 +236,225 @@
     const BADGE_DEFS = [
 
         { id: 'first_steps', group: 'volume', title: 'First Steps', desc: 'Watch your first episode',
-          icon: '🌱', svg: 'sprout', tier: 'bronze',
+          svg: 'sprout', tier: 'bronze',
           progress: (ctx) => ({ current: Math.min(ctx.index.totals.episodes, 1), target: 1 }) },
-        { id: 'starter_stack', group: 'volume', title: 'Starter Stack', desc: 'Watch 25 episodes',
-          icon: '📖', svg: 'book', tier: 'bronze',
-          progress: (ctx) => ({ current: Math.min(ctx.index.totals.episodes, 25), target: 25 }) },
-        { id: 'century_club', group: 'volume', title: 'Century Club', desc: 'Watch 100 episodes',
-          icon: '💯', svg: 'hundred', tier: 'silver',
-          progress: (ctx) => ({ current: Math.min(ctx.index.totals.episodes, 100), target: 100 }) },
+        { id: 'starter_stack', group: 'volume', title: 'Starter Stack', desc: 'Watch 50 episodes',
+          svg: 'book', tier: 'bronze',
+          progress: (ctx) => ({ current: Math.min(ctx.index.totals.episodes, 50), target: 50 }) },
+        { id: 'century_club', group: 'volume', title: 'Century Club', desc: 'Watch 200 episodes',
+          svg: 'hundred', tier: 'silver',
+          progress: (ctx) => ({ current: Math.min(ctx.index.totals.episodes, 200), target: 200 }) },
         { id: 'double_century', group: 'volume', title: 'Double Century', desc: 'Watch 250 episodes',
-          icon: '⚡', svg: 'bolt', tier: 'silver',
+          svg: 'bolt', tier: 'silver',
           progress: (ctx) => ({ current: Math.min(ctx.index.totals.episodes, 250), target: 250 }) },
-        { id: 'marathoner_500', group: 'volume', title: 'Half-K Hero', desc: 'Watch 500 episodes',
-          icon: '🚀', svg: 'rocket', tier: 'gold',
-          progress: (ctx) => ({ current: Math.min(ctx.index.totals.episodes, 500), target: 500 }) },
-        { id: 'marathoner_1k', group: 'volume', title: 'Marathoner', desc: 'Watch 1,000 episodes',
-          icon: '🏆', svg: 'trophy', tier: 'platinum',
-          progress: (ctx) => ({ current: Math.min(ctx.index.totals.episodes, 1000), target: 1000 }) },
+        { id: 'marathoner_500', group: 'volume', title: 'Endurance Runner', desc: 'Watch 750 episodes',
+          svg: 'rocket', tier: 'gold',
+          progress: (ctx) => ({ current: Math.min(ctx.index.totals.episodes, 750), target: 750 }) },
+        { id: 'marathoner_1k', group: 'volume', title: 'Marathoner', desc: 'Watch 1,500 episodes',
+          svg: 'trophy', tier: 'platinum',
+          progress: (ctx) => ({ current: Math.min(ctx.index.totals.episodes, 1500), target: 1500 }) },
 
 
-        { id: 'day_one_24h', group: 'time', title: '24-Hour Club', desc: 'Watch 24 hours total',
-          icon: '⏱️', svg: 'clock', tier: 'bronze',
-          progress: (ctx) => ({ current: Math.min(ctx.index.totals.seconds, 86400), target: 86400, unit: 'seconds' }) },
-        { id: 'time_traveler', group: 'time', title: 'Time Traveler', desc: 'Watch 100 hours total',
-          icon: '⏳', svg: 'hourglass', tier: 'silver',
-          progress: (ctx) => ({ current: Math.min(ctx.index.totals.seconds, 360000), target: 360000, unit: 'seconds' }) },
-        { id: 'time_keeper_250', group: 'time', title: 'Time Keeper', desc: 'Watch 250 hours total',
-          icon: '💎', svg: 'gem', tier: 'gold',
-          progress: (ctx) => ({ current: Math.min(ctx.index.totals.seconds, 900000), target: 900000, unit: 'seconds' }) },
-        { id: 'time_legend', group: 'time', title: 'Time Legend', desc: 'Watch 500 hours total',
-          icon: '🕰️', svg: 'clock', tier: 'platinum',
-          progress: (ctx) => ({ current: Math.min(ctx.index.totals.seconds, 1800000), target: 1800000, unit: 'seconds' }) },
+        { id: 'day_one_24h', group: 'time', title: '50-Hour Club', desc: 'Watch 50 hours total',
+          svg: 'clock', tier: 'bronze',
+          progress: (ctx) => ({ current: Math.min(ctx.index.totals.seconds, 180000), target: 180000, unit: 'seconds' }) },
+        { id: 'time_traveler', group: 'time', title: 'Time Traveler', desc: 'Watch 150 hours total',
+          svg: 'hourglass', tier: 'silver',
+          progress: (ctx) => ({ current: Math.min(ctx.index.totals.seconds, 540000), target: 540000, unit: 'seconds' }) },
+        { id: 'time_keeper_250', group: 'time', title: 'Time Keeper', desc: 'Watch 400 hours total',
+          svg: 'gem', tier: 'gold',
+          progress: (ctx) => ({ current: Math.min(ctx.index.totals.seconds, 1440000), target: 1440000, unit: 'seconds' }) },
+        { id: 'time_legend', group: 'time', title: 'Time Legend', desc: 'Watch 1,000 hours total',
+          svg: 'clock', tier: 'platinum',
+          progress: (ctx) => ({ current: Math.min(ctx.index.totals.seconds, 3600000), target: 3600000, unit: 'seconds' }) },
 
 
-        { id: 'completionist', group: 'series', title: 'Completionist', desc: 'Finish your first series',
-          icon: '✅', svg: 'check', tier: 'bronze',
+        { id: 'completionist', group: 'series', title: 'Completionist', desc: 'Finish 5 series',
+          svg: 'check', tier: 'bronze',
           progress: (ctx) => {
               const rows = ctx.categorize();
-              return { current: Math.min(rows.completed.length, 1), target: 1 };
+              return { current: Math.min(rows.completed.length, 5), target: 5 };
           } },
         { id: 'library_builder_10', group: 'series', title: 'Collection Started', desc: 'Track 10 anime',
-          icon: '📚', svg: 'books', tier: 'bronze',
+          svg: 'books', tier: 'bronze',
           progress: (ctx) => ({ current: Math.min(ctx.index.totals.animes, 10), target: 10 }) },
-        { id: 'completionist_10', group: 'series', title: 'Series Collector', desc: 'Finish 10 series',
-          icon: '📚', svg: 'books', tier: 'silver',
-          progress: (ctx) => {
-              const rows = ctx.categorize();
-              return { current: Math.min(rows.completed.length, 10), target: 10 };
-          } },
-        { id: 'completionist_25', group: 'series', title: 'Series Veteran', desc: 'Finish 25 series',
-          icon: '👑', svg: 'crown', tier: 'gold',
+        { id: 'completionist_10', group: 'series', title: 'Series Collector', desc: 'Finish 25 series',
+          svg: 'books', tier: 'silver',
           progress: (ctx) => {
               const rows = ctx.categorize();
               return { current: Math.min(rows.completed.length, 25), target: 25 };
           } },
-        { id: 'completionist_50', group: 'series', title: 'Series Master', desc: 'Finish 50 series',
-          icon: '👑', svg: 'crown', tier: 'platinum',
+        { id: 'completionist_25', group: 'series', title: 'Series Veteran', desc: 'Finish 60 series',
+          svg: 'crown', tier: 'gold',
           progress: (ctx) => {
               const rows = ctx.categorize();
-              return { current: Math.min(rows.completed.length, 50), target: 50 };
+              return { current: Math.min(rows.completed.length, 60), target: 60 };
           } },
-        { id: 'library_builder', group: 'series', title: 'Library Builder', desc: 'Track 50 anime',
-          icon: '📖', svg: 'book', tier: 'silver',
-          progress: (ctx) => ({ current: Math.min(ctx.index.totals.animes, 50), target: 50 }) },
-        { id: 'library_builder_100', group: 'series', title: 'Archive Architect', desc: 'Track 100 anime',
-          icon: '🏛️', svg: 'books', tier: 'platinum',
-          progress: (ctx) => ({ current: Math.min(ctx.index.totals.animes, 100), target: 100 }) },
-        { id: 'long_runner', group: 'series', title: 'Long Runner', desc: 'Finish a 50+ episode series',
-          icon: '🏃', svg: 'runner', tier: 'gold',
-          progress: (ctx) => ({ current: Math.min(longestEpisodesInOneSeries(ctx.animeData, { onlyCompleted: true }), 50), target: 50 }) },
-        { id: 'epic_finisher', group: 'series', title: 'Epic Finisher', desc: 'Finish a 100+ episode series',
-          icon: '⚔️', svg: 'sword', tier: 'platinum',
+        { id: 'completionist_50', group: 'series', title: 'Series Master', desc: 'Finish 120 series',
+          svg: 'crown', tier: 'platinum',
+          progress: (ctx) => {
+              const rows = ctx.categorize();
+              return { current: Math.min(rows.completed.length, 120), target: 120 };
+          } },
+        { id: 'library_builder', group: 'series', title: 'Library Builder', desc: 'Track 75 anime',
+          svg: 'book', tier: 'silver',
+          progress: (ctx) => ({ current: Math.min(ctx.index.totals.animes, 75), target: 75 }) },
+        { id: 'library_builder_75', group: 'series', title: 'Archive Curator', desc: 'Track 150 anime',
+          svg: 'books', tier: 'gold',
+          progress: (ctx) => ({ current: Math.min(ctx.index.totals.animes, 150), target: 150 }) },
+        { id: 'library_builder_100', group: 'series', title: 'Archive Architect', desc: 'Track 300 anime',
+          svg: 'books', tier: 'platinum',
+          progress: (ctx) => ({ current: Math.min(ctx.index.totals.animes, 300), target: 300 }) },
+        { id: 'short_runner', group: 'series', title: 'Short Runner', desc: 'Finish a 100+ episode series',
+          svg: 'runner', tier: 'bronze',
           progress: (ctx) => ({ current: Math.min(longestEpisodesInOneSeries(ctx.animeData, { onlyCompleted: true }), 100), target: 100 }) },
+        { id: 'season_runner', group: 'series', title: 'Season Runner', desc: 'Finish a 250+ episode series',
+          svg: 'runner', tier: 'silver',
+          progress: (ctx) => ({ current: Math.min(longestEpisodesInOneSeries(ctx.animeData, { onlyCompleted: true }), 250), target: 250 }) },
+        { id: 'long_runner', group: 'series', title: 'Long Runner', desc: 'Finish a 500+ episode series',
+          svg: 'runner', tier: 'gold',
+          progress: (ctx) => ({ current: Math.min(longestEpisodesInOneSeries(ctx.animeData, { onlyCompleted: true }), 500), target: 500 }) },
+        { id: 'epic_finisher', group: 'series', title: 'Epic Finisher', desc: 'Finish a 1,000+ episode series',
+          svg: 'sword', tier: 'platinum',
+          progress: (ctx) => ({ current: Math.min(longestEpisodesInOneSeries(ctx.animeData, { onlyCompleted: true }), 1000), target: 1000 }) },
 
 
-        { id: 'movie_night', group: 'cinema', title: 'Movie Night', desc: 'Watch your first anime movie',
-          icon: '🍿', svg: 'clapper', tier: 'bronze',
-          progress: (ctx) => ({ current: Math.min(countMovies(ctx.animeData), 1), target: 1 }) },
-        { id: 'movie_buff', group: 'cinema', title: 'Movie Buff', desc: 'Watch 5 anime movies',
-          icon: '🎬', svg: 'clapper', tier: 'silver',
+        { id: 'movie_night', group: 'cinema', title: 'Movie Night', desc: 'Watch 5 anime movies',
+          svg: 'clapper', tier: 'bronze',
           progress: (ctx) => ({ current: Math.min(countMovies(ctx.animeData), 5), target: 5 }) },
-        { id: 'double_feature', group: 'cinema', title: 'Double Feature', desc: 'Watch 10 anime movies',
-          icon: '🎞', svg: 'film', tier: 'gold',
-          progress: (ctx) => ({ current: Math.min(countMovies(ctx.animeData), 10), target: 10 }) },
-        { id: 'cinephile', group: 'cinema', title: 'Cinephile', desc: 'Watch 25 anime movies',
-          icon: '🎞️', svg: 'film', tier: 'platinum',
-          progress: (ctx) => ({ current: Math.min(countMovies(ctx.animeData), 25), target: 25 }) },
+        { id: 'movie_buff', group: 'cinema', title: 'Movie Buff', desc: 'Watch 15 anime movies',
+          svg: 'clapper', tier: 'silver',
+          progress: (ctx) => ({ current: Math.min(countMovies(ctx.animeData), 15), target: 15 }) },
+        { id: 'double_feature', group: 'cinema', title: 'Film Curator', desc: 'Watch 40 anime movies',
+          svg: 'film', tier: 'gold',
+          progress: (ctx) => ({ current: Math.min(countMovies(ctx.animeData), 40), target: 40 }) },
+        { id: 'cinephile', group: 'cinema', title: 'Cinephile', desc: 'Watch 100 anime movies',
+          svg: 'film', tier: 'platinum',
+          progress: (ctx) => ({ current: Math.min(countMovies(ctx.animeData), 100), target: 100 }) },
 
 
-        { id: 'streak_starter', group: 'streaks', title: 'Streak Starter', desc: '3-day watch streak',
-          icon: '📅', svg: 'calendar7', tier: 'bronze',
-          progress: (ctx) => ({ current: Math.min(ctx.streak.longestStreak, 3), target: 3 }) },
-        { id: 'power_hour', group: 'streaks', title: 'Power Hour', desc: 'Watch 5 episodes in a single day',
-          icon: '⚡', svg: 'bolt', tier: 'bronze',
-          progress: (ctx) => ({ current: Math.min(bestDailyEpisodeCount(ctx.index), 5), target: 5 }) },
-        { id: 'marathon_day', group: 'streaks', title: 'Marathon Day', desc: 'Watch 10 episodes in a single day',
-          icon: '🔥', svg: 'flame', tier: 'silver',
-          progress: (ctx) => ({ current: Math.min(bestDailyEpisodeCount(ctx.index), 10), target: 10 }) },
-        { id: 'ultra_marathon', group: 'streaks', title: 'Ultra Marathon', desc: 'Watch 15 episodes in a single day',
-          icon: '🚀', svg: 'rocket', tier: 'gold',
-          progress: (ctx) => ({ current: Math.min(bestDailyEpisodeCount(ctx.index), 15), target: 15 }) },
-        { id: 'binge_week', group: 'streaks', title: 'Binge Week', desc: '7-day watch streak',
-          icon: '🗓️', svg: 'calendar7', tier: 'silver',
+        { id: 'streak_starter', group: 'streaks', title: 'Streak Starter', desc: '7-day watch streak',
+          svg: 'calendar7', tier: 'bronze',
           progress: (ctx) => ({ current: Math.min(ctx.streak.longestStreak, 7), target: 7 }) },
-        { id: 'fortnight_fan', group: 'streaks', title: 'Fortnight Fan', desc: '14-day watch streak',
-          icon: '💎', svg: 'gem', tier: 'gold',
+        { id: 'power_hour', group: 'streaks', title: 'Power Hour', desc: 'Watch 8 episodes in a single day',
+          svg: 'bolt', tier: 'bronze',
+          progress: (ctx) => ({ current: Math.min(bestDailyEpisodeCount(ctx.index), 8), target: 8 }) },
+        { id: 'marathon_day', group: 'streaks', title: 'Marathon Day', desc: 'Watch 15 episodes in a single day',
+          svg: 'flame', tier: 'silver',
+          progress: (ctx) => ({ current: Math.min(bestDailyEpisodeCount(ctx.index), 15), target: 15 }) },
+        { id: 'ultra_marathon', group: 'streaks', title: 'Ultra Marathon', desc: 'Watch 25 episodes in a single day',
+          svg: 'rocket', tier: 'gold',
+          progress: (ctx) => ({ current: Math.min(bestDailyEpisodeCount(ctx.index), 25), target: 25 }) },
+        { id: 'legendary_day', group: 'streaks', title: 'Legendary Day', desc: 'Watch 35 episodes in a single day',
+          svg: 'trophy', tier: 'platinum',
+          progress: (ctx) => ({ current: Math.min(bestDailyEpisodeCount(ctx.index), 35), target: 35 }) },
+        { id: 'binge_week', group: 'streaks', title: 'Binge Week', desc: '14-day watch streak',
+          svg: 'calendar7', tier: 'silver',
           progress: (ctx) => ({ current: Math.min(ctx.streak.longestStreak, 14), target: 14 }) },
-        { id: 'dedication', group: 'streaks', title: 'Dedication', desc: '30-day watch streak',
-          icon: '💎', svg: 'gem', tier: 'gold',
-          progress: (ctx) => ({ current: Math.min(ctx.streak.longestStreak, 30), target: 30 }) },
+        { id: 'fortnight_fan', group: 'streaks', title: 'Fortnight Fan', desc: '14-day watch streak',
+          svg: 'gem', tier: 'gold',
+          progress: (ctx) => ({ current: Math.min(ctx.streak.longestStreak, 14), target: 14 }) },
+        { id: 'dedication', group: 'streaks', title: 'Dedication', desc: '45-day watch streak',
+          svg: 'gem', tier: 'gold',
+          progress: (ctx) => ({ current: Math.min(ctx.streak.longestStreak, 45), target: 45 }) },
         { id: 'unstoppable', group: 'streaks', title: 'Unstoppable', desc: '100-day watch streak',
-          icon: '🌋', svg: 'volcano', tier: 'platinum',
+          svg: 'volcano', tier: 'platinum',
           progress: (ctx) => ({ current: Math.min(ctx.streak.longestStreak, 100), target: 100 }) },
 
 
-        { id: 'night_owl', group: 'lifestyle', title: 'Night Owl', desc: 'Watch between 2am and 5am',
-          icon: '🌙', svg: 'moon', tier: 'bronze',
-          progress: (ctx) => {
-              const hasNight = [2, 3, 4].some(h => (ctx.hourIndex.hours.get(h) || 0) > 0);
-              return { current: hasNight ? 1 : 0, target: 1 };
-          } },
-        { id: 'early_bird', group: 'lifestyle', title: 'Early Bird', desc: 'Watch between 4am and 7am',
-          icon: '☀️', svg: 'sun', tier: 'bronze',
-          progress: (ctx) => {
-              const hasEarly = [4, 5, 6].some(h => (ctx.hourIndex.hours.get(h) || 0) > 0);
-              return { current: hasEarly ? 1 : 0, target: 1 };
-          } },
-        { id: 'weekend_mood', group: 'lifestyle', title: 'Weekend Mood', desc: 'Watch 5 episodes on weekends',
-          icon: '🛋️', svg: 'couch', tier: 'bronze',
-          progress: (ctx) => ({ current: Math.min(weekendEpisodes(ctx.animeData), 5), target: 5 }) },
-        { id: 'weekend_warrior', group: 'lifestyle', title: 'Weekend Warrior', desc: 'Watch 20 episodes on weekends',
-          icon: '🛋️', svg: 'couch', tier: 'silver',
+        { id: 'night_owl', group: 'lifestyle', title: 'Night Owl', desc: 'Watch 5 episodes between 2am and 5am',
+          svg: 'moon', tier: 'bronze',
+          progress: (ctx) => ({ current: Math.min(countWatchedInHours(ctx.hourIndex, [2, 3, 4]), 5), target: 5 }) },
+        { id: 'early_bird', group: 'lifestyle', title: 'Early Bird', desc: 'Watch 5 episodes between 4am and 7am',
+          svg: 'sun', tier: 'bronze',
+          progress: (ctx) => ({ current: Math.min(countWatchedInHours(ctx.hourIndex, [4, 5, 6]), 5), target: 5 }) },
+        { id: 'night_owl_5', group: 'lifestyle', title: 'Moonlit Watcher', desc: 'Watch 25 episodes between 2am and 5am',
+          svg: 'moon', tier: 'silver',
+          progress: (ctx) => ({ current: Math.min(countWatchedInHours(ctx.hourIndex, [2, 3, 4]), 25), target: 25 }) },
+        { id: 'night_owl_20', group: 'lifestyle', title: 'Midnight Regular', desc: 'Watch 75 episodes between 2am and 5am',
+          svg: 'moon', tier: 'gold',
+          progress: (ctx) => ({ current: Math.min(countWatchedInHours(ctx.hourIndex, [2, 3, 4]), 75), target: 75 }) },
+        { id: 'night_owl_50', group: 'lifestyle', title: 'Nocturnal Legend', desc: 'Watch 150 episodes between 2am and 5am',
+          svg: 'moon', tier: 'platinum',
+          progress: (ctx) => ({ current: Math.min(countWatchedInHours(ctx.hourIndex, [2, 3, 4]), 150), target: 150 }) },
+        { id: 'early_bird_5', group: 'lifestyle', title: 'Morning Watcher', desc: 'Watch 25 episodes between 4am and 7am',
+          svg: 'sun', tier: 'silver',
+          progress: (ctx) => ({ current: Math.min(countWatchedInHours(ctx.hourIndex, [4, 5, 6]), 25), target: 25 }) },
+        { id: 'early_bird_20', group: 'lifestyle', title: 'Sunrise Regular', desc: 'Watch 75 episodes between 4am and 7am',
+          svg: 'sun', tier: 'gold',
+          progress: (ctx) => ({ current: Math.min(countWatchedInHours(ctx.hourIndex, [4, 5, 6]), 75), target: 75 }) },
+        { id: 'early_bird_50', group: 'lifestyle', title: 'Dawn Legend', desc: 'Watch 150 episodes between 4am and 7am',
+          svg: 'sun', tier: 'platinum',
+          progress: (ctx) => ({ current: Math.min(countWatchedInHours(ctx.hourIndex, [4, 5, 6]), 150), target: 150 }) },
+        { id: 'weekend_mood', group: 'lifestyle', title: 'Weekend Mood', desc: 'Watch 20 episodes on weekends',
+          svg: 'couch', tier: 'bronze',
           progress: (ctx) => ({ current: Math.min(weekendEpisodes(ctx.animeData), 20), target: 20 }) },
-        { id: 'patient_viewer', group: 'lifestyle', title: 'Patient Viewer', desc: 'Watch one anime for 180+ days',
-          icon: '🌸', svg: 'sakura', tier: 'gold',
+        { id: 'weekend_warrior', group: 'lifestyle', title: 'Weekend Warrior', desc: 'Watch 75 episodes on weekends',
+          svg: 'couch', tier: 'silver',
+          progress: (ctx) => ({ current: Math.min(weekendEpisodes(ctx.animeData), 75), target: 75 }) },
+        { id: 'weekend_champion', group: 'lifestyle', title: 'Weekend Champion', desc: 'Watch 150 episodes on weekends',
+          svg: 'couch', tier: 'gold',
+          progress: (ctx) => ({ current: Math.min(weekendEpisodes(ctx.animeData), 150), target: 150 }) },
+        { id: 'weekend_legend', group: 'lifestyle', title: 'Weekend Legend', desc: 'Watch 300 episodes on weekends',
+          svg: 'couch', tier: 'platinum',
+          progress: (ctx) => ({ current: Math.min(weekendEpisodes(ctx.animeData), 300), target: 300 }) },
+        { id: 'steady_companion', group: 'lifestyle', title: 'Steady Companion', desc: 'Watch one anime across 7+ days',
+          svg: 'sakura', tier: 'bronze',
+          progress: (ctx) => ({ current: Math.min(longestSpanDays(ctx.index), 7), target: 7 }) },
+        { id: 'seasoned_companion', group: 'lifestyle', title: 'Seasoned Companion', desc: 'Watch one anime across 30+ days',
+          svg: 'sakura', tier: 'silver',
+          progress: (ctx) => ({ current: Math.min(longestSpanDays(ctx.index), 30), target: 30 }) },
+        { id: 'patient_viewer', group: 'lifestyle', title: 'Patient Viewer', desc: 'Watch one anime across 90+ days',
+          svg: 'sakura', tier: 'gold',
+          progress: (ctx) => ({ current: Math.min(longestSpanDays(ctx.index), 90), target: 90 }) },
+        { id: 'yearlong_companion', group: 'lifestyle', title: 'Long-haul Companion', desc: 'Watch one anime across 180+ days',
+          svg: 'sakura', tier: 'platinum',
           progress: (ctx) => ({ current: Math.min(longestSpanDays(ctx.index), 180), target: 180 }) },
-        { id: 'yearlong_companion', group: 'lifestyle', title: 'Yearlong Companion', desc: 'Watch one anime for 365+ days',
-          icon: '✨', svg: 'sakura', tier: 'platinum',
-          progress: (ctx) => ({ current: Math.min(longestSpanDays(ctx.index), 365), target: 365 }) },
         { id: 'comeback_kid', group: 'lifestyle', title: 'Comeback Kid', desc: 'Return to a series after 30+ days',
-          icon: '🔁', svg: 'loop', tier: 'bronze',
-          progress: (ctx) => ({ current: hasComebackGap(ctx.animeData, 30) ? 1 : 0, target: 1 }) },
+          svg: 'loop', tier: 'bronze',
+          progress: (ctx) => ({ current: Math.min(maxComebackGapDays(ctx.animeData), 30), target: 30 }) },
         { id: 'long_return', group: 'lifestyle', title: 'Long Return', desc: 'Return to a series after 90+ days',
-          icon: '🌊', svg: 'loop', tier: 'silver',
-          progress: (ctx) => ({ current: hasComebackGap(ctx.animeData, 90) ? 1 : 0, target: 1 }) },
-        { id: 'shelf_keeper', group: 'lifestyle', title: 'Shelf Keeper', desc: 'Put 3 anime on hold',
-          icon: '📦', svg: 'books', tier: 'bronze',
-          progress: (ctx) => ({ current: Math.min(countOnHold(ctx.animeData), 3), target: 3 }) },
-        { id: 'picky_viewer', group: 'lifestyle', title: 'Picky Viewer', desc: 'Drop 5 anime',
-          icon: '🙅', svg: 'noEntry', tier: 'bronze',
-          progress: (ctx) => ({ current: Math.min(countDropped(ctx.animeData), 5), target: 5 }) }
+          svg: 'loop', tier: 'silver',
+          progress: (ctx) => ({ current: Math.min(maxComebackGapDays(ctx.animeData), 90), target: 90 }) },
+        { id: 'long_comeback', group: 'lifestyle', title: 'Long Comeback', desc: 'Return to a series after 180+ days',
+          svg: 'loop', tier: 'gold',
+          progress: (ctx) => ({ current: Math.min(maxComebackGapDays(ctx.animeData), 180), target: 180 }) },
+        { id: 'legendary_return', group: 'lifestyle', title: 'Legendary Return', desc: 'Return to a series after 365+ days',
+          svg: 'loop', tier: 'platinum',
+          progress: (ctx) => ({ current: Math.min(maxComebackGapDays(ctx.animeData), 365), target: 365 }) },
+        { id: 'shelf_keeper', group: 'lifestyle', title: 'Shelf Keeper', desc: 'Put 2 anime on hold',
+          svg: 'books', tier: 'bronze',
+          progress: (ctx) => ({ current: Math.min(countOnHold(ctx.animeData), 2), target: 2 }) },
+        { id: 'shelf_manager', group: 'lifestyle', title: 'Shelf Manager', desc: 'Put 5 anime on hold',
+          svg: 'books', tier: 'silver',
+          progress: (ctx) => ({ current: Math.min(countOnHold(ctx.animeData), 5), target: 5 }) },
+        { id: 'shelf_archivist', group: 'lifestyle', title: 'Shelf Archivist', desc: 'Put 12 anime on hold',
+          svg: 'books', tier: 'gold',
+          progress: (ctx) => ({ current: Math.min(countOnHold(ctx.animeData), 12), target: 12 }) },
+        { id: 'shelf_master', group: 'lifestyle', title: 'Shelf Master', desc: 'Put 25 anime on hold',
+          svg: 'books', tier: 'platinum',
+          progress: (ctx) => ({ current: Math.min(countOnHold(ctx.animeData), 25), target: 25 }) },
+        { id: 'picky_viewer', group: 'lifestyle', title: 'Picky Viewer', desc: 'Drop 3 anime',
+          svg: 'noEntry', tier: 'bronze',
+          progress: (ctx) => ({ current: Math.min(countDropped(ctx.animeData), 3), target: 3 }) },
+        { id: 'selective_viewer', group: 'lifestyle', title: 'Selective Viewer', desc: 'Drop 8 anime',
+          svg: 'noEntry', tier: 'silver',
+          progress: (ctx) => ({ current: Math.min(countDropped(ctx.animeData), 8), target: 8 }) },
+        { id: 'strict_curator', group: 'lifestyle', title: 'Strict Curator', desc: 'Drop 18 anime',
+          svg: 'noEntry', tier: 'gold',
+          progress: (ctx) => ({ current: Math.min(countDropped(ctx.animeData), 18), target: 18 }) },
+        { id: 'ruthless_curator', group: 'lifestyle', title: 'Ruthless Curator', desc: 'Drop 35 anime',
+          svg: 'noEntry', tier: 'platinum',
+          progress: (ctx) => ({ current: Math.min(countDropped(ctx.animeData), 35), target: 35 }) }
     ];
 
     const GROUP_DEFS = [
-        { id: 'volume',    title: 'Volume',    icon: '🎯' },
-        { id: 'time',      title: 'Time',      icon: '⏱️' },
-        { id: 'series',    title: 'Series',    icon: '📚' },
-        { id: 'cinema',    title: 'Cinema',    icon: '🎬' },
-        { id: 'streaks',   title: 'Streaks',   icon: '🔥' },
-        { id: 'lifestyle', title: 'Lifestyle', icon: '🌙' }
+        { id: 'volume',    title: 'Volume' },
+        { id: 'time',      title: 'Time' },
+        { id: 'series',    title: 'Series' },
+        { id: 'cinema',    title: 'Cinema' },
+        { id: 'streaks',   title: 'Streaks' },
+        { id: 'lifestyle', title: 'Lifestyle' }
     ];
 
 
@@ -406,7 +500,6 @@
                 group: def.group || 'volume',
                 title: def.title,
                 desc: def.desc,
-                icon: def.icon,
                 svg: def.svg || null,
                 tier: def.tier,
                 unlocked,
