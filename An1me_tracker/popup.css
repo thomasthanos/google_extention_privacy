@@ -626,34 +626,54 @@ body {
 }
 
 /* ── Category tabs (Batch B) ────────────────────────────────────────────
-   Underline segmented control. Inactive tabs are bare (no background,
-   muted text). Active tab gets bold text + a 2px primary underline that
-   slides between positions via the JS-driven `.category-tabs-slider`
-   element (kept from the old pill design — repurposed as the underline). */
+   Compact segmented control. The active tab is drawn by the
+   JS-driven `.category-tabs-slider` element. */
 
 .category-tabs {
   display: flex;
-  gap: 0;
-  padding: 0;
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid var(--b1);
-  border-radius: 0;
+  gap: 3px;
+  height: 36px;
+  padding: 3px;
+  background:
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.045), rgba(var(--ink-rgb), 0.012)),
+    rgba(8, 13, 23, 0.96);
+  border: 1px solid rgba(var(--ink-rgb), 0.065);
+  border-radius: 12px;
   position: relative;
-  margin-top: 0
+  margin-top: 2px;
+  isolation: isolate;
+  overflow: visible;
+  box-shadow:
+    inset 0 1px 0 rgba(var(--ink-rgb), 0.055),
+    inset 0 -1px 0 rgba(var(--shadow-rgb), 0.28)
+}
+
+.category-tabs::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: 9px;
+  border: 1px solid rgba(var(--primary-rgb), 0.045);
+  pointer-events: none;
+  z-index: 0
 }
 
 .category-tabs-slider {
   position: absolute;
-  top: auto;
-  bottom: -1px;
+  top: 3px;
+  bottom: 3px;
   left: 0;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--primary);
-  border: 0;
-  box-shadow: 0 0 8px var(--primary-soft);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.15, 1), width 0.25s cubic-bezier(0.4, 0, 0.15, 1), opacity 0.18s ease;
+  height: auto;
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.055), rgba(var(--ink-rgb), 0.018)),
+    #111826;
+  border: 1px solid rgba(var(--primary-rgb), 0.16);
+  box-shadow: inset 0 1px 0 rgba(var(--ink-rgb), 0.065);
+  transition:
+    transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 0.24s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.18s ease;
   z-index: 1;
   pointer-events: none;
   opacity: 0
@@ -669,43 +689,56 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 10px 8px;
+  height: 28px;
+  padding: 0 10px;
   background: transparent;
   border: 0;
-  border-radius: 0;
-  color: var(--t2);
-  font-size: 12px;
-  font-weight: 500;
+  border-radius: 8px;
+  color: rgba(170, 182, 208, 0.78);
+  font-size: 11.5px;
+  font-weight: 600;
   font-family: inherit;
-  letter-spacing: 0.1px;
+  letter-spacing: 0;
   cursor: pointer;
-  transition: color 0.2s ease, font-weight 0.15s ease;
+  transition: color 0.18s ease, background 0.18s ease;
   position: relative;
-  z-index: 0;
-  min-height: 40px  /* a11y tap target */
+  z-index: 2;
+  min-width: 0;
+  line-height: 1;
+  min-height: 28px;
+  white-space: nowrap
 }
 
 .category-tab svg {
-  width: 13px;
-  height: 13px
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  transition: opacity 0.18s ease
 }
 
 .category-tab:hover {
-  color: var(--t1)
+  color: var(--t1);
+  background: rgba(var(--ink-rgb), 0.035)
 }
 
 .category-tab.active {
-  color: var(--primary);
+  color: var(--t1);
   font-weight: 700;
   background: transparent;
   border: 0;
   outline: none
 }
 
+.category-tab.active svg {
+  opacity: 1
+}
+
 /* Slider-disabled fallback: emulate the underline without animation. */
 .category-tabs:not(.slider-ready) .category-tab.active {
-  background: transparent;
-  box-shadow: inset 0 -2px 0 0 var(--primary)
+  background:
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.055), rgba(var(--ink-rgb), 0.018)),
+    #111826;
+  box-shadow: inset 0 1px 0 rgba(var(--ink-rgb), 0.065)
 }
 
 .toolbar {
@@ -804,7 +837,9 @@ body {
   color: rgba(154, 168, 195, 0.58)   /* muted-foreground 60% */
 }
 
-.search-input:focus {
+.search-input:focus,
+.search-input:focus-visible,
+.search-container:focus-within .search-input {
   outline: none;
   background: var(--bg-3);
   border-color: var(--primary-ring);
@@ -837,6 +872,100 @@ body {
   cursor: pointer;
   box-shadow: none;
   transition: color var(--tf), background var(--tf)
+}
+
+.search-container {
+  min-height: 44px
+}
+
+.search-icon-badge {
+  position: absolute;
+  left: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-pill);
+  background:
+    linear-gradient(180deg, rgba(var(--primary-rgb), 0.10), rgba(var(--primary-rgb), 0.045)),
+    rgba(7, 12, 21, 0.88);
+  border: 1px solid rgba(var(--primary-rgb), 0.11);
+  color: rgba(125, 220, 255, 0.9);
+  pointer-events: none;
+  z-index: 1
+}
+
+.search-icon-badge .search-icon {
+  position: static;
+  transform: none;
+  width: 15px;
+  height: 15px;
+  color: currentColor
+}
+
+.search-input {
+  height: 44px;
+  padding: 0 72px 0 44px;
+  background:
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.04), rgba(var(--ink-rgb), 0.01)),
+    rgba(8, 13, 23, 0.94);
+  border: 1px solid rgba(var(--ink-rgb), 0.06);
+  border-radius: var(--r-pill);
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+  box-shadow:
+    0 1px 2px rgba(var(--shadow-rgb), 0.28),
+    inset 0 1px 0 rgba(var(--ink-rgb), 0.035),
+    inset 0 -1px 0 rgba(var(--shadow-rgb), 0.22)
+}
+
+.search-input::placeholder {
+  color: rgba(170, 182, 208, 0.60)
+}
+
+.search-input:focus,
+.search-input:focus-visible,
+.search-container:focus-within .search-input {
+  background:
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.055), rgba(var(--ink-rgb), 0.012)),
+    rgba(10, 17, 29, 0.98);
+  border-color: rgba(var(--primary-rgb), 0.38);
+  box-shadow:
+    0 0 18px -9px oklch(0.79 0.145 220 / 0.20),
+    0 1px 2px rgba(var(--shadow-rgb), 0.28),
+    inset 0 1px 0 rgba(var(--ink-rgb), 0.05);
+  animation: search-glow-pulse 1.8s ease-in-out infinite
+}
+
+.search-actions {
+  right: 7px;
+  gap: 3px
+}
+
+.search-actions .btn-add-anime,
+.search-actions .btn-sort {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-pill)
+}
+
+@keyframes search-glow-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 18px -9px oklch(0.79 0.145 220 / 0.20),
+      0 1px 2px rgba(var(--shadow-rgb), 0.28),
+      inset 0 1px 0 rgba(var(--ink-rgb), 0.05)
+  }
+  50% {
+    box-shadow:
+      0 0 22px -8px oklch(0.79 0.145 220 / 0.28),
+      0 1px 2px rgba(var(--shadow-rgb), 0.28),
+      inset 0 1px 0 rgba(var(--ink-rgb), 0.05)
+  }
 }
 
 .search-actions .btn-add-anime::before {
@@ -6022,8 +6151,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   }
 
   .category-tab {
-    padding: 9px 0;
-    font-size: 12px
+    padding: 0 10px;
+    font-size: 11.5px
   }
 
   .stats-bar {
