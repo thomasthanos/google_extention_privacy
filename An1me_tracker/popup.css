@@ -2303,11 +2303,40 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .anime-episodes.collapsible {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  background: var(--bg-3);
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.04) 0%, transparent 42%),
+    linear-gradient(135deg, rgba(var(--primary-rgb), 0.028) 0%, transparent 62%),
+    rgba(17, 25, 40, 0.58);
   border: 1px solid var(--b1);
+  border-top-color: var(--b2);
   border-radius: var(--r-sm);
-  transition: grid-template-rows 0.22s ease, background var(--tf), border-color var(--tf), padding var(--tn);
+  box-shadow: inset 0 1px 0 rgba(var(--ink-rgb), 0.04), inset 0 -10px 16px -18px rgba(var(--shadow-rgb), 0.42);
+  backdrop-filter: blur(6px) saturate(112%);
+  -webkit-backdrop-filter: blur(6px) saturate(112%);
+  transition: grid-template-rows 0.22s ease, background var(--tf), border-color var(--tf), box-shadow var(--tf), padding var(--tn);
   will-change: grid-template-rows
+}
+
+.anime-episodes.collapsible::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  z-index: 1;
+  background: linear-gradient(150deg,
+    rgba(var(--ink-rgb), 0.16) 0%,
+    rgba(var(--ink-rgb), 0.045) 22%,
+    transparent 46%,
+    transparent 62%,
+    rgba(var(--primary-rgb), 0.08) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  transition: background var(--tn)
 }
 
 .anime-card.expanded .anime-episodes.collapsible {
@@ -2317,7 +2346,26 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .anime-card.expanded .anime-episodes.collapsible.collapsed {
   grid-template-rows: auto minmax(0, 0fr);
-  background: var(--bg-2)
+  background:
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.032) 0%, transparent 44%),
+    linear-gradient(135deg, rgba(var(--primary-rgb), 0.022) 0%, transparent 64%),
+    rgba(13, 20, 33, 0.54);
+  border-color: rgba(var(--ink-rgb), 0.07);
+  border-top-color: rgba(var(--ink-rgb), 0.10)
+}
+
+.anime-card.expanded .anime-episodes.collapsible:not(.collapsed) {
+  border-color: rgba(var(--primary-rgb), 0.10);
+  border-top-color: rgba(var(--primary-rgb), 0.15)
+}
+
+.anime-card.expanded .anime-episodes.collapsible:not(.collapsed)::after {
+  background: linear-gradient(150deg,
+    rgba(var(--ink-rgb), 0.20) 0%,
+    rgba(var(--ink-rgb), 0.06) 18%,
+    transparent 44%,
+    rgba(var(--primary-rgb), 0.06) 68%,
+    rgba(var(--primary-rgb), 0.14) 100%)
 }
 
 .episodes-header {
@@ -5181,16 +5229,62 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   display: flex;
   flex-direction: column;
   padding: 6px 10px;
-  background: var(--bg-3);
+  background:
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.04) 0%, transparent 38%),
+    linear-gradient(135deg, rgba(var(--primary-rgb), 0.026) 0%, transparent 58%),
+    rgba(18, 27, 43, 0.58);
   border: 1px solid var(--b1);
+  border-top-color: var(--b2);
   border-radius: var(--r-sm);
+  box-shadow: inset 0 1px 0 rgba(var(--ink-rgb), 0.04), inset 0 -10px 16px -18px rgba(var(--shadow-rgb), 0.42);
+  backdrop-filter: blur(6px) saturate(112%);
+  -webkit-backdrop-filter: blur(6px) saturate(112%);
   overflow: visible;
-  transition: border-color var(--tf)
+  transition: border-color var(--tf), box-shadow var(--tf), background var(--tf)
+}
+
+.grp-item::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  z-index: 1;
+  background: linear-gradient(150deg,
+    rgba(var(--ink-rgb), 0.16) 0%,
+    rgba(var(--ink-rgb), 0.045) 22%,
+    transparent 48%,
+    transparent 62%,
+    rgba(var(--primary-rgb), 0.075) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  transition: background var(--tn)
+}
+
+.grp-item:hover,
+.grp-item:focus-within {
+  border-color: rgba(var(--primary-rgb), 0.12);
+  border-top-color: rgba(var(--primary-rgb), 0.18);
+  box-shadow: inset 0 1px 0 rgba(var(--ink-rgb), 0.05), inset 0 -10px 16px -18px rgba(var(--shadow-rgb), 0.42), 0 4px 12px rgba(var(--shadow-rgb), 0.12)
+}
+
+.grp-item:hover::after,
+.grp-item:focus-within::after {
+  background: linear-gradient(150deg,
+    rgba(var(--ink-rgb), 0.24) 0%,
+    rgba(var(--ink-rgb), 0.065) 18%,
+    transparent 44%,
+    rgba(var(--primary-rgb), 0.06) 68%,
+    rgba(var(--primary-rgb), 0.15) 100%)
 }
 
 /* Pressed / expanded — minimal change: just a hair brighter border. */
 .season-item.expanded {
-  border-color: var(--b2)
+  border-color: rgba(var(--primary-rgb), 0.12);
+  border-top-color: rgba(var(--primary-rgb), 0.18)
 }
 
 .season-item-header {
