@@ -715,7 +715,14 @@
         const { number, watchedAt, duration, durationSource, ...rest } = ep;
         const out = { ...rest };
         if (number !== undefined) out.n = number;
-        if (watchedAt !== undefined) out.w = watchedAt;
+        if (watchedAt !== undefined) {
+            if (typeof watchedAt === 'string') {
+                const t = Date.parse(watchedAt);
+                out.w = (Number.isFinite(t) && new Date(t).toISOString() === watchedAt) ? t : watchedAt;
+            } else {
+                out.w = watchedAt;
+            }
+        }
         if (duration !== undefined) out.d = duration;
         // 'video' is the implicit default and isn't stored.
         if (durationSource !== undefined && durationSource !== 'video') out.s = durationSource;
@@ -728,7 +735,7 @@
         const { n, w, d, s, ...rest } = ep;
         const out = { ...rest };
         if (n !== undefined) out.number = n;
-        if (w !== undefined) out.watchedAt = w;
+        if (w !== undefined) out.watchedAt = (typeof w === 'number') ? new Date(w).toISOString() : w;
         if (d !== undefined) out.duration = d;
         if (s !== undefined) out.durationSource = s;
         return out;

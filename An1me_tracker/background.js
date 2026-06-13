@@ -138,6 +138,25 @@ const FSDebug = (() => {
         );
     }
 
+    const MSG_TYPES = new Set([
+        'SYNC_TO_FIREBASE', 'SYNC_TO_FIREBASE_IMMEDIATE', 'SYNC_PROGRESS_ONLY',
+        'WAKE_AND_POLL_CLOUD', 'WAKE_AND_POLL_CLOUD_FORCE', 'GET_CLOUD_DOC',
+        'PUSH_PLAYBACK_SETTINGS', 'PUSH_ANILIST_AUTH', 'WATCHLIST_SYNC',
+        'INVALIDATE_BG_CLOUD_DOC_CACHE', 'UPDATE_BG_CLOUD_DOC_CACHE',
+        'UPDATE_BG_CLOUD_DOC_PARTIAL', 'BATCH_FETCH_ANIME_INFO', 'FETCH_ANIME_INFO',
+        'START_LIBRARY_REPAIR', 'SET_SMART_NOTIFICATIONS'
+    ]);
+    function msg(type, sender) {
+        if (!enabled || !MSG_TYPES.has(type)) return;
+        push({ t: Date.now(), op: 'MSG', reason: type });
+        const from = sender?.url ? sender.url.split('/').pop() : (sender?.tab ? 'tab' : 'popup');
+        console.log(
+            `%c[FS] msg ←%c ${type} %c(${from})`,
+            'background:#0891b2;color:#fff;border-radius:3px;padding:1px 6px;font-weight:700',
+            'color:#67e8f9', 'color:#64748b'
+        );
+    }
+
     function stats() {
         const summary = {
             uptimeMin: +mins().toFixed(1),
@@ -156,7 +175,7 @@ const FSDebug = (() => {
         return summary;
     }
 
-    return { read, write, skip, trigger, stats, isEnabled: () => enabled };
+    return { read, write, skip, trigger, msg, stats, isEnabled: () => enabled };
 })();
 try { globalThis.fsStats = () => FSDebug.stats(); } catch {}
 
@@ -2367,6 +2386,7 @@ async function persistBeforeUnloadTrack(animeInfo, duration) {
 
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    try { FSDebug.msg(message?.type, _sender); } catch {}
     if (message.type === 'SYNC_TO_FIREBASE_IMMEDIATE') {
         sendResponse({ received: true });
         if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
