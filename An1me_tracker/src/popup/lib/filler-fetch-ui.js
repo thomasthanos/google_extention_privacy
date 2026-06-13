@@ -43,11 +43,11 @@ const FillerFetchUI = {
         const { overlay, container, progressFill, progressText, logFeed } = this.IDS;
 
         const html = `
-        <div id="${overlay}" class="ffui-overlay" style="display:none">
-          <div id="${container}" class="ffui-box">
+        <div id="${overlay}" class="ffui-overlay" style="display:none" aria-hidden="true">
+          <div id="${container}" class="ffui-box" role="dialog" aria-modal="true" aria-labelledby="ffui-title" tabindex="-1">
 
             <div class="ffui-header">
-              <span class="ffui-title"><span class="ffui-title-dot"></span>Fetch & Import</span>
+              <span class="ffui-title" id="ffui-title"><span class="ffui-title-dot"></span>Fetch & Import</span>
             </div>
 
             <div class="ffui-body">
@@ -100,44 +100,80 @@ const FillerFetchUI = {
 
         .ffui-overlay {
             position:fixed; inset:0;
-            background:rgba(var(--shadow-rgb), 0.62);
-            backdrop-filter:blur(10px) saturate(1.1);
-            -webkit-backdrop-filter:blur(10px) saturate(1.1);
+            background:
+                radial-gradient(circle at 50% 12%, rgba(var(--primary-rgb),0.10), transparent 38%),
+                rgba(var(--shadow-rgb), 0.66);
+            backdrop-filter:blur(18px) saturate(1.25);
+            -webkit-backdrop-filter:blur(18px) saturate(1.25);
             z-index:100000;
             display:flex; align-items:center; justify-content:center;
             padding:20px;
+            pointer-events:auto;
             animation:ffui-fade .2s ease;
         }
         @keyframes ffui-fade { from{opacity:0} to{opacity:1} }
 
 
         .ffui-box {
+            position:relative;
             background:
-                radial-gradient(120% 78% at 50% -12%, rgba(var(--primary-rgb),0.10) 0%, transparent 58%),
-                var(--bg-card);
-            border: 1px solid var(--b1);
-            border-top-color: rgba(var(--primary-rgb),0.30);
+                radial-gradient(115% 74% at 50% -16%, rgba(var(--primary-rgb),0.16) 0%, transparent 58%),
+                linear-gradient(180deg, rgba(var(--ink-rgb),0.08) 0%, rgba(var(--ink-rgb),0.018) 36%, transparent 100%),
+                rgba(10, 16, 28, 0.78);
+            border: 1px solid rgba(var(--ink-rgb),0.09);
+            border-top-color: rgba(var(--ink-rgb),0.20);
             border-radius: 20px;
             box-shadow:
-                0 0 0 1px rgba(var(--shadow-rgb),0.5),
-                0 24px 60px -14px rgba(var(--shadow-rgb),0.78),
-                0 1px 0 rgba(var(--ink-rgb),0.05) inset;
+                0 28px 70px -18px rgba(var(--shadow-rgb),0.82),
+                inset 0 1px 0 rgba(var(--ink-rgb),0.08),
+                inset 0 -20px 34px -30px rgba(var(--shadow-rgb),0.62);
+            backdrop-filter: blur(24px) saturate(1.35);
+            -webkit-backdrop-filter: blur(24px) saturate(1.35);
             width:100%; max-width:400px;
             display:flex; flex-direction:column;
             overflow:hidden;
             animation:ffui-up .28s cubic-bezier(.4,0,.2,1);
             font-family: var(--font-body, 'Inter', 'Segoe UI', system-ui, sans-serif);
         }
+        .ffui-box::after {
+            content:'';
+            position:absolute; inset:0;
+            border-radius:inherit;
+            padding:1px;
+            pointer-events:none;
+            z-index:2;
+            background:linear-gradient(150deg,
+                rgba(var(--ink-rgb),0.36) 0%,
+                rgba(var(--ink-rgb),0.10) 22%,
+                transparent 46%,
+                rgba(var(--primary-rgb),0.08) 72%,
+                rgba(var(--primary-rgb),0.26) 100%);
+            -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+                    mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite:xor;
+                    mask-composite:exclude;
+        }
+        .ffui-box.is-attention {
+            animation:ffui-attention .18s ease;
+        }
         @keyframes ffui-up {
             from{transform:translateY(16px);opacity:0}
             to  {transform:translateY(0);  opacity:1}
         }
+        @keyframes ffui-attention {
+            0%,100%{transform:translateY(0) scale(1)}
+            42%{transform:translateY(-1px) scale(1.006)}
+        }
 
 
         .ffui-header {
+            position:relative;
+            z-index:3;
             padding: 16px 18px 14px;
-            background: linear-gradient(180deg, rgba(var(--primary-rgb),0.06) 0%, transparent 100%);
-            border-bottom: 1px solid var(--b0);
+            background:
+                linear-gradient(180deg, rgba(var(--ink-rgb),0.07) 0%, transparent 100%),
+                rgba(var(--primary-rgb),0.035);
+            border-bottom: 1px solid rgba(var(--ink-rgb),0.07);
             display:flex; align-items:center; justify-content:space-between;
         }
         .ffui-title {
@@ -148,58 +184,99 @@ const FillerFetchUI = {
         }
         .ffui-title-dot {
             width:8px; height:8px; border-radius:50%;
-            background: var(--primary);
-            box-shadow: 0 0 10px rgba(var(--primary-rgb),0.85), 0 0 0 3px rgba(var(--primary-rgb),0.13);
+            background: rgba(var(--primary-rgb),0.86);
+            box-shadow: 0 0 10px rgba(var(--primary-rgb),0.55), 0 0 0 3px rgba(var(--primary-rgb),0.10);
             flex-shrink:0;
             animation: ffui-pulse 2.4s ease-in-out infinite;
         }
         @keyframes ffui-pulse {
-            0%,100% { box-shadow: 0 0 10px rgba(var(--primary-rgb),0.80), 0 0 0 3px rgba(var(--primary-rgb),0.11); }
-            50%     { box-shadow: 0 0 15px rgba(var(--primary-rgb),1),    0 0 0 4px rgba(var(--primary-rgb),0.20); }
+            0%,100% { box-shadow: 0 0 10px rgba(var(--primary-rgb),0.50), 0 0 0 3px rgba(var(--primary-rgb),0.09); }
+            50%     { box-shadow: 0 0 14px rgba(var(--primary-rgb),0.72), 0 0 0 4px rgba(var(--primary-rgb),0.15); }
         }
 
 
-        .ffui-body { padding:16px 18px; display:flex; flex-direction:column; gap:14px; }
+        .ffui-body {
+            position:relative;
+            z-index:3;
+            padding:16px 18px 18px;
+            display:flex; flex-direction:column; gap:14px;
+        }
+
+        .ffui-progress-wrap {
+            padding: 11px 12px 12px;
+            border-radius: 14px;
+            background:
+                linear-gradient(180deg, rgba(var(--ink-rgb),0.07) 0%, transparent 62%),
+                rgba(8, 14, 24, 0.46);
+            border: 1px solid rgba(var(--ink-rgb),0.07);
+            box-shadow: inset 0 1px 0 rgba(var(--ink-rgb),0.055), inset 0 -12px 18px -22px rgba(var(--shadow-rgb),0.55);
+            backdrop-filter: blur(10px) saturate(1.15);
+            -webkit-backdrop-filter: blur(10px) saturate(1.15);
+        }
 
 
         .ffui-progress-info {
             display:flex; justify-content:space-between; align-items:center;
             margin-bottom:7px;
+            min-width:0;
         }
-        .ffui-progress-label { font-size:11px; color:var(--t2); font-weight:500; }
+        .ffui-progress-label {
+            flex:1 1 auto;
+            min-width:0;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            white-space:nowrap;
+            font-size:11px; color:var(--t2); font-weight:500;
+        }
         .ffui-pct {
+            flex:0 0 auto;
+            margin-left:10px;
             font-size:11px; font-weight:700;
-            color:var(--primary);
-            text-shadow: 0 0 12px rgba(var(--primary-rgb),0.45);
+            color:rgba(122, 215, 247, 0.90);
+            text-shadow: 0 0 10px rgba(var(--primary-rgb),0.24);
             font-variant-numeric:tabular-nums;
         }
         .ffui-bar {
-            height:6px;
-            background:rgba(var(--ink-rgb),0.06);
+            height:7px;
+            background:
+                linear-gradient(180deg, rgba(var(--ink-rgb),0.12) 0%, transparent 54%),
+                rgba(var(--ink-rgb),0.045);
+            border:1px solid rgba(var(--ink-rgb),0.055);
             border-radius:999px;
             overflow:hidden;
+            box-shadow: inset 0 1px 0 rgba(var(--ink-rgb),0.07), inset 0 -1px 2px rgba(var(--shadow-rgb),0.20);
         }
         .ffui-bar-fill {
             height:100%;
-            background: linear-gradient(90deg, var(--primary) 0%, #2aa8ee 100%);
+            background:
+                linear-gradient(180deg, rgba(var(--ink-rgb),0.22) 0%, transparent 54%),
+                linear-gradient(90deg, rgba(32, 151, 184, 0.90) 0%, rgba(68, 190, 232, 0.92) 100%);
             border-radius:999px;
             width:0%;
             transition:width .35s ease;
-            box-shadow: 0 0 10px rgba(var(--primary-rgb),0.5);
+            box-shadow: inset 0 1px 0 rgba(var(--ink-rgb),0.14), 0 0 10px rgba(var(--primary-rgb),0.18);
         }
 
 
         .ffui-stats {
-            display:grid; grid-template-columns:repeat(4,1fr); gap:8px;
+            display:grid; grid-template-columns:repeat(auto-fit,minmax(0,1fr)); gap:8px;
         }
         .ffui-stat {
-            background: linear-gradient(180deg, rgba(var(--ink-rgb),0.05) 0%, rgba(var(--ink-rgb),0.018) 100%);
-            border: 1px solid var(--b1);
-            border-top-color: var(--b2);
+            position:relative;
+            background:
+                linear-gradient(180deg, rgba(var(--ink-rgb),0.08) 0%, transparent 58%),
+                rgba(8, 14, 24, 0.44);
+            border: 1px solid rgba(var(--ink-rgb),0.07);
+            border-top-color: rgba(var(--ink-rgb),0.14);
             border-radius: 13px;
             padding: 10px 4px 9px;
             text-align:center;
-            box-shadow: 0 2px 10px rgba(var(--shadow-rgb),0.35), inset 0 1px 0 rgba(var(--ink-rgb),0.05);
+            box-shadow: 0 2px 10px rgba(var(--shadow-rgb),0.25), inset 0 1px 0 rgba(var(--ink-rgb),0.06), inset 0 -10px 16px -18px rgba(var(--shadow-rgb),0.52);
+            backdrop-filter: blur(8px) saturate(1.12);
+            -webkit-backdrop-filter: blur(8px) saturate(1.12);
+        }
+        .ffui-stat.is-hidden {
+            display:none;
         }
         .ffui-stat-val {
             display:block; font-size:21px; font-weight:800;
@@ -207,10 +284,10 @@ const FillerFetchUI = {
             font-variant-numeric:tabular-nums;
         }
         .ffui-stat-val.ffui-stat-cyan {
-            color:var(--primary);
-            text-shadow: 0 0 14px rgba(var(--primary-rgb),0.45);
+            color:rgba(112, 211, 245, 0.92);
+            text-shadow: 0 0 12px rgba(var(--primary-rgb),0.24);
         }
-        .ffui-stat-val.ffui-stat-err { color:var(--danger); }
+        .ffui-stat-val.ffui-stat-err { color:rgba(236, 112, 124, 0.92); }
         .ffui-stat-lbl {
             display:block; font-size:9px; color:var(--t3);
             text-transform:uppercase; letter-spacing:.7px; font-weight:600;
@@ -218,24 +295,32 @@ const FillerFetchUI = {
 
 
         .ffui-log {
-            background: rgba(var(--shadow-rgb),0.28);
-            border: 1px solid var(--b0);
+            background:
+                linear-gradient(180deg, rgba(var(--ink-rgb),0.045), rgba(var(--ink-rgb),0.012)),
+                rgba(5, 10, 18, 0.50);
+            border: 1px solid rgba(var(--ink-rgb),0.07);
+            border-top-color: rgba(var(--ink-rgb),0.12);
             border-radius: 13px;
             padding: 8px 10px;
-            max-height: 148px;
+            max-height: 174px;
             overflow-y: auto;
             display:flex; flex-direction:column; gap:2px;
-            scrollbar-width:thin;
-            scrollbar-color:rgba(var(--primary-rgb),.18) transparent;
+            scrollbar-width:none;
+            -ms-overflow-style:none;
+            box-shadow: inset 0 1px 0 rgba(var(--ink-rgb),0.045);
+            backdrop-filter: blur(9px) saturate(1.12);
+            -webkit-backdrop-filter: blur(9px) saturate(1.12);
         }
-        .ffui-log::-webkit-scrollbar { width:6px; }
-        .ffui-log::-webkit-scrollbar-thumb {
-            background:rgba(var(--primary-rgb),.20); border-radius:999px;
+        .ffui-log::-webkit-scrollbar {
+            width:0;
+            height:0;
         }
         .ffui-log-row {
             display:flex; align-items:center; gap:7px;
             font-size:11px; line-height:1.5;
-            padding: 1px 0;
+            padding: 2px 4px;
+            border-radius: 8px;
+            background: rgba(var(--ink-rgb),0.018);
             animation:ffui-row-in .12s ease;
         }
         @keyframes ffui-row-in {
@@ -251,17 +336,20 @@ const FillerFetchUI = {
         .ffui-log-detail {
             flex-shrink:0; font-size:10px; font-weight:600;
             padding: 1px 7px; border-radius:999px; white-space:nowrap;
+            box-shadow: inset 0 1px 0 rgba(var(--ink-rgb),0.055), 0 0 0 1px rgba(var(--ink-rgb),0.035);
+            backdrop-filter: blur(3px) saturate(1.08);
+            -webkit-backdrop-filter: blur(3px) saturate(1.08);
         }
 
         .ffui-log-row.is-fetch   .ffui-log-name  { color:var(--t1); }
-        .ffui-log-row.is-fetch   .ffui-log-detail { background:var(--primary-soft); color:var(--primary); }
-        .ffui-log-row.is-cached  .ffui-log-detail { background:rgba(var(--ink-rgb),0.05); color:var(--t2); }
-        .ffui-log-row.is-nofill  .ffui-log-detail { background:rgba(var(--ink-rgb),0.035); color:var(--t3); }
-        .ffui-log-row.is-movie   .ffui-log-detail { background:rgba(var(--purple-rgb),0.13); color:var(--purple); }
-        .ffui-log-row.is-error   .ffui-log-detail { background:var(--danger-soft); color:var(--danger); }
+        .ffui-log-row.is-fetch   .ffui-log-detail { background:rgba(var(--primary-rgb),0.10); color:rgba(122, 215, 247, 0.90); }
+        .ffui-log-row.is-cached  .ffui-log-detail { background:rgba(var(--ink-rgb),0.045); color:var(--t2); }
+        .ffui-log-row.is-nofill  .ffui-log-detail { background:rgba(var(--ink-rgb),0.030); color:rgba(145, 157, 184, 0.80); }
+        .ffui-log-row.is-movie   .ffui-log-detail { background:rgba(var(--purple-rgb),0.10); color:rgba(178, 142, 255, 0.88); }
+        .ffui-log-row.is-error   .ffui-log-detail { background:rgba(var(--danger-rgb),0.10); color:rgba(236, 112, 124, 0.92); }
         .ffui-log-row.is-summary {
             margin-top:5px; padding-top:6px;
-            border-top:1px solid var(--b1);
+            border-top:1px solid rgba(var(--ink-rgb),0.08);
             font-weight:700; color:var(--t1);
         }
         .ffui-log-row.is-summary .ffui-log-name { color:var(--t1); }
@@ -271,16 +359,27 @@ const FillerFetchUI = {
 
 
     attachEventListeners() {
-        document.getElementById(this.IDS.overlay)
-            .addEventListener('click', (e) => {
-                if (e.target.id === this.IDS.overlay) this.close();
-            });
+        const overlay = document.getElementById(this.IDS.overlay);
+        const blockOutsideClick = (e) => {
+            if (e.target.id !== this.IDS.overlay) return;
+            e.preventDefault();
+            e.stopPropagation();
+            this._nudgeModal();
+        };
+        overlay.addEventListener('mousedown', blockOutsideClick);
+        overlay.addEventListener('click', blockOutsideClick);
 
         if (this._escHandler) {
             try { document.removeEventListener('keydown', this._escHandler); } catch {}
         }
         this._escHandler = (e) => {
-            if (e.key === 'Escape' && this.state.isOpen) this.close();
+            if (e.key !== 'Escape' || !this.state.isOpen) return;
+            if (this.state.isRunning) {
+                e.preventDefault();
+                this._nudgeModal();
+                return;
+            }
+            this.close();
         };
         document.addEventListener('keydown', this._escHandler);
     },
@@ -295,13 +394,27 @@ const FillerFetchUI = {
         const data = await window.AnimeTracker.Storage.get(['animeData']);
         this.state.total = Object.keys(data.animeData || {}).length;
 
-        document.getElementById(this.IDS.overlay).style.display = 'flex';
+        const overlay = document.getElementById(this.IDS.overlay);
+        const container = document.getElementById(this.IDS.container);
+        overlay.style.display = 'flex';
+        overlay.setAttribute('aria-hidden', 'false');
+        requestAnimationFrame(() => container?.focus?.());
     },
 
     close() {
         this.state.isOpen = false;
         this.state.autoMode = false;
-        document.getElementById(this.IDS.overlay).style.display = 'none';
+        const overlay = document.getElementById(this.IDS.overlay);
+        overlay.style.display = 'none';
+        overlay.setAttribute('aria-hidden', 'true');
+    },
+
+    _nudgeModal() {
+        const container = document.getElementById(this.IDS.container);
+        if (!container) return;
+        container.classList.remove('is-attention');
+        void container.offsetWidth;
+        container.classList.add('is-attention');
     },
 
     resetUI(options = {}) {
@@ -329,7 +442,11 @@ const FillerFetchUI = {
 
     _setStat(name, value) {
         const el = document.querySelector(`[data-stat="${name}"]`);
-        if (el) el.textContent = value;
+        if (!el) return;
+        el.textContent = value;
+
+        const shouldCollapse = (name === 'cached' || name === 'failed') && Number(value) === 0;
+        el.closest('.ffui-stat')?.classList.toggle('is-hidden', shouldCollapse);
     },
 
     _renderLogs(entries) {

@@ -609,8 +609,11 @@
         deferredListRefresh = {
             filter,
             updateStats: (deferredListRefresh?.updateStats || false) || shouldUpdateStats,
-            timerId: setTimeout(() => {
-                if (elements.animeList?.matches(':hover')) return;
+            timerId: setTimeout(function attempt() {
+                if (elements.animeList?.matches(':hover')) {
+                    if (deferredListRefresh) deferredListRefresh.timerId = setTimeout(attempt, 800);
+                    return;
+                }
                 flushDeferredListRefresh();
             }, delayMs)
         };
