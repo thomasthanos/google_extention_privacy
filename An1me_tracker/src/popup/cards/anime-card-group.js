@@ -489,8 +489,9 @@
                 lastWatchedText = latestWatched ? UIHelpers.formatDate(latestWatched.toISOString()) : 'Never';
             }
             const itemCount = expandedSeasons.length;
+            const inMoviesCategory = AT.PopupState?.currentCategory === 'movies';
             const itemLabel = isChronologyGroup
-                ? `${itemCount} titles`
+                ? (inMoviesCategory ? `${itemCount} ${itemCount === 1 ? 'movie' : 'movies'}` : `${itemCount} titles`)
                 : (itemCount === filteredSeasons.length ? `${itemCount} seasons` : `${itemCount} parts`);
 
             const anyStarted = filteredSeasons.some(({ anime }) =>
@@ -504,7 +505,9 @@
             } else {
                 statusGroup = 'Watching';
             }
-            const groupProgressBadge = `<span class="meta-badge meta-badge-progress">${itemLabel}</span>`;
+            const groupProgressBadge = (isChronologyGroup && inMoviesCategory)
+                ? `<span class="meta-badge" style="color:#f4a261;background:rgba(244,162,97,0.12);border:1px solid rgba(244,162,97,0.35);">${itemLabel}</span>`
+                : `<span class="meta-badge meta-badge-progress">${itemLabel}</span>`;
             const groupStatusClass = allSeasonsComplete ? 'meta-badge-complete' : (anyStarted ? 'meta-badge-watching' : 'meta-badge-notstarted');
             const groupStatusIcon = allSeasonsComplete ? '✓' : '⊙';
             const groupStatusBadge = `<span class="meta-badge ${groupStatusClass}">${groupStatusIcon} ${statusGroup}</span>`;
