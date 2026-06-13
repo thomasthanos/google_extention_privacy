@@ -341,7 +341,6 @@
             }
         }
 
-        const activeCompactItem = compactStatusItems.find(item => item.key === AT.PopupState.currentCompactStatus) || null;
         const chipsHtml = compactStatusItems.length > 0
             ? `
                 <div class="status-chip-row" role="tablist" aria-label="Quick status lists">
@@ -358,9 +357,15 @@
                 </div>
             `
             : '';
-        const activeCompactSectionHtml = activeCompactItem ? activeCompactItem.sectionHtml : '';
+        const compactSectionsHtml = compactStatusItems
+            .map(item => `
+                <div data-compact-section="${item.key}"${item.key === AT.PopupState.currentCompactStatus ? '' : ' hidden'}>
+                    ${item.sectionHtml}
+                </div>
+            `)
+            .join('');
 
-        const combinedHtml = inProgressHtml + trackedHtml + chipsHtml + activeCompactSectionHtml;
+        const combinedHtml = inProgressHtml + trackedHtml + chipsHtml + compactSectionsHtml;
 
         if (combinedHtml === AT.PopupState.lastRenderedListMarkup && elements.animeList.firstChild) {
 
@@ -431,9 +436,20 @@
                 const nextStatus = normalizeCompactStatus(chip.dataset.compactStatus || '');
                 if (nextStatus !== AT.PopupState.currentCompactStatus) {
                     AT.PopupState.currentCompactStatus = nextStatus;
-                    AT.PopupState.lastRenderedListMarkup = null;
-                    suppressHoverUntilMouseMove();
-                    renderAnimeList(getActiveFilter());
+                    list.querySelectorAll('[data-compact-status]').forEach(btn => {
+                        const isActive = normalizeCompactStatus(btn.dataset.compactStatus || '') === nextStatus;
+                        btn.classList.toggle('active', isActive);
+                        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+                    });
+                    list.querySelectorAll('[data-compact-section]').forEach(section => {
+                        const isActive = normalizeCompactStatus(section.dataset.compactSection || '') === nextStatus;
+                        section.toggleAttribute('hidden', !isActive);
+                        if (isActive) {
+                            const cards = section.querySelector('.airing-list-cards, .onhold-list-cards, .completed-list-cards, .dropped-list-cards');
+                            if (cards) cards.classList.toggle('open', AT.PopupState.currentCompactStatusOpen);
+                        }
+                    });
+                    refreshCompactChevrons();
                 }
                 return;
             }

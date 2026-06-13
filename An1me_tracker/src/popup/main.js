@@ -2031,20 +2031,6 @@
             elements.animeList.addEventListener('click', async (e) => {
                 const target = e.target;
 
-                const statusChip = target.closest('[data-compact-status]');
-                if (statusChip && elements.animeList.contains(statusChip)) {
-                    e.preventDefault();
-                    e.stopImmediatePropagation();
-                    const nextStatus = normalizeCompactStatus(statusChip.dataset.compactStatus || '');
-                    if (nextStatus !== currentCompactStatus) {
-                        currentCompactStatus = nextStatus;
-                        _lastRenderedListMarkup = null;
-                        suppressHoverUntilMouseMove();
-                        renderAnimeList(getActiveFilter());
-                    }
-                    return;
-                }
-
                 if (target.classList.contains('progress-delete-btn') || target.closest('.progress-delete-btn')) {
                     const btn = target.classList.contains('progress-delete-btn') ? target : target.closest('.progress-delete-btn');
                     const slug = btn.dataset.slug;

@@ -60,13 +60,41 @@
             delete AT.AnilistService.cache[slug];
         }
 
-        if (AT.PopupState.animeData?.[slug] && AT.StatusService.repairAiringCompleted(AT.PopupState.animeData, { slugs: [slug] })) {
-            const payload = { animeData: AT.PopupState.animeData };
-            markInternalSave(payload);
-            AT.Storage.set(payload).catch((error) => {
-                PopupLogger.warn('AnimeInfo', 'Failed to persist repaired completion state:', error);
-            });
+        // Coalesce completion-maintenance writes. Each finished background metadata
+        // fetch writes one animeinfo_<slug> key; reacting per-slug ran repair and wrote
+        // the entire animeData doc once per slug → N fetches = N full ~554KB syncs.
+        // Instead, collect the slugs and flush once after the burst settles, running
+        // repair AND persist together (the same pair finalizeAfterMaintenance uses) so
+        // they can't disagree across calls and ping-pong the completedAt timestamps.
+        if (AT.PopupState.animeData?.[slug]) {
+            _pendingRepairSlugs.add(slug);
+            if (_repairFlushTimer) clearTimeout(_repairFlushTimer);
+            _repairFlushTimer = setTimeout(flushPendingCompletionRepair, 1500);
         }
+    }
+
+    const _pendingRepairSlugs = new Set();
+    let _repairFlushTimer = null;
+
+    function flushPendingCompletionRepair() {
+        _repairFlushTimer = null;
+        const slugs = [..._pendingRepairSlugs];
+        _pendingRepairSlugs.clear();
+
+        const data = AT.PopupState.animeData;
+        if (!data) return;
+        const present = slugs.filter((s) => data[s]);
+        if (present.length === 0) return;
+
+        let changed = AT.StatusService.repairAiringCompleted(data, { slugs: present });
+        if (AT.StatusService.persistDetectedCompletions(data, { slugs: present })) changed = true;
+        if (!changed) return;
+
+        const payload = { animeData: data };
+        markInternalSave(payload);
+        AT.Storage.set(payload).catch((error) => {
+            PopupLogger.warn('AnimeInfo', 'Failed to persist repaired completion state:', error);
+        });
     }
 
     function applyEpisodeTypesCacheChange(storageKey, value) {

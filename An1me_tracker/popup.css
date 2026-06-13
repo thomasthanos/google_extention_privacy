@@ -1685,25 +1685,12 @@ body {
   flex: 1;                      /* fill the row from after the ETA to the edge */
   margin-left: 4px;
   min-width: 64px;
-  opacity: 1;
-  /* Fade out on expand / fade in on collapse. `allow-discrete` defers the
-     display:none until after the opacity fade so the row still collapses its
-     space, just gracefully. The list's `.no-transition` guard during re-renders
-     suppresses this so cards don't fade on every render. */
-  transition: opacity 0.2s ease, display 0.2s ease allow-discrete
+  opacity: 1
 }
 
 /* Hidden once the card is expanded — the detailed bar inside takes over */
 .anime-card.expanded .meta-time-progress {
-  display: none;
-  opacity: 0
-}
-
-/* Start the collapse fade-in from transparent */
-@starting-style {
-  .anime-card:not(.expanded) .meta-time-progress {
-    opacity: 0
-  }
+  display: none
 }
 
 .meta-time-progress-bar {
