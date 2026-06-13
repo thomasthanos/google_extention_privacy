@@ -467,7 +467,7 @@
             if (siteId) {
 
                 chrome.runtime.sendMessage(
-                    { type: 'WATCHLIST_SYNC', animeId: siteId, watchlistType },
+                    { type: 'WATCHLIST_SYNC', animeId: siteId, watchlistType, animeSlug: slug },
                     () => { if (chrome.runtime.lastError) {              } }
                 );
                 PopupLogger.debug('WatchlistSync', `sent ${watchlistType} for #${siteId}`);
@@ -484,7 +484,7 @@
                             if (AT.PopupState.animeData[slug]) AT.PopupState.animeData[slug].siteAnimeId = fetchedId;
 
                             chrome.runtime.sendMessage(
-                                { type: 'WATCHLIST_SYNC', animeId: fetchedId, watchlistType },
+                                { type: 'WATCHLIST_SYNC', animeId: fetchedId, watchlistType, animeSlug: slug },
                                 () => { if (chrome.runtime.lastError) {              } }
                             );
                             PopupLogger.debug('WatchlistSync', `fetched #${fetchedId}, sent ${watchlistType}`);

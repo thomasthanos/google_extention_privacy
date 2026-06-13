@@ -1,7 +1,7 @@
 
 
 
-async function syncWatchlistToSite(animeId, type) {
+async function syncWatchlistToSite(animeId, type, animeSlug = null) {
     dlog(`%c WatchlistSync %c ${type} %c anime #${animeId}`, 'background:#6366f1;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'background:#818cf8;color:#fff;padding:2px 6px', 'color:#a5b4fc');
 
     try {
@@ -15,7 +15,10 @@ async function syncWatchlistToSite(animeId, type) {
             chrome.tabs.sendMessage(liveTab.id, {
                 type: 'WATCHLIST_SYNC_EXECUTE',
                 animeId,
-                watchlistType: type
+                watchlistType: type,
+                // Lets the content script do a proper reset-before-add and persist
+                // the synced status, instead of a blind single request.
+                animeSlug
             }, (response) => {
                 if (chrome.runtime.lastError) {
                     console.warn(`%c WatchlistSync %c tab forward failed`, 'background:#ef4444;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:700', 'color:#fca5a5', chrome.runtime.lastError.message);

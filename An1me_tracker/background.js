@@ -2521,9 +2521,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     if (message.type === 'WATCHLIST_SYNC') {
         sendResponse({ received: true });
-        const { animeId, watchlistType } = message;
+        const { animeId, watchlistType, animeSlug } = message;
         if (animeId && watchlistType) {
-            syncWatchlistToSite(animeId, watchlistType).catch(e =>
+            syncWatchlistToSite(animeId, watchlistType, animeSlug || null).catch(e =>
                 console.log('[BG] Watchlist sync error:', e)
             );
         }

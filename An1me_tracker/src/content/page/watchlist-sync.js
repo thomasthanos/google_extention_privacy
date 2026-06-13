@@ -90,6 +90,23 @@ const WatchlistSync = {
 
     resolveRepairStatus(entry, animeSlug = null) {
         const watchedCount = Array.isArray(entry?.episodes) ? entry.episodes.length : 0;
+        const prevSynced = String(entry?.watchlistSyncedType || '').toLowerCase();
+
+        // If this anime is already on the site's list (it was synced before), keep
+        // it fully in sync with the local state — including moving it *back out* of
+        // Dropped / Completed / On Hold into Watching / Plan to Watch. The old
+        // terminal-only logic returned null for those transitions, so un-dropping
+        // (or un-completing) an anime never propagated and the site list stayed
+        // stuck on the old status.
+        if (prevSynced && prevSynced !== 'remove') {
+            return this.resolveStatus(entry, animeSlug, {
+                fallbackType: watchedCount > 0 ? 'watching' : 'plan_to_watch'
+            });
+        }
+
+        // Not yet on the site list: only push *terminal* states automatically and
+        // leave active/plan anime to the watch-page sync, so reconcile never
+        // bulk-adds locally-only entries the user never put on the site.
         const totalEpisodes = Number(entry?.totalEpisodes) || 0;
         const listState = String(entry?.listState || '').toLowerCase();
 
@@ -420,10 +437,21 @@ if (/\/watch\//.test(location.pathname)) {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (!message || message.type !== 'WATCHLIST_SYNC_EXECUTE') return false;
 
-    const { animeId, watchlistType } = message;
+    const { animeId, watchlistType, animeSlug } = message;
     if (!animeId || !watchlistType) {
         sendResponse({ success: false, error: 'invalid_payload' });
         return false;
+    }
+
+    // When the slug is known, run the full status update: it removes the previous
+    // status before adding the new one (reset-before-add) and persists the synced
+    // status so reconcile's bookkeeping stays accurate. Falls back to a single raw
+    // request when we only have the site id.
+    if (animeSlug) {
+        WatchlistSync.updateStatus(animeId, watchlistType, animeSlug, { force: true })
+            .then((ok) => sendResponse({ success: ok !== false }))
+            .catch((e) => sendResponse({ success: false, error: e?.message || String(e) }));
+        return true;
     }
 
     const action = watchlistType === 'remove' ? 'remove_from_watchlist' : 'add_to_watchlist';

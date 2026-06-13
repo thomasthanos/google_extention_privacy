@@ -132,6 +132,10 @@
             const { slug, episode } = parsed;
 
             const anime = (animeData && animeData[slug]) || null;
+            // Dropped / on-hold anime must never appear in Continue Watching, even
+            // when an in-progress (<85%) episode still has saved progress. The
+            // animeData loop below already guards this; the progress loop must too.
+            if (isHardInactive(anime)) continue;
             const animeInfo = (animeInfoBySlug && animeInfoBySlug[slug]) || null;
 
             const currentTime = Number(entry.currentTime) || 0;
