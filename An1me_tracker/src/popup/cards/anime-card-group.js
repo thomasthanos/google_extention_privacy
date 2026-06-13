@@ -27,6 +27,12 @@
         },
     };
 
+    // Shared status glyphs for every movie render path (single card, movie
+    // group header/rows, movie-inside-season-group). Keeps the icon identical
+    // everywhere instead of mixing ✓/⊙/○.
+    const MOVIE_ICON_COMPLETED = '✓';
+    const MOVIE_ICON_INCOMPLETE = '○';
+
     Object.assign(AnimeCardRenderer, {
         // Outer shell for any grouped card. `title`/`metaRowHtml`/`coverHtml`/
         // `itemsHtml` are pre-escaped HTML fragments built by the caller.
@@ -159,12 +165,12 @@
                 if (isMovie) {
                     const watchTime = anime.totalWatchTime || 0;
                     const formattedTime = UIHelpers.formatDuration(watchTime);
-                    const isWatched = episodeCount > 0 || watchTime > 0;
+                    const isWatched = this.isMovieWatched(anime);
 
                     isComplete = isWatched;
                     hasProgress = isWatched;
                     statusClass = isComplete ? 'complete' : 'not-started';
-                    statusIcon = isComplete ? '✓' : '○';
+                    statusIcon = isComplete ? MOVIE_ICON_COMPLETED : MOVIE_ICON_INCOMPLETE;
 
                     episodeBadgeText = formattedTime || 'Movie';
                     progressInfoHTML = '';
@@ -532,6 +538,16 @@
                 .reduce((sum, ep) => sum + (Number(ep?.duration) || 0), 0);
         },
 
+        // Single source of truth for "has this movie been watched/completed?"
+        // used by every movie render path so the state is consistent whether the
+        // movie is standalone, in a movie group, or inside a season group.
+        isMovieWatched(anime) {
+            if (!anime) return false;
+            return this.getRealMovieEpisodes(anime).length > 0
+                || this.getRealMovieWatchTime(anime) > 0
+                || (Number(anime.totalWatchTime) || 0) > 0;
+        },
+
         extractMovieBaseTitle(title) {
             return title
                 .replace(/\s*-?\s*Movie\s*\d+.*$/i, '')
@@ -551,7 +567,7 @@
                 variant: 'movie',
                 slug,
                 statusClass: isWatched ? 'complete' : 'not-started',
-                statusIcon: isWatched ? '✓' : '○',
+                statusIcon: isWatched ? MOVIE_ICON_COMPLETED : MOVIE_ICON_INCOMPLETE,
                 label: UIHelpers.escapeHtml(label),
                 rightHtml
             });
@@ -576,17 +592,13 @@
 
             const movieItemsHTML = movies.map(({ slug, anime }) => {
                 const movieLabel = SeasonGrouping.getMovieLabel(slug, anime.title);
-                const realEpisodes = this.getRealMovieEpisodes(anime);
                 const watchTime = this.getRealMovieWatchTime(anime);
                 const formattedTime = UIHelpers.formatDuration(watchTime);
-                const isWatched = realEpisodes.length > 0 || watchTime > 0;
+                const isWatched = this.isMovieWatched(anime);
                 return this.renderMovieItem(slug, movieLabel, formattedTime, isWatched);
             }).join('');
 
-            const watchedCount = movies.filter(m => {
-                const realEpisodes = this.getRealMovieEpisodes(m.anime);
-                return realEpisodes.length > 0 || this.getRealMovieWatchTime(m.anime) > 0;
-            }).length;
+            const watchedCount = movies.filter(m => this.isMovieWatched(m.anime)).length;
             const allMoviesWatchedForDate = watchedCount >= movies.length;
             let lastWatchedText;
             if (allMoviesWatchedForDate && watchedCount > 0) {
@@ -617,7 +629,7 @@
             const allMoviesWatched = watchedCount >= totalMovies;
             const movieTypeBadge = `<span class="meta-badge" style="color:#f4a261;background:rgba(244,162,97,0.12);border:1px solid rgba(244,162,97,0.35);">${totalMovies} Movies</span>`;
             const movieStatusClass = allMoviesWatched ? 'meta-badge-complete' : (watchedCount > 0 ? 'meta-badge-watching' : 'meta-badge-notstarted');
-            const movieStatusIcon = allMoviesWatched ? '✓' : '⊙';
+            const movieStatusIcon = allMoviesWatched ? MOVIE_ICON_COMPLETED : MOVIE_ICON_INCOMPLETE;
             const movieStatusBadge = `<span class="meta-badge ${movieStatusClass}">${movieStatusIcon} ${statusGroup}</span>`;
             const metaRowHtml = `<div class="grp-meta-row">${movieTypeBadge}${movieStatusBadge}</div><span class="meta-time">${lastWatchedText}</span>`;
 
@@ -635,10 +647,9 @@
             const { UIHelpers } = window.AnimeTracker;
 
             const title = anime.title || slug;
-            const realEpisodes = this.getRealMovieEpisodes(anime);
             const watchTime = this.getRealMovieWatchTime(anime);
             const formattedTime = UIHelpers.formatDuration(watchTime);
-            const isWatched = realEpisodes.length > 0 || watchTime > 0;
+            const isWatched = this.isMovieWatched(anime);
             let lastWatched;
             if (isWatched) {
                 const startedDate = UIHelpers.getStartedDate(anime);
@@ -654,8 +665,8 @@
             const coverHtml = UIHelpers.renderCoverFigure(title, anime.coverImage || null);
 
             const singleStatusClass = isWatched ? 'meta-badge-complete' : 'meta-badge-notstarted';
-            const singleStatusIcon = isWatched ? '✓' : '⊙';
-            const singleStatusText = isWatched ? 'Watched' : 'Not watched';
+            const singleStatusIcon = isWatched ? MOVIE_ICON_COMPLETED : MOVIE_ICON_INCOMPLETE;
+            const singleStatusText = isWatched ? 'Completed' : 'Not started';
             const metaRowHtml = `<div class="grp-meta-row"><span class="meta-badge" style="color:#f4a261;background:rgba(244,162,97,0.12);border:1px solid rgba(244,162,97,0.35);">Movie</span><span class="meta-badge ${singleStatusClass}">${singleStatusIcon} ${singleStatusText}</span></div><span class="meta-time">${lastWatched}</span>`;
 
             return this.renderGroupShell({
