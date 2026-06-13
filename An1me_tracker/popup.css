@@ -980,76 +980,8 @@ body {
   position: relative;
   flex: 1;
   display: flex;
-  align-items: center
-}
-
-.search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 17px;
-  height: 17px;
-  color: var(--t3);
-  pointer-events: none;
-  z-index: 1
-}
-
-.search-input {
-  width: 100%;
-  padding: 10px 82px 10px 36px;   /* room for two 32×32 trailing icons + gaps */
-  background: var(--bg-2);
-  border: 1px solid var(--b1);
-  border-radius: var(--r-md);
-  color: var(--t1);
-  font-size: 13px;
-  font-family: inherit;
-  transition: border-color var(--tn), background var(--tn), box-shadow var(--tn)
-}
-
-.search-input::placeholder {
-  color: rgba(154, 168, 195, 0.58)   /* muted-foreground 60% */
-}
-
-.search-input:focus,
-.search-input:focus-visible,
-.search-container:focus-within .search-input {
-  outline: none;
-  background: var(--bg-3);
-  border-color: var(--primary-ring);
-  box-shadow: 0 0 0 3px var(--primary-soft)
-}
-
-.search-actions {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
   align-items: center;
-  gap: 2px;
-  z-index: 2
-}
-
-.search-actions .btn-add-anime,
-.search-actions .btn-sort {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: 0;
-  border-radius: 8px;
-  color: var(--t3);
-  cursor: pointer;
-  box-shadow: none;
-  transition: color var(--tf), background var(--tf)
-}
-
-.search-container {
-  min-height: 44px;
+  min-height: 40px;
   isolation: isolate
 }
 
@@ -1075,11 +1007,11 @@ body {
 
 .search-icon-badge {
   position: absolute;
-  left: 7px;
+  left: 6px;
   top: 50%;
   transform: translateY(-50%);
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1102,19 +1034,24 @@ body {
 }
 
 .search-input {
-  height: 44px;
-  padding: 0 72px 0 44px;
+  width: 100%;
+  height: 40px;
+  padding: 0 68px 0 40px;
   background:
     linear-gradient(180deg, rgba(var(--ink-rgb), 0.04), rgba(var(--ink-rgb), 0.01)),
     rgba(8, 13, 23, 0.94);
   border: 1px solid rgba(var(--ink-rgb), 0.06);
   border-radius: var(--r-pill);
+  color: var(--t1);
+  font-size: 13px;
+  font-family: inherit;
   backdrop-filter: blur(8px) saturate(120%);
   -webkit-backdrop-filter: blur(8px) saturate(120%);
   box-shadow:
     0 1px 2px rgba(var(--shadow-rgb), 0.28),
     inset 0 1px 0 rgba(var(--ink-rgb), 0.035),
-    inset 0 -1px 0 rgba(var(--shadow-rgb), 0.22)
+    inset 0 -1px 0 rgba(var(--shadow-rgb), 0.22);
+  transition: border-color var(--tn), background var(--tn), box-shadow var(--tn)
 }
 
 .search-input::placeholder {
@@ -1124,6 +1061,7 @@ body {
 .search-input:focus,
 .search-input:focus-visible,
 .search-container:focus-within .search-input {
+  outline: none;
   background:
     linear-gradient(180deg, rgba(var(--ink-rgb), 0.055), rgba(var(--ink-rgb), 0.012)),
     rgba(10, 17, 29, 0.98);
@@ -1136,15 +1074,31 @@ body {
 }
 
 .search-actions {
-  right: 7px;
-  gap: 3px
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  z-index: 2
 }
 
 .search-actions .btn-add-anime,
 .search-actions .btn-sort {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--r-pill)
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-pill);
+  color: var(--t3);
+  cursor: pointer;
+  box-shadow: none;
+  transition: color var(--tf), background var(--tf)
 }
 
 @keyframes search-glow-pulse {
@@ -1396,6 +1350,8 @@ body {
 
 .status-chip {
   --chip-fg:   var(--t2);
+  --chip-glass-rgb: var(--ink-rgb);
+  --chip-hover-fg: rgba(185, 196, 216, 0.82);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1411,18 +1367,26 @@ body {
   letter-spacing: 0.1px;
   font-family: inherit;
   cursor: pointer;
-  transition: color var(--tn)
+  transition: color var(--tn), background var(--tn), box-shadow var(--tn)
 }
 
 .status-chip:hover {
-  background: rgba(var(--ink-rgb), 0.035);
+  background:
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.10) 0%, transparent 56%),
+    rgba(var(--chip-glass-rgb), 0.075);
+  box-shadow: inset 0 1px 0 rgba(var(--ink-rgb), 0.07), inset 0 -1px 2px rgba(var(--shadow-rgb), 0.14), 0 0 0 1px rgba(var(--chip-glass-rgb), 0.12);
+  backdrop-filter: blur(4px) saturate(112%);
+  -webkit-backdrop-filter: blur(4px) saturate(112%);
+  color: var(--chip-hover-fg);
   opacity: 1
 }
 
-.status-chip.airing:hover   { background: rgba(var(--primary-rgb), 0.07) }
-.status-chip.on-hold:hover  { background: rgba(var(--warning-rgb), 0.07) }
-.status-chip.completed:hover{ background: rgba(var(--success-rgb), 0.07) }
-.status-chip.dropped:hover  { background: rgba(var(--danger-rgb), 0.07) }
+.status-chip.active:hover {
+  background:
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.12) 0%, transparent 54%),
+    rgba(var(--chip-glass-rgb), 0.10);
+  box-shadow: inset 0 1px 0 rgba(var(--ink-rgb), 0.08), inset 0 -1px 2px rgba(var(--shadow-rgb), 0.16), 0 0 0 1px rgba(var(--chip-glass-rgb), 0.16)
+}
 
 .status-chip.active {
   background: transparent;
@@ -1444,7 +1408,9 @@ body {
 }
 
 .status-chip.airing {
-  --chip-fg: var(--primary)
+  --chip-fg: var(--primary);
+  --chip-glass-rgb: var(--primary-rgb);
+  --chip-hover-fg: rgba(123, 213, 244, 0.84)
 }
 .status-chip.airing::before {
   content: '';
@@ -1456,9 +1422,23 @@ body {
   flex-shrink: 0
 }
 
-.status-chip.on-hold   { --chip-fg: var(--warning) }
-.status-chip.completed { --chip-fg: var(--success) }
-.status-chip.dropped   { --chip-fg: var(--danger) }
+.status-chip.on-hold {
+  --chip-fg: var(--warning);
+  --chip-glass-rgb: var(--warning-rgb);
+  --chip-hover-fg: rgba(224, 195, 116, 0.84)
+}
+
+.status-chip.completed {
+  --chip-fg: #35b46d;
+  --chip-glass-rgb: 42, 152, 91;
+  --chip-hover-fg: rgba(83, 184, 124, 0.90)
+}
+
+.status-chip.dropped {
+  --chip-fg: var(--danger);
+  --chip-glass-rgb: var(--danger-rgb);
+  --chip-hover-fg: rgba(226, 126, 137, 0.84)
+}
 
 .status-chip-sep {
   color: var(--t3);
@@ -3243,7 +3223,12 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .sync-status.synced {
-  color: rgba(127, 232, 169, 0.86);
+  color: #35b46d;
+  text-shadow: none
+}
+
+.sync-status.synced svg {
+  filter: drop-shadow(0 0 3px rgba(53, 180, 109, 0.28))
 }
 
 .sync-status.syncing {
@@ -5785,6 +5770,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .meta-badge {
   --badge-fg:   var(--t2);
   --badge-bg:   rgba(var(--ink-rgb), 0.04);
+  --badge-border: rgba(var(--ink-rgb), 0.055);
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -5793,7 +5779,12 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   padding: 2px 8px;
   border-radius: var(--r-pill);
   border: 0;
-  background: var(--badge-bg);
+  background:
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.10) 0%, transparent 55%),
+    var(--badge-bg);
+  box-shadow: inset 0 1px 0 rgba(var(--ink-rgb), 0.06), inset 0 -1px 2px rgba(var(--shadow-rgb), 0.12), 0 0 0 1px var(--badge-border);
+  backdrop-filter: blur(3px) saturate(110%);
+  -webkit-backdrop-filter: blur(3px) saturate(110%);
   color: var(--badge-fg);
   white-space: nowrap;
   flex-shrink: 0;
@@ -5804,39 +5795,46 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 /* Each variant just sets its colour pair — the shared rule above paints. */
 .meta-badge-progress {
   --badge-fg: var(--primary);
-  --badge-bg: var(--primary-soft)
+  --badge-bg: rgba(var(--primary-rgb), 0.095);
+  --badge-border: rgba(var(--primary-rgb), 0.13)
 }
 
 .meta-badge-watching {
   --badge-fg: var(--warning);
-  --badge-bg: var(--warning-soft)
+  --badge-bg: rgba(var(--warning-rgb), 0.105);
+  --badge-border: rgba(var(--warning-rgb), 0.13)
 }
 
 .meta-badge-complete {
   --badge-fg: var(--success);
-  --badge-bg: var(--success-soft)
+  --badge-bg: rgba(var(--success-rgb), 0.105);
+  --badge-border: rgba(var(--success-rgb), 0.13)
 }
 
 .meta-badge-notstarted {
   --badge-fg: var(--t3);
-  --badge-bg: rgba(var(--ink-rgb), 0.03)
+  --badge-bg: rgba(var(--ink-rgb), 0.03);
+  --badge-border: rgba(var(--ink-rgb), 0.045)
 }
 
 .meta-badge-onhold {
   --badge-fg: var(--warning);
-  --badge-bg: var(--warning-soft)
+  --badge-bg: rgba(var(--warning-rgb), 0.105);
+  --badge-border: rgba(var(--warning-rgb), 0.13)
 }
 
 .meta-badge-dropped {
   --badge-fg: var(--danger);
-  --badge-bg: var(--danger-soft)
+  --badge-bg: rgba(var(--danger-rgb), 0.095);
+  --badge-border: rgba(var(--danger-rgb), 0.13)
 }
 
 /* Airing carries a leading pulsing dot — the only badge with an icon
    beyond the inline emoji glyphs that come from JS. */
 .meta-badge-airing {
   --badge-fg: var(--primary);
-  --badge-bg: var(--primary-soft)
+  --badge-bg: rgba(var(--primary-rgb), 0.095);
+  --badge-border: rgba(var(--primary-rgb), 0.13)
 }
 .meta-badge-airing::before {
   content: '';
@@ -8639,6 +8637,10 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   gap: 6px;
   font-size: 11px;
   color: #52e28d;
+}
+
+.app.settings-mode .sync-status.synced {
+  color: #35b46d;
 }
 
 .app.settings-mode .sync-status svg {
