@@ -711,14 +711,17 @@ body {
 .app.stats-mode .toolbar,
 .app.stats-mode .empty-state,
 .app.stats-mode .search-empty,
+.app.stats-mode .list-loading,
 .app.goals-mode .anime-list,
 .app.goals-mode .toolbar,
 .app.goals-mode .empty-state,
 .app.goals-mode .search-empty,
+.app.goals-mode .list-loading,
 .app.settings-mode .anime-list,
 .app.settings-mode .toolbar,
 .app.settings-mode .empty-state,
 .app.settings-mode .search-empty,
+.app.settings-mode .list-loading,
 .app.settings-mode .category-tabs,
 .app.settings-mode #statsBar {
   display: none !important
@@ -3066,6 +3069,40 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .search-empty-text strong {
   color: var(--t1);
   font-weight: 600
+}
+
+.list-loading {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 14px;
+  padding: 40px 24px;
+  flex: 1
+}
+
+.list-loading.visible {
+  display: flex
+}
+
+.list-loading-spinner {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2.5px solid var(--primary-ring);
+  border-top-color: var(--primary);
+  animation: list-loading-spin 0.7s linear infinite
+}
+
+.list-loading-text {
+  font-size: 12.5px;
+  color: var(--t2);
+  margin: 0
+}
+
+@keyframes list-loading-spin {
+  to { transform: rotate(360deg) }
 }
 
 .footer {

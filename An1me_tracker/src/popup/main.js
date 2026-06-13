@@ -224,6 +224,7 @@
     let goalSettings = null;
     let badgeState = {};
     let currentViewMode = null;
+    let _syncing = false;
 
     // ─── Shared popup state ───────────────────────────────────────────────
     // Accessors bound to this IIFE's closure variables so extracted modules
@@ -260,7 +261,9 @@
         get lastMetadataRepairState() { return lastMetadataRepairState; },
         set lastMetadataRepairState(v) { lastMetadataRepairState = v; },
         get currentViewMode() { return currentViewMode; },
-        set currentViewMode(v) { currentViewMode = v; }
+        set currentViewMode(v) { currentViewMode = v; },
+        get syncing() { return _syncing; },
+        set syncing(v) { _syncing = v; }
     };
 
     const COPY_GUARD_STORAGE_KEY = 'copyGuardEnabled';
@@ -294,6 +297,7 @@
         emptyState: document.getElementById('emptyState'),
         searchEmptyState: document.getElementById('searchEmptyState'),
         searchEmptyQuery: document.getElementById('searchEmptyQuery'),
+        listLoading: document.getElementById('listLoading'),
         searchInput: document.getElementById('searchInput'),
         totalAnime: document.getElementById('totalAnime'),
         totalMovies: document.getElementById('totalMovies'),
@@ -1125,6 +1129,7 @@
     async function loadAndSyncData(options = {}) {
         if (loadAndSyncInProgress) return;
         loadAndSyncInProgress = true;
+        AT.PopupState.syncing = true;
 
         const { FirebaseSync } = AT;
         const { skipAutoFetch = false } = options;
@@ -1195,6 +1200,8 @@
             await loadData({ skipAutoFetch });
         } finally {
             loadAndSyncInProgress = false;
+            AT.PopupState.syncing = false;
+            renderAnimeList(elements.searchInput?.value || '');
         }
     }
 

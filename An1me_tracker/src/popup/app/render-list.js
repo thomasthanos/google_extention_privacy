@@ -258,15 +258,22 @@
                 if (elements.searchEmptyQuery) elements.searchEmptyQuery.textContent = `“${filter}”`;
                 elements.searchEmptyState?.classList.add('visible');
                 elements.emptyState.classList.remove('visible');
+                elements.listLoading?.classList.remove('visible');
+            } else if (AT.PopupState.syncing) {
+                elements.listLoading?.classList.add('visible');
+                elements.emptyState.classList.remove('visible');
+                elements.searchEmptyState?.classList.remove('visible');
             } else {
                 elements.emptyState.classList.add('visible');
                 elements.searchEmptyState?.classList.remove('visible');
+                elements.listLoading?.classList.remove('visible');
             }
             return;
         }
 
         elements.emptyState.classList.remove('visible');
         elements.searchEmptyState?.classList.remove('visible');
+        elements.listLoading?.classList.remove('visible');
 
         const latestMap = buildLatestActivityMap(entries, AT.PopupState.videoProgress);
 
@@ -294,6 +301,14 @@
         const onHoldCardsHtml    = renderEntryGroupsHtml(onHoldEntries, completedOrderMap, visibleProgress);
         const inProgressHtml     = AnimeCardRenderer.createInProgressGroup(inProgressAnime);
 
+        const moviesOnlyCompleted =
+            AT.PopupState.currentCategory === 'movies' &&
+            completedEntries.length > 0 &&
+            normalEntries.length === 0 &&
+            inProgressAnime.length === 0 &&
+            airingEntries.length === 0 &&
+            onHoldEntries.length === 0;
+
         const completedGroupHtml = completedEntries.length > 0
             ? renderCompactSectionHtml({
                 classPrefix: 'completed',
@@ -301,7 +316,7 @@
                 label: 'COMPLETED LIST',
                 subLabel: `${AT.CONFIG.COMPLETED_LIST_MIN_DAYS}+ days since last watch`,
                 cardsHtml: completedCardsHtml,
-                isOpen: AT.PopupState.currentCompactStatusOpen
+                isOpen: AT.PopupState.currentCompactStatusOpen || moviesOnlyCompleted
             })
             : '';
         const droppedGroupHtml = droppedEntries.length > 0
@@ -349,7 +364,12 @@
             }
         }
 
-        const chipsHtml = compactStatusItems.length > 0
+        const hideChipRow =
+            AT.PopupState.currentCategory === 'movies' &&
+            compactStatusItems.length === 1 &&
+            compactStatusItems[0].key === 'completed';
+
+        const chipsHtml = (compactStatusItems.length > 0 && !hideChipRow)
             ? `
                 <div class="status-chip-row" role="tablist" aria-label="Quick status lists">
                     ${compactStatusItems.map((item, index) => `
