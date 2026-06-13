@@ -1704,7 +1704,14 @@ body {
   min-width: 30px;
   height: 5px;
   border-radius: var(--r-pill);
-  background: rgba(var(--ink-rgb), 0.075);
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.11) 0%, transparent 48%),
+    rgba(var(--ink-rgb), 0.045);
+  border: 1px solid rgba(var(--ink-rgb), 0.055);
+  box-shadow: inset 0 1px 0 rgba(var(--ink-rgb), 0.07), inset 0 -1px 2px rgba(var(--shadow-rgb), 0.18);
+  backdrop-filter: blur(4px) saturate(112%);
+  -webkit-backdrop-filter: blur(4px) saturate(112%);
   overflow: hidden
 }
 
@@ -1712,8 +1719,12 @@ body {
   display: block;
   height: 100%;
   border-radius: var(--r-pill);
+  position: relative;
   /* Subtle teal → cyan gradient (same accent as before, now rounded). */
-  background: linear-gradient(90deg, #24abc8 0%, var(--primary) 100%);
+  background:
+    linear-gradient(180deg, rgba(var(--ink-rgb), 0.24) 0%, transparent 52%),
+    linear-gradient(90deg, rgba(27, 142, 170, 0.88) 0%, rgba(58, 184, 224, 0.90) 100%);
+  box-shadow: inset 0 1px 0 rgba(var(--ink-rgb), 0.15), 0 0 10px rgba(var(--primary-rgb), 0.10);
   transition: width 0.25s ease
 }
 
