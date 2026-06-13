@@ -259,7 +259,7 @@
                 elements.searchEmptyState?.classList.add('visible');
                 elements.emptyState.classList.remove('visible');
                 elements.listLoading?.classList.remove('visible');
-            } else if (AT.PopupState.syncing) {
+            } else if (AT.PopupState.syncing || !AT.PopupState.libraryLoaded || AT.PopupState.cloudPending) {
                 elements.listLoading?.classList.add('visible');
                 elements.emptyState.classList.remove('visible');
                 elements.searchEmptyState?.classList.remove('visible');
@@ -274,6 +274,7 @@
         elements.emptyState.classList.remove('visible');
         elements.searchEmptyState?.classList.remove('visible');
         elements.listLoading?.classList.remove('visible');
+        AT.PopupState.cloudPending = false;
 
         const latestMap = buildLatestActivityMap(entries, AT.PopupState.videoProgress);
 

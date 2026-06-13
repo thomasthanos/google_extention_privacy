@@ -225,6 +225,9 @@
     let badgeState = {};
     let currentViewMode = null;
     let _syncing = false;
+    let _libraryLoaded = false;
+    let _cloudPending = false;
+    let _cloudPendingTimer = null;
 
     // ─── Shared popup state ───────────────────────────────────────────────
     // Accessors bound to this IIFE's closure variables so extracted modules
@@ -263,7 +266,11 @@
         get currentViewMode() { return currentViewMode; },
         set currentViewMode(v) { currentViewMode = v; },
         get syncing() { return _syncing; },
-        set syncing(v) { _syncing = v; }
+        set syncing(v) { _syncing = v; },
+        get libraryLoaded() { return _libraryLoaded; },
+        set libraryLoaded(v) { _libraryLoaded = v; },
+        get cloudPending() { return _cloudPending; },
+        set cloudPending(v) { _cloudPending = v; }
     };
 
     const COPY_GUARD_STORAGE_KEY = 'copyGuardEnabled';
@@ -704,6 +711,10 @@
             elements.syncStatus?.classList.remove('synced');
             if (elements.syncText) elements.syncText.textContent = 'Local Only';
         }
+
+        if (!AT.PopupState.libraryLoaded) {
+            try { renderAnimeList(getActiveFilter()); } catch {}
+        }
     }
 
     // Render pipeline → src/popup/app/render-list.js
@@ -1123,6 +1134,8 @@
             videoProgress = {};
             renderAnimeList();
             updateStats();
+        } finally {
+            AT.PopupState.libraryLoaded = true;
         }
     }
 
@@ -2262,6 +2275,15 @@
 
         FirebaseSync.init({
             onUserSignedIn: async (user) => {
+                if (!AT.PopupState.libraryLoaded || Object.keys(animeData).length === 0) {
+                    AT.PopupState.cloudPending = true;
+                    if (_cloudPendingTimer) clearTimeout(_cloudPendingTimer);
+                    _cloudPendingTimer = setTimeout(() => {
+                        AT.PopupState.cloudPending = false;
+                        _cloudPendingTimer = null;
+                        try { renderAnimeList(getActiveFilter()); } catch {}
+                    }, 10000);
+                }
                 showMainApp(user);
 
                 try {
@@ -2331,6 +2353,8 @@
                 await maybePromptPostUpdateFetch();
             },
             onUserSignedOut: () => {
+                if (_cloudPendingTimer) { clearTimeout(_cloudPendingTimer); _cloudPendingTimer = null; }
+                AT.PopupState.cloudPending = false;
                 stopPopupCloudRefresh();
                 showAuthScreen();
             },

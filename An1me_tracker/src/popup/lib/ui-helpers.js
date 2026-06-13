@@ -189,7 +189,7 @@ const UIHelpers = {
         const cls = `at-cover at-cover--${size}${extraClass ? ' ' + extraClass : ''}`;
 
         if (safeUrl) {
-            return `<img class="${cls}" src="${this.escapeHtml(safeUrl)}" alt="${safeTitle}">`;
+            return `<img class="${cls}" src="${this.escapeHtml(safeUrl)}" alt="${safeTitle}" loading="lazy" decoding="async">`;
         }
 
         const letter = (title || '').trim().charAt(0).toUpperCase();
