@@ -2131,10 +2131,9 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #24abc8, rgba(var(--primary-rgb), 0.82));
+  background: var(--primary);
   border-radius: 9999px;
-  transition: width 0.6s ease-out;
-  box-shadow: 0 0 5px rgba(var(--primary-rgb), 0.24)
+  transition: width 0.6s ease-out
 }
 
 .progress-bar.size-small {
@@ -2201,9 +2200,9 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .anime-in-progress {
   margin-bottom: 0;
   padding: 0;
-  background: rgba(var(--warning-rgb), 0.04);
-  border: 1px solid rgba(var(--warning-rgb), 0.14);
-  border-radius: var(--r-xs);
+  background: var(--bg-3);
+  border: 1px solid var(--b1);
+  border-radius: var(--r-sm);
   max-height: 0;
   overflow: hidden;
   opacity: 0;
@@ -2219,9 +2218,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .anime-card.expanded .anime-in-progress.collapsed {
   max-height: 30px;
-  padding: 6px 9px;
-  border-color: rgba(var(--warning-rgb), 0.22);
-  border-bottom: none
+  padding: 6px 9px
 }
 
 .in-progress-header {
@@ -2233,10 +2230,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   font-weight: 600;
   cursor: pointer;
   user-select: none
-}
-
-.in-progress-header:hover {
-  color: #fcd34d
 }
 
 .in-progress-title {
@@ -2261,20 +2254,14 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   max-height: 130px;
   overflow-y: auto;
   opacity: 1;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   transition: max-height var(--tn), margin var(--tn), opacity var(--tn)
 }
 
 .in-progress-content::-webkit-scrollbar {
-  width: 3px
-}
-
-.in-progress-content::-webkit-scrollbar-track {
-  background: transparent
-}
-
-.in-progress-content::-webkit-scrollbar-thumb {
-  background: rgba(var(--warning-rgb), 0.35);
-  border-radius: 3px
+  width: 0;
+  height: 0
 }
 
 .anime-in-progress.collapsed .in-progress-content {
@@ -2316,8 +2303,8 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .anime-episodes.collapsible {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  background: linear-gradient(180deg, var(--bg-3) 0%, var(--bg-2) 100%);
-  border: 1px solid rgba(var(--ink-rgb), 0.06);
+  background: var(--bg-3);
+  border: 1px solid var(--b1);
   border-radius: var(--r-sm);
   transition: grid-template-rows 0.22s ease, background var(--tf), border-color var(--tf), padding var(--tn);
   will-change: grid-template-rows
@@ -2330,7 +2317,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .anime-card.expanded .anime-episodes.collapsible.collapsed {
   grid-template-rows: auto minmax(0, 0fr);
-  background: var(--bg-1)
+  background: var(--bg-2)
 }
 
 .episodes-header {
@@ -2341,10 +2328,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   min-height: 21px;
   padding: 2px 0;
   transition: color var(--tf)
-}
-
-.episodes-header:hover {
-  color: var(--cyan)
 }
 
 .episodes-title {
@@ -4879,9 +4862,9 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   overflow: hidden;
   opacity: 0;
   transition: max-height var(--tn), opacity var(--tn), margin var(--tn), padding var(--tn);
-  background: rgba(var(--primary-rgb), 0.03);
-  border: 1px solid rgba(var(--primary-rgb), 0.1);
-  border-radius: var(--r-xs);
+  background: var(--bg-3);
+  border: 1px solid var(--b1);
+  border-radius: var(--r-sm);
   margin-bottom: 0;
   padding: 0
 }
@@ -4904,10 +4887,6 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   gap: 5px;
   cursor: pointer;
   transition: color var(--tf)
-}
-
-.parts-header:hover {
-  color: var(--cyan)
 }
 
 .parts-icon {
@@ -4954,13 +4933,13 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   padding: 6px 8px;
   background: var(--bg-3);
   border: 1px solid var(--b1);
-  border-radius: var(--r-xs);
+  border-radius: var(--r-sm);
   font-size: 10px;
-  transition: all var(--tf)
+  transition: background var(--tf), border-color var(--tf)
 }
 
-.part-item:hover {
-  border-color: rgba(var(--primary-rgb), 0.2)
+.part-item.expanded {
+  border-color: var(--b2)
 }
 
 .part-item-header {
@@ -4972,24 +4951,26 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .part-expand-icon {
-  width: 13px;
-  height: 13px;
-  color: var(--t2);
-  transition: all var(--tf);
+  width: 18px;
+  height: 18px;
+  color: rgba(var(--ink-rgb), 0.28);
+  transition: color var(--tf), transform var(--tf);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: auto
+  margin-left: auto;
+  flex-shrink: 0
 }
 
 .part-expand-icon svg {
-  width: 13px;
-  height: 13px
+  width: 11px;
+  height: 11px;
+  stroke-width: 1.8
 }
 
 .part-item.expanded .part-expand-icon {
   transform: rotate(90deg);
-  color: var(--cyan)
+  color: rgba(var(--ink-rgb), 0.45)
 }
 
 .part-item-content,
@@ -5015,17 +4996,14 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 .part-episodes-list {
   max-height: 80px;
-  overflow-y: auto
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none
 }
 
 .part-episodes-list::-webkit-scrollbar {
-  width: 3px
-}
-
-.part-episodes-list::-webkit-scrollbar-thumb {
-  background: var(--cyan);
-  border-radius: 3px;
-  opacity: 0.4
+  width: 0;
+  height: 0
 }
 
 .part-status-icon {
@@ -5049,17 +5027,9 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   background: rgba(var(--warning-rgb), 0.1)
 }
 
-.part-item.in-progress {
-  border-color: rgba(var(--warning-rgb), 0.2)
-}
-
 .part-item.complete .part-status-icon {
   color: var(--green);
   background: rgba(var(--success-rgb), 0.1)
-}
-
-.part-item.complete {
-  border-color: rgba(var(--success-rgb), 0.2)
 }
 
 .part-name {
@@ -5081,24 +5051,11 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .part-progress {
   font-size: 9px;
   font-weight: 600;
-  padding: 1px 5px;
-  border-radius: var(--r-xs);
-  white-space: nowrap
-}
-
-.part-item.not-started .part-progress {
-  color: var(--t3);
-  background: rgba(var(--ink-rgb), 0.03)
-}
-
-.part-item.in-progress .part-progress {
-  color: var(--amber);
-  background: rgba(var(--warning-rgb), 0.08)
-}
-
-.part-item.complete .part-progress {
-  color: var(--green);
-  background: rgba(var(--success-rgb), 0.08)
+  padding: 1px 6px;
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+  color: var(--t2);
+  background: rgba(var(--ink-rgb), 0.05)
 }
 
 .anime-season-group,
@@ -5149,18 +5106,14 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   height: 15px
 }
 
-.grp-card:hover .grp-expand-icon {
-  color: var(--t2)
-}
-
 .anime-season-group.expanded .grp-expand-icon {
-  color: var(--cyan)
+  color: var(--t2)
 }
 
 .grp-content {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   max-height: 0;
   overflow: hidden;
   opacity: 0;
@@ -5169,9 +5122,20 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .anime-season-group.expanded .grp-content {
-  max-height: 460px;
+  max-height: min(460px, calc(var(--h) - 200px));
   opacity: 1;
-  margin-top: 8px
+  margin-top: 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-right: 2px
+}
+
+.anime-season-group.expanded .grp-content::-webkit-scrollbar {
+  width: 0;
+  height: 0
 }
 
 .season-chronology-separator {
@@ -5184,7 +5148,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .season-chronology-line {
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, rgba(var(--primary-rgb), 0.04), rgba(var(--primary-rgb), 0.28), rgba(var(--primary-rgb), 0.04))
+  background: var(--b1)
 }
 
 .season-chronology-label {
@@ -5192,22 +5156,35 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: rgba(var(--primary-rgb), 0.85);
+  color: var(--t3);
   white-space: nowrap
 }
 
+/* ─── Unified season / movie group rows — dark glass-solid family ──────────
+   Every grouped row (plain season, season-movie, movie-group) shares this one
+   surface: a deep-navy solid with a faint top-down sheen, a hairline glass
+   border and a 1px inset "liquid" highlight along the top edge. Kept subtle
+   (low white-alpha) so it never reads as bright/frosted. Compact padding,
+   overflow visible so badges / duration / action icons are never clipped. */
+/* ─── Unified SOLID row/panel surface ─────────────────────────────────────
+   One flat solid surface for every group row (season / season-movie / movie)
+   AND every collapsible panel below. No gradients, no inset highlights, no
+   shadows, no per-status border tints — status is shown ONLY by the small
+   status glyph. This keeps all item headers visually identical. */
 .grp-item {
+  position: relative;
   display: flex;
   flex-direction: column;
-  padding: 7px 9px;
+  padding: 6px 10px;
   background: var(--bg-3);
   border: 1px solid var(--b1);
   border-radius: var(--r-sm);
-  transition: all var(--tf)
+  overflow: visible;
+  transition: border-color var(--tf)
 }
 
-.grp-item:hover {
-  background: var(--bg-4);
+/* Pressed / expanded — minimal change: just a hair brighter border. */
+.season-item.expanded {
   border-color: var(--b2)
 }
 
@@ -5250,25 +5227,9 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   background: rgba(var(--warning-rgb), 0.12)
 }
 
-.grp-item.in-progress {
-  border-color: rgba(var(--warning-rgb), 0.2)
-}
-
-.grp-item.in-progress:hover {
-  border-color: rgba(var(--warning-rgb), 0.38)
-}
-
 .grp-item.complete .grp-status-icon {
   color: var(--green);
   background: rgba(var(--success-rgb), 0.12)
-}
-
-.grp-item.complete {
-  border-color: rgba(var(--success-rgb), 0.2)
-}
-
-.grp-item.complete:hover {
-  border-color: rgba(var(--success-rgb), 0.38)
 }
 
 .season-label {
@@ -5291,70 +5252,45 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .season-episode-badge {
-  font-size: 9px;
-  font-weight: 600;
-  padding: 2px 7px;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 8px;
   border-radius: var(--r-pill);
-  white-space: nowrap
-}
-
-.season-item.not-started .season-episode-badge {
-  color: var(--t3);
-  background: rgba(var(--ink-rgb), 0.03);
-  border: 1px solid var(--b0)
-}
-
-.season-item.in-progress .season-episode-badge {
-  color: var(--amber);
-  background: rgba(var(--warning-rgb), 0.08);
-  border: 1px solid rgba(var(--warning-rgb), 0.2)
-}
-
-.season-item.complete .season-episode-badge {
-  color: var(--green);
-  background: rgba(var(--success-rgb), 0.08);
-  border: 1px solid rgba(var(--success-rgb), 0.2)
+  white-space: nowrap;
+  line-height: 1.5;
+  letter-spacing: 0.1px;
+  flex-shrink: 0;
+  color: var(--t2);
+  background: rgba(var(--ink-rgb), 0.05);
+  border: 1px solid var(--b1)
 }
 
 .season-item-actions {
-  display: none;
+  display: flex;
   align-items: center;
-  gap: 2px
+  gap: 2px;
+  opacity: 0;
+  transform: translateX(3px);
+  pointer-events: none;
+  transition: opacity var(--tf), transform var(--tf)
 }
 
-.season-item.expanded .season-item-actions {
-  display: flex
+.season-item.expanded .season-item-actions,
+.season-item:focus-within .season-item-actions,
+.season-item-movie .season-item-actions {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto
 }
 
 .season-item-movie .season-item-header {
   cursor: default
 }
 
-.season-item-movie .season-item-actions {
-  display: flex;
-  opacity: 0;
-  transform: translateX(4px);
-  pointer-events: none;
-  transition: opacity var(--tn), transform var(--tn)
-}
-
-.season-item-movie:hover .season-item-actions,
-.season-item-movie:focus-within .season-item-actions {
-  opacity: 1;
-  transform: translateX(0);
-  pointer-events: auto
-}
-
 .season-movie-type-badge {
-  color: #f4a261;
-  background: rgba(244, 162, 97, 0.12);
-  border: 1px solid rgba(244, 162, 97, 0.35);
-  transition: background var(--tf), border-color var(--tf)
-}
-
-.season-item-movie:hover .season-movie-type-badge {
-  background: rgba(244, 162, 97, 0.2);
-  border-color: rgba(244, 162, 97, 0.55)
+  color: var(--t2);
+  background: rgba(var(--ink-rgb), 0.05);
+  border: 1px solid var(--b1)
 }
 
 .season-edit-btn,
@@ -5389,31 +5325,29 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 }
 
 .season-expand-icon {
-  width: 13px;
-  height: 13px;
-  color: var(--t3);
-  transition: all var(--tf);
+  width: 18px;
+  height: 18px;
+  color: rgba(var(--ink-rgb), 0.28);
+  transition: color var(--tf), transform var(--tf);
   display: flex;
   align-items: center;
-  justify-content: center
+  justify-content: center;
+  flex-shrink: 0
 }
 
 .season-expand-icon svg {
-  width: 13px;
-  height: 13px
-}
-
-.season-item:hover .season-expand-icon {
-  color: var(--cyan)
+  width: 11px;
+  height: 11px;
+  stroke-width: 1.8
 }
 
 .season-item.expanded .season-expand-icon {
   transform: rotate(90deg);
-  color: var(--cyan)
+  color: rgba(var(--ink-rgb), 0.45)
 }
 
 .season-item.expanded .season-item-content {
-  max-height: 280px;
+  max-height: 640px;
   opacity: 1;
   margin-top: 7px;
   padding-top: 7px;
@@ -5448,23 +5382,16 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   color: var(--purple)
 }
 
+/* No nested mini-scroll inside an expanded row — the episode list flows and the
+   group container owns the single scroll. */
 .season-episodes {
-  max-height: 100px;
-  overflow-y: auto
-}
-
-.season-episodes::-webkit-scrollbar {
-  width: 3px
-}
-
-.season-episodes::-webkit-scrollbar-thumb {
-  background: var(--t3);
-  border-radius: 3px
+  max-height: none;
+  overflow: visible
 }
 
 .anime-movie-group.expanded .grp-expand-icon {
   transform: rotate(90deg);
-  color: var(--cyan)
+  color: var(--t2)
 }
 
 .anime-card,
@@ -5666,13 +5593,7 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .movie-item-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
-  opacity: 0;
-  transition: opacity var(--tf)
-}
-
-.movie-item:hover .movie-item-actions {
-  opacity: 1
+  gap: 2px
 }
 
 .movie-edit-btn,
