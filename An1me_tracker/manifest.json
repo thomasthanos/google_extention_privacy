@@ -23,7 +23,11 @@
     "https://api.jikan.moe/*",
     "https://api.aniskip.com/*",
     "https://myanimelist.net/*",
-    "https://cdn.myanimelist.net/*"
+    "https://cdn.myanimelist.net/*",
+    "https://s4.anilist.co/*",
+    "https://image.tmdb.org/*",
+    "https://media.kitsu.app/*",
+    "https://img1.ak.crunchyroll.com/*"
   ],
   "action": {
     "default_popup": "popup.html",

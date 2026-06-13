@@ -1096,6 +1096,27 @@
         }
     }
 
+    async function warmCoverCache() {
+        try {
+            const CoverCache = AT.CoverCache;
+            const sanitize = AT.UIHelpers?.sanitizeImageUrl?.bind(AT.UIHelpers);
+            if (!CoverCache || !sanitize) return;
+            const urls = [];
+            for (const slug in animeData) {
+                const safe = sanitize(animeData[slug]?.coverImage);
+                if (safe) urls.push(safe);
+            }
+            const groupImgs = window.AnimeTracker.groupCoverImages || {};
+            for (const key in groupImgs) {
+                const safe = sanitize(groupImgs[key]);
+                if (safe) urls.push(safe);
+            }
+            await CoverCache.warm(urls);
+        } catch (e) {
+            PopupLogger.debug('CoverCache', 'warm failed:', e?.message || e);
+        }
+    }
+
     async function loadData(options = {}) {
         const { Storage } = AT;
         const { skipAutoFetch = false } = options;
@@ -1121,6 +1142,7 @@
 
             await finalizeAfterMaintenance();
 
+            await warmCoverCache();
             renderAnimeList();
             await updateStats();
             await loadGoalAndBadgeState();
@@ -1182,6 +1204,7 @@
 
                 await finalizeAfterMaintenance();
 
+                await warmCoverCache();
                 renderAnimeList(elements.searchInput?.value || '');
                 await updateStats();
                 await loadGoalAndBadgeState();
