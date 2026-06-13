@@ -34,6 +34,7 @@
     function buildCard(item) {
         const card = document.createElement('div');
         card.className = 'at-cw-card';
+        card.classList.add(item.isStart ? 'at-cw-card-start' : 'at-cw-card-resume');
 
         const resume = document.createElement('a');
         resume.className = 'at-cw-resume';
@@ -107,21 +108,6 @@
             '<svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true" fill="currentColor"><polygon points="8 5 19 12 8 19"/></svg>'
             + `<span>${item.isStart ? 'Start' : 'Resume'}</span>`;
         actions.appendChild(resumeBtn);
-
-        if (item.nextUrl && !item.isStart) {
-            const next = document.createElement('a');
-            next.className = 'at-cw-btn at-cw-btn-next';
-            next.href = item.nextUrl;
-            next.title = `Skip to episode ${item.nextNumber}`;
-
-            next.addEventListener('click', (e) => { e.stopPropagation(); }, { passive: true });
-            next.innerHTML =
-                `<span>Next · Ep ${item.nextNumber}</span>` +
-                '<svg class="at-cw-btn-arrow" viewBox="0 0 24 24" aria-hidden="true">' +
-                '<path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' +
-                '</svg>';
-            actions.appendChild(next);
-        }
 
         card.appendChild(actions);
 

@@ -292,7 +292,10 @@
             .at-cw-meta { padding: 6px 8px 4px; }
             .at-cw-title {
                 font-size: 11.5px; font-weight: 700; line-height: 1.25; color: #e8edf8;
-                display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+                display: block;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
             .at-cw-sub {
                 margin-top: 2px; font-size: 10px; font-weight: 500; color: #8899b0;
@@ -300,16 +303,34 @@
             }
 
             .at-cw-actions {
-                display: flex; flex-direction: column; gap: 4px;
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 4px;
                 padding: 0 8px 8px;
+            }
+            .at-cw-card-start .at-cw-meta {
+                padding-bottom: 2px;
+            }
+            .at-cw-card-start .at-cw-actions {
+                padding-top: 0;
+            }
+            .at-cw-card-start .at-cw-btn-resume {
+                min-height: 28px;
             }
             .at-cw-btn {
                 display: flex; align-items: center; justify-content: center; gap: 4px;
                 padding: 5px 6px;
+                min-width: 0;
                 border-radius: 9px;
                 font-size: 10px; font-weight: 700; letter-spacing: .3px;
                 text-decoration: none !important;
                 transition: background .18s ease, color .18s ease, border-color .18s ease, transform .18s ease;
+            }
+            .at-cw-btn span {
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
             .at-cw-btn-resume {
                 background:
@@ -325,36 +346,12 @@
                     linear-gradient(180deg, #81d4fa 0%, #4fc3f7 100%);
                 transform: translateY(-1px);
             }
-            .at-cw-btn-next {
-                background:
-                    linear-gradient(180deg, rgba(79,195,247,0.12) 0%, rgba(79,195,247,0.04) 100%);
-                border: 1px solid rgba(79,195,247,0.22);
-                color: #b8d4e8 !important;
-                -webkit-backdrop-filter: blur(10px) saturate(160%);
-                backdrop-filter: blur(10px) saturate(160%);
-                box-shadow:
-                    inset 0 1px 0 rgba(255,255,255,0.10),
-                    inset 0 -1px 0 rgba(0,0,0,0.18);
-            }
-            .at-cw-btn-next:hover {
-                background:
-                    linear-gradient(180deg, rgba(79,195,247,0.26) 0%, rgba(79,195,247,0.10) 100%);
-                border-color: rgba(79,195,247,0.50);
-                color: #fff !important;
-                transform: translateY(-1px);
-            }
             .at-cw-btn:focus-visible {
                 outline: 2px solid #4fc3f7; outline-offset: 2px;
             }
-            .at-cw-btn-arrow {
-                width: 9px; height: 9px; fill: currentColor;
-                transition: transform .15s ease;
-            }
-            .at-cw-btn-next:hover .at-cw-btn-arrow { transform: translateX(2px); }
-
             /* ============ Motion + responsive ============ */
             @media (prefers-reduced-motion: reduce) {
-                .at-cw-card, .at-cw-play, .at-cw-thumb, .at-cw-btn, .at-cw-btn-arrow, .at-cw-track {
+                .at-cw-card, .at-cw-play, .at-cw-thumb, .at-cw-btn, .at-cw-track {
                     transition: none !important;
                     scroll-behavior: auto !important;
                 }
