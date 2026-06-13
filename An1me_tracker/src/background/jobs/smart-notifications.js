@@ -225,7 +225,11 @@ function showNewEpisodeNotification({ slug, anime, episode, behind }) {
             iconUrl: 'src/icons/icon128.png',
             title: 'New Episode Available!',
             message: `${title} — Episode ${episode} is out${behindText}`,
-            priority: 1
+            priority: 2,
+            // Stay on screen until the user acts — so a missed sound or being
+            // away from the desk doesn't make them lose the alert.
+            requireInteraction: true,
+            buttons: [{ title: 'Watch now' }]
         });
     } catch (e) {
         console.warn('[BG] New episode notification failed:', e);
@@ -243,60 +247,63 @@ function showBatchNewEpisodeNotification(items) {
             iconUrl: 'src/icons/icon128.png',
             title: `${count} new episodes available!`,
             message: `${list}. Tap to open your library.`,
-            priority: 1
+            priority: 2,
+            requireInteraction: true,
+            buttons: [{ title: 'Open library' }]
         });
     } catch (e) {
         console.warn('[BG] Batch new episode notification failed:', e);
     }
 }
 
+// Shared helper: open the extension popup (with a tab fallback for contexts
+// where openPopup isn't available, e.g. no focused window).
+function openLibraryFromNotification() {
+    const openPopupFallback = () => {
+        try { chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') }); } catch {}
+    };
+    try {
+        const result = chrome.action?.openPopup?.();
+        if (result && typeof result.then === 'function') result.catch(openPopupFallback);
+        else if (result === undefined) openPopupFallback();
+    } catch {
+        openPopupFallback();
+    }
+}
+
+function openAnimeFromNotification(notifId) {
+    const slug = notifId.replace('new-ep-', '');
+    const encoded = encodeURIComponent(slug);
+    chrome.tabs.create({ url: `https://an1me.to/anime/${encoded}/` });
+}
+
 chrome.notifications.onClicked.addListener((notifId) => {
     if (notifId === 'new-eps-batch') {
-        // Multiple anime — open the library popup so the user can pick.
-        const openPopupFallback = () => {
-            try { chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') }); } catch {}
-        };
-        try {
-            const result = chrome.action?.openPopup?.();
-            if (result && typeof result.then === 'function') result.catch(openPopupFallback);
-            else if (result === undefined) openPopupFallback();
-        } catch {
-            openPopupFallback();
-        }
+        openLibraryFromNotification();
         chrome.notifications.clear(notifId);
         return;
     }
     if (notifId.startsWith('new-ep-')) {
-        const slug = notifId.replace('new-ep-', '');
-
-
-        const encoded = encodeURIComponent(slug);
-        chrome.tabs.create({ url: `https://an1me.to/anime/${encoded}/` });
+        openAnimeFromNotification(notifId);
         chrome.notifications.clear(notifId);
         return;
     }
     if (notifId.startsWith('badge-') || notifId === 'badges-batch') {
-
-
-        const openPopupFallback = () => {
-            try {
-                chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
-            } catch {                                   }
-        };
-        try {
-            const result = chrome.action?.openPopup?.();
-            if (result && typeof result.then === 'function') {
-                result.catch(openPopupFallback);
-            } else if (result === undefined) {
-
-
-                openPopupFallback();
-            }
-        } catch {
-            openPopupFallback();
-        }
+        openLibraryFromNotification();
         chrome.notifications.clear(notifId);
     }
+});
+
+// Button clicks mirror the body-click behaviour for each notification type.
+chrome.notifications.onButtonClicked.addListener((notifId) => {
+    if (notifId === 'new-eps-batch') {
+        openLibraryFromNotification();
+    } else if (notifId.startsWith('new-ep-')) {
+        openAnimeFromNotification(notifId);
+    } else if (notifId.startsWith('badge-') || notifId === 'badges-batch') {
+        openLibraryFromNotification();
+    }
+    chrome.notifications.clear(notifId);
 });
 
 function showBadgeNotification(badge) {
