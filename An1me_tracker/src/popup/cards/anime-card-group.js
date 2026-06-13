@@ -418,8 +418,11 @@
                         </div>`
                     : '';
 
+                const movieTypeBadgeHtml = AT.PopupState?.currentCategory === 'movies'
+                    ? ''
+                    : '<span class="meta-badge season-movie-type-badge">Movie</span>';
                 const rightSideHtml = isMovie
-                    ? `<span class="meta-badge season-movie-type-badge">Movie</span>
+                    ? `${movieTypeBadgeHtml}
                        <span class="movie-duration">${episodeBadgeText}</span>
                        <div class="season-item-actions">
                            <button class="season-edit-btn" data-slug="${UIHelpers.escapeHtml(slug)}" title="Edit title">${UIHelpers.createIcon('edit')}</button>
@@ -510,6 +513,7 @@
             return this.renderGroupShell({
                 variant: 'season',
                 baseSlug,
+                extraClass: AT.PopupState?.currentCategory === 'movies' ? 'no-inner-scroll' : '',
                 coverHtml: coverHtmlGroup,
                 title: UIHelpers.escapeHtml(baseTitle),
                 metaRowHtml: metaRowHtmlGroup,

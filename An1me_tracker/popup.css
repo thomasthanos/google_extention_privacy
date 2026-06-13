@@ -5138,6 +5138,11 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   height: 0
 }
 
+.anime-season-group.no-inner-scroll.expanded .grp-content {
+  max-height: none;
+  overflow: visible
+}
+
 .season-chronology-separator {
   display: flex;
   align-items: center;
@@ -5609,6 +5614,13 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   cursor: pointer;
   border-radius: var(--r-xs);
   transition: all var(--tf)
+}
+
+.movie-edit-btn svg,
+.movie-delete-btn svg {
+  width: 11px;
+  height: 11px;
+  stroke-width: 1.8
 }
 
 .movie-edit-btn:hover {
