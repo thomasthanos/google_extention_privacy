@@ -42,7 +42,7 @@
                 const isLegacyDuration = window.AnimeTrackerMergeUtils?.PLACEHOLDER_DURATION_VALUES?.includes(currentDuration)
                     ?? (currentDuration === 1440 || currentDuration === 6000 || currentDuration === 7200);
                 const isUnknownDuration = currentDuration <= 0;
-                const isVideoMeasured = ep?.durationSource === 'video';
+                const isVideoMeasured = (ep?.durationSource || 'video') === 'video';
 
                 let nextDuration = currentDuration;
                 if (hasBetterProgressDuration && (isLegacyDuration || currentDuration < MIN_RELIABLE_DURATION_SECONDS)) {

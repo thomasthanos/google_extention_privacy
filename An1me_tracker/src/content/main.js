@@ -100,7 +100,7 @@
                 let inferredDuration = 1440;
                 if (entry && Array.isArray(entry.episodes)) {
                     const realDurs = entry.episodes
-                        .filter(ep => ep?.durationSource === 'video' && Number(ep.duration) > 0)
+                        .filter(ep => (ep?.durationSource || 'video') === 'video' && Number(ep.duration) > 0)
                         .map(ep => Number(ep.duration))
                         .sort((a, b) => a - b);
                     if (realDurs.length > 0) {

@@ -995,7 +995,11 @@
         const withoutAutoRepaired = ProgressManager.removeAutoRepairedEpisodes(
             normalized.animeData || {}
         );
-        const repairedData = ProgressManager.removeDuplicateEpisodes(withoutAutoRepaired.cleanedData);
+        const dedupedData = ProgressManager.removeDuplicateEpisodes(withoutAutoRepaired.cleanedData);
+        // Drop per-episode defaults (vestigial patchedManually + durationSource:'video')
+        // so the stored/synced doc stays compact. Returns the same ref if nothing changed.
+        const repairedData = AT.MergeUtils.stripEpisodeDefaultsFromMap(dedupedData);
+        const episodeDefaultsStripped = repairedData !== dedupedData;
 
         const anilistDateScrub = scrubAnilistImportDates(repairedData);
         if (anilistDateScrub.changed) {
@@ -1029,6 +1033,7 @@
 
         const changed =
             episodeCountChanged ||
+            episodeDefaultsStripped ||
             withoutAutoRepaired.removedCount > 0 ||
             progressRemoved > 0 ||
             durationFix.changed ||

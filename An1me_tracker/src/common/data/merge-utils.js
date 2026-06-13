@@ -167,7 +167,10 @@
             if (getSafeNumber(Number(a.number)) !== getSafeNumber(Number(b.number))) return false;
             if (getSafeString(a.watchedAt) !== getSafeString(b.watchedAt)) return false;
             if (getSafeNumber(Number(a.duration)) !== getSafeNumber(Number(b.duration))) return false;
-            if (getSafeString(a.durationSource) !== getSafeString(b.durationSource)) return false;
+            // 'video' is the implicit default and is no longer stored — a missing
+            // durationSource is equivalent to 'video', so normalise both sides to
+            // avoid false "changed" diffs (which would re-trigger sync writes).
+            if ((a.durationSource || 'video') !== (b.durationSource || 'video')) return false;
         }
 
         return true;
@@ -484,8 +487,8 @@
                 if (episodeWatchedAt > existingWatchedAt) {
                     episodesByNumber.set(episode.number, episode);
                 } else if (episodeWatchedAt === existingWatchedAt) {
-                    const existingIsVideo = existing.durationSource === 'video';
-                    const episodeIsVideo = episode.durationSource === 'video';
+                    const existingIsVideo = (existing.durationSource || 'video') === 'video';
+                    const episodeIsVideo = (episode.durationSource || 'video') === 'video';
                     const existingDuration = Number(existing.duration) || 0;
                     const episodeDuration = Number(episode.duration) || 0;
 
@@ -665,6 +668,41 @@
         return changed ? out : animeData;
     }
 
+    // Strip per-episode fields that don't need storing: the vestigial
+    // `patchedManually` (no code reads it) and `durationSource` when it equals the
+    // implicit default 'video'. Shrinks the synced doc; readers treat a missing
+    // durationSource as 'video'. Returns a new map only if something changed.
+    function stripEpisodeDefaultsFromMap(animeData) {
+        if (!animeData || typeof animeData !== 'object') return animeData;
+        const out = {};
+        let changedAny = false;
+        for (const [slug, entry] of Object.entries(animeData)) {
+            if (!entry || !Array.isArray(entry.episodes)) {
+                out[slug] = entry;
+                continue;
+            }
+            let entryChanged = false;
+            const episodes = entry.episodes.map((ep) => {
+                if (!ep || typeof ep !== 'object') return ep;
+                const hasPatched = Object.prototype.hasOwnProperty.call(ep, 'patchedManually');
+                const hasDefaultSource = ep.durationSource === 'video';
+                if (!hasPatched && !hasDefaultSource) return ep;
+                const next = { ...ep };
+                delete next.patchedManually;
+                if (next.durationSource === 'video') delete next.durationSource;
+                entryChanged = true;
+                return next;
+            });
+            if (entryChanged) {
+                out[slug] = { ...entry, episodes };
+                changedAny = true;
+            } else {
+                out[slug] = entry;
+            }
+        }
+        return changedAny ? out : animeData;
+    }
+
     const root = typeof globalThis !== 'undefined' ? globalThis : self;
     const exports = {
         mergeVideoProgress,
@@ -683,6 +721,7 @@
         isLikelyMovieSlug,
         isPlaceholderDuration,
         stripAutoRepairedEpisodesFromMap,
+        stripEpisodeDefaultsFromMap,
         PLACEHOLDER_DURATION_VALUES
     };
     root.AnimeTrackerMergeUtils = exports;

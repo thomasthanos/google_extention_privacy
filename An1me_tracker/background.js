@@ -47,6 +47,8 @@ const isLikelyMovieSlug = sharedMergeUtils.isLikelyMovieSlug || missingMergeUtil
 const isPlaceholderDuration = sharedMergeUtils.isPlaceholderDuration || missingMergeUtil('isPlaceholderDuration');
 const stripAutoRepairedEpisodesFromMap = sharedMergeUtils.stripAutoRepairedEpisodesFromMap
     || ((m) => m);
+const stripEpisodeDefaultsFromMap = sharedMergeUtils.stripEpisodeDefaultsFromMap
+    || ((m) => m);
 
 const BG_DEBUG = false;
 const dlog = (...a) => { if (BG_DEBUG) console.log(...a); };
@@ -188,6 +190,7 @@ function stripFirebaseSilentAnimeMetadata(anime) {
             const epCopy = { ...episode };
             delete epCopy.duration;
             delete epCopy.durationSource;
+            delete epCopy.patchedManually;
             return epCopy;
         });
     }
@@ -1587,6 +1590,12 @@ async function syncToFirebase(reason = 'sync') {
             ? mergeAnimeData(localAnime, cloudDoc.animeData)
             : stripAutoRepairedEpisodesFromMap({ ...localAnime });
 
+        // Drop per-episode defaults (vestigial patchedManually + durationSource:'video')
+        // so the written doc stays compact. Equality treats missing durationSource as
+        // 'video', so this never triggers an extra write on its own — the compacted
+        // payload lands on the next real change.
+        mergedAnime = stripEpisodeDefaultsFromMap(mergedAnime);
+
         mergedDeleted = pruneStaleDeletedAnime(mergedAnime, mergedDeleted);
         applyDeletedAnime(mergedAnime, mergedDeleted);
 
@@ -1853,6 +1862,7 @@ async function _doApplyCloudUpdate(cloudDoc) {
             : (local.deletedAnime || {});
 
         let mergedAnime = mergeAnimeData(local.animeData || {}, cloudDoc.animeData || {});
+        mergedAnime = stripEpisodeDefaultsFromMap(mergedAnime);
         mergedDeleted = pruneStaleDeletedAnime(mergedAnime, mergedDeleted);
         applyDeletedAnime(mergedAnime, mergedDeleted);
 
