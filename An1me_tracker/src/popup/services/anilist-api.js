@@ -785,11 +785,8 @@ const AnilistService = {
     cache: {},
 
     CACHE_TTL: 24 * 60 * 60 * 1000,
-    // Airing shows refresh more often than finished ones, but 1h made the popup
-    // re-scrape every releasing title on basically every open. Kept in sync with
-    // the background metadata-repair airing TTL; smart-notifications handles the
-    // tight "new episode just dropped" polling on top of this.
     CACHE_TTL_AIRING: 6 * 60 * 60 * 1000,
+    CACHE_TTL_AIRING_OPEN: 20 * 60 * 1000,
     CACHE_TTL_NOT_FOUND: 3 * 24 * 60 * 60 * 1000,
     CACHE_TTL_RETRYABLE: 15 * 60 * 1000,
 
@@ -813,6 +810,24 @@ const AnilistService = {
         const data = this.cache[slug];
         if (!data || !data.nextEpisodeAt) return null;
         return data.nextEpisodeAt;
+    },
+
+    isFresh(slug) {
+        const cached = this.cache[slug];
+        if (!cached || !cached.cachedAt) return false;
+        const age = Date.now() - cached.cachedAt;
+        if (cached.notFound) return age < this.CACHE_TTL_NOT_FOUND;
+        if (cached.retryable) return age < this.CACHE_TTL_RETRYABLE;
+        if (cached.status === 'RELEASING') {
+            if (cached.nextEpisodeAt) {
+                const nextMs = new Date(cached.nextEpisodeAt).getTime();
+                if (Number.isFinite(nextMs) && nextMs <= Date.now() && cached.cachedAt < nextMs) {
+                    return false;
+                }
+            }
+            return age < this.CACHE_TTL_AIRING_OPEN;
+        }
+        return age < this.CACHE_TTL;
     },
 
     async loadCachedData(animeData) {
@@ -896,15 +911,7 @@ const AnilistService = {
             }
 
             const now = Date.now();
-            const slugsToFetch = Object.keys(animeData).filter(slug => {
-                const cached = this.cache[slug];
-                if (!cached || !cached.cachedAt) return true;
-                const age = now - cached.cachedAt;
-                if (cached.notFound) return age >= this.CACHE_TTL_NOT_FOUND;
-                if (cached.retryable) return age >= this.CACHE_TTL_RETRYABLE;
-                const ttl = cached.status === 'RELEASING' ? this.CACHE_TTL_AIRING : this.CACHE_TTL;
-                return age >= ttl;
-            });
+            const slugsToFetch = Object.keys(animeData).filter(slug => !this.isFresh(slug));
 
             if (slugsToFetch.length === 0) {
                 if (onComplete) onComplete();
@@ -940,6 +947,12 @@ const AnilistService = {
                     expectedKeys.delete(key);
                     processed++;
                     const slug = key.replace(/^animeinfo_/, '');
+                    // Sync the freshly-fetched info into the in-memory cache right
+                    // away, so the re-render that fires when this batch finishes
+                    // computes the correct status (e.g. AIRING) immediately — instead
+                    // of reading stale cache and only catching up on a full reload.
+                    const newVal = changes[key] && changes[key].newValue;
+                    if (newVal) this.cache[slug] = newVal;
                     const title = animeData[slug]?.title || slug;
                     try {
                         if (onProgress) onProgress(processed, total, title);

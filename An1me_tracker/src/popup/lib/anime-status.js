@@ -102,6 +102,15 @@
             }
         }
 
+        // Fallback: releasing show with a scheduled next episode but no parsed
+        // latest-episode count (An1me scrape didn't yield one). A viewer who has
+        // watched episodes is treated as caught-up/airing rather than plain watching.
+        if (watchedCount > 0 && !anime.completedAt && listState !== AnimeStatus.COMPLETED
+            && anilistStatus === 'RELEASING' && !(latestAvailable > 0)
+            && AnilistService?.getNextEpisodeAt(lowerSlug)) {
+            return AnimeStatus.AIRING;
+        }
+
         return AnimeStatus.WATCHING;
     }
 
@@ -231,13 +240,16 @@
 
             const lowerSlug = String(slug || '').toLowerCase();
             const anilistStatus = AT.AnilistService?.getStatus(lowerSlug);
-            const knownTotal = getKnownTotalEpisodesForRepair(lowerSlug, anime);
-            if (knownTotal <= watchedCount) continue;
 
             let shouldRevert = false;
             if (anilistStatus === 'RELEASING') {
+                // An airing show must never stay stuck as "completed", regardless of
+                // episode-count math — AniList may not know the full total yet, so the
+                // knownTotal<=watchedCount guard below would wrongly keep it completed.
                 shouldRevert = true;
             } else {
+                const knownTotal = getKnownTotalEpisodesForRepair(lowerSlug, anime);
+                if (knownTotal <= watchedCount) continue;
                 // Decide via getStatus() (same source of truth persist uses), on a probe
                 // with stored completion flags stripped so it doesn't short-circuit.
                 const probe = { ...anime };
@@ -278,7 +290,15 @@
             if (listState === 'dropped' || listState === 'on_hold') continue;
 
 
-            if (AT.AnilistService?.getStatus(String(slug).toLowerCase()) === 'RELEASING') continue;
+            const releaseStatus = AT.AnilistService?.getStatus(String(slug).toLowerCase());
+            if (releaseStatus === 'RELEASING') continue;
+            // Don't lock in a completion while the release status is still unknown
+            // (An1me/AniList not fetched yet) — the show could be airing with more
+            // episodes to come. Defer until we have data, so we never persist a
+            // wrong completedAt that a later repair has to undo (which caused the
+            // completed→airing flip on a second render). Movies/one-shots are
+            // inherently finished, so they stay exempt.
+            if (!releaseStatus && !AT.SeasonGrouping?.isMovie(slug, anime)) continue;
 
             if (getStatus(slug, anime) !== AnimeStatus.COMPLETED) continue;
 

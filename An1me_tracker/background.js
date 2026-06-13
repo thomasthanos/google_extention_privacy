@@ -62,7 +62,7 @@ const ddebug = (...a) => { if (BG_DEBUG) console.debug(...a); };
 //   • One-shot summary from the SW console:   fsStats()
 // ─────────────────────────────────────────────────────────────────────────────
 const FSDebug = (() => {
-    let enabled = true;                      // default ON
+    let enabled = false;                     // default OFF — enable via chrome.storage.local.set({__fsDebug:true})
     const startedAt = Date.now();
     const counts = { reads: 0, writes: 0, skips: 0, full: 0, progress: 0, playback: 0, anilist: 0, revalidate: 0 };
     const recent = [];                       // ring buffer for fsStats()
@@ -155,12 +155,6 @@ const FSDebug = (() => {
     return { read, write, skip, trigger, stats, isEnabled: () => enabled };
 })();
 try { globalThis.fsStats = () => FSDebug.stats(); } catch {}
-console.log(
-    '%c[FS]%c Firestore debug active — every read/write/skip logs here. ' +
-    'Run %cfsStats()%c for a summary · silence with %cchrome.storage.local.set({__fsDebug:false})',
-    'background:#16a34a;color:#fff;border-radius:3px;padding:1px 6px;font-weight:700', 'color:#94a3b8',
-    'color:#e2e8f0;font-weight:700', 'color:#94a3b8', 'color:#e2e8f0'
-);
 
 const COMPLETED_PERCENTAGE = 85;
 const DELETED_ANIME_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
