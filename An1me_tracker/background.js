@@ -78,7 +78,7 @@ const FSDebug = (() => {
         chrome.storage.onChanged.addListener((ch, ns) => {
             if (ns === 'local' && ch.__fsDebug && typeof ch.__fsDebug.newValue === 'boolean') {
                 enabled = ch.__fsDebug.newValue;
-                console.log(`%c[FS] debug ${enabled ? 'ON' : 'OFF'}`, 'color:#f59e0b;font-weight:700');
+                console.debug(`%c[FS] debug ${enabled ? 'ON' : 'OFF'}`, 'color:#f59e0b;font-weight:700');
             }
         });
     } catch {}
@@ -95,8 +95,8 @@ const FSDebug = (() => {
         if (!enabled) return;
         console.log(
             `%c[FS] READ #${counts.reads} ${kind}%c ${reason}  %c${tag()}`,
-            'background:#2563eb;color:#fff;border-radius:3px;padding:1px 6px;font-weight:700',
-            'color:#93c5fd', 'color:#64748b'
+            'background:#dc2626;color:#fff;border-radius:3px;padding:1px 6px;font-weight:700',
+            'color:#fca5a5', 'color:#64748b'
         );
     }
 
@@ -118,10 +118,10 @@ const FSDebug = (() => {
         counts.skips++;
         push({ t: Date.now(), op: 'SKIP', type, reason });
         if (!enabled) return;
-        console.log(
-            `%c[FS] skip ${type}%c ${reason} — cloud already up to date  %c${tag()}`,
+        console.debug(
+            `%c[FS] skip ${type}%c ${reason} — cloud already up to date`,
             'background:#475569;color:#fff;border-radius:3px;padding:1px 6px',
-            'color:#cbd5e1', 'color:#64748b'
+            'color:#cbd5e1'
         );
     }
 
@@ -131,7 +131,7 @@ const FSDebug = (() => {
     function trigger(label) {
         push({ t: Date.now(), op: 'TRIG', reason: label });
         if (!enabled) return;
-        console.log(
+        console.debug(
             `%c[FS] trigger%c ${label}`,
             'background:#7c3aed;color:#fff;border-radius:3px;padding:1px 6px;font-weight:700',
             'color:#c4b5fd'
@@ -146,15 +146,30 @@ const FSDebug = (() => {
         'UPDATE_BG_CLOUD_DOC_PARTIAL', 'BATCH_FETCH_ANIME_INFO', 'FETCH_ANIME_INFO',
         'START_LIBRARY_REPAIR', 'SET_SMART_NOTIFICATIONS'
     ]);
+    const msgLog = [];
+    let msgGroupPrinted = false;
+    const printMsgGroupOnce = () => {
+        if (msgGroupPrinted) return;
+        msgGroupPrinted = true;
+        const group = console.groupCollapsed || console.group || console.log;
+        group.call(
+            console,
+            '%c[FS] msg%c all messages (live)',
+            'background:#0891b2;color:#fff;border-radius:3px;padding:1px 6px;font-weight:700',
+            'color:#67e8f9;font-weight:700'
+        );
+        console.debug('Open this live array to inspect every msg:', msgLog);
+        console.groupEnd?.();
+    };
+    try { globalThis.fsMsgs = msgLog; } catch {}
+
     function msg(type, sender) {
         if (!enabled || !MSG_TYPES.has(type)) return;
         push({ t: Date.now(), op: 'MSG', reason: type });
         const from = sender?.url ? sender.url.split('/').pop() : (sender?.tab ? 'tab' : 'popup');
-        console.log(
-            `%c[FS] msg ←%c ${type} %c(${from})`,
-            'background:#0891b2;color:#fff;border-radius:3px;padding:1px 6px;font-weight:700',
-            'color:#67e8f9', 'color:#64748b'
-        );
+        msgLog.push({ at: new Date().toLocaleTimeString(), type, from });
+        if (msgLog.length > 250) msgLog.shift();
+        printMsgGroupOnce();
     }
 
     function stats() {
