@@ -238,9 +238,15 @@
             if (anilistStatus === 'RELEASING') {
                 shouldRevert = true;
             } else {
-                const totalCanon = AT.FillerService?.getTotalCanonEpisodes(lowerSlug, knownTotal) || knownTotal;
-                const canonWatched = AT.FillerService?.getCanonEpisodeCount(lowerSlug, anime.episodes) || watchedCount;
-                if (canonWatched < totalCanon) {
+                // Use the SAME progress calc that getStatus()/persistDetectedCompletions
+                // rely on, so repair and re-complete can never disagree. The old
+                // canon-only check used a different total (anilist) than
+                // calculateProgress (max(anilist, maxTracked)), so for anime with
+                // fillers + quirky numbering (e.g. Bleach) the two ping-ponged the
+                // completedAt/listStateUpdatedAt timestamps on every load — firing a
+                // full ~554KB Firestore sync each popup open.
+                const prog = AT.FillerService?.calculateProgress(watchedCount, slug, anime);
+                if (prog && prog.progress != null && prog.progress < 100) {
                     shouldRevert = true;
                 }
             }

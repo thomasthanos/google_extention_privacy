@@ -52,6 +52,116 @@ const BG_DEBUG = false;
 const dlog = (...a) => { if (BG_DEBUG) console.log(...a); };
 const ddebug = (...a) => { if (BG_DEBUG) console.debug(...a); };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Firestore activity debugger.
+// Logs every Firestore READ / WRITE (and every *skipped* no-op sync) to the
+// service-worker console, with the trigger reason and running session counters,
+// so you can see exactly what is hitting the database and why.
+//   • On by default. Silence with:   chrome.storage.local.set({ __fsDebug:false })
+//   • Re-enable with:                chrome.storage.local.set({ __fsDebug:true })
+//   • One-shot summary from the SW console:   fsStats()
+// ─────────────────────────────────────────────────────────────────────────────
+const FSDebug = (() => {
+    let enabled = true;                      // default ON
+    const startedAt = Date.now();
+    const counts = { reads: 0, writes: 0, skips: 0, full: 0, progress: 0, playback: 0, anilist: 0, revalidate: 0 };
+    const recent = [];                       // ring buffer for fsStats()
+
+    try {
+        chrome.storage.local.get(['__fsDebug']).then((r) => {
+            if (typeof r.__fsDebug === 'boolean') enabled = r.__fsDebug;
+        }).catch(() => {});
+        chrome.storage.onChanged.addListener((ch, ns) => {
+            if (ns === 'local' && ch.__fsDebug && typeof ch.__fsDebug.newValue === 'boolean') {
+                enabled = ch.__fsDebug.newValue;
+                console.log(`%c[FS] debug ${enabled ? 'ON' : 'OFF'}`, 'color:#f59e0b;font-weight:700');
+            }
+        });
+    } catch {}
+
+    const mins = () => Math.max(1 / 60, (Date.now() - startedAt) / 60000);
+    const tag = () =>
+        `Σ r=${counts.reads} w=${counts.writes} [full=${counts.full} prog=${counts.progress} pb=${counts.playback} ani=${counts.anilist}] skip=${counts.skips} · ${(counts.writes / mins()).toFixed(1)}w/min`;
+    const push = (e) => { recent.push(e); if (recent.length > 80) recent.shift(); };
+
+    function read(reason, kind = 'full') {
+        counts.reads++;
+        if (kind === 'revalidate') counts.revalidate++;
+        push({ t: Date.now(), op: 'READ', kind, reason });
+        if (!enabled) return;
+        console.log(
+            `%c[FS] READ #${counts.reads} ${kind}%c ${reason}  %c${tag()}`,
+            'background:#2563eb;color:#fff;border-radius:3px;padding:1px 6px;font-weight:700',
+            'color:#93c5fd', 'color:#64748b'
+        );
+    }
+
+    function write(type, reason, info = {}) {
+        counts.writes++;
+        if (counts[type] != null) counts[type]++;
+        push({ t: Date.now(), op: 'WRITE', type, reason, fields: info.fields, bytes: info.bytes });
+        if (!enabled) return;
+        const fields = info.fields ? ` [${info.fields.join(',')}]` : '';
+        const size = info.bytes != null ? ` ${(info.bytes / 1024).toFixed(1)}KB` : '';
+        console.log(
+            `%c[FS] WRITE #${counts.writes} ${type}%c ${reason}${fields}${size}  %c${tag()}`,
+            'background:#dc2626;color:#fff;border-radius:3px;padding:1px 6px;font-weight:700',
+            'color:#fca5a5', 'color:#64748b'
+        );
+    }
+
+    function skip(type, reason) {
+        counts.skips++;
+        push({ t: Date.now(), op: 'SKIP', type, reason });
+        if (!enabled) return;
+        console.log(
+            `%c[FS] skip ${type}%c ${reason} — cloud already up to date  %c${tag()}`,
+            'background:#475569;color:#fff;border-radius:3px;padding:1px 6px',
+            'color:#cbd5e1', 'color:#64748b'
+        );
+    }
+
+    // Trigger layer: a chrome.storage write (from any of the split modules) that
+    // *may* lead to a sync. Logs what changed and the decision, so you can trace
+    // a write back to whichever module/event caused it. Not counted as an op.
+    function trigger(label) {
+        push({ t: Date.now(), op: 'TRIG', reason: label });
+        if (!enabled) return;
+        console.log(
+            `%c[FS] trigger%c ${label}`,
+            'background:#7c3aed;color:#fff;border-radius:3px;padding:1px 6px;font-weight:700',
+            'color:#c4b5fd'
+        );
+    }
+
+    function stats() {
+        const summary = {
+            uptimeMin: +mins().toFixed(1),
+            reads: counts.reads, writes: counts.writes, skips: counts.skips,
+            byType: { full: counts.full, progress: counts.progress, playback: counts.playback, anilist: counts.anilist },
+            writesPerMin: +(counts.writes / mins()).toFixed(2)
+        };
+        try {
+            console.table(recent.slice(-40).map((e) => ({
+                at: new Date(e.t).toLocaleTimeString(),
+                op: e.op, type: e.type || e.kind || '', reason: e.reason || '',
+                fields: (e.fields || []).join(','), KB: e.bytes != null ? +(e.bytes / 1024).toFixed(1) : ''
+            })));
+        } catch {}
+        console.log('[FS] session summary:', summary);
+        return summary;
+    }
+
+    return { read, write, skip, trigger, stats, isEnabled: () => enabled };
+})();
+try { globalThis.fsStats = () => FSDebug.stats(); } catch {}
+console.log(
+    '%c[FS]%c Firestore debug active — every read/write/skip logs here. ' +
+    'Run %cfsStats()%c for a summary · silence with %cchrome.storage.local.set({__fsDebug:false})',
+    'background:#16a34a;color:#fff;border-radius:3px;padding:1px 6px;font-weight:700', 'color:#94a3b8',
+    'color:#e2e8f0;font-weight:700', 'color:#94a3b8', 'color:#e2e8f0'
+);
+
 const COMPLETED_PERCENTAGE = 85;
 const DELETED_ANIME_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_PROGRESS_ENTRIES = 200;
@@ -72,6 +182,11 @@ function stripFirebaseSilentAnimeMetadata(anime) {
     delete copy.nextEpisodeTimezone;
     delete copy.durationSeconds;
     delete copy.totalWatchTime;
+    // an1me.to watchlist bookkeeping — set by the watchlist reconcile/updateStatus
+    // flow, not user data. On its own it must not trigger a full Firestore sync
+    // (it piggybacks on the next real change), otherwise every drop/complete/hold
+    // status push costs a second cloud write.
+    delete copy.watchlistSyncedType;
 
     if (Array.isArray(copy.episodes)) {
         copy.episodes = copy.episodes.map((episode) => {
@@ -100,6 +215,37 @@ function areAnimeDataEqualIgnoringFetchMetadata(oldAnime = {}, newAnime = {}) {
         }
     }
     return true;
+}
+
+// Diagnostic: pinpoint WHAT changed between two animeData maps (ignoring the
+// silent fetch-metadata fields), so a full-sync trigger can name the exact
+// slug+field that flapped. Returns a short human string.
+function describeAnimeDataDiff(oldAnime = {}, newAnime = {}) {
+    const oldKeys = Object.keys(oldAnime || {});
+    const newKeys = Object.keys(newAnime || {});
+    const added = newKeys.filter((k) => !(k in oldAnime));
+    const removed = oldKeys.filter((k) => !(k in newAnime));
+    if (added.length) return `added ${added.length}: ${added.slice(0, 3).join(',')}`;
+    if (removed.length) return `removed ${removed.length}: ${removed.slice(0, 3).join(',')}`;
+
+    for (const slug of newKeys) {
+        const a = stripFirebaseSilentAnimeMetadata(oldAnime[slug]) || {};
+        const b = stripFirebaseSilentAnimeMetadata(newAnime[slug]) || {};
+        if (JSON.stringify(a) === JSON.stringify(b)) continue;
+        const fields = new Set([...Object.keys(a), ...Object.keys(b)]);
+        const diffs = [];
+        for (const f of fields) {
+            if (JSON.stringify(a[f]) === JSON.stringify(b[f])) continue;
+            if (f === 'episodes') {
+                diffs.push(`episodes ${(a.episodes || []).length}→${(b.episodes || []).length}`);
+            } else {
+                const av = JSON.stringify(a[f]); const bv = JSON.stringify(b[f]);
+                diffs.push(`${f}(${av && av.length < 24 ? av : '…'}→${bv && bv.length < 24 ? bv : '…'})`);
+            }
+        }
+        return `${slug}: ${diffs.join(', ')}`;
+    }
+    return 'key-order/count only';
 }
 
 
@@ -948,7 +1094,7 @@ const fromFSDoc = _fsCodec.decodeDoc || (() => null);
 let _fetchInFlightUid = null;
 let _fetchInFlightPromise = null;
 
-async function fetchCloudData(user, token) {
+async function fetchCloudData(user, token, reason = 'read') {
 
 
 
@@ -959,6 +1105,7 @@ async function fetchCloudData(user, token) {
 
     const fetchPromise = (async () => {
         try {
+            FSDebug.read(reason, 'full');
             const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
             const response = await fetchWithTimeout(url, { headers: { 'Authorization': `Bearer ${token}` } });
             if (response.status === 404) {
@@ -1040,7 +1187,7 @@ async function pollCloudData(reason = 'consumer-connected', { force = false } = 
             const pollAt = Date.now();
             _lastCloudPollAt = pollAt;
             persistBgPollState({ cloudPollAt: pollAt });
-            const cloudDoc = await fetchCloudData(user, token);
+            const cloudDoc = await fetchCloudData(user, token, `poll:${reason}`);
             if (cloudDoc) {
                 await applyCloudUpdate(cloudDoc);
             }
@@ -1140,8 +1287,9 @@ const _bgCacheStats = { fresh: 0, revalidated: 0, fullFetch: 0 };
 
 
 
-async function _revalidateCloudDocViaLastUpdated(user, token, cachedLastUpdated) {
+async function _revalidateCloudDocViaLastUpdated(user, token, cachedLastUpdated, reason = 'revalidate') {
     if (!user || !token || !cachedLastUpdated) return undefined;
+    FSDebug.read(reason, 'revalidate');
     const url = `${FIRESTORE_BASE}/documents/users/${user.uid}?mask.fieldPaths=lastUpdated`;
     let response;
     try {
@@ -1165,7 +1313,7 @@ async function _revalidateCloudDocViaLastUpdated(user, token, cachedLastUpdated)
     return decoded?.lastUpdated || null;
 }
 
-async function fetchCloudDataCached(user, token) {
+async function fetchCloudDataCached(user, token, reason = 'cache') {
     await hydrateBgCloudDocCache();
     const now = Date.now();
 
@@ -1191,7 +1339,7 @@ async function fetchCloudDataCached(user, token) {
         await _isCacheShortCircuitEnabledBg()
     ) {
         try {
-            const cloudLastUpdated = await _revalidateCloudDocViaLastUpdated(user, token, _bgCloudDocCache.lastUpdated);
+            const cloudLastUpdated = await _revalidateCloudDocViaLastUpdated(user, token, _bgCloudDocCache.lastUpdated, reason);
             if (cloudLastUpdated && cloudLastUpdated === _bgCloudDocCache.lastUpdated) {
                 _bgCloudDocCacheTime = Date.now();
                 bgStorageSet({
@@ -1213,7 +1361,7 @@ async function fetchCloudDataCached(user, token) {
 
     let doc = null;
     try {
-        doc = await fetchCloudData(user, token);
+        doc = await fetchCloudData(user, token, reason);
     } catch (e) {
 
 
@@ -1251,7 +1399,7 @@ function enqueueFirestoreWrite(fn) {
     return next;
 }
 
-async function syncProgressOnly() {
+async function syncProgressOnly(reason = 'progress') {
     if (progressSyncInProgress) { progressSyncPending = true; return; }
 
     const user = await getFirebaseUser();
@@ -1264,7 +1412,7 @@ async function syncProgressOnly() {
         const result = await bgStorageGet(['videoProgress', 'animeData', 'deletedAnime']);
         let localVP = result.videoProgress || {};
 
-        if (lastPushedProgressBG && areProgressMapsEqual(localVP, lastPushedProgressBG)) return;
+        if (lastPushedProgressBG && areProgressMapsEqual(localVP, lastPushedProgressBG)) { FSDebug.skip('progress', `${reason}/local==pushed`); return; }
 
         localVP = cleanTrackedProgressBg(result.animeData || {}, localVP, result.deletedAnime || {});
 
@@ -1275,9 +1423,11 @@ async function syncProgressOnly() {
 
 
         let mergedVP = localVP;
+        let cloudVP = null;
         try {
-            const cloudDoc = await fetchCloudDataCached(user, token);
+            const cloudDoc = await fetchCloudDataCached(user, token, `prog:${reason}`);
             if (cloudDoc?.videoProgress) {
+                cloudVP = cloudDoc.videoProgress;
                 mergedVP = mergeVideoProgress(localVP, cloudDoc.videoProgress);
 
 
@@ -1297,25 +1447,35 @@ async function syncProgressOnly() {
             await bgStorageSet({ videoProgress: mergedVP });
         }
 
+        // Skip the cloud PATCH when the cloud copy already matches. The
+        // lastPushedProgressBG guard below is in-memory only and resets on every
+        // service-worker restart, so without this a redundant progress write fires
+        // after each restart (e.g. each extension reload) even though nothing changed.
+        if (cloudVP !== null && areProgressMapsEqual(mergedVP, cloudVP)) {
+            lastPushedProgressBG = structuredClone(mergedVP);
+            FSDebug.skip('progress', `${reason}/cloud==merged`);
+            return;
+        }
 
-
-        if (lastPushedProgressBG && areProgressMapsEqual(mergedVP, lastPushedProgressBG)) return;
+        if (lastPushedProgressBG && areProgressMapsEqual(mergedVP, lastPushedProgressBG)) { FSDebug.skip('progress', `${reason}/merged==pushed`); return; }
 
         const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         const fieldMask = 'updateMask.fieldPaths=videoProgress&updateMask.fieldPaths=lastUpdated';
         const pushedAt = new Date().toISOString();
+        const _body = JSON.stringify({
+            fields: jsonToFirestoreFields({
+                videoProgress: mergedVP,
+                lastUpdated: pushedAt
+            })
+        });
         const response = await fetchWithTimeout(`${url}?${fieldMask}`, {
             method: 'PATCH',
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                fields: jsonToFirestoreFields({
-                    videoProgress: mergedVP,
-                    lastUpdated: pushedAt
-                })
-            })
+            body: _body
         });
 
         if (response.ok) {
+            FSDebug.write('progress', reason, { fields: ['videoProgress'], bytes: _body.length });
             lastPushedProgressBG = structuredClone(mergedVP);
 
 
@@ -1406,7 +1566,7 @@ async function syncProgressOnly() {
     }
 }
 
-async function syncToFirebase() {
+async function syncToFirebase(reason = 'sync') {
     if (syncInProgress) { pendingSync = true; return; }
 
     const user = await getFirebaseUser();
@@ -1417,7 +1577,7 @@ async function syncToFirebase() {
     syncInProgress = true;
     try {
         await enqueueFirestoreWrite(async () => {
-        const cloudDoc = await fetchCloudDataCached(user, token);
+        const cloudDoc = await fetchCloudDataCached(user, token, reason);
 
         const result = await bgStorageGet(['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages']);
         const localAnime = result.animeData || {};
@@ -1466,15 +1626,17 @@ async function syncToFirebase() {
         const cloudProgressRef = cloudDoc?.videoProgress || {};
         const cloudDeletedRef = cloudDoc?.deletedAnime || {};
         const cloudGroupRef = cloudDoc?.groupCoverImages || {};
-        const needsCloudWrite =
-            !areAnimeDataMapsEqual(mergedAnime, cloudAnimeRef) ||
-            !areProgressMapsEqual(mergedProgress, cloudProgressRef) ||
-            !shallowEqualDeletedAnime(mergedDeleted, cloudDeletedRef) ||
-            !shallowEqualObjectMap(mergedGroup, cloudGroupRef);
+        const _changedFields = [];
+        if (!areAnimeDataMapsEqual(mergedAnime, cloudAnimeRef)) _changedFields.push('animeData');
+        if (!areProgressMapsEqual(mergedProgress, cloudProgressRef)) _changedFields.push('videoProgress');
+        if (!shallowEqualDeletedAnime(mergedDeleted, cloudDeletedRef)) _changedFields.push('deletedAnime');
+        if (!shallowEqualObjectMap(mergedGroup, cloudGroupRef)) _changedFields.push('groupCoverImages');
+        const needsCloudWrite = _changedFields.length > 0;
 
         if (!needsCloudWrite) {
             _bgCloudDocCacheTime = Date.now();
             _bgCloudDocCacheUid = user.uid;
+            FSDebug.skip('full', reason);
             return;
         }
 
@@ -1495,15 +1657,17 @@ async function syncToFirebase() {
         };
         if (shouldWriteEmail) payloadFields.email = user.email;
 
+        const _body = JSON.stringify({
+            fields: jsonToFirestoreFields(payloadFields)
+        });
         const response = await fetchWithTimeout(`${url}?${fieldMask}`, {
             method: 'PATCH',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                fields: jsonToFirestoreFields(payloadFields)
-            })
+            body: _body
         });
 
         if (response.ok) {
+            FSDebug.write('full', reason, { fields: _changedFields, bytes: _body.length });
 
 
 
@@ -1910,7 +2074,7 @@ async function flushPendingProgressSync() {
     let cleared = false;
     try { cleared = await chrome.alarms.clear(PROGRESS_SYNC_ALARM); } catch {}
     if (cleared && !syncDebounceTimeout && !syncInProgress) {
-        syncProgressOnly().catch(() => {});
+        syncProgressOnly('flush').catch(() => {});
     }
     return cleared;
 }
@@ -1936,6 +2100,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
     let _pendingProgressSync = false;
     let _pendingFullSync = false;
+    let _animeDiffDetail = null;
 
     if (changes.videoProgress && !isSyncPaused()) {
         _pendingProgressSync = true;
@@ -1949,6 +2114,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         const newCount = Object.values(newAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
 
         const libraryChanged = !areAnimeDataEqualIgnoringFetchMetadata(oldAnime, newAnime);
+        if (libraryChanged) _animeDiffDetail = describeAnimeDataDiff(oldAnime, newAnime);
 
         if (newCount > oldCount || libraryChanged) {
             if (newCount > oldCount) {
@@ -1984,12 +2150,24 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         chrome.alarms.clear(PROGRESS_SYNC_ALARM).catch(() => {});
         if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
         markSyncPending();
-        syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 5000);
+        syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase('onChanged:library'); }, 5000);
     } else if (_pendingProgressSync) {
 
 
 
         chrome.alarms.create(PROGRESS_SYNC_ALARM, { delayInMinutes: 5 });
+    }
+
+    // Trace which storage write (from any split module) reached the sync layer and
+    // what was decided — so a noisy writer can be spotted even if it ends in no-op.
+    const _changedSyncKeys = ['videoProgress', 'animeData', 'deletedAnime', 'groupCoverImages']
+        .filter((k) => changes[k]);
+    if (_changedSyncKeys.length) {
+        const decision = isSyncPaused() ? 'paused (self-write echo)'
+            : _pendingFullSync ? 'full-sync queued (5s)'
+            : _pendingProgressSync ? 'progress-sync queued (5min)'
+            : 'no-op (fetch-metadata only / no real change)';
+        FSDebug.trigger(`onChanged [${_changedSyncKeys.join(',')}] → ${decision}${_animeDiffDetail ? ` · diff=${_animeDiffDetail}` : ''}`);
     }
 
     if (changes.animeData) {
@@ -2179,8 +2357,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ received: true });
         if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
         markSyncPending();
-        syncToFirebase();
-        syncProgressOnly();
+        syncToFirebase('msg:immediate');
+        syncProgressOnly('msg:immediate');
         return true;
     }
 
@@ -2218,6 +2396,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                     })
                 });
                 if (res.ok) {
+                    FSDebug.write('playback', 'push-playback-settings', { fields: ['playbackSettings'] });
                     if (_bgCloudDocCache && _bgCloudDocCacheUid === user.uid) {
                         _bgCloudDocCache.playbackSettings = message.playbackSettings;
                         _bgCloudDocCacheTime = Date.now();
@@ -2258,6 +2437,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                     })
                 });
                 if (res.ok) {
+                    FSDebug.write('anilist', 'push-anilist-auth', { fields: ['anilistAuth'] });
                     if (_bgCloudDocCache && _bgCloudDocCacheUid === user.uid) {
                         _bgCloudDocCache.anilistAuth = message.anilistAuth;
                         _bgCloudDocCacheTime = Date.now();
@@ -2281,7 +2461,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ received: true });
         if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
         markSyncPending();
-        syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase(); }, 500);
+        syncDebounceTimeout = setTimeout(() => { syncDebounceTimeout = null; syncToFirebase('msg:sync'); }, 500);
         return true;
     }
 
@@ -2311,7 +2491,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             const sinceLast = Date.now() - _lastProgressSyncAt;
             if (_lastProgressSyncAt && sinceLast < 4 * 60 * 1000) return;
             try { await chrome.alarms.clear(PROGRESS_SYNC_ALARM); } catch {}
-            syncProgressOnly();
+            syncProgressOnly('msg:progress-only');
         })();
         return true;
     }
@@ -2788,7 +2968,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
     if (alarm.name === PROGRESS_SYNC_ALARM) {
         if (syncDebounceTimeout || syncInProgress) return;
-        syncProgressOnly();
+        syncProgressOnly('alarm:progress');
         return;
     }
 
@@ -2801,13 +2981,13 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 
         markSyncPending();
-        syncToFirebase();
+        syncToFirebase('alarm:full-retry');
         return;
     }
 
     if (alarm.name === PROGRESS_SYNC_RETRY_ALARM) {
         if (progressSyncInProgress) return;
-        syncProgressOnly();
+        syncProgressOnly('alarm:progress-retry');
         return;
     }
 
@@ -2869,7 +3049,7 @@ ensureDailyCleanupAlarmScheduled();
         const ts = Number(stored?.[PENDING_SYNC_KEY]) || 0;
         if (!ts) return;
         dlog('[BG] Recovering stranded sync from previous SW incarnation');
-        syncToFirebase();
+        syncToFirebase('recovery:stranded');
     } catch (e) {
         console.warn('[BG] Pending-sync recovery check failed:', e);
     }
