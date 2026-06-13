@@ -3,9 +3,22 @@
 
 const METADATA_REPAIR_STATE_KEY = 'metadataRepairState';
 const PENDING_METADATA_REPAIR_KEY = 'pendingBackgroundMetadataRepair';
+// Slugs queued for a *targeted* repair (e.g. anime just added to the library).
+// When this list is non-empty the next repair only touches these slugs instead
+// of sweeping the whole library.
+const PENDING_REPAIR_SLUGS_KEY = 'pendingRepairSlugs';
+// Timestamp of the last *full* library sweep, used to throttle them.
+const META_LAST_RUN_KEY = 'metadataRepairLastRunAt';
+// A full library sweep is expensive, so never run two within this window. Only
+// the post-update sweep and explicit user "Refresh all" should ever need one.
+const META_REPAIR_GATE_MS = 6 * 60 * 60 * 1000;
 const METADATA_REPAIR_ALARM = 'metadataRepairTick';
 const METADATA_REPAIR_INFO_TTL_MS = 24 * 60 * 60 * 1000;
-const METADATA_REPAIR_INFO_TTL_AIRING_MS = 60 * 60 * 1000;
+// Airing shows still get fresher treatment than finished ones, but 1h was far
+// too aggressive: every sweep re-fetched every releasing title. The dedicated
+// smart-notifications job already polls airing anime on its own tight cadence,
+// so the generic repair only needs a loose ceiling here.
+const METADATA_REPAIR_INFO_TTL_AIRING_MS = 6 * 60 * 60 * 1000;
 const METADATA_REPAIR_EPISODE_TYPES_TTL_MS = 24 * 60 * 60 * 1000;
 const METADATA_REPAIR_NOT_FOUND_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 const METADATA_REPAIR_RETRYABLE_TTL_MS = 15 * 60 * 1000;
@@ -160,7 +173,13 @@ async function buildLibraryRepairPlan(animeData, options = {}) {
     const forceInfoRefresh = options.forceInfoRefresh === true;
     const forceFillerRefresh = options.forceFillerRefresh === true;
     const isMobile = options.isMobile === true || isMobileUA;
-    const entries = Object.entries(animeData || {});
+    // When a specific set of slugs is requested (a targeted repair) restrict the
+    // plan to just those entries instead of scanning the whole library.
+    const onlySlugs = Array.isArray(options.onlySlugs) && options.onlySlugs.length
+        ? new Set(options.onlySlugs)
+        : null;
+    const entries = Object.entries(animeData || {})
+        .filter(([slug]) => !onlySlugs || onlySlugs.has(slug));
     const storageKeys = [];
 
     entries.forEach(([slug]) => {
@@ -336,7 +355,7 @@ async function finalizeMetadataRepair(state, patch = {}) {
 
     // If there is a pending repair (e.g. from an anime added during this run), trigger it once this loop completes.
     setTimeout(() => {
-        maybeStartPendingMetadataRepair(true).catch((error) => {
+        maybeStartPendingMetadataRepair().catch((error) => {
             console.error('[BG] Failed to trigger pending repair after finalization:', error);
         });
     }, 100);
@@ -471,6 +490,8 @@ async function runMetadataRepairBatch(options = {}) {
 }
 
 async function startLibraryRepair(options = {}) {
+    const isTargeted = Array.isArray(options.onlySlugs) && options.onlySlugs.length > 0;
+
     const existing = await getMetadataRepairState();
     if (existing?.status === 'running') {
         // If already running, mark the pending flag as true so that it starts a new sweep
@@ -483,7 +504,26 @@ async function startLibraryRepair(options = {}) {
         return existing;
     }
 
+    // Automatic full sweeps (e.g. the catch-up fired on every sign-in / popup
+    // open) are throttled so they can't re-scrape the whole library each time.
+    // User-initiated sweeps (options.auto !== true) and targeted repairs bypass.
+    if (options.auto === true && !isTargeted) {
+        try {
+            const gateRead = await bgStorageGet([META_LAST_RUN_KEY]);
+            const lastRun = Number(gateRead[META_LAST_RUN_KEY]) || 0;
+            if (lastRun > 0 && (Date.now() - lastRun) < META_REPAIR_GATE_MS) {
+                return { status: 'throttled', throttled: true, total: 0 };
+            }
+        } catch {                                                       }
+    }
+
     await bgStorageSet({ [PENDING_METADATA_REPAIR_KEY]: false });
+
+    // Stamp the throttle as soon as a full (non-targeted) sweep commits to
+    // running, so every later automatic sweep is gated against this one.
+    if (!isTargeted) {
+        try { await bgStorageSet({ [META_LAST_RUN_KEY]: Date.now() }); } catch {                   }
+    }
 
     const stored = await bgStorageGet(['animeData']);
     const animeData = stored.animeData || {};
@@ -534,32 +574,69 @@ async function startLibraryRepair(options = {}) {
     return state;
 }
 
-async function maybeStartPendingMetadataRepair(force = false) {
-    const stored = await bgStorageGet([PENDING_METADATA_REPAIR_KEY]);
+// Queue a targeted repair for specific slugs (e.g. anime just added). The slugs
+// are accumulated so a burst of additions coalesces into a single run, and the
+// pending flag is flipped to drive maybeStartPendingMetadataRepair().
+async function queueTargetedMetadataRepair(slugs) {
+    const list = (Array.isArray(slugs) ? slugs : []).filter(Boolean);
+    if (list.length === 0) return;
+
+    const stored = await bgStorageGet([PENDING_REPAIR_SLUGS_KEY]);
+    const existing = Array.isArray(stored[PENDING_REPAIR_SLUGS_KEY])
+        ? stored[PENDING_REPAIR_SLUGS_KEY]
+        : [];
+    const merged = Array.from(new Set([...existing, ...list]));
+
+    await bgStorageSet({
+        [PENDING_REPAIR_SLUGS_KEY]: merged,
+        [PENDING_METADATA_REPAIR_KEY]: true
+    });
+}
+
+async function maybeStartPendingMetadataRepair() {
+    const stored = await bgStorageGet([PENDING_METADATA_REPAIR_KEY, PENDING_REPAIR_SLUGS_KEY]);
     if (!stored[PENDING_METADATA_REPAIR_KEY]) return false;
 
+    const targetedSlugs = Array.isArray(stored[PENDING_REPAIR_SLUGS_KEY])
+        ? stored[PENDING_REPAIR_SLUGS_KEY].filter(Boolean)
+        : [];
+    const isTargeted = targetedSlugs.length > 0;
 
-    const META_LAST_RUN_KEY = 'metadataRepairLastRunAt';
-    const META_REPAIR_GATE_MS = 6 * 60 * 60 * 1000;
-    try {
-        const gateRead = await bgStorageGet([META_LAST_RUN_KEY]);
-        const lastRun = Number(gateRead[META_LAST_RUN_KEY]) || 0;
-        const existingState = await getMetadataRepairState();
-        const isIdle = !existingState || existingState.status !== 'running';
-        if (!force && isIdle && lastRun > 0 && (Date.now() - lastRun) < META_REPAIR_GATE_MS) {
+    const existingState = await getMetadataRepairState();
+    const isRunning = existingState && existingState.status === 'running';
 
-
-            await bgStorageSet({ [PENDING_METADATA_REPAIR_KEY]: false });
-            return false;
-        }
-    } catch {                                                       }
+    // A *full* library sweep is throttled hard: never run two within the gate
+    // window. (Post-update and explicit "Refresh all" are the only things that
+    // should ever need one.) A *targeted* repair of just-added anime is cheap and
+    // intentional, so it skips the long gate. Either way, if a run is already in
+    // flight we simply let startLibraryRepair coalesce the request.
+    if (!isRunning && !isTargeted) {
+        try {
+            const gateRead = await bgStorageGet([META_LAST_RUN_KEY]);
+            const lastRun = Number(gateRead[META_LAST_RUN_KEY]) || 0;
+            if (lastRun > 0 && (Date.now() - lastRun) < META_REPAIR_GATE_MS) {
+                // Too soon for another full sweep — drop the request; the cache is
+                // still fresh enough.
+                await bgStorageSet({ [PENDING_METADATA_REPAIR_KEY]: false });
+                return false;
+            }
+        } catch {                                                       }
+    }
 
     await startLibraryRepair({
         forceInfoRefresh: false,
-        forceFillerRefresh: false
+        forceFillerRefresh: false,
+        onlySlugs: isTargeted ? targetedSlugs : null
     });
+    // (startLibraryRepair stamps the full-sweep throttle itself when a full run
+    // actually starts.)
 
-    try { await bgStorageSet({ [META_LAST_RUN_KEY]: Date.now() }); } catch {                   }
+    // Consume the queued slugs once we've actually kicked a targeted run off. If
+    // a run was already in flight, startLibraryRepair only marked a follow-up, so
+    // we keep the slugs queued for it.
+    if (!isRunning && isTargeted) {
+        try { await bgStorageSet({ [PENDING_REPAIR_SLUGS_KEY]: [] }); } catch {                   }
+    }
     return true;
 }
 

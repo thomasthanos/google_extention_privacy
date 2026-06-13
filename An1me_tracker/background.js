@@ -1995,28 +1995,22 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     if (changes.animeData) {
         const oldAnime = changes.animeData.oldValue || {};
         const newAnime = changes.animeData.newValue || {};
-        const oldSlugs = Object.keys(oldAnime);
-        const newSlugs = Object.keys(newAnime);
-        const hasNewSlug = newSlugs.some(s => !oldSlugs.includes(s));
+        const oldSlugs = new Set(Object.keys(oldAnime));
+        const newlyAdded = Object.keys(newAnime).filter(s => !oldSlugs.has(s));
 
-        if (hasNewSlug) {
-            bgStorageSet({ pendingBackgroundMetadataRepair: true }).catch((error) => {
-                console.error('[BG] Failed to trigger repair for new anime:', error);
-            });
-        } else {
-            maybeStartPendingMetadataRepair().catch((error) => {
-                console.error('[BG] Failed to honor pending repair request:', error);
+        // Only the just-added anime need fetching — queue a *targeted* repair
+        // rather than sweeping (and re-fetching) the entire library.
+        if (newlyAdded.length > 0) {
+            queueTargetedMetadataRepair(newlyAdded).catch((error) => {
+                console.error('[BG] Failed to queue repair for new anime:', error);
             });
         }
     }
 
 
 
-
-
-
     if (changes.pendingBackgroundMetadataRepair?.newValue === true) {
-        maybeStartPendingMetadataRepair(true).catch((error) => {
+        maybeStartPendingMetadataRepair().catch((error) => {
             console.error('[BG] Failed to start pending repair on flag flip:', error);
         });
     }
@@ -2625,7 +2619,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         startLibraryRepair({
             forceInfoRefresh: message.forceInfoRefresh === true,
             forceFillerRefresh: message.forceFillerRefresh === true,
-            isMobile: message.isMobile === true
+            isMobile: message.isMobile === true,
+            // Automatic catch-up sweeps (e.g. on sign-in) pass auto:true so they're
+            // throttled; explicit user "Refresh all" omits it and always runs.
+            auto: message.auto === true
         })
             .then((state) => sendResponse({ success: true, state }))
             .catch((error) => sendResponse({ success: false, error: error.message }));
@@ -2721,7 +2718,10 @@ chrome.runtime.onInstalled.addListener((details) => {
 
         bgStorageGet(['postUpdateFetchTriggeredAt']).then((existing) => {
             const payload = {
-                pendingBackgroundMetadataRepair: true
+                pendingBackgroundMetadataRepair: true,
+                // Empty list => treat the post-update repair as a full library
+                // sweep (subject to the 6h throttle), not a targeted one.
+                pendingRepairSlugs: []
             };
             if (!existing.postUpdateFetchTriggeredAt) {
                 payload.postUpdateFetchTriggeredAt = Date.now();

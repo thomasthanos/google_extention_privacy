@@ -785,7 +785,11 @@ const AnilistService = {
     cache: {},
 
     CACHE_TTL: 24 * 60 * 60 * 1000,
-    CACHE_TTL_AIRING: 60 * 60 * 1000,
+    // Airing shows refresh more often than finished ones, but 1h made the popup
+    // re-scrape every releasing title on basically every open. Kept in sync with
+    // the background metadata-repair airing TTL; smart-notifications handles the
+    // tight "new episode just dropped" polling on top of this.
+    CACHE_TTL_AIRING: 6 * 60 * 60 * 1000,
     CACHE_TTL_NOT_FOUND: 3 * 24 * 60 * 60 * 1000,
     CACHE_TTL_RETRYABLE: 15 * 60 * 1000,
 

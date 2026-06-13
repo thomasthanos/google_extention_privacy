@@ -1196,8 +1196,9 @@
         }
     }
 
-    async function refreshPopupCloudData(forceFresh = false) {
+    async function refreshPopupCloudData(forceFresh = false, options = {}) {
         if (!AT?.FirebaseSync?.getUser?.()) return;
+        const { skipAutoFetch = false } = options;
         if (forceFresh) {
             try { AT.FirebaseSync.clearCachedUserDocument(); } catch {}
         }
@@ -1206,7 +1207,7 @@
         } catch (e) {
             PopupLogger.debug('Sync', 'Failed to dispatch bg cloud poll request:', e);
         }
-        await loadAndSyncData();
+        await loadAndSyncData({ skipAutoFetch });
     }
 
     function stopPopupCloudRefresh() {
@@ -1221,7 +1222,10 @@
         if (document.hidden || !AT?.FirebaseSync?.getUser?.()) return;
 
         popupCloudRefreshTimer = setInterval(() => {
-            refreshPopupCloudData(false).catch((error) => {
+            // The periodic heartbeat only pulls cloud (Firebase) data — it must not
+            // re-scrape an1me.to metadata. Metadata catch-up runs on explicit
+            // open/login and via the throttled background repair instead.
+            refreshPopupCloudData(false, { skipAutoFetch: true }).catch((error) => {
                 PopupLogger.debug('Sync', 'Background popup refresh skipped:', error?.message || error);
             });
         }, POPUP_CLOUD_REFRESH_MS);
@@ -2292,7 +2296,10 @@
                         type: 'START_LIBRARY_REPAIR',
                         forceInfoRefresh: false,
                         forceFillerRefresh: false,
-                        isMobile: !detectHasGoogleAuth()
+                        isMobile: !detectHasGoogleAuth(),
+                        // Sign-in fires on every popup open while logged in, so this
+                        // catch-up sweep must be throttled (6h) — not run each time.
+                        auto: true
                     }, (response) => {
                         const err = chrome.runtime.lastError;
                         if (err) {
