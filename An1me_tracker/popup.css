@@ -710,12 +710,15 @@ body {
 .app.stats-mode .anime-list,
 .app.stats-mode .toolbar,
 .app.stats-mode .empty-state,
+.app.stats-mode .search-empty,
 .app.goals-mode .anime-list,
 .app.goals-mode .toolbar,
 .app.goals-mode .empty-state,
+.app.goals-mode .search-empty,
 .app.settings-mode .anime-list,
 .app.settings-mode .toolbar,
 .app.settings-mode .empty-state,
+.app.settings-mode .search-empty,
 .app.settings-mode .category-tabs,
 .app.settings-mode #statsBar {
   display: none !important
@@ -3018,6 +3021,51 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 .empty-state-tips strong {
   color: var(--t1);
   font-weight: 600;
+}
+
+.search-empty {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+  padding: 36px 24px;
+  flex: 1
+}
+
+.search-empty.visible {
+  display: flex
+}
+
+.search-empty-icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--ink-rgb), 0.04);
+  border: 1px solid var(--b1);
+  border-radius: 50%;
+  color: var(--t2)
+}
+
+.search-empty-icon svg {
+  width: 20px;
+  height: 20px
+}
+
+.search-empty-text {
+  font-size: 12.5px;
+  color: var(--t2);
+  max-width: 240px;
+  line-height: 1.5;
+  margin: 0
+}
+
+.search-empty-text strong {
+  color: var(--t1);
+  font-weight: 600
 }
 
 .footer {

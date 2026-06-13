@@ -292,6 +292,8 @@
 
         animeList: document.getElementById('animeList'),
         emptyState: document.getElementById('emptyState'),
+        searchEmptyState: document.getElementById('searchEmptyState'),
+        searchEmptyQuery: document.getElementById('searchEmptyQuery'),
         searchInput: document.getElementById('searchInput'),
         totalAnime: document.getElementById('totalAnime'),
         totalMovies: document.getElementById('totalMovies'),

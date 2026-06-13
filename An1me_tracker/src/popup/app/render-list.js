@@ -254,11 +254,19 @@
                 elements.animeList.replaceChildren();
                 AT.PopupState.lastRenderedListMarkup = '';
             }
-            elements.emptyState.classList.add('visible');
+            if (filter) {
+                if (elements.searchEmptyQuery) elements.searchEmptyQuery.textContent = `“${filter}”`;
+                elements.searchEmptyState?.classList.add('visible');
+                elements.emptyState.classList.remove('visible');
+            } else {
+                elements.emptyState.classList.add('visible');
+                elements.searchEmptyState?.classList.remove('visible');
+            }
             return;
         }
 
         elements.emptyState.classList.remove('visible');
+        elements.searchEmptyState?.classList.remove('visible');
 
         const latestMap = buildLatestActivityMap(entries, AT.PopupState.videoProgress);
 
