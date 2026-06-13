@@ -2169,6 +2169,18 @@
         }
 
         try {
+            const { cachedStats } = await Storage.get(['cachedStats']);
+            if (cachedStats) {
+                if (cachedStats.totalAnime != null) setTopStatValue(elements.totalAnime, cachedStats.totalAnime);
+                if (cachedStats.totalMovies != null) setTopStatValue(elements.totalMovies, cachedStats.totalMovies);
+                if (cachedStats.totalEpisodes != null) setTopStatValue(elements.totalEpisodes, cachedStats.totalEpisodes);
+                if (cachedStats.totalTime != null) setTopStatValue(elements.totalTime, cachedStats.totalTime);
+            }
+        } catch (e) {
+            PopupLogger.debug('Init', 'Could not prime cached stats:', e);
+        }
+
+        try {
             const manifest = chrome.runtime.getManifest();
             if (manifest?.version) {
                 if (elements.versionText) elements.versionText.textContent = `Anime Tracker v${manifest.version}`;
