@@ -703,6 +703,48 @@
         return changedAny ? out : animeData;
     }
 
+    // ── Cloud wire codec ─────────────────────────────────────────────────────
+    // To shrink the Firestore doc, episode objects are stored with SHORT keys on
+    // the wire (number→n, watchedAt→w, duration→d, durationSource→s). Everything
+    // in memory / local storage keeps the FULL keys, so no reader changes are
+    // needed — we only encode right before the PATCH and decode right after read.
+    // Values are preserved unchanged (no precision loss), so an encode→decode
+    // round-trip is identity → it never produces a false "changed" diff.
+    function encodeEpisodeForCloud(ep) {
+        if (!ep || typeof ep !== 'object') return ep;
+        const { number, watchedAt, duration, durationSource, ...rest } = ep;
+        const out = { ...rest };
+        if (number !== undefined) out.n = number;
+        if (watchedAt !== undefined) out.w = watchedAt;
+        if (duration !== undefined) out.d = duration;
+        // 'video' is the implicit default and isn't stored.
+        if (durationSource !== undefined && durationSource !== 'video') out.s = durationSource;
+        return out;
+    }
+    function decodeEpisodeFromCloud(ep) {
+        if (!ep || typeof ep !== 'object') return ep;
+        // Old cloud data has full keys and no short keys → pass through untouched.
+        if (!('n' in ep) && !('w' in ep) && !('d' in ep) && !('s' in ep)) return ep;
+        const { n, w, d, s, ...rest } = ep;
+        const out = { ...rest };
+        if (n !== undefined) out.number = n;
+        if (w !== undefined) out.watchedAt = w;
+        if (d !== undefined) out.duration = d;
+        if (s !== undefined) out.durationSource = s;
+        return out;
+    }
+    function mapEpisodes(animeData, fn) {
+        if (!animeData || typeof animeData !== 'object') return animeData;
+        const out = {};
+        for (const [slug, entry] of Object.entries(animeData)) {
+            if (!entry || !Array.isArray(entry.episodes)) { out[slug] = entry; continue; }
+            out[slug] = { ...entry, episodes: entry.episodes.map(fn) };
+        }
+        return out;
+    }
+    function encodeEpisodesForCloud(animeData) { return mapEpisodes(animeData, encodeEpisodeForCloud); }
+    function decodeEpisodesFromCloud(animeData) { return mapEpisodes(animeData, decodeEpisodeFromCloud); }
+
     const root = typeof globalThis !== 'undefined' ? globalThis : self;
     const exports = {
         mergeVideoProgress,
@@ -722,6 +764,8 @@
         isPlaceholderDuration,
         stripAutoRepairedEpisodesFromMap,
         stripEpisodeDefaultsFromMap,
+        encodeEpisodesForCloud,
+        decodeEpisodesFromCloud,
         PLACEHOLDER_DURATION_VALUES
     };
     root.AnimeTrackerMergeUtils = exports;

@@ -49,6 +49,8 @@ const stripAutoRepairedEpisodesFromMap = sharedMergeUtils.stripAutoRepairedEpiso
     || ((m) => m);
 const stripEpisodeDefaultsFromMap = sharedMergeUtils.stripEpisodeDefaultsFromMap
     || ((m) => m);
+const encodeEpisodesForCloud = sharedMergeUtils.encodeEpisodesForCloud || ((m) => m);
+const decodeEpisodesFromCloud = sharedMergeUtils.decodeEpisodesFromCloud || ((m) => m);
 
 const BG_DEBUG = false;
 const dlog = (...a) => { if (BG_DEBUG) console.log(...a); };
@@ -1123,7 +1125,11 @@ async function fetchCloudData(user, token, reason = 'read') {
                 err.body = body;
                 throw err;
             }
-            return fromFSDoc(await response.json());
+            const doc = fromFSDoc(await response.json());
+            // Expand short episode keys (n/w/d/s) back to full keys so the rest of
+            // the app sees the normal shape. Old full-key docs pass through untouched.
+            if (doc && doc.animeData) doc.animeData = decodeEpisodesFromCloud(doc.animeData);
+            return doc;
         } catch (e) {
 
 
@@ -1660,8 +1666,12 @@ async function syncToFirebase(reason = 'sync') {
         };
         if (shouldWriteEmail) payloadFields.email = user.email;
 
+        // Encode episodes with short keys ONLY for the wire (the stored Firestore
+        // doc). The cache update below keeps the full-key `payloadFields` so all
+        // in-memory comparisons stay consistent with local storage.
+        const wireFields = { ...payloadFields, animeData: encodeEpisodesForCloud(mergedAnime) };
         const _body = JSON.stringify({
-            fields: jsonToFirestoreFields(payloadFields)
+            fields: jsonToFirestoreFields(wireFields)
         });
         const response = await fetchWithTimeout(`${url}?${fieldMask}`, {
             method: 'PATCH',
