@@ -1093,20 +1093,6 @@
         const repairState = await syncMetadataRepairStateFromStorage();
         const repairRunning = repairState?.status === 'running';
 
-        // After AniList/An1me info lands, re-run the airing repair so any anime that
-        // was marked completed before its release status was known flips to Airing in
-        // THIS session — instead of only on the next reload.
-        const reconcileAndRefresh = () => {
-            let changed = repairAiringCompletedEntries(animeData);
-            if (persistDetectedCompletions(animeData)) changed = true;
-            if (changed) {
-                const payload = { animeData };
-                markInternalSave(payload);
-                AT.Storage.set(payload).catch(() => {});
-            }
-            scheduleDeferredListRefresh();
-        };
-
         const releasingSubset = {};
         for (const slug of slugsList) {
             if (AT.AnilistService.getStatus(slug) === 'RELEASING' && !AT.AnilistService.isFresh(slug)) {
@@ -1114,7 +1100,7 @@
             }
         }
         if (Object.keys(releasingSubset).length) {
-            runAutoFetch(AT.AnilistService, releasingSubset, reconcileAndRefresh);
+            runAutoFetch(AT.AnilistService, releasingSubset, () => scheduleDeferredListRefresh());
         }
 
         if (!repairRunning && !allFillersCached) {
@@ -1125,7 +1111,7 @@
             for (const slug of slugsList) {
                 if (!releasingSubset[slug]) rest[slug] = animeData[slug];
             }
-            runAutoFetch(AT.AnilistService, rest, reconcileAndRefresh);
+            runAutoFetch(AT.AnilistService, rest, () => scheduleDeferredListRefresh());
         }
     }
 

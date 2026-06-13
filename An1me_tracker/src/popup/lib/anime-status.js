@@ -248,6 +248,12 @@
                 // knownTotal<=watchedCount guard below would wrongly keep it completed.
                 shouldRevert = true;
             } else {
+                // The canon-based completion verdict is unreliable until this anime's
+                // filler list is loaded (KNOWN_FILLERS is populated async by the
+                // background filler fetch). Deciding before it arrives, then re-deciding
+                // after, flips completed↔active — and costs a full cloud write each
+                // time. Defer until the filler data is loaded.
+                if (!AT.FillerService?.episodeTypesCache?.[slug]) continue;
                 const knownTotal = getKnownTotalEpisodesForRepair(lowerSlug, anime);
                 if (knownTotal <= watchedCount) continue;
                 // Decide via getStatus() (same source of truth persist uses), on a probe
@@ -299,6 +305,11 @@
             // completed→airing flip on a second render). Movies/one-shots are
             // inherently finished, so they stay exempt.
             if (!releaseStatus && !AT.SeasonGrouping?.isMovie(slug, anime)) continue;
+
+            // Same reason as repairAiringCompleted: don't lock a completion until the
+            // filler list is loaded, otherwise the canon math flips it once the
+            // background filler fetch lands → completed↔active churn + full writes.
+            if (!AT.SeasonGrouping?.isMovie(slug, anime) && !AT.FillerService?.episodeTypesCache?.[slug]) continue;
 
             if (getStatus(slug, anime) !== AnimeStatus.COMPLETED) continue;
 
