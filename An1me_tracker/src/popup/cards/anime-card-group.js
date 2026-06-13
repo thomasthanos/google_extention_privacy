@@ -67,7 +67,7 @@
                 <div class="grp-item ${v.item} ${statusClass}${extraItemClass ? ' ' + extraItemClass : ''}" data-slug="${UIHelpers.escapeHtml(slug)}">
                     <div class="grp-item-header ${v.itemHeader}">
                         <div class="grp-item-left">
-                            <span class="grp-status-icon">${statusIcon}</span>
+                            ${statusIcon ? `<span class="grp-status-icon">${statusIcon}</span>` : ''}
                             <span class="${v.label}">${label}</span>
                         </div>
                         <div class="${v.itemRight}">
@@ -170,7 +170,7 @@
                     isComplete = isWatched;
                     hasProgress = isWatched;
                     statusClass = isComplete ? 'complete' : 'not-started';
-                    statusIcon = isComplete ? MOVIE_ICON_COMPLETED : MOVIE_ICON_INCOMPLETE;
+                    statusIcon = '';
 
                     episodeBadgeText = formattedTime || 'Movie';
                     progressInfoHTML = '';
@@ -571,7 +571,7 @@
                 variant: 'movie',
                 slug,
                 statusClass: isWatched ? 'complete' : 'not-started',
-                statusIcon: isWatched ? MOVIE_ICON_COMPLETED : MOVIE_ICON_INCOMPLETE,
+                statusIcon: '',
                 label: UIHelpers.escapeHtml(label),
                 rightHtml
             });
