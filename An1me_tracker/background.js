@@ -140,6 +140,7 @@ const FSDebug = (() => {
 
     function stats() {
         const attempts = counts.writes + counts.skips;
+        const savedPct = attempts ? Math.round((counts.skips / attempts) * 100) : 0;
         const summary = {
             uptimeMin: +mins().toFixed(1),
             reads: counts.reads,
@@ -155,19 +156,56 @@ const FSDebug = (() => {
             lastRead: ago(lastReadAt),
             lastWrite: ago(lastWriteAt),
         };
-        try {
-            console.table(recent.slice(-40).map((e) => ({
-                time: new Date(e.t).toLocaleTimeString(),
-                op: e.op.toLowerCase(),
-                type: e.type || e.kind || '', reason: e.reason || '',
-                fields: (e.fields || []).join(', '), KB: e.bytes ? +(e.bytes / 1024).toFixed(1) : ''
-            })));
-        } catch {}
-        console.log(
-            `%cFirestore session%c  ${counts.reads} reads · ${counts.writes} writes · ${kb(counts.bytes)} · ${counts.skips} saved`,
-            'background:#0ea5e9;color:#fff;border-radius:3px;padding:1px 7px;font-weight:600', css.meta
+
+        const group = console.groupCollapsed || console.group || console.log;
+        group.call(
+            console,
+            `%c FIRESTORE %c ${counts.reads} reads · ${counts.writes} writes · ${kb(counts.bytes)} · up ${summary.uptimeMin}m `,
+            'background:#0ea5e9;color:#fff;border-radius:3px 0 0 3px;padding:2px 8px;font-weight:700',
+            'background:#1e293b;color:#cbd5e1;border-radius:0 3px 3px 0;padding:2px 8px'
         );
-        console.log(summary);
+
+        console.log(
+            `%cREAD %c ${counts.reads}  %c${rate(counts.reads)}/min · last ${ago(lastReadAt)}`,
+            css.read, 'color:#fdba74;font-weight:700', css.meta
+        );
+        console.log(
+            `%cWRITE%c ${counts.writes}  %c${rate(counts.writes)}/min · ${kb(counts.bytes)} · last ${ago(lastWriteAt)}`,
+            css.write, 'color:#fca5a5;font-weight:700', css.meta
+        );
+        console.log(
+            `%cskip %c ${counts.skips}  %c${savedPct}% of writes avoided`,
+            css.skip, 'color:#cbd5e1;font-weight:700', css.meta
+        );
+
+        try {
+            console.table([
+                { type: 'full sync', writes: counts.writeType.full,     skipped: counts.skipType.full },
+                { type: 'progress',  writes: counts.writeType.progress, skipped: counts.skipType.progress },
+                { type: 'playback',  writes: counts.writeType.playback, skipped: counts.skipType.playback },
+                { type: 'anilist',   writes: counts.writeType.anilist,  skipped: counts.skipType.anilist },
+            ]);
+            console.table([
+                { read: 'fresh',      count: counts.readKind.full },
+                { read: 'revalidate', count: counts.readKind.revalidate },
+            ]);
+        } catch {}
+
+        if (recent.length) {
+            const sub = console.groupCollapsed || console.log;
+            sub.call(console, `%crecent activity (last ${Math.min(recent.length, 30)})`, 'color:#94a3b8;font-weight:700');
+            try {
+                console.table(recent.slice(-30).map((e) => ({
+                    time: new Date(e.t).toLocaleTimeString(),
+                    op: e.op.toLowerCase(),
+                    what: (e.fields || []).join(', ') || e.type || e.kind || '',
+                    KB: e.bytes ? +(e.bytes / 1024).toFixed(1) : ''
+                })));
+            } catch {}
+            console.groupEnd?.();
+        }
+
+        console.groupEnd?.();
         return summary;
     }
 
