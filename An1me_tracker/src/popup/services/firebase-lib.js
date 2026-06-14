@@ -4,6 +4,8 @@ const FirebaseLib = (function () {
   const API_KEY = firebaseConfig.apiKey;
   const PROJECT_ID = firebaseConfig.projectId;
 
+  const RESET_BACKEND_URL = "https://api.thomast.uk";
+
   const OAUTH_CLIENT_ID_LOCAL = '851894443732-st4bqk291b03jf6bscup0eqck2n60gmq.apps.googleusercontent.com';
   // const OAUTH_CLIENT_ID_LOCAL =
   //   "851894443732-uncr0msnm21fbrfbagtdd76pmkatui1t.apps.googleusercontent.com";
@@ -863,10 +865,22 @@ const FirebaseLib = (function () {
   async function sendPasswordReset(email) {
     if (!email) throw new Error("MISSING_EMAIL");
     try {
-      await _identityToolkitPost("accounts:sendOobCode", {
-        requestType: "PASSWORD_RESET",
-        email,
-      });
+      const response = await fetchWithTimeout(
+        `${RESET_BACKEND_URL}/send-password-reset`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        },
+        60000,
+      );
+
+      const body = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(body?.message || `HTTP_${response.status}`);
+      }
+
       PopupLogger.log(
         "Firebase",
         `Password reset request accepted for ${email}`,
@@ -874,24 +888,15 @@ const FirebaseLib = (function () {
       return {
         ok: true,
         message:
+          body?.message ||
           "If an account exists for that email, a reset link has been sent.",
       };
     } catch (err) {
-      const map = mapIdentityToolkitError(err?.message);
-
-      if (map.suppressError) {
-        PopupLogger.log(
-          "Firebase",
-          `Password reset (treating as success): ${err?.message}`,
-        );
-        return { ok: true, message: map.friendly };
-      }
-      const friendlyErr = new Error(map.friendly);
-      friendlyErr.code = String(err?.message || "")
-        .split(":")[0]
-        .trim()
-        .toUpperCase()
-        .replace(/\s+/g, "_");
+      PopupLogger.error("Firebase", "Password reset backend error:", err);
+      const friendlyErr = new Error(
+        "Couldn't send the reset email. Please try again in a moment.",
+      );
+      friendlyErr.code = "RESET_BACKEND_ERROR";
       friendlyErr.original = err;
       throw friendlyErr;
     }

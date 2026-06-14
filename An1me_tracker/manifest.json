@@ -15,6 +15,7 @@
   "host_permissions": [
     "https://an1me.to/*",
     "https://*.an1me.to/*",
+    "https://api.thomast.uk/*",
     "https://identitytoolkit.googleapis.com/*",
     "https://securetoken.googleapis.com/*",
     "https://firestore.googleapis.com/*",
