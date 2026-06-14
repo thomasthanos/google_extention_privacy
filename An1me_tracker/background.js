@@ -222,11 +222,21 @@ const FSDebug = (() => {
         console.log('%cFirestore counters reset', 'background:#10b981;color:#fff;border-radius:3px;padding:1px 7px;font-weight:600');
     }
 
-    return { read, write, skip, stats, reset, isEnabled: () => enabled };
+    function enable(v) {
+        enabled = !!v;
+        try { chrome.storage.local.set({ __fsDebug: enabled }); } catch {}
+        console.log(`%cFirestore debug ${enabled ? 'ON' : 'OFF'}`, `background:${enabled ? '#10b981' : '#64748b'};color:#fff;border-radius:3px;padding:1px 7px;font-weight:600`);
+        return enabled;
+    }
+
+    return { read, write, skip, stats, reset, enable, isEnabled: () => enabled };
 })();
 try {
     globalThis.fsStats = () => FSDebug.stats();
     globalThis.fsReset = () => FSDebug.reset();
+    globalThis.fsOn = () => FSDebug.enable(true);
+    globalThis.fsOff = () => FSDebug.enable(false);
+    globalThis.fsState = () => ({ enabled: FSDebug.isEnabled() });
 } catch {}
 
 const COMPLETED_PERCENTAGE = 85;
