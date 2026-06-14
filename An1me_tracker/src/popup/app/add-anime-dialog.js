@@ -729,8 +729,8 @@
                 (async () => {
                     const gcRes = await Storage.get(['groupCoverImages']);
                     await FirebaseSync.saveToCloud({
-                        animeData,
-                        videoProgress,
+                        animeData: AT.PopupState.animeData,
+                        videoProgress: AT.PopupState.videoProgress,
                         deletedAnime,
                         groupCoverImages: gcRes.groupCoverImages || {}
                     });
@@ -785,8 +785,8 @@
                 (async () => {
                     const gcRes = await Storage.get(['groupCoverImages']);
                     await FirebaseSync.saveToCloud({
-                        animeData,
-                        videoProgress,
+                        animeData: AT.PopupState.animeData,
+                        videoProgress: AT.PopupState.videoProgress,
                         deletedAnime,
                         groupCoverImages: gcRes.groupCoverImages || {}
                     });

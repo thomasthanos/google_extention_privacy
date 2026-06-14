@@ -895,11 +895,10 @@
 
         try {
             const result = await chrome.storage.local.get(['auto4kServerEnabled']);
-            const enabled = result.auto4kServerEnabled !== false;
+            const enabled = result.auto4kServerEnabled === true;
             if (enabled) maybeAutoSelect4kServer();
         } catch (err) {
-            Logger.warn('Auto-4k setting read failed (defaulting ON):', err);
-            try { maybeAutoSelect4kServer(); } catch {}
+            Logger.warn('Auto-4k setting read failed (defaulting OFF):', err);
         }
 
         const periodicCheck = setInterval(() => {

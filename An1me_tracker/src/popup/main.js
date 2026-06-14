@@ -490,8 +490,8 @@
             btnId: 'settingsAuto4kServer',
             subtitleId: 'settingsAuto4kServerSubtitle',
             storageKey: AUTO_4K_SERVER_KEY,
-            defaultsTo: true,
-            interpret: (raw) => raw !== false,
+            defaultsTo: false,
+            interpret: (raw) => raw === true,
             copy: {
                 on: 'Auto-switch to 4k server when available',
                 off: '4k auto-pick is off'
@@ -2005,7 +2005,7 @@
                 renderSkiptimeHelperSetting(changes[SKIPTIME_HELPER_KEY].newValue === true);
             }
             if (changes[AUTO_4K_SERVER_KEY]) {
-                renderAuto4kServerSetting(changes[AUTO_4K_SERVER_KEY].newValue !== false);
+                renderAuto4kServerSetting(changes[AUTO_4K_SERVER_KEY].newValue === true);
             }
             if (changes.videoProgress) {
                 videoProgress = changes.videoProgress.newValue || {};
