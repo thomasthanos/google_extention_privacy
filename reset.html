@@ -9,21 +9,572 @@
     <meta name="robots" content="noindex, nofollow, noarchive">
     <title>Επαναφορά κωδικού | An1me Tracker</title>
 
-    <!-- Inline SVG favicon (self-contained: works regardless of host path) -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%2339bcff'/><stop offset='1' stop-color='%238d4aff'/></linearGradient></defs><rect width='64' height='64' rx='14' fill='%230a0e1a'/><path d='M14 18h36v8H38v24h-12V26H14z' fill='url(%23g)'/><circle cx='44' cy='22' r='2.4' fill='%2339bcff'/></svg>">
-    <link rel="alternate icon" type="image/png" sizes="32x32" href="/An1me_tracker/src/icons/icon32.png">
-    <link rel="alternate icon" type="image/png" sizes="16x16" href="/An1me_tracker/src/icons/icon16.png">
-    <link rel="apple-touch-icon" sizes="128x128" href="/An1me_tracker/src/icons/icon128.png">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Shippori+Mincho:wght@500;700&display=swap">
 
-    <link rel="stylesheet" href="/reset-assets/styles.css">
-    <script src="/reset-assets/app.js" defer></script>
+    <style>
+:root {
+    --ink-900: #060912;
+    --ink-800: #0a0e1a;
+    --ink-700: #0e1426;
+    --ink-600: #131a30;
+    --line: rgba(126, 149, 208, 0.14);
+    --line-strong: rgba(137, 158, 204, 0.28);
+
+    --text: #f4f6ff;
+    --text-soft: #aeb8d1;
+    --text-dim: #76829d;
+
+    --blue: #39bcff;
+    --purple: #8d4aff;
+    --pink: #ec4899;
+    --sakura: #ff6aa3;
+    --green: #36d49a;
+    --red: #fb7185;
+    --warning: #ffb84c;
+    --hinomaru: #e63946;
+
+    --focus: rgba(57, 188, 255, 0.45);
+
+    --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+    --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px;
+
+    --r-sm: 10px; --r-md: 14px; --r-lg: 20px; --r-xl: 28px;
+
+    --shadow-card:
+        0 1px 0 rgba(255,255,255,0.04) inset,
+        0 -1px 0 rgba(0,0,0,0.4) inset,
+        0 30px 80px -20px rgba(0,0,0,0.6),
+        0 8px 24px -10px rgba(141, 74, 255, 0.18);
+    --shadow-btn:
+        0 1px 0 rgba(255,255,255,0.35) inset,
+        0 -2px 6px rgba(0,0,0,0.3) inset,
+        0 18px 36px -12px rgba(141, 74, 255, 0.55),
+        0 6px 14px -6px rgba(57,188,255,0.35);
+    --shadow-input-inset:
+        0 2px 4px rgba(0,0,0,0.45) inset,
+        0 -1px 0 rgba(255,255,255,0.03) inset;
+
+    font-family: "Inter", "Segoe UI", Roboto, Arial, sans-serif;
+    --font-display: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+}
+
+* { box-sizing: border-box; }
+
+html { min-height: 100%; background: var(--ink-800); }
+
+body {
+    min-height: 100vh;
+    min-height: 100svh;
+    margin: 0;
+    color: var(--text);
+    background:
+        radial-gradient(80% 50% at 50% 0%, rgba(141, 74, 255, 0.14), transparent 60%),
+        radial-gradient(60% 40% at 100% 100%, rgba(57, 188, 255, 0.10), transparent 60%),
+        linear-gradient(165deg, var(--ink-900) 0%, var(--ink-800) 55%, #0e1324 100%);
+    overflow-x: hidden;
+}
+
+body::before {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    content: "";
+    background-image:
+        linear-gradient(rgba(108, 128, 174, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(108, 128, 174, 0.045) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(circle at center, #000, transparent 75%);
+}
+
+.kanji-stamp {
+    position: fixed;
+    z-index: 0;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: var(--font-display);
+    font-size: clamp(280px, 80vw, 540px);
+    color: #ffffff;
+    opacity: 0.018;
+    user-select: none;
+    pointer-events: none;
+    line-height: 1;
+}
+
+.ambient {
+    position: fixed;
+    z-index: 0;
+    filter: blur(100px);
+    opacity: 0.28;
+    pointer-events: none;
+    border-radius: 50%;
+}
+.ambient-blue {
+    width: min(70vw, 480px); height: min(70vw, 480px);
+    left: -24vw; bottom: 6vh; background: var(--blue);
+}
+.ambient-purple {
+    width: min(80vw, 540px); height: min(80vw, 540px);
+    top: -22vw; right: -32vw; background: var(--purple);
+}
+
+.shell {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100svh;
+    width: min(100%, 440px);
+    margin: 0 auto;
+    padding:
+        max(28px, env(safe-area-inset-top))
+        20px
+        max(24px, env(safe-area-inset-bottom));
+}
+
+.brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--s-3);
+    margin: var(--s-2) 0 var(--s-8);
+}
+
+.logo3d {
+    display: block;
+    width: 64px;
+    height: 64px;
+    perspective: 600px;
+    filter: drop-shadow(0 18px 28px rgba(57, 188, 255, 0.35))
+            drop-shadow(0 8px 14px rgba(141, 74, 255, 0.28));
+    transition: transform 220ms cubic-bezier(.2,.7,.3,1.2);
+    transform-style: preserve-3d;
+    will-change: transform;
+}
+.logo3d svg { width: 100%; height: 100%; display: block; }
+
+.brand-name {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.42em;
+    color: #dbe7ff;
+    background: linear-gradient(100deg, var(--blue), #a986ff 52%, var(--sakura));
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.reset-card {
+    position: relative;
+    border: 1px solid var(--line);
+    border-radius: var(--r-xl);
+    clip-path: polygon(18px 0, 100% 0, 100% 100%, 0 100%, 0 18px);
+    padding: 34px 22px 22px;
+    background:
+        radial-gradient(120% 80% at 100% 0%, rgba(141, 74, 255, 0.10), transparent 50%),
+        radial-gradient(80% 60% at 0% 100%, rgba(57, 188, 255, 0.06), transparent 60%),
+        linear-gradient(180deg, rgba(17, 23, 41, 0.96), rgba(11, 15, 28, 0.92));
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(18px);
+    overflow: hidden;
+}
+
+.hinomaru-rule {
+    display: block;
+    position: relative;
+    width: 60px;
+    height: 1px;
+    margin: 0 auto var(--s-6);
+    background: var(--line-strong);
+}
+.hinomaru-rule::after {
+    content: "";
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--hinomaru);
+    box-shadow: 0 0 12px rgba(230,57,70,0.55);
+}
+
+.tategaki {
+    position: absolute;
+    top: 18px;
+    left: 8px;
+    writing-mode: vertical-rl;
+    font-size: 9px;
+    letter-spacing: 0.4em;
+    color: var(--text-dim);
+    opacity: 0.55;
+    font-family: var(--font-display);
+    user-select: none;
+}
+
+.security-icon {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    margin: 0 auto var(--s-4);
+    border-radius: 16px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--purple), var(--pink));
+    box-shadow:
+        0 1px 0 rgba(255,255,255,0.3) inset,
+        0 -2px 6px rgba(0,0,0,0.3) inset,
+        0 18px 32px -8px rgba(188, 63, 184, 0.45);
+    border-top-right-radius: 4px;
+}
+.security-icon svg { width: 28px; height: 28px; color: #fff; }
+
+.eyebrow {
+    margin: 0 0 6px;
+    text-align: center;
+    color: #8176aa;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.32em;
+}
+
+h1 {
+    margin: 0 0 var(--s-3);
+    text-align: center;
+    font-family: var(--font-display);
+    font-size: clamp(26px, 7.5vw, 32px);
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    font-weight: 700;
+}
+
+.intro {
+    margin: 0 0 var(--s-6);
+    color: var(--text-soft);
+    font-size: 14px;
+    line-height: 1.55;
+    text-align: center;
+}
+.intro strong {
+    display: block;
+    margin-top: 3px;
+    color: #dfe6fc;
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+}
+
+.status-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--s-4);
+    min-height: 180px;
+    padding-top: 40px;
+    color: var(--text-soft);
+    font-size: 14px;
+}
+.status-view p { margin: 0; }
+
+.spinner, .button-spinner {
+    display: block;
+    width: 26px; height: 26px;
+    border: 2px solid rgba(57, 188, 255, 0.18);
+    border-top-color: var(--blue);
+    border-right-color: var(--purple);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+.view[hidden], .status-view[hidden] { display: none; }
+
+.field-label {
+    display: block;
+    margin: 0 0 var(--s-2);
+    color: #ced6e9;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.password-field {
+    position: relative;
+    margin-bottom: var(--s-3);
+}
+
+.password-field input {
+    width: 100%;
+    min-height: 52px;
+    padding: 0 60px 0 16px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-md);
+    color: var(--text);
+    background: rgba(6, 9, 18, 0.7);
+    box-shadow: var(--shadow-input-inset);
+    font: inherit;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 150ms ease, box-shadow 200ms ease, background 150ms ease;
+}
+.password-field input::placeholder { color: #5a6483; }
+.password-field input:focus {
+    border-color: var(--blue);
+    background: rgba(6, 9, 18, 0.85);
+    box-shadow:
+        var(--shadow-input-inset),
+        0 0 0 4px var(--focus);
+}
+
+.reveal {
+    position: absolute;
+    top: 50%; right: 8px;
+    transform: translateY(-50%);
+    display: grid; place-items: center;
+    width: 40px; height: 40px;
+    border: 0;
+    border-radius: var(--r-sm);
+    color: #8995b0;
+    background: transparent;
+    cursor: pointer;
+    transition: color 150ms, background 150ms;
+}
+.reveal:hover, .reveal:focus-visible {
+    color: var(--blue);
+    background: rgba(57, 188, 255, 0.08);
+    outline: none;
+}
+.reveal svg { width: 20px; height: 20px; }
+.reveal .i-hide { display: none; }
+.reveal.is-visible .i-show { display: none; }
+.reveal.is-visible .i-hide { display: block; }
+
+.strength {
+    min-height: 44px;
+    margin: 2px 0 var(--s-3);
+}
+.strength-track {
+    display: flex;
+    gap: 5px;
+    height: 4px;
+    margin-bottom: var(--s-2);
+}
+.strength-track .seg {
+    flex: 1;
+    height: 100%;
+    border-radius: 4px;
+    background: #1e263a;
+    transition: background-color 220ms ease;
+}
+#strength-text {
+    color: var(--text-dim);
+    font-size: 11.5px;
+    letter-spacing: 0.02em;
+}
+
+.strength[data-level="weak"] .seg:nth-child(1) { background: var(--red); }
+.strength[data-level="medium"] .seg:nth-child(1),
+.strength[data-level="medium"] .seg:nth-child(2) { background: var(--warning); }
+.strength[data-level="strong"] .seg { background: var(--green); }
+
+.strength[data-level="weak"] #strength-text { color: var(--red); }
+.strength[data-level="medium"] #strength-text { color: var(--warning); }
+.strength[data-level="strong"] #strength-text { color: var(--green); }
+
+.inline-error {
+    margin: var(--s-1) 0 var(--s-4);
+    padding: 11px 13px;
+    border: 1px solid rgba(251, 113, 133, 0.24);
+    border-left-width: 3px;
+    border-radius: var(--r-sm);
+    color: #ff9eae;
+    background: rgba(251, 113, 133, 0.08);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.primary-button {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 54px;
+    margin-top: var(--s-5);
+    border: 0;
+    border-radius: var(--r-md);
+    color: #fff;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.12), rgba(0,0,0,0.0) 50%),
+        linear-gradient(108deg, var(--purple), var(--pink));
+    box-shadow: var(--shadow-btn);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: transform 130ms ease, filter 130ms ease, box-shadow 150ms;
+}
+.primary-button:hover { filter: brightness(1.08); }
+.primary-button:active {
+    transform: translateY(1px) scale(0.995);
+    box-shadow:
+        0 1px 0 rgba(255,255,255,0.2) inset,
+        0 -1px 4px rgba(0,0,0,0.3) inset,
+        0 8px 16px -8px rgba(141, 74, 255, 0.45);
+}
+.primary-button:focus-visible {
+    outline: 3px solid rgba(57, 188, 255, 0.55);
+    outline-offset: 3px;
+}
+.primary-button:disabled { opacity: 0.7; cursor: wait; }
+
+.button-spinner {
+    display: none;
+    width: 18px; height: 18px;
+    border-color: rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    border-right-color: #fff;
+}
+.primary-button.is-loading .button-spinner { display: block; }
+.primary-button.is-loading .button-text { opacity: 0.7; }
+
+.message-view {
+    padding: var(--s-5) var(--s-1) var(--s-3);
+    text-align: center;
+}
+.result-icon {
+    display: grid;
+    place-items: center;
+    width: 72px; height: 72px;
+    margin: var(--s-1) auto var(--s-5);
+    border-radius: 50%;
+}
+.result-icon svg { width: 56px; height: 56px; }
+.result-icon.success {
+    color: var(--green);
+    background: radial-gradient(circle, rgba(54,212,154,0.18), rgba(54,212,154,0.04) 70%);
+    box-shadow: 0 0 0 1px rgba(54,212,154,0.25), 0 18px 32px -10px rgba(54,212,154,0.35);
+}
+.result-icon.error {
+    color: var(--red);
+    background: radial-gradient(circle, rgba(251,113,133,0.18), rgba(251,113,133,0.04) 70%);
+    box-shadow: 0 0 0 1px rgba(251,113,133,0.25), 0 18px 32px -10px rgba(251,113,133,0.35);
+}
+
+.message-view h2 {
+    margin: 0 0 var(--s-3);
+    font-family: var(--font-display);
+    font-size: 22px;
+    letter-spacing: -0.01em;
+    font-weight: 700;
+}
+.message-view p {
+    margin: 0 auto var(--s-6);
+    max-width: 320px;
+    color: var(--text-soft);
+    font-size: 14px;
+    line-height: 1.55;
+}
+
+.success-pill {
+    display: inline-flex;
+    padding: 10px 16px;
+    border: 1px solid rgba(54, 212, 154, 0.22);
+    border-radius: 999px;
+    color: #86edc4;
+    background: rgba(54, 212, 154, 0.08);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.safety-note {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: var(--s-6);
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    color: var(--text-dim);
+    background: rgba(141, 74, 255, 0.04);
+}
+.safety-note svg {
+    flex: 0 0 auto;
+    width: 16px; height: 16px;
+    color: #9d74ff;
+}
+.safety-note p {
+    margin: 0;
+    font-size: 11.5px;
+    line-height: 1.45;
+}
+.safety-note strong {
+    color: #d9dff1;
+    margin-right: 6px;
+    font-weight: 600;
+}
+
+.footer {
+    margin-top: auto;
+    padding: var(--s-8) var(--s-1) var(--s-1);
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 11px;
+    letter-spacing: 0.03em;
+}
+.footer p { margin: 0; }
+
+.noscript {
+    position: fixed;
+    inset: auto 16px 18px;
+    z-index: 9;
+    padding: 14px;
+    border-radius: var(--r-sm);
+    color: #fff;
+    background: #262d42;
+    text-align: center;
+    font-size: 14px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (min-width: 520px) {
+    .shell {
+        justify-content: center;
+        padding-block: var(--s-8);
+    }
+    .reset-card { padding: 38px 32px 26px; }
+    .footer { margin-top: var(--s-6); }
+    .tategaki { left: 14px; font-size: 10px; }
+}
+
+@media (max-width: 359px) {
+    .shell { padding-inline: 14px; }
+    .reset-card {
+        padding-inline: 18px;
+        clip-path: polygon(14px 0, 100% 0, 100% 100%, 0 100%, 0 14px);
+    }
+    .brand-name { font-size: 11px; letter-spacing: 0.32em; }
+    .logo3d { width: 56px; height: 56px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+    .logo3d { transition: none !important; }
+}
+    </style>
 </head>
 <body>
-    <!-- Reusable SVG sprite -->
     <svg width="0" height="0" style="position:absolute" aria-hidden="true">
         <defs>
             <linearGradient id="grad-primary" x1="0" y1="0" x2="1" y2="1">
@@ -68,25 +619,18 @@
         </defs>
     </svg>
 
-    <!-- Ambient kanji watermark -->
     <div class="kanji-stamp" aria-hidden="true">記</div>
     <div class="ambient ambient-blue" aria-hidden="true"></div>
     <div class="ambient ambient-purple" aria-hidden="true"></div>
 
     <main class="shell">
         <header class="brand" aria-label="An1me Tracker">
-            <!-- 3D layered T-mark logo -->
             <span class="logo3d" id="logo3d" aria-hidden="true">
                 <svg viewBox="0 0 80 80">
-                    <!-- back side / depth -->
                     <rect x="10" y="14" width="60" height="60" rx="16" fill="url(#grad-side)"/>
-                    <!-- front face -->
                     <rect x="6" y="8" width="60" height="60" rx="16" fill="#0e1426" stroke="url(#grad-primary)" stroke-width="1.2"/>
-                    <!-- T letter -->
                     <path d="M18 22h36v9H42v27H30V31H18z" fill="url(#grad-primary)"/>
-                    <!-- eye accent dot -->
                     <circle cx="48" cy="27" r="2.6" fill="#39bcff"/>
-                    <!-- top bevel highlight -->
                     <rect x="6" y="8" width="60" height="18" rx="16" fill="url(#grad-bevel)"/>
                 </svg>
             </span>
@@ -94,7 +638,6 @@
         </header>
 
         <section class="reset-card" aria-labelledby="page-title">
-            <!-- Tategaki vertical eyebrow -->
             <span class="tategaki" aria-hidden="true">安 全 ・ S E C U R E</span>
 
             <div class="security-icon" aria-hidden="true">
@@ -198,5 +741,234 @@
     <noscript>
         <div class="noscript">Για να αλλάξεις κωδικό, ενεργοποίησε τη JavaScript και άνοιξε ξανά τον σύνδεσμο.</div>
     </noscript>
+
+    <script>
+(() => {
+    'use strict';
+
+    const FIREBASE_API_KEY = 'AIzaSyCDF9US2OwARlyZ0AH_zDpjzmOXRtrGKMg';
+    const RESET_ENDPOINT = `https://identitytoolkit.googleapis.com/v1/accounts:resetPassword?key=${FIREBASE_API_KEY}`;
+    const parameters = new URLSearchParams(window.location.search);
+    const mode = parameters.get('mode');
+    const actionCode = parameters.get('oobCode');
+
+    const views = {
+        loading: document.getElementById('loading-view'),
+        form: document.getElementById('form-view'),
+        success: document.getElementById('success-view'),
+        error: document.getElementById('error-view')
+    };
+    const accountEmail = document.getElementById('account-email');
+    const form = document.getElementById('reset-form');
+    const passwordInput = document.getElementById('new-password');
+    const confirmInput = document.getElementById('confirm-password');
+    const formError = document.getElementById('form-error');
+    const submitButton = document.getElementById('submit-button');
+    const strength = document.querySelector('.strength');
+    const strengthText = document.getElementById('strength-text');
+    const errorTitle = document.getElementById('error-title');
+    const errorMessage = document.getElementById('error-message');
+    const logo3d = document.getElementById('logo3d');
+
+    function showView(name) {
+        Object.entries(views).forEach(([key, node]) => {
+            node.hidden = key !== name;
+        });
+    }
+
+    function maskEmail(email) {
+        const parts = String(email).split('@');
+        if (parts.length !== 2) return email;
+        const name = parts[0];
+        const visible = name.length <= 2 ? name[0] : name.slice(0, 2);
+        return `${visible}${'*'.repeat(Math.max(2, Math.min(6, name.length - visible.length)))}@${parts[1]}`;
+    }
+
+    async function firebaseResetPassword(payload) {
+        let response;
+        try {
+            response = await fetch(RESET_ENDPOINT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        } catch (error) {
+            throw new Error('NETWORK_ERROR');
+        }
+
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(body?.error?.message || 'UNKNOWN_ERROR');
+        }
+        return body;
+    }
+
+    function resetLinkError(code) {
+        if (code.includes('EXPIRED_OOB_CODE')) {
+            return {
+                title: 'Ο σύνδεσμος έληξε',
+                message: 'Για την ασφάλειά σου, ο σύνδεσμος επαναφοράς δεν ισχύει πλέον. Ζήτησε νέο email από το extension.'
+            };
+        }
+        if (code.includes('INVALID_OOB_CODE')) {
+            return {
+                title: 'Μη έγκυρος σύνδεσμος',
+                message: 'Ο σύνδεσμος έχει ήδη χρησιμοποιηθεί ή δεν είναι έγκυρος. Ζήτησε νέο email επαναφοράς.'
+            };
+        }
+        if (code === 'NETWORK_ERROR') {
+            return {
+                title: 'Δεν υπάρχει σύνδεση',
+                message: 'Δεν μπορέσαμε να επικοινωνήσουμε με το Firebase. Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά.'
+            };
+        }
+        return {
+            title: 'Δεν ολοκληρώθηκε η επαναφορά',
+            message: 'Ο σύνδεσμος δεν μπορεί να επαληθευτεί. Ζήτησε νέο email επαναφοράς από το extension.'
+        };
+    }
+
+    function showLinkError(code) {
+        const content = resetLinkError(code);
+        errorTitle.textContent = content.title;
+        errorMessage.textContent = content.message;
+        showView('error');
+    }
+
+    function setFormError(message) {
+        formError.textContent = message || '';
+        formError.hidden = !message;
+    }
+
+    function setSubmitting(isSubmitting) {
+        submitButton.disabled = isSubmitting;
+        submitButton.classList.toggle('is-loading', isSubmitting);
+        passwordInput.disabled = isSubmitting;
+        confirmInput.disabled = isSubmitting;
+    }
+
+    function updateStrength() {
+        const value = passwordInput.value;
+        if (!value) {
+            strength.removeAttribute('data-level');
+            strengthText.textContent = 'Χρησιμοποίησε γράμματα, αριθμούς και σύμβολα';
+            return;
+        }
+
+        let score = 0;
+        if (value.length >= 8) score += 1;
+        if (value.length >= 12) score += 1;
+        if (/[a-zα-ω]/i.test(value) && /\d/.test(value)) score += 1;
+        if (/[^a-zα-ω0-9]/i.test(value)) score += 1;
+
+        if (value.length < 6 || score <= 1) {
+            strength.dataset.level = 'weak';
+            strengthText.textContent = 'Αδύναμος κωδικός';
+        } else if (score <= 2) {
+            strength.dataset.level = 'medium';
+            strengthText.textContent = 'Καλός κωδικός - μπορεί να γίνει ισχυρότερος';
+        } else {
+            strength.dataset.level = 'strong';
+            strengthText.textContent = 'Ισχυρός κωδικός';
+        }
+    }
+
+    function confirmationError(code) {
+        if (code.includes('WEAK_PASSWORD')) {
+            return 'Ο κωδικός είναι πολύ αδύναμος. Χρησιμοποίησε περισσότερους χαρακτήρες και συνδυασμούς.';
+        }
+        if (code.includes('PASSWORD_DOES_NOT_MEET_REQUIREMENTS')) {
+            return 'Ο κωδικός δεν καλύπτει τις απαιτήσεις ασφαλείας. Δοκίμασε μεγαλύτερο κωδικό με αριθμό και σύμβολο.';
+        }
+        if (code === 'NETWORK_ERROR') {
+            return 'Αδυναμία σύνδεσης. Έλεγξε το internet και προσπάθησε ξανά.';
+        }
+        return '';
+    }
+
+    async function verifyLink() {
+        if (mode !== 'resetPassword' || !actionCode) {
+            showLinkError('INVALID_OOB_CODE');
+            return;
+        }
+
+        try {
+            const result = await firebaseResetPassword({ oobCode: actionCode });
+            window.history.replaceState({}, document.title, window.location.pathname);
+            accountEmail.textContent = maskEmail(result.email || '');
+            showView('form');
+            passwordInput.focus();
+        } catch (error) {
+            showLinkError(error.message);
+        }
+    }
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const password = passwordInput.value;
+        const confirmation = confirmInput.value;
+
+        setFormError('');
+        if (password.length < 6) {
+            setFormError('Ο νέος κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες.');
+            passwordInput.focus();
+            return;
+        }
+        if (password !== confirmation) {
+            setFormError('Οι δύο κωδικοί δεν ταιριάζουν.');
+            confirmInput.focus();
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            await firebaseResetPassword({ oobCode: actionCode, newPassword: password });
+            form.reset();
+            showView('success');
+        } catch (error) {
+            const fieldMessage = confirmationError(error.message);
+            if (fieldMessage) {
+                setFormError(fieldMessage);
+                setSubmitting(false);
+                return;
+            }
+            showLinkError(error.message);
+        }
+    });
+
+    passwordInput.addEventListener('input', () => {
+        setFormError('');
+        updateStrength();
+    });
+    confirmInput.addEventListener('input', () => setFormError(''));
+
+    document.querySelectorAll('.reveal').forEach((button) => {
+        button.addEventListener('click', () => {
+            const input = document.getElementById(button.dataset.target);
+            const willShow = input.type === 'password';
+            input.type = willShow ? 'text' : 'password';
+            button.classList.toggle('is-visible', willShow);
+            button.setAttribute('aria-label', willShow ? 'Απόκρυψη κωδικού' : 'Εμφάνιση κωδικού');
+        });
+    });
+
+    const fine = window.matchMedia('(pointer: fine)').matches;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (logo3d && fine && !reduced) {
+        const rect = () => logo3d.getBoundingClientRect();
+        logo3d.addEventListener('pointermove', (e) => {
+            const r = rect();
+            const x = ((e.clientX - r.left) / r.width - 0.5) * 2;
+            const y = ((e.clientY - r.top) / r.height - 0.5) * 2;
+            logo3d.style.transform = `rotateY(${x * 14}deg) rotateX(${-y * 14}deg)`;
+        });
+        logo3d.addEventListener('pointerleave', () => {
+            logo3d.style.transform = '';
+        });
+    }
+
+    verifyLink();
+})();
+    </script>
 </body>
 </html>

@@ -182,6 +182,21 @@ function replaceAll(template, placeholder, value) {
   return template.replace(new RegExp(escapeRegExp(placeholder), "g"), value);
 }
 
+function buildResetLink(firebaseLink) {
+  try {
+    const oobCode = new URL(firebaseLink).searchParams.get("oobCode");
+    if (oobCode && process.env.ACTION_URL) {
+      const target = new URL(process.env.ACTION_URL);
+      target.searchParams.set("mode", "resetPassword");
+      target.searchParams.set("oobCode", oobCode);
+      return target.toString();
+    }
+  } catch (error) {
+    console.warn("buildResetLink failed, using Firebase default link:", error.message);
+  }
+  return firebaseLink;
+}
+
 app.post("/send-password-reset", passwordResetLimiter, async (req, res) => {
   const email = typeof req.body?.email === "string" ? req.body.email.trim() : "";
 
@@ -206,9 +221,11 @@ app.post("/send-password-reset", passwordResetLimiter, async (req, res) => {
       handleCodeInApp: false
     };
 
-    const resetLink = await admin
+    const firebaseLink = await admin
       .auth()
       .generatePasswordResetLink(email, actionCodeSettings);
+
+    const resetLink = buildResetLink(firebaseLink);
 
     const template = await fs.readFile(templatePath, "utf8");
     const html = replaceAll(
