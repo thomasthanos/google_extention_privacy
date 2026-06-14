@@ -196,6 +196,7 @@ const SeasonGrouping = {
         if (slug.startsWith('kimetsu-no-yaiba')) return 'kimetsu-no-yaiba';
         if (slug.startsWith('shingeki-no-kyojin')) return 'shingeki-no-kyojin';
         if (slug.startsWith('initial-d')) return 'initial-d';
+        if (slug.startsWith('blue-lock')) return 'blue-lock';
         if (slug.startsWith('bleach')) return 'bleach';
         if (slug.startsWith('hunter-x-hunter') || slug.startsWith('hunterhunter')) return 'hunter-x-hunter';
 
@@ -356,6 +357,13 @@ const SeasonGrouping = {
             return 1;
         }
 
+        if (slug.startsWith('blue-lock')) {
+            if (slug.includes('season-3') || slug.includes('3rd-season') || slug.includes('-3')) return 3;
+            if (slug.includes('vs-u-20') || slug.includes('vs-u20') || slug.includes('u-20-japan')
+                || slug.includes('season-2') || slug.includes('2nd-season') || slug.includes('-2')) return 2;
+            return 1;
+        }
+
         let match = slug.match(/-season-?(\d+)/i);
         if (match) return parseInt(match[1], 10);
 
@@ -446,6 +454,13 @@ const SeasonGrouping = {
             if (slug.includes('third-stage') || slug.includes('3rd-stage')) return 'Third Stage (Movie)';
             if (slug.includes('second-stage') || slug.includes('2nd-stage')) return 'Second Stage';
             return 'First Stage';
+        }
+
+        if (slug.startsWith('blue-lock')) {
+            if (slug.includes('season-3') || slug.includes('3rd-season') || slug.includes('-3')) return 'Season 3';
+            if (slug.includes('vs-u-20') || slug.includes('vs-u20') || slug.includes('u-20-japan')
+                || slug.includes('season-2') || slug.includes('2nd-season') || slug.includes('-2')) return 'Season 2: vs. U-20 Japan';
+            return 'Season 1';
         }
 
         if (slug.includes('bleach-sennen-kessen-hen')) {

@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Set a new password — An1me Tracker</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Inter,system-ui,sans-serif;
+    color:#f5f5f7;
+    background:#000;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* iOS 26 style animated mesh background */
+  body::before,body::after{
+    content:"";position:fixed;inset:-25%;z-index:-2;filter:blur(80px);pointer-events:none;
+  }
+  body::before{
+    background:
+      radial-gradient(40% 40% at 20% 30%, #ff2d92 0%, transparent 60%),
+      radial-gradient(35% 35% at 80% 20%, #5e5ce6 0%, transparent 60%),
+      radial-gradient(45% 45% at 70% 80%, #0a84ff 0%, transparent 60%),
+      radial-gradient(40% 40% at 15% 85%, #30d158 0%, transparent 60%);
+    animation:drift 22s ease-in-out infinite alternate;
+  }
+  body::after{
+    background:
+      radial-gradient(30% 30% at 60% 50%, #ff9f0a 0%, transparent 65%),
+      radial-gradient(35% 35% at 30% 60%, #bf5af2 0%, transparent 65%);
+    opacity:.7;
+    animation:drift 28s ease-in-out -8s infinite alternate-reverse;
+  }
+  @keyframes drift{
+    0%{transform:translate3d(0,0,0) scale(1)}
+    50%{transform:translate3d(3%,-4%,0) scale(1.08)}
+    100%{transform:translate3d(-3%,4%,0) scale(1.05)}
+  }
+  /* subtle grain */
+  body > .grain{
+    position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.06;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.7'/></svg>");
+  }
+
+  .reset-shell{
+    min-height:100dvh;display:grid;place-items:center;padding:24px;
+  }
+
+  /* Liquid Glass panel */
+  .reset-panel{
+    position:relative;
+    width:100%;max-width:420px;
+    padding:28px 26px 22px;
+    border-radius:30px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.06));
+    backdrop-filter:blur(40px) saturate(180%);
+    border:1px solid rgba(255,255,255,.18);
+    box-shadow:
+      0 30px 80px -20px rgba(0,0,0,.6),
+      0 1px 0 rgba(255,255,255,.25) inset,
+      0 -1px 0 rgba(255,255,255,.06) inset;
+    overflow:hidden;
+    isolation:isolate;
+  }
+  /* glossy highlight */
+  .reset-panel::before{
+    content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:
+      radial-gradient(120% 60% at 50% -10%, rgba(255,255,255,.35), transparent 60%);
+    mix-blend-mode:overlay;opacity:.7;
+  }
+
+  .brand-row{
+    display:flex;align-items:center;gap:10px;margin-bottom:18px;
+  }
+  .brand-mark{
+    width:32px;height:32px;border-radius:10px;
+    display:grid;place-items:center;font-weight:700;font-size:16px;color:#fff;
+    background:linear-gradient(135deg,#ff2d92,#5e5ce6);
+    box-shadow:0 6px 18px -6px rgba(94,92,230,.7),0 1px 0 rgba(255,255,255,.4) inset;
+  }
+  .brand-name{
+    font-size:12px;letter-spacing:.18em;font-weight:600;color:rgba(255,255,255,.75);
+  }
+
+  .state-badge{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:6px 12px;border-radius:999px;
+    font-size:12px;font-weight:500;color:rgba(255,255,255,.85);
+    background:rgba(255,255,255,.1);
+    border:1px solid rgba(255,255,255,.15);
+    backdrop-filter:blur(20px);
+    margin-bottom:14px;
+  }
+
+  h1{
+    font-size:28px;line-height:1.15;font-weight:700;letter-spacing:-.02em;margin:0 0 8px;
+    background:linear-gradient(180deg,#fff, rgba(255,255,255,.7));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .lead{
+    margin:0 0 18px;font-size:14.5px;line-height:1.5;color:rgba(255,255,255,.7);
+  }
+
+  .status-box{
+    margin:0 0 14px;padding:11px 14px;border-radius:14px;font-size:13.5px;line-height:1.4;
+    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);
+    color:rgba(255,255,255,.9);
+    backdrop-filter:blur(20px);
+  }
+  .status-box.is-warn{background:rgba(255,159,10,.14);border-color:rgba(255,159,10,.35);color:#ffd9a8}
+  .status-box.is-error{background:rgba(255,69,58,.16);border-color:rgba(255,69,58,.4);color:#ffb3ad}
+  .status-box.is-ok{background:rgba(48,209,88,.14);border-color:rgba(48,209,88,.4);color:#a8f0bd}
+
+  .reset-form{display:flex;flex-direction:column;gap:12px}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field > span{
+    font-size:12px;font-weight:600;letter-spacing:.02em;color:rgba(255,255,255,.7);
+    padding-left:4px;
+  }
+  .field input{
+    appearance:none;-webkit-appearance:none;
+    width:100%;
+    padding:14px 16px;
+    border-radius:16px;
+    border:1px solid rgba(255,255,255,.16);
+    background:rgba(255,255,255,.08);
+    backdrop-filter:blur(20px);
+    color:#fff;font-size:16px;font-family:inherit;
+    transition:border-color .2s ease, background .2s ease, box-shadow .2s ease, transform .15s ease;
+    box-shadow:0 1px 0 rgba(255,255,255,.08) inset;
+  }
+  .field input::placeholder{color:rgba(255,255,255,.4)}
+  .field input:focus{
+    outline:none;
+    border-color:rgba(255,255,255,.45);
+    background:rgba(255,255,255,.14);
+    box-shadow:0 0 0 4px rgba(10,132,255,.25),0 1px 0 rgba(255,255,255,.15) inset;
+  }
+  .field input:disabled{opacity:.55;cursor:not-allowed}
+
+  .primary-button{
+    margin-top:6px;
+    appearance:none;border:0;cursor:pointer;
+    width:100%;padding:15px 18px;
+    border-radius:18px;
+    font-family:inherit;font-size:16px;font-weight:600;color:#fff;letter-spacing:-.01em;
+    background:linear-gradient(180deg,#0a84ff,#0066d6);
+    box-shadow:
+      0 10px 30px -10px rgba(10,132,255,.7),
+      0 1px 0 rgba(255,255,255,.35) inset,
+      0 -1px 0 rgba(0,0,0,.2) inset;
+    transition:transform .12s ease, box-shadow .2s ease, filter .2s ease;
+  }
+  .primary-button:hover:not(:disabled){filter:brightness(1.08)}
+  .primary-button:active:not(:disabled){transform:scale(.985)}
+  .primary-button:disabled{opacity:.55;cursor:not-allowed;filter:saturate(.6)}
+
+  .return-link{
+    display:block;text-align:center;margin-top:18px;
+    color:rgba(255,255,255,.7);font-size:13.5px;text-decoration:none;font-weight:500;
+    transition:color .2s ease;
+  }
+  .return-link:hover{color:#fff}
+
+  @media (max-width:380px){
+    .reset-panel{padding:24px 20px;border-radius:26px}
+    h1{font-size:24px}
+  }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<main class="reset-shell">
+  <section class="reset-panel" aria-labelledby="resetTitle">
+    <div class="brand-row">
+      <span class="brand-mark" aria-hidden="true">A</span>
+      <span class="brand-name">AN1ME TRACKER</span>
+    </div>
+
+    <div class="state-badge" id="stateBadge">Secure reset link</div>
+
+    <h1 id="resetTitle">Set a new password</h1>
+    <p class="lead" id="resetLead">
+      Create a fresh password for your An1me Tracker account.
+    </p>
+
+    <div class="status-box" id="statusBox" role="status" aria-live="polite" hidden></div>
+
+    <form class="reset-form" id="resetForm" novalidate>
+      <label class="field">
+        <span>New password</span>
+        <input id="passwordInput" name="password" type="password" autocomplete="new-password" minlength="6" required>
+      </label>
+      <label class="field">
+        <span>Confirm password</span>
+        <input id="confirmInput" name="confirmPassword" type="password" autocomplete="new-password" minlength="6" required>
+      </label>
+      <button class="primary-button" id="submitButton" type="submit">Reset password</button>
+    </form>
+
+    <a class="return-link" href="https://an1me.to/">Back to An1me</a>
+  </section>
+</main>
+
+<script>
+(function () {
+  const API_KEY = 'AIzaSyCDF9US2OwARlyZ0AH_zDpjzmOXRtrGKMg';
+  const ENDPOINT = `https://identitytoolkit.googleapis.com/v1/accounts:resetPassword?key=${API_KEY}`;
+  const params = new URLSearchParams(window.location.search);
+  const mode = params.get('mode');
+  const oobCode = params.get('oobCode');
+
+  const form = document.getElementById('resetForm');
+  const passwordInput = document.getElementById('passwordInput');
+  const confirmInput = document.getElementById('confirmInput');
+  const submitButton = document.getElementById('submitButton');
+  const statusBox = document.getElementById('statusBox');
+  const stateBadge = document.getElementById('stateBadge');
+  const resetLead = document.getElementById('resetLead');
+
+  function setStatus(message, kind) {
+    statusBox.hidden = false;
+    statusBox.textContent = message;
+    statusBox.className = `status-box ${kind ? `is-${kind}` : ''}`.trim();
+  }
+  function setDisabled(disabled) {
+    passwordInput.disabled = disabled;
+    confirmInput.disabled = disabled;
+    submitButton.disabled = disabled;
+  }
+  async function callResetPassword(payload) {
+    const response = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.error) {
+      const code = data.error?.message || `HTTP_${response.status}`;
+      throw new Error(code);
+    }
+    return data;
+  }
+  function friendlyError(code) {
+    if (code.includes('EXPIRED_OOB_CODE')) return 'This reset link has expired. Please request a new password reset email.';
+    if (code.includes('INVALID_OOB_CODE')) return 'This reset link is invalid or has already been used. Please request a new one.';
+    if (code.includes('WEAK_PASSWORD')) return 'Use at least 6 characters for the new password.';
+    if (code.includes('USER_DISABLED')) return 'This account is disabled.';
+    return 'Something went wrong while resetting the password. Please try again.';
+  }
+  async function verifyLink() {
+    if (mode && mode !== 'resetPassword') {
+      setDisabled(true);
+      stateBadge.textContent = 'Unsupported link';
+      setStatus('This link is not a password reset link.', 'error');
+      return;
+    }
+    if (!oobCode) {
+      setDisabled(true);
+      stateBadge.textContent = 'Missing code';
+      setStatus('The reset link is missing its verification code. Open the full link from your email.', 'error');
+      return;
+    }
+    try {
+      setDisabled(true);
+      setStatus('Checking your reset link...', 'warn');
+      const data = await callResetPassword({ oobCode });
+      const email = data.email ? ` for ${data.email}` : '';
+      stateBadge.textContent = 'Ready';
+      resetLead.textContent = `Create a fresh password${email}.`;
+      statusBox.hidden = true;
+      setDisabled(false);
+      passwordInput.focus();
+    } catch (error) {
+      setDisabled(true);
+      stateBadge.textContent = 'Link problem';
+      setStatus(friendlyError(error.message), 'error');
+    }
+  }
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const password = passwordInput.value;
+    const confirm = confirmInput.value;
+    if (password.length < 6) {
+      setStatus('Password must be at least 6 characters.', 'error');
+      passwordInput.focus();
+      return;
+    }
+    if (password !== confirm) {
+      setStatus('Passwords do not match.', 'error');
+      confirmInput.focus();
+      return;
+    }
+    try {
+      setDisabled(true);
+      submitButton.textContent = 'Resetting...';
+      setStatus('Saving your new password...', 'warn');
+      await callResetPassword({ oobCode, newPassword: password });
+      stateBadge.textContent = 'Done';
+      setStatus('Your password was reset successfully. You can now sign in with the new password.', 'ok');
+      form.hidden = true;
+    } catch (error) {
+      setDisabled(false);
+      submitButton.textContent = 'Reset password';
+      setStatus(friendlyError(error.message), 'error');
+    }
+  });
+  verifyLink();
+})();
+</script>
+</body>
+</html>
