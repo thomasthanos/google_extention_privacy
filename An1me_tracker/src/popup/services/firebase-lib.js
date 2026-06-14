@@ -4,7 +4,7 @@ const FirebaseLib = (function () {
   const API_KEY = firebaseConfig.apiKey;
   const PROJECT_ID = firebaseConfig.projectId;
 
-  const RESET_BACKEND_URL = "https://api.thomast.uk";
+  const RESET_BACKEND_URL = "https://an1me-tracker-password-reset.onrender.com";
 
   const OAUTH_CLIENT_ID_LOCAL = '851894443732-st4bqk291b03jf6bscup0eqck2n60gmq.apps.googleusercontent.com';
   // const OAUTH_CLIENT_ID_LOCAL =

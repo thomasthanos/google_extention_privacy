@@ -15,7 +15,7 @@
   "host_permissions": [
     "https://an1me.to/*",
     "https://*.an1me.to/*",
-    "https://api.thomast.uk/*",
+    "https://an1me-tracker-password-reset.onrender.com/*",
     "https://identitytoolkit.googleapis.com/*",
     "https://securetoken.googleapis.com/*",
     "https://firestore.googleapis.com/*",
