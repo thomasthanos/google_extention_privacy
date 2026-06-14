@@ -117,6 +117,18 @@
                 <span>Forgot password?</span>
             `;
         }
+
+        const warmup = () => AT.FirebaseSync?.warmupResetBackend?.();
+        const emailInput = document.getElementById('authEmailInput');
+        if (emailInput && !emailInput.dataset.warmupBound) {
+            emailInput.dataset.warmupBound = '1';
+            emailInput.addEventListener('focus', warmup, { passive: true });
+        }
+        if (forgot && !forgot.dataset.warmupBound) {
+            forgot.dataset.warmupBound = '1';
+            forgot.addEventListener('pointerenter', warmup, { passive: true });
+            forgot.addEventListener('focus', warmup, { passive: true });
+        }
     }
 
     if (document.readyState === 'loading') {
@@ -312,29 +324,30 @@
 
 
         const forgotBtn = document.getElementById('authForgotPasswordBtn');
-        const originalText = forgotBtn?.textContent || 'Forgot password?';
         if (forgotBtn) {
             forgotBtn.disabled = true;
             forgotBtn.textContent = 'Sending…';
         }
 
-        try {
-            await FirebaseSync.sendPasswordReset(email);
-            PopupLogger.log('Firebase', `Password reset request accepted for ${email}`);
+        // Fire-and-forget: the backend sends the email regardless of whether we
+        // wait for the response (and always replies with a generic message for
+        // privacy). Never block here — the user may remember their password and
+        // sign in normally instead of completing the reset.
+        FirebaseSync.sendPasswordReset(email)
+            .then(() => PopupLogger.log('Firebase', `Password reset request accepted for ${email}`))
+            .catch((err) => PopupLogger.warn('Firebase', `Password reset request error (non-blocking): ${err?.message}`));
 
-            setEmailFormError(
-                `If an account exists for ${email}, a reset email will arrive shortly. Check your inbox and spam folder.`,
-                { success: true }
-            );
-        } catch (err) {
-            PopupLogger.error('Firebase', 'Password reset error:', err);
-            setEmailFormError(friendlyAuthError(err));
-        } finally {
-            if (forgotBtn) {
+        setEmailFormError(
+            `If an account exists for ${email}, a reset email will arrive shortly. Check your inbox and spam folder. You can still sign in normally if you remember your password.`,
+            { success: true }
+        );
+
+        if (forgotBtn) {
+            setTimeout(() => {
                 forgotBtn.disabled = false;
-                forgotBtn.textContent = originalText;
+                forgotBtn.textContent = 'Forgot password?';
                 enhanceAuthMarkup();
-            }
+            }, 2000);
         }
     }
 

@@ -862,6 +862,20 @@ const FirebaseLib = (function () {
     }
   }
 
+  let _resetWarmupAt = 0;
+  function warmupResetBackend() {
+    const now = Date.now();
+    if (now - _resetWarmupAt < 60000) return;
+    _resetWarmupAt = now;
+    try {
+      fetch(`${RESET_BACKEND_URL}/health`, {
+        method: "GET",
+        keepalive: true,
+        cache: "no-store",
+      }).catch(() => {});
+    } catch {}
+  }
+
   async function sendPasswordReset(email) {
     if (!email) throw new Error("MISSING_EMAIL");
     try {
@@ -945,6 +959,7 @@ const FirebaseLib = (function () {
     signUpWithEmailPassword,
     setPasswordForCurrentUser,
     sendPasswordReset,
+    warmupResetBackend,
     verifyPasswordSilently,
     signOut,
     onAuthStateChanged,
@@ -1010,6 +1025,10 @@ const FirebaseSync = (function () {
 
     async function sendPasswordReset(email) {
         return await FirebaseLib.sendPasswordReset(email);
+    }
+
+    function warmupResetBackend() {
+        return FirebaseLib.warmupResetBackend();
     }
 
     async function setPasswordForCurrentUser(password) {
@@ -1089,6 +1108,7 @@ const FirebaseSync = (function () {
         signUpWithEmailPassword,
         signOut,
         sendPasswordReset,
+        warmupResetBackend,
         setPasswordForCurrentUser,
         verifyPasswordSilently,
         saveToCloud,
