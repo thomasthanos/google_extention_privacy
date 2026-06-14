@@ -764,6 +764,7 @@
         mergeGoalSettings,
         mergeBadgeUnlocks,
         areAnimeDataMapsEqual,
+        areAnimeEntriesEqual,
         areProgressMapsEqual,
         shallowEqualDeletedAnime,
         shallowEqualObjectMap,

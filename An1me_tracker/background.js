@@ -1603,6 +1603,10 @@ async function syncProgressOnly(reason = 'progress') {
     }
 }
 
+function fsFieldPathSegment(name) {
+    return '`' + String(name).replace(/\\/g, '\\\\').replace(/`/g, '\\`') + '`';
+}
+
 async function syncToFirebase(reason = 'sync') {
     if (syncInProgress) { pendingSync = true; return; }
 
@@ -1669,12 +1673,17 @@ async function syncToFirebase(reason = 'sync') {
         const cloudProgressRef = cloudDoc?.videoProgress || {};
         const cloudDeletedRef = cloudDoc?.deletedAnime || {};
         const cloudGroupRef = cloudDoc?.groupCoverImages || {};
-        const _changedFields = [];
-        if (!areAnimeDataMapsEqual(mergedAnime, cloudAnimeRef)) _changedFields.push('animeData');
-        if (!areProgressMapsEqual(mergedProgress, cloudProgressRef)) _changedFields.push('videoProgress');
-        if (!shallowEqualDeletedAnime(mergedDeleted, cloudDeletedRef)) _changedFields.push('deletedAnime');
-        if (!shallowEqualObjectMap(mergedGroup, cloudGroupRef)) _changedFields.push('groupCoverImages');
-        const needsCloudWrite = _changedFields.length > 0;
+
+        const animeChangedSlugs = [];
+        for (const slug of Object.keys(mergedAnime)) {
+            if (!areAnimeEntriesEqual(mergedAnime[slug], cloudAnimeRef[slug])) animeChangedSlugs.push(slug);
+        }
+        const animeRemovedSlugs = Object.keys(cloudAnimeRef).filter((s) => !(s in mergedAnime));
+        const animeFieldChanged = animeChangedSlugs.length > 0 || animeRemovedSlugs.length > 0;
+        const progressChangedC = !areProgressMapsEqual(mergedProgress, cloudProgressRef);
+        const deletedChangedC = !shallowEqualDeletedAnime(mergedDeleted, cloudDeletedRef);
+        const groupChangedC = !shallowEqualObjectMap(mergedGroup, cloudGroupRef);
+        const needsCloudWrite = animeFieldChanged || progressChangedC || deletedChangedC || groupChangedC;
 
         if (!needsCloudWrite) {
             _bgCloudDocCacheTime = Date.now();
@@ -1685,12 +1694,8 @@ async function syncToFirebase(reason = 'sync') {
 
         const url = `${FIRESTORE_BASE}/documents/users/${user.uid}`;
         const shouldWriteEmail = !cloudDoc || cloudDoc.email !== user.email;
-
-        const fieldList = ['animeData', 'videoProgress', 'deletedAnime', 'groupCoverImages', 'lastUpdated'];
-        if (shouldWriteEmail) fieldList.push('email');
-        const fieldMask = fieldList.map(f => `updateMask.fieldPaths=${f}`).join('&');
-
         const pushedAt = new Date().toISOString();
+
         const payloadFields = {
             animeData: mergedAnime,
             videoProgress: mergedProgress,
@@ -1700,10 +1705,29 @@ async function syncToFirebase(reason = 'sync') {
         };
         if (shouldWriteEmail) payloadFields.email = user.email;
 
-        // Encode episodes with short keys ONLY for the wire (the stored Firestore
-        // doc). The cache update below keeps the full-key `payloadFields` so all
-        // in-memory comparisons stay consistent with local storage.
-        const wireFields = { ...payloadFields, animeData: encodeEpisodesForCloud(mergedAnime) };
+        const fieldPaths = [];
+        const wireFields = { lastUpdated: pushedAt };
+        const _changedFields = [];
+
+        if (!cloudDoc) {
+            wireFields.animeData = encodeEpisodesForCloud(mergedAnime);
+            fieldPaths.push('animeData');
+            _changedFields.push(`animeData(new,${Object.keys(mergedAnime).length})`);
+        } else if (animeFieldChanged) {
+            const partial = {};
+            for (const s of animeChangedSlugs) partial[s] = mergedAnime[s];
+            wireFields.animeData = encodeEpisodesForCloud(partial);
+            for (const s of animeChangedSlugs) fieldPaths.push('animeData.' + fsFieldPathSegment(s));
+            for (const s of animeRemovedSlugs) fieldPaths.push('animeData.' + fsFieldPathSegment(s));
+            _changedFields.push(`animeData(${animeChangedSlugs.length}+, ${animeRemovedSlugs.length}-)`);
+        }
+        if (progressChangedC) { wireFields.videoProgress = mergedProgress; fieldPaths.push('videoProgress'); _changedFields.push('videoProgress'); }
+        if (deletedChangedC) { wireFields.deletedAnime = mergedDeleted; fieldPaths.push('deletedAnime'); _changedFields.push('deletedAnime'); }
+        if (groupChangedC) { wireFields.groupCoverImages = mergedGroup; fieldPaths.push('groupCoverImages'); _changedFields.push('groupCoverImages'); }
+        fieldPaths.push('lastUpdated');
+        if (shouldWriteEmail) { wireFields.email = user.email; fieldPaths.push('email'); }
+
+        const fieldMask = fieldPaths.map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&');
         const _body = JSON.stringify({
             fields: jsonToFirestoreFields(wireFields)
         });
