@@ -1863,12 +1863,12 @@
                 if (!containerRect.width || !tabRect.width) return;
 
                 const offsetX = tabRect.left - containerRect.left;
+                if (instant) slider.style.transition = 'none';
                 slider.style.width = tabRect.width + 'px';
                 slider.style.transform = `translateX(${offsetX}px)`;
                 slider.classList.add('is-ready');
                 elements.categoryTabs.classList.add('slider-ready');
                 if (instant) {
-                    slider.style.transition = 'none';
                     slider.offsetHeight;
                     slider.style.transition = '';
                 }
@@ -1907,7 +1907,7 @@
 
                     setViewMode(null);
 
-                    requestAnimationFrame(() => moveSlider(tab, false));
+                    moveSlider(tab, false);
 
                     if (categoryChanged) {
                         currentCategory = nextCategory;
