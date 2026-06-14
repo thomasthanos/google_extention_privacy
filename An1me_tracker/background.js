@@ -105,8 +105,9 @@ const FSDebug = (() => {
         lastReadAt = Date.now();
         push({ t: lastReadAt, op: 'READ', kind, reason });
         if (!enabled) return;
+        const why = reason || 'cloud data';
         console.log(
-            `%cREAD%c cloud data  %c${tag()}`,
+            `%cREAD%c ${why} · ${kind}  %c${tag()}`,
             css.read, css.reason, css.meta
         );
     }
