@@ -363,6 +363,15 @@ async function finalizeMetadataRepair(state, patch = {}) {
     return finalState;
 }
 
+async function _isWatchTabOpen() {
+    try {
+        const tabs = await chrome.tabs.query({ url: ['https://an1me.to/watch/*', 'https://*.an1me.to/watch/*'] });
+        return Array.isArray(tabs) && tabs.length > 0;
+    } catch {
+        return false;
+    }
+}
+
 async function runMetadataRepairBatch(options = {}) {
     if (metadataRepairInProgress) return false;
     metadataRepairInProgress = true;
@@ -381,6 +390,11 @@ async function runMetadataRepairBatch(options = {}) {
             state = await getMetadataRepairState();
             if (!state || state.status !== 'running') {
                 await chrome.alarms.clear(METADATA_REPAIR_ALARM);
+                return false;
+            }
+
+            if (await _isWatchTabOpen()) {
+                scheduleMetadataRepairFallback(1);
                 return false;
             }
 
@@ -469,7 +483,7 @@ async function runMetadataRepairBatch(options = {}) {
             }
 
             await setMetadataRepairState(state);
-            await delay(METADATA_REPAIR_INTER_ITEM_DELAY_MS);
+            await delay(isMobileUA ? 1500 : METADATA_REPAIR_INTER_ITEM_DELAY_MS);
         }
     } catch (error) {
         console.error('[BG] Library repair failed:', error);
