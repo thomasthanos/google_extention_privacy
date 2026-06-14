@@ -40,6 +40,7 @@ const applyDeletedAnime = sharedMergeUtils.applyDeletedAnime || missingMergeUtil
 const removeDeletedProgress = sharedMergeUtils.removeDeletedProgress || missingMergeUtil('removeDeletedProgress');
 const mergeGroupCoverImages = sharedMergeUtils.mergeGroupCoverImages || missingMergeUtil('mergeGroupCoverImages');
 const areAnimeDataMapsEqual = sharedMergeUtils.areAnimeDataMapsEqual || missingMergeUtil('areAnimeDataMapsEqual');
+const areAnimeEntriesEqual = sharedMergeUtils.areAnimeEntriesEqual || missingMergeUtil('areAnimeEntriesEqual');
 const areProgressMapsEqual = sharedMergeUtils.areProgressMapsEqual || missingMergeUtil('areProgressMapsEqual');
 const shallowEqualDeletedAnime = sharedMergeUtils.shallowEqualDeletedAnime || missingMergeUtil('shallowEqualDeletedAnime');
 const shallowEqualObjectMap = sharedMergeUtils.shallowEqualObjectMap || missingMergeUtil('shallowEqualObjectMap');
@@ -57,19 +58,18 @@ const dlog = (...a) => { if (BG_DEBUG) console.log(...a); };
 const ddebug = (...a) => { if (BG_DEBUG) console.debug(...a); };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Firestore activity debugger.
-// Logs every Firestore READ / WRITE (and every *skipped* no-op sync) to the
-// service-worker console, with the trigger reason and running session counters,
-// so you can see exactly what is hitting the database and why.
-//   • On by default. Silence with:   chrome.storage.local.set({ __fsDebug:false })
-//   • Re-enable with:                chrome.storage.local.set({ __fsDebug:true })
-//   • One-shot summary from the SW console:   fsStats()
-// ─────────────────────────────────────────────────────────────────────────────
 const FSDebug = (() => {
-    let enabled = false;                     // default OFF — enable via chrome.storage.local.set({__fsDebug:true})
-    const startedAt = Date.now();
-    const counts = { reads: 0, writes: 0, skips: 0, full: 0, progress: 0, playback: 0, anilist: 0, revalidate: 0 };
-    const recent = [];                       // ring buffer for fsStats()
+    let enabled = false;
+    let startedAt = Date.now();
+    let lastReadAt = 0;
+    let lastWriteAt = 0;
+    const counts = {
+        reads: 0, writes: 0, skips: 0, bytes: 0,
+        readKind: { full: 0, revalidate: 0 },
+        writeType: { full: 0, progress: 0, playback: 0, anilist: 0 },
+        skipType: { full: 0, progress: 0, playback: 0, anilist: 0 },
+    };
+    const recent = [];
 
     try {
         chrome.storage.local.get(['__fsDebug']).then((r) => {
@@ -78,121 +78,116 @@ const FSDebug = (() => {
         chrome.storage.onChanged.addListener((ch, ns) => {
             if (ns === 'local' && ch.__fsDebug && typeof ch.__fsDebug.newValue === 'boolean') {
                 enabled = ch.__fsDebug.newValue;
-                console.debug(`%c[FS] debug ${enabled ? 'ON' : 'OFF'}`, 'color:#f59e0b;font-weight:700');
+                console.log(`%cFirestore debug ${enabled ? 'ON' : 'OFF'}`, `background:${enabled ? '#10b981' : '#64748b'};color:#fff;border-radius:3px;padding:1px 7px;font-weight:600`);
             }
         });
     } catch {}
 
     const mins = () => Math.max(1 / 60, (Date.now() - startedAt) / 60000);
-    const tag = () =>
-        `Σ r=${counts.reads} w=${counts.writes} [full=${counts.full} prog=${counts.progress} pb=${counts.playback} ani=${counts.anilist}] skip=${counts.skips} · ${(counts.writes / mins()).toFixed(1)}w/min`;
+    const rate = (n) => +(n / mins()).toFixed(1);
+    const ago = (t) => (t ? `${Math.round((Date.now() - t) / 1000)}s ago` : '—');
+    const kb = (b) => `${(b / 1024).toFixed(1)} KB`;
+
+    const css = {
+        read:   'background:#f97316;color:#fff;border-radius:3px;padding:1px 7px;font-weight:600',
+        write:  'background:#ef4444;color:#fff;border-radius:3px;padding:1px 7px;font-weight:600',
+        skip:   'background:#475569;color:#cbd5e1;border-radius:3px;padding:1px 7px',
+        reason: 'color:#e2e8f0',
+        meta:   'color:#94a3b8',
+    };
+
+    const tag = () => `${counts.reads}R ${counts.writes}W · ${kb(counts.bytes)}`;
     const push = (e) => { recent.push(e); if (recent.length > 80) recent.shift(); };
 
     function read(reason, kind = 'full') {
         counts.reads++;
-        if (kind === 'revalidate') counts.revalidate++;
-        push({ t: Date.now(), op: 'READ', kind, reason });
+        if (counts.readKind[kind] != null) counts.readKind[kind]++;
+        lastReadAt = Date.now();
+        push({ t: lastReadAt, op: 'READ', kind, reason });
         if (!enabled) return;
         console.log(
-            `%c[FS] READ #${counts.reads} ${kind}%c ${reason}  %c${tag()}`,
-            'background:#dc2626;color:#fff;border-radius:3px;padding:1px 6px;font-weight:700',
-            'color:#fca5a5', 'color:#64748b'
+            `%cREAD%c cloud data  %c${tag()}`,
+            css.read, css.reason, css.meta
         );
     }
 
     function write(type, reason, info = {}) {
         counts.writes++;
-        if (counts[type] != null) counts[type]++;
-        push({ t: Date.now(), op: 'WRITE', type, reason, fields: info.fields, bytes: info.bytes });
+        if (counts.writeType[type] != null) counts.writeType[type]++;
+        const bytes = info.bytes || 0;
+        counts.bytes += bytes;
+        lastWriteAt = Date.now();
+        push({ t: lastWriteAt, op: 'WRITE', type, reason, fields: info.fields, bytes });
         if (!enabled) return;
-        const fields = info.fields ? ` [${info.fields.join(',')}]` : '';
-        const size = info.bytes != null ? ` ${(info.bytes / 1024).toFixed(1)}KB` : '';
+        const what = info.fields && info.fields.length ? info.fields.join(', ') : type;
+        const size = bytes ? `${kb(bytes)}` : '—';
         console.log(
-            `%c[FS] WRITE #${counts.writes} ${type}%c ${reason}${fields}${size}  %c${tag()}`,
-            'background:#dc2626;color:#fff;border-radius:3px;padding:1px 6px;font-weight:700',
-            'color:#fca5a5', 'color:#64748b'
+            `%cWRITE%c ${what} · ${size}  %c${tag()}`,
+            css.write, css.reason, css.meta
         );
     }
 
     function skip(type, reason) {
         counts.skips++;
+        if (counts.skipType[type] != null) counts.skipType[type]++;
         push({ t: Date.now(), op: 'SKIP', type, reason });
         if (!enabled) return;
         console.debug(
-            `%c[FS] skip ${type}%c ${reason} — cloud already up to date`,
-            'background:#475569;color:#fff;border-radius:3px;padding:1px 6px',
-            'color:#cbd5e1'
+            `%cskip%c ${type} — already in sync`,
+            css.skip, css.meta
         );
-    }
-
-    // Trigger layer: a chrome.storage write (from any of the split modules) that
-    // *may* lead to a sync. Logs what changed and the decision, so you can trace
-    // a write back to whichever module/event caused it. Not counted as an op.
-    function trigger(label) {
-        push({ t: Date.now(), op: 'TRIG', reason: label });
-        if (!enabled) return;
-        console.debug(
-            `%c[FS] trigger%c ${label}`,
-            'background:#7c3aed;color:#fff;border-radius:3px;padding:1px 6px;font-weight:700',
-            'color:#c4b5fd'
-        );
-    }
-
-    const MSG_TYPES = new Set([
-        'SYNC_TO_FIREBASE', 'SYNC_TO_FIREBASE_IMMEDIATE', 'SYNC_PROGRESS_ONLY',
-        'WAKE_AND_POLL_CLOUD', 'WAKE_AND_POLL_CLOUD_FORCE', 'GET_CLOUD_DOC',
-        'PUSH_PLAYBACK_SETTINGS', 'PUSH_ANILIST_AUTH', 'WATCHLIST_SYNC',
-        'INVALIDATE_BG_CLOUD_DOC_CACHE', 'UPDATE_BG_CLOUD_DOC_CACHE',
-        'UPDATE_BG_CLOUD_DOC_PARTIAL', 'BATCH_FETCH_ANIME_INFO', 'FETCH_ANIME_INFO',
-        'START_LIBRARY_REPAIR', 'SET_SMART_NOTIFICATIONS'
-    ]);
-    const msgLog = [];
-    let msgGroupPrinted = false;
-    const printMsgGroupOnce = () => {
-        if (msgGroupPrinted) return;
-        msgGroupPrinted = true;
-        const group = console.groupCollapsed || console.group || console.log;
-        group.call(
-            console,
-            '%c[FS] msg%c all messages (live)',
-            'background:#0891b2;color:#fff;border-radius:3px;padding:1px 6px;font-weight:700',
-            'color:#67e8f9;font-weight:700'
-        );
-        console.debug('Open this live array to inspect every msg:', msgLog);
-        console.groupEnd?.();
-    };
-    try { globalThis.fsMsgs = msgLog; } catch {}
-
-    function msg(type, sender) {
-        if (!enabled || !MSG_TYPES.has(type)) return;
-        push({ t: Date.now(), op: 'MSG', reason: type });
-        const from = sender?.url ? sender.url.split('/').pop() : (sender?.tab ? 'tab' : 'popup');
-        msgLog.push({ at: new Date().toLocaleTimeString(), type, from });
-        if (msgLog.length > 250) msgLog.shift();
-        printMsgGroupOnce();
     }
 
     function stats() {
+        const attempts = counts.writes + counts.skips;
         const summary = {
             uptimeMin: +mins().toFixed(1),
-            reads: counts.reads, writes: counts.writes, skips: counts.skips,
-            byType: { full: counts.full, progress: counts.progress, playback: counts.playback, anilist: counts.anilist },
-            writesPerMin: +(counts.writes / mins()).toFixed(2)
+            reads: counts.reads,
+            writes: counts.writes,
+            skips: counts.skips,
+            savedRatio: attempts ? +(counts.skips / attempts).toFixed(2) : 0,
+            KBwritten: +(counts.bytes / 1024).toFixed(1),
+            readsPerMin: rate(counts.reads),
+            writesPerMin: rate(counts.writes),
+            readByKind: { ...counts.readKind },
+            writeByType: { ...counts.writeType },
+            skipByType: { ...counts.skipType },
+            lastRead: ago(lastReadAt),
+            lastWrite: ago(lastWriteAt),
         };
         try {
             console.table(recent.slice(-40).map((e) => ({
-                at: new Date(e.t).toLocaleTimeString(),
-                op: e.op, type: e.type || e.kind || '', reason: e.reason || '',
-                fields: (e.fields || []).join(','), KB: e.bytes != null ? +(e.bytes / 1024).toFixed(1) : ''
+                time: new Date(e.t).toLocaleTimeString(),
+                op: e.op.toLowerCase(),
+                type: e.type || e.kind || '', reason: e.reason || '',
+                fields: (e.fields || []).join(', '), KB: e.bytes ? +(e.bytes / 1024).toFixed(1) : ''
             })));
         } catch {}
-        console.log('[FS] session summary:', summary);
+        console.log(
+            `%cFirestore session%c  ${counts.reads} reads · ${counts.writes} writes · ${kb(counts.bytes)} · ${counts.skips} saved`,
+            'background:#0ea5e9;color:#fff;border-radius:3px;padding:1px 7px;font-weight:600', css.meta
+        );
+        console.log(summary);
         return summary;
     }
 
-    return { read, write, skip, trigger, msg, stats, isEnabled: () => enabled };
+    function reset() {
+        counts.reads = counts.writes = counts.skips = counts.bytes = 0;
+        for (const k in counts.readKind) counts.readKind[k] = 0;
+        for (const k in counts.writeType) counts.writeType[k] = 0;
+        for (const k in counts.skipType) counts.skipType[k] = 0;
+        recent.length = 0;
+        startedAt = Date.now();
+        lastReadAt = lastWriteAt = 0;
+        console.log('%cFirestore counters reset', 'background:#10b981;color:#fff;border-radius:3px;padding:1px 7px;font-weight:600');
+    }
+
+    return { read, write, skip, stats, reset, isEnabled: () => enabled };
 })();
-try { globalThis.fsStats = () => FSDebug.stats(); } catch {}
+try {
+    globalThis.fsStats = () => FSDebug.stats();
+    globalThis.fsReset = () => FSDebug.reset();
+} catch {}
 
 const COMPLETED_PERCENTAGE = 85;
 const DELETED_ANIME_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -249,41 +244,6 @@ function areAnimeDataEqualIgnoringFetchMetadata(oldAnime = {}, newAnime = {}) {
     }
     return true;
 }
-
-// Diagnostic: pinpoint WHAT changed between two animeData maps (ignoring the
-// silent fetch-metadata fields), so a full-sync trigger can name the exact
-// slug+field that flapped. Returns a short human string.
-function describeAnimeDataDiff(oldAnime = {}, newAnime = {}) {
-    const oldKeys = Object.keys(oldAnime || {});
-    const newKeys = Object.keys(newAnime || {});
-    const added = newKeys.filter((k) => !(k in oldAnime));
-    const removed = oldKeys.filter((k) => !(k in newAnime));
-    if (added.length) return `added ${added.length}: ${added.slice(0, 3).join(',')}`;
-    if (removed.length) return `removed ${removed.length}: ${removed.slice(0, 3).join(',')}`;
-
-    for (const slug of newKeys) {
-        const a = stripFirebaseSilentAnimeMetadata(oldAnime[slug]) || {};
-        const b = stripFirebaseSilentAnimeMetadata(newAnime[slug]) || {};
-        if (JSON.stringify(a) === JSON.stringify(b)) continue;
-        const fields = new Set([...Object.keys(a), ...Object.keys(b)]);
-        const diffs = [];
-        for (const f of fields) {
-            if (JSON.stringify(a[f]) === JSON.stringify(b[f])) continue;
-            if (f === 'episodes') {
-                diffs.push(`episodes ${(a.episodes || []).length}→${(b.episodes || []).length}`);
-            } else {
-                const av = JSON.stringify(a[f]); const bv = JSON.stringify(b[f]);
-                diffs.push(`${f}(${av && av.length < 24 ? av : '…'}→${bv && bv.length < 24 ? bv : '…'})`);
-            }
-        }
-        return `${slug}: ${diffs.join(', ')}`;
-    }
-    return 'key-order/count only';
-}
-
-
-
-
 
 const PENDING_SYNC_KEY = 'pendingSyncFlush';
 
@@ -1512,7 +1472,7 @@ async function syncProgressOnly(reason = 'progress') {
         });
 
         if (response.ok) {
-            FSDebug.write('progress', reason, { fields: ['videoProgress'], bytes: _body.length });
+            FSDebug.write('progress', reason, { fields: ['progress'], bytes: _body.length });
             lastPushedProgressBG = structuredClone(mergedVP);
 
 
@@ -1712,18 +1672,18 @@ async function syncToFirebase(reason = 'sync') {
         if (!cloudDoc) {
             wireFields.animeData = encodeEpisodesForCloud(mergedAnime);
             fieldPaths.push('animeData');
-            _changedFields.push(`animeData(new,${Object.keys(mergedAnime).length})`);
+            _changedFields.push('anime');
         } else if (animeFieldChanged) {
             const partial = {};
             for (const s of animeChangedSlugs) partial[s] = mergedAnime[s];
             wireFields.animeData = encodeEpisodesForCloud(partial);
             for (const s of animeChangedSlugs) fieldPaths.push('animeData.' + fsFieldPathSegment(s));
             for (const s of animeRemovedSlugs) fieldPaths.push('animeData.' + fsFieldPathSegment(s));
-            _changedFields.push(`animeData(${animeChangedSlugs.length}+, ${animeRemovedSlugs.length}-)`);
+            _changedFields.push('anime');
         }
-        if (progressChangedC) { wireFields.videoProgress = mergedProgress; fieldPaths.push('videoProgress'); _changedFields.push('videoProgress'); }
-        if (deletedChangedC) { wireFields.deletedAnime = mergedDeleted; fieldPaths.push('deletedAnime'); _changedFields.push('deletedAnime'); }
-        if (groupChangedC) { wireFields.groupCoverImages = mergedGroup; fieldPaths.push('groupCoverImages'); _changedFields.push('groupCoverImages'); }
+        if (progressChangedC) { wireFields.videoProgress = mergedProgress; fieldPaths.push('videoProgress'); _changedFields.push('progress'); }
+        if (deletedChangedC) { wireFields.deletedAnime = mergedDeleted; fieldPaths.push('deletedAnime'); _changedFields.push('deleted'); }
+        if (groupChangedC) { wireFields.groupCoverImages = mergedGroup; fieldPaths.push('groupCoverImages'); _changedFields.push('covers'); }
         fieldPaths.push('lastUpdated');
         if (shouldWriteEmail) { wireFields.email = user.email; fieldPaths.push('email'); }
 
@@ -2172,7 +2132,6 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
     let _pendingProgressSync = false;
     let _pendingFullSync = false;
-    let _animeDiffDetail = null;
 
     if (changes.videoProgress && !isSyncPaused()) {
         _pendingProgressSync = true;
@@ -2186,7 +2145,6 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         const newCount = Object.values(newAnime).reduce((s, a) => s + (a.episodes?.length || 0), 0);
 
         const libraryChanged = !areAnimeDataEqualIgnoringFetchMetadata(oldAnime, newAnime);
-        if (libraryChanged) _animeDiffDetail = describeAnimeDataDiff(oldAnime, newAnime);
 
         if (newCount > oldCount || libraryChanged) {
             if (newCount > oldCount) {
@@ -2228,18 +2186,6 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
 
         chrome.alarms.create(PROGRESS_SYNC_ALARM, { delayInMinutes: 5 });
-    }
-
-    // Trace which storage write (from any split module) reached the sync layer and
-    // what was decided — so a noisy writer can be spotted even if it ends in no-op.
-    const _changedSyncKeys = ['videoProgress', 'animeData', 'deletedAnime', 'groupCoverImages']
-        .filter((k) => changes[k]);
-    if (_changedSyncKeys.length) {
-        const decision = isSyncPaused() ? 'paused (self-write echo)'
-            : _pendingFullSync ? 'full-sync queued (5s)'
-            : _pendingProgressSync ? 'progress-sync queued (5min)'
-            : 'no-op (fetch-metadata only / no real change)';
-        FSDebug.trigger(`onChanged [${_changedSyncKeys.join(',')}] → ${decision}${_animeDiffDetail ? ` · diff=${_animeDiffDetail}` : ''}`);
     }
 
     if (changes.animeData) {
@@ -2425,7 +2371,6 @@ async function persistBeforeUnloadTrack(animeInfo, duration) {
 
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    try { FSDebug.msg(message?.type, _sender); } catch {}
     if (message.type === 'SYNC_TO_FIREBASE_IMMEDIATE') {
         sendResponse({ received: true });
         if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
@@ -2469,7 +2414,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                     })
                 });
                 if (res.ok) {
-                    FSDebug.write('playback', 'push-playback-settings', { fields: ['playbackSettings'] });
+                    FSDebug.write('playback', 'push-playback-settings', { fields: ['settings'] });
                     if (_bgCloudDocCache && _bgCloudDocCacheUid === user.uid) {
                         _bgCloudDocCache.playbackSettings = message.playbackSettings;
                         _bgCloudDocCacheTime = Date.now();
@@ -2510,7 +2455,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                     })
                 });
                 if (res.ok) {
-                    FSDebug.write('anilist', 'push-anilist-auth', { fields: ['anilistAuth'] });
+                    FSDebug.write('anilist', 'push-anilist-auth', { fields: ['anilist'] });
                     if (_bgCloudDocCache && _bgCloudDocCacheUid === user.uid) {
                         _bgCloudDocCache.anilistAuth = message.anilistAuth;
                         _bgCloudDocCacheTime = Date.now();
