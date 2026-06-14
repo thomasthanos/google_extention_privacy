@@ -4111,6 +4111,12 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   box-shadow: none !important
 }
 
+.slug-input-wrap input[readonly] {
+  cursor: default;
+  color: rgba(226,232,246,0.9);
+  -webkit-text-fill-color: rgba(226,232,246,0.9)
+}
+
 /* Meta panel below the input — visible only when card has data */
 .slug-card-meta {
   display: none;
@@ -4377,12 +4383,34 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
 
 /* ─── "Watching now" auto-detect banner (Add Anime dialog) ─── */
 .watch-detect {
+  display: flex;
   margin-bottom: 14px;
   padding: 10px 12px;
   border-radius: 10px;
   background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.10), rgba(var(--primary-rgb), 0.03));
   border: 1px solid rgba(var(--primary-rgb), 0.22);
-  animation: fadeIn 0.18s ease
+  animation: fadeIn 0.18s ease;
+  align-items: stretch;
+  gap: 10px
+}
+.watch-detect-cover {
+  width: 58px;
+  min-width: 58px;
+  height: 82px;
+  border-radius: 8px;
+  object-fit: cover;
+  align-self: stretch;
+  background: rgba(5,9,18,0.5);
+  border: 1px solid rgba(var(--ink-rgb), 0.08);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.22)
+}
+.watch-detect-cover:not([src]),
+.watch-detect-cover[src=""] {
+  display: none
+}
+.watch-detect-content {
+  flex: 1 1 auto;
+  min-width: 0
 }
 .watch-detect-top {
   display: flex;
@@ -9809,4 +9837,16 @@ body.is-suppressing-hover #animeList .airing-list-cards .anime-movie-group:hover
   justify-self: end !important;
   align-self: center !important;
   transform: none !important;
+}
+
+/* Hide popup scrollbars while keeping scroll behavior. */
+* {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important
+}
+
+*::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important
 }

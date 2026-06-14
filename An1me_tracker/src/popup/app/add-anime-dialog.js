@@ -24,6 +24,10 @@
 
     function showAddAnimeDialog() {
         elements.animeSlugInput.value = '';
+        elements.animeSlugInput.readOnly = false;
+        delete elements.animeSlugInput.dataset.autoDetected;
+        elements.animeSlugInput.removeAttribute('title');
+        _setSlugSectionVisible(true);
         elements.episodesWatchedInput.value = '';
         elements.animeSlugInput.classList.remove('error');
         elements.episodesWatchedInput.classList.remove('error', 'invalid-range');
@@ -70,6 +74,11 @@
 
         const _wdb = document.getElementById('watchDetectBanner');
         if (_wdb) _wdb.style.display = 'none';
+        const watchCover = document.getElementById('watchDetectCover');
+        if (watchCover) {
+            watchCover.removeAttribute('src');
+            watchCover.style.display = 'none';
+        }
 
         openDialogA11y(elements.addAnimeDialog, {
             initialFocus: elements.animeSlugInput,
@@ -81,10 +90,27 @@
     }
 
     // ─── Auto-detect the anime/episode from an open an1me.to watch tab ───
+    function _watchInfoFromUrl(url) {
+        const slug = extractSlugFromInput(url || '');
+        if (!slug) return null;
+        const episodeMatch = String(url || '').match(/\/watch\/[^/?#]+-episode-(\d+)(?:[/?#]|$)/i);
+        return {
+            slug,
+            title: null,
+            episode: episodeMatch ? Number(episodeMatch[1]) : null,
+            secondEpisode: null,
+            totalEpisodes: null,
+            coverImage: null,
+            link: url || `https://an1me.to/anime/${slug}`
+        };
+    }
+
     async function _detectFromActiveTab() {
         let info = null;
         try {
-            const tabs = await chrome.tabs.query({
+            const activeTabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            const activeAn1meTab = (activeTabs || []).find(t => /^https:\/\/([^/]+\.)?an1me\.to\//i.test(t.url || ''));
+            const tabs = activeAn1meTab ? [activeAn1meTab] : await chrome.tabs.query({
                 url: ['https://an1me.to/watch/*', 'https://*.an1me.to/watch/*']
             });
             if (!tabs || tabs.length === 0) return;
@@ -96,17 +122,57 @@
                     resolve(resp || null);
                 });
             });
+            if (!info) info = _watchInfoFromUrl(tab.url);
+            if (info) info = await _hydrateWatchInfoMedia(info);
         } catch { return; }
-        if (!info || !info.slug || !info.episode) return;
+        if (!info || !info.slug) return;
         // Bail if the dialog was closed again while we were waiting.
         if (elements.addAnimeDialog?.getAttribute('aria-hidden') === 'true') return;
         _renderDetectBanner(info);
     }
 
+    async function _hydrateWatchInfoMedia(info) {
+        if (!info?.slug || info.coverImage) return info;
+        const slug = info.slug;
+        const tracked = AT.PopupState.animeData?.[slug];
+        if (tracked?.coverImage) return { ...info, coverImage: tracked.coverImage };
+        try {
+            const cached = await chrome.storage.local.get([`animeinfo_${slug}`]);
+            const animeInfo = cached?.[`animeinfo_${slug}`];
+            if (animeInfo?.coverImage) return { ...info, coverImage: animeInfo.coverImage };
+        } catch {}
+        return info;
+    }
+
+    function _setSlugSectionVisible(visible) {
+        const group = elements.animeSlugInput?.closest('.form-group');
+        if (group) group.style.display = visible ? '' : 'none';
+    }
+
+    function _setAutoDetectedSlug(slug, options = {}) {
+        if (!slug || elements.animeSlugInput.value.trim() !== '') return false;
+        elements.animeSlugInput.value = slug;
+        elements.animeSlugInput.readOnly = !!options.lock;
+        if (options.lock) {
+            elements.animeSlugInput.dataset.autoDetected = 'true';
+            elements.animeSlugInput.title = 'Auto-detected from the current an1me.to page';
+        } else {
+            delete elements.animeSlugInput.dataset.autoDetected;
+            elements.animeSlugInput.removeAttribute('title');
+        }
+        _setSlugSectionVisible(!options.hide);
+        onSlugInputChange(slug);
+        return true;
+    }
+
     function _renderDetectBanner(info) {
         const slug = info.slug;
         const epLo = Number(info.episode) || 0;
-        if (!slug || epLo <= 0) return;
+        if (!slug) return;
+        if (epLo <= 0) {
+            _setAutoDetectedSlug(slug, { lock: false, hide: false });
+            return;
+        }
         const epHi = (Number(info.secondEpisode) > epLo) ? Number(info.secondEpisode) : epLo;
         const isDouble = epHi > epLo;
 
@@ -115,14 +181,12 @@
 
         // Pre-fill the slug and kick off metadata loading (fillers / cover / total),
         // but never clobber something the user already typed.
-        if (elements.animeSlugInput.value.trim() === '') {
-            elements.animeSlugInput.value = slug;
-            onSlugInputChange(slug);
-        }
+        _setAutoDetectedSlug(slug, { lock: true, hide: true });
 
         const titleEl = document.getElementById('watchDetectTitle');
         const epEl = document.getElementById('watchDetectEp');
         const linkEl = document.getElementById('watchDetectLink');
+        const coverEl = document.getElementById('watchDetectCover');
         const existingEl = document.getElementById('watchDetectExisting');
         const onlyBtn = document.getElementById('watchDetectOnly');
         const allBtn = document.getElementById('watchDetectAll');
@@ -132,6 +196,15 @@
         if (titleEl) titleEl.textContent = displayTitle;
         if (epEl) epEl.textContent = `Episode ${epLabel}`;
         if (linkEl) linkEl.href = info.link || `https://an1me.to/watch/${slug}`;
+        if (coverEl) {
+            if (info.coverImage) {
+                coverEl.src = info.coverImage;
+                coverEl.style.display = '';
+            } else {
+                coverEl.removeAttribute('src');
+                coverEl.style.display = 'none';
+            }
+        }
 
         // Show what's already saved for this anime, if anything.
         const existing = AT.PopupState.animeData?.[slug];
@@ -174,15 +247,28 @@
             }
         }
 
+        if (elements.episodesWatchedInput?.value.trim() === '') {
+            const watchedSet = new Set(watchedNums);
+            const missing = [];
+            for (let n = 1; n <= epHi; n++) {
+                if (!watchedSet.has(n)) missing.push(n);
+            }
+            if (missing.length > 0) {
+                _applyDetectChoice(AT.EpisodeParse.buildRangeString(missing), { focusConfirm: false });
+            }
+        }
+
         banner.style.display = '';
     }
 
-    function _applyDetectChoice(rangeStr) {
+    function _applyDetectChoice(rangeStr, options = {}) {
         elements.episodesWatchedInput.value = rangeStr;
         elements.episodesWatchedInput.classList.remove('error', 'invalid-range');
         updateEpisodesPreview(rangeStr);
         // Nudge focus to the confirm button so Enter saves straight away.
-        try { elements.confirmAddAnime?.focus(); } catch {                 }
+        if (options.focusConfirm !== false) {
+            try { elements.confirmAddAnime?.focus(); } catch {                 }
+        }
     }
 
     function _setSlugStatus(status) {
