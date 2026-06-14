@@ -1,16 +1,4 @@
-/website
-/an1me-tracker-extension/.claude
-/an1me-tracker-extension/An1me.to
-/an1me-tracker-extension/An1me.to Tracker
-*.zip
-/An1me_tracker/.claude
-An1me_tracker/An1me_tracker
-An1me_tracker/_metadata/generated_indexed_rulesets/_ruleset1
-An1me_tracker/FILLER_AUTOSKIP_TODO.txt
-/An1me_tracker/screenshots
-/basckup
-/An1me_tracker/old backup dont change
 An1me_tracker/backend/.env
+An1me_tracker/backend/package-lock.json
 An1me_tracker/backend/serviceAccountKey.json
-An1me_tracker/backend/serviceAccountKey.base64.txt
-An1me_tracker/backend/node_modules/
+An1me_tracker/X.backup
