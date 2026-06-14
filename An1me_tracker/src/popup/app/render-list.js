@@ -404,6 +404,9 @@
             return;
         }
 
+        const scrollHost = elements.animeList.closest('.main-content') || document.querySelector('.main-content');
+        const savedScroll = scrollHost ? scrollHost.scrollTop : 0;
+
         elements.animeList.classList.add('no-transition');
 
         const range = document.createRange();
@@ -414,6 +417,10 @@
         AT.PopupState.lastRenderedListMarkup = combinedHtml;
 
         restoreExpansionState(elements.animeList, expansionState);
+
+        if (scrollHost && savedScroll > 0 && scrollHost.scrollTop !== savedScroll) {
+            scrollHost.scrollTop = savedScroll;
+        }
 
         setupCardEventListeners();
 
