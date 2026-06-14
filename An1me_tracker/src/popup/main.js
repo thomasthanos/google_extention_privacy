@@ -2344,13 +2344,8 @@
                 try {
                     chrome.runtime.sendMessage({ type: 'GET_VERSION' }, () => { void chrome.runtime.lastError; });
                 } catch {}
-                await refreshPopupCloudData(true);
+                await refreshPopupCloudData(false);
                 startPopupCloudRefresh();
-                try {
-                    chrome.runtime.sendMessage({ type: 'WAKE_AND_POLL_CLOUD_FORCE' });
-                } catch (e) {
-                    PopupLogger.error('Login', 'Failed to trigger cloud poll:', e);
-                }
 
                 const syncResult = AT.FirebaseSync.lastSyncResult || null;
                 const providers = user.providers || [];
@@ -2514,7 +2509,7 @@
         }
 
         startPopupCloudRefresh();
-        refreshPopupCloudData(true).catch((error) => {
+        refreshPopupCloudData(false).catch((error) => {
             PopupLogger.debug('Sync', 'Visibility refresh skipped:', error?.message || error);
         });
     });
