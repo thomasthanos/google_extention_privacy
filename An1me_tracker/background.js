@@ -199,6 +199,7 @@ const FSDebug = (() => {
                     time: new Date(e.t).toLocaleTimeString(),
                     op: e.op.toLowerCase(),
                     what: (e.fields || []).join(', ') || e.type || e.kind || '',
+                    why: e.reason || '',
                     KB: e.bytes ? +(e.bytes / 1024).toFixed(1) : ''
                 })));
             } catch {}
@@ -1224,6 +1225,12 @@ async function pollCloudData(reason = 'consumer-connected', { force = false } = 
             persistBgPollState({ cloudPollAt: pollAt });
             const cloudDoc = await fetchCloudData(user, token, `poll:${reason}`);
             if (cloudDoc) {
+                _bgCloudDocCache = cloudDoc;
+                _bgCloudDocCacheTime = Date.now();
+                _bgCloudDocCacheUid = user.uid;
+                bgStorageSet({
+                    [_BG_CLOUD_CACHE_KEY]: { uid: user.uid, doc: cloudDoc, cachedAt: _bgCloudDocCacheTime }
+                }).catch(() => {});
                 await applyCloudUpdate(cloudDoc);
             }
             return cloudDoc;
