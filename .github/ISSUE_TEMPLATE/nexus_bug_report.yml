@@ -1,0 +1,34 @@
+name: "NexusMods Bypass — Bug report"
+description: "Report a problem with the NexusMods Bypass extension. The extension pre-fills this form for you."
+title: "[Bug] "
+labels: ["bug", "nexusmods-bypass"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! If you clicked **Report a bug** inside the extension, the diagnostic
+        report below is already filled in (and a full copy is on your clipboard — paste it over the
+        short one if the field looks truncated).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, and what went wrong?
+      placeholder: "I clicked 'Download all mods' on a collection and…"
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Diagnostic report
+      description: "Auto-filled by the extension. If empty, paste the report from your clipboard here (the extension copies it when you click Report a bug)."
+      render: text
+    validations:
+      required: false
+  - type: input
+    id: browser
+    attributes:
+      label: Browser & version
+      placeholder: "Chrome 138 (only if the report above is empty)"
+    validations:
+      required: false

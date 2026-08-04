@@ -1,0 +1,10 @@
+# Build artifacts
+*.zip
+
+# Wrangler
+.wrangler
+node_modules/
+
+# Secrets — never commit
+.env*
+.dev.vars*

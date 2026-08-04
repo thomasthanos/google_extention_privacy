@@ -1,0 +1,402 @@
+/* ============================================================
+   nxtk-shared.css — Shared UI primitives (popup + content)
+   iOS 26/27 "Liquid Glass" design system
+   - Strong perimeter glass (luminous rim, dual hairline)
+   - Multi-layer liquid interior (tint + refraction + specular + grain)
+   - Background fully masked behind opaque tint + heavy backdrop blur
+   ============================================================ */
+
+:root {
+  /* Base palette */
+  --nxtk-bg-deep: #0b0c14;
+  --nxtk-accent: #d98f40;
+  --nxtk-accent-hover: #f0a352;
+  --nxtk-accent-dim: #b87a30;
+  --nxtk-accent-soft: rgba(217, 143, 64, 0.18);
+  --nxtk-accent-glow: 0 0 24px rgba(217, 143, 64, 0.35);
+  --nxtk-accent-glow-strong: 0 0 40px rgba(217, 143, 64, 0.55);
+
+  /* Liquid glass tints — high opacity so the page behind never bleeds through */
+  --nxtk-glass-tint: rgba(18, 20, 32, 0.78);
+  --nxtk-glass-tint-strong: rgba(14, 16, 26, 0.88);
+  --nxtk-glass-tint-soft: rgba(28, 30, 44, 0.62);
+  --nxtk-glass-blur: blur(32px) saturate(180%) contrast(1.05);
+  --nxtk-glass-blur-strong: blur(44px) saturate(200%) contrast(1.08);
+
+  /* Perimeter glass — the signature iOS 26 luminous rim */
+  --nxtk-rim-light: rgba(255, 255, 255, 0.55);
+  --nxtk-rim-light-soft: rgba(255, 255, 255, 0.22);
+  --nxtk-rim-dark: rgba(0, 0, 0, 0.55);
+  --nxtk-rim-hairline: rgba(255, 255, 255, 0.08);
+
+  /* Combined perimeter shadow stack — applied to every glass surface */
+  --nxtk-rim:
+    inset 0 1.2px 0 var(--nxtk-rim-light),
+    inset 0 -1px 0 var(--nxtk-rim-dark),
+    inset 1px 0 0 var(--nxtk-rim-light-soft),
+    inset -1px 0 0 rgba(0, 0, 0, 0.35),
+    inset 0 0 0 1px var(--nxtk-rim-hairline),
+    0 22px 60px rgba(0, 0, 0, 0.55),
+    0 4px 14px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(217, 143, 64, 0.22);
+
+  --nxtk-rim-strong:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1.2px 0 rgba(0, 0, 0, 0.65),
+    inset 1px 0 0 rgba(255, 255, 255, 0.28),
+    inset -1px 0 0 rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 28px 80px rgba(0, 0, 0, 0.65),
+    0 6px 18px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(217, 143, 64, 0.3),
+    0 0 30px rgba(217, 143, 64, 0.18);
+
+  /* Specular highlight gradients */
+  --nxtk-specular: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.22) 0%,
+    rgba(255, 255, 255, 0.06) 18%,
+    transparent 38%,
+    transparent 62%,
+    rgba(255, 255, 255, 0.04) 82%,
+    rgba(255, 255, 255, 0.14) 100%
+  );
+
+  --nxtk-sheen: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.14) 0%,
+    rgba(255, 255, 255, 0.04) 30%,
+    transparent 55%
+  );
+
+  /* SVG grain — adds the wet/glassy texture without showing the page */
+  --nxtk-noise: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.06 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+
+  /* Surfaces */
+  --nxtk-surface: var(--nxtk-glass-tint);
+  --nxtk-surface-high: var(--nxtk-glass-tint-strong);
+  --nxtk-border: rgba(217, 143, 64, 0.22);
+  --nxtk-border-strong: rgba(217, 143, 64, 0.45);
+  --nxtk-glass-border: rgba(255, 255, 255, 0.08);
+  --nxtk-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  /* Text */
+  --nxtk-text: #ececf3;
+  --nxtk-text-dim: #8a8a99;
+  --nxtk-text-bright: #ffffff;
+
+  /* Status */
+  --nxtk-danger: #ff5c5c;
+  --nxtk-success: #4ddb78;
+  --nxtk-info: #58b8ea;
+
+  /* Radii — iOS 26 "pebble" squircle */
+  --nxtk-radius: 22px;
+  --nxtk-radius-sm: 14px;
+  --nxtk-radius-xs: 10px;
+  --nxtk-radius-pill: 999px;
+
+  /* Motion */
+  --nxtk-transition: all 0.32s cubic-bezier(0.32, 0.72, 0.24, 1);
+  --nxtk-transition-fast: all 0.18s cubic-bezier(0.32, 0.72, 0.24, 1);
+
+  --nxtk-shadow-ambient: 0 12px 40px rgba(0, 0, 0, 0.5);
+  --nxtk-shadow-elevated: 0 28px 70px rgba(0, 0, 0, 0.6), 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+/* ============================================================
+   Buttons — liquid glass pills
+   ============================================================ */
+.nxtk-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border: none;
+  border-radius: var(--nxtk-radius-pill);
+  font-family: -apple-system, "SF Pro Display", "Inter", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: var(--nxtk-transition);
+  white-space: nowrap;
+  line-height: 1;
+  isolation: isolate;
+  overflow: hidden;
+  color: var(--nxtk-text-bright);
+  background: var(--nxtk-glass-tint);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 6px 18px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(217, 143, 64, 0.18);
+  backdrop-filter: var(--nxtk-glass-blur);
+  -webkit-backdrop-filter: var(--nxtk-glass-blur);
+}
+
+.nxtk-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--nxtk-specular);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  opacity: 0.9;
+  z-index: 1;
+}
+
+.nxtk-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    140% 80% at 50% -20%,
+    rgba(255, 255, 255, 0.28),
+    transparent 55%
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+.nxtk-btn > * {
+  position: relative;
+  z-index: 3;
+}
+
+.nxtk-btn:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 10px 26px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(217, 143, 64, 0.32),
+    var(--nxtk-accent-glow);
+}
+
+.nxtk-btn:active {
+  transform: translateY(1px) scale(0.985);
+  transition: var(--nxtk-transition-fast);
+}
+
+.nxtk-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+/* Primary — luminous orange liquid */
+.nxtk-btn-primary {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 50%),
+    linear-gradient(135deg, var(--nxtk-accent-hover), var(--nxtk-accent-dim));
+  color: #fff;
+  box-shadow:
+    inset 0 1.2px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 8px 22px rgba(217, 143, 64, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.nxtk-btn-primary:hover {
+  box-shadow:
+    inset 0 1.2px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2),
+    0 12px 32px rgba(217, 143, 64, 0.5),
+    var(--nxtk-accent-glow-strong);
+}
+
+/* Secondary — clear liquid glass */
+.nxtk-btn-secondary {
+  background: var(--nxtk-glass-tint);
+  color: var(--nxtk-text);
+}
+
+.nxtk-btn-secondary:hover {
+  background: var(--nxtk-glass-tint-strong);
+  color: var(--nxtk-text-bright);
+}
+
+/* Ghost */
+.nxtk-btn-ghost {
+  background: transparent;
+  color: var(--nxtk-text-dim);
+  padding: 8px;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.nxtk-btn-ghost::before,
+.nxtk-btn-ghost::after { display: none; }
+
+.nxtk-btn-ghost:hover {
+  color: var(--nxtk-accent);
+  background: rgba(217, 143, 64, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(217, 143, 64, 0.2);
+}
+
+.nxtk-btn-icon {
+  padding: 9px;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 50%;
+}
+
+/* ============================================================
+   Badge
+   ============================================================ */
+.nxtk-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 11px;
+  border-radius: var(--nxtk-radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  position: relative;
+  isolation: isolate;
+}
+
+.nxtk-badge-accent {
+  background: linear-gradient(135deg, var(--nxtk-accent-hover), var(--nxtk-accent-dim));
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+    0 2px 6px rgba(217, 143, 64, 0.3);
+}
+
+.nxtk-badge-outline {
+  background: var(--nxtk-glass-tint);
+  color: var(--nxtk-accent);
+  box-shadow:
+    inset 0 0 0 1px rgba(217, 143, 64, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: var(--nxtk-glass-blur);
+  -webkit-backdrop-filter: var(--nxtk-glass-blur);
+}
+
+/* ============================================================
+   Toggle Switch — liquid glass pill with floating bead
+   ============================================================ */
+.nxtk-toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.nxtk-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.nxtk-toggle-track {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--nxtk-radius-pill);
+  cursor: pointer;
+  background: rgba(20, 22, 32, 0.7);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.5),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  transition: var(--nxtk-transition);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.nxtk-toggle-track::after {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  left: 3px;
+  top: 3px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.95), rgba(220, 220, 230, 0.6) 60%, rgba(180, 180, 200, 0.4));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 2px 6px rgba(0, 0, 0, 0.5),
+    0 0 0 0.5px rgba(0, 0, 0, 0.2);
+  transition: var(--nxtk-transition);
+}
+
+.nxtk-toggle input:checked + .nxtk-toggle-track {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 55%),
+    linear-gradient(135deg, var(--nxtk-accent-hover), var(--nxtk-accent-dim));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 0 16px rgba(217, 143, 64, 0.45);
+}
+
+.nxtk-toggle input:checked + .nxtk-toggle-track::after {
+  transform: translateX(18px);
+  background:
+    radial-gradient(circle at 30% 25%, #ffffff, #f4f4f8 60%, #e4e4ec);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 3px 8px rgba(0, 0, 0, 0.35),
+    0 0 0 0.5px rgba(0, 0, 0, 0.15);
+}
+
+/* ============================================================
+   Animations
+   ============================================================ */
+@keyframes nxtk-slideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); filter: blur(8px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+@keyframes nxtk-fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes nxtk-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes nxtk-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+
+@keyframes nxtk-spin { to { transform: rotate(360deg); } }
+
+@keyframes nxtk-shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+
+/* Liquid breathing on accent glow */
+@keyframes nxtk-glow-breathe {
+  0%, 100% { box-shadow: 0 0 24px rgba(217, 143, 64, 0.25); }
+  50% { box-shadow: 0 0 36px rgba(217, 143, 64, 0.45); }
+}
+
+.nxtk-stagger-1 { animation: nxtk-fadeIn 0.5s cubic-bezier(0.32, 0.72, 0.24, 1) 0.05s both; }
+.nxtk-stagger-2 { animation: nxtk-fadeIn 0.5s cubic-bezier(0.32, 0.72, 0.24, 1) 0.10s both; }
+.nxtk-stagger-3 { animation: nxtk-fadeIn 0.5s cubic-bezier(0.32, 0.72, 0.24, 1) 0.16s both; }
+.nxtk-stagger-4 { animation: nxtk-fadeIn 0.5s cubic-bezier(0.32, 0.72, 0.24, 1) 0.22s both; }
+.nxtk-stagger-5 { animation: nxtk-fadeIn 0.5s cubic-bezier(0.32, 0.72, 0.24, 1) 0.28s both; }
+.nxtk-stagger-6 { animation: nxtk-fadeIn 0.5s cubic-bezier(0.32, 0.72, 0.24, 1) 0.34s both; }

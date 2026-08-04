@@ -1,0 +1,1152 @@
+{
+  "appName": {
+    "message": "NexusMods Bypass"
+  },
+  "appDesc": {
+    "message": "Nexus Mods 다운로드를 간편하게 하고, 컬렉션 다운로드 대기열을 관리하며, 완료된 파일의 기록을 로컬에 보관합니다."
+  },
+  "sectionQuickControls": {
+    "message": "빠른 설정"
+  },
+  "toggleAutoStart": {
+    "message": "다운로드 자동 시작"
+  },
+  "setAutoCloseTabLabel": {
+    "message": "Vortex 탭 닫기"
+  },
+  "toggleSkipReq": {
+    "message": "필수 항목 화면 건너뛰기"
+  },
+  "toggleHideUpsells": {
+    "message": "광고 및 Premium 패널 숨기기"
+  },
+  "toggleHideDownloadBar": {
+    "message": "다운로드 버튼 숨기기"
+  },
+  "setHandleArchivedFilesLabel": {
+    "message": "보관된 파일 버튼"
+  },
+  "setDebugLogsLabel": {
+    "message": "상세 확장 프로그램 로그"
+  },
+  "btnPageSettings": {
+    "message": "페이지 설정"
+  },
+  "btnGoNexus": {
+    "message": "NexusMods"
+  },
+  "btnReportBug": {
+    "message": "버그 신고 — 오류 보고서 복사"
+  },
+  "popupFooter": {
+    "message": "Nexus Mods 및 Vortex용 다운로드 도우미"
+  },
+  "ratingPrompt": {
+    "message": "마음에 드시나요? ⭐ GitHub에서 별을 눌러 주세요"
+  },
+  "ratingDismiss": {
+    "message": "닫기"
+  },
+  "welcomeTitle": {
+    "message": "NexusMods Bypass 준비 완료!"
+  },
+  "welcomeSubtitle": {
+    "message": "Nexus Mods 파일과 컬렉션 전체를 더 적은 클릭으로 — 대기열, 속도 조절, 재개를 지원합니다."
+  },
+  "quickStartTitle": {
+    "message": "빠른 시작"
+  },
+  "step1Title": {
+    "message": "Nexus Mods 파일 페이지 열기"
+  },
+  "step1Text": {
+    "message": "다운로드 버튼을 클릭하면 확장 프로그램이 링크를 준비하고 다운로드를 시작합니다."
+  },
+  "step2Title": {
+    "message": "컬렉션 사용해 보기"
+  },
+  "step2Text": {
+    "message": "컬렉션 페이지를 열고 Collection Downloader 패널에서 클릭 한 번으로 모든 모드를 받으세요."
+  },
+  "step3Title": {
+    "message": "원하는 대로 조정"
+  },
+  "step3Text": {
+    "message": "확장 프로그램 아이콘을 클릭하면 빠른 설정, Nexus 페이지의 ⚙ 버튼을 누르면 전체 설정을 볼 수 있습니다."
+  },
+  "privacyCardTitle": {
+    "message": "🔒 설계부터 프라이빗"
+  },
+  "privacyCardText": {
+    "message": "분석 도구, 계정, 외부 서버가 없습니다. 모든 것이 브라우저 안에 머무릅니다."
+  },
+  "bugCardTitle": {
+    "message": "🐛 문제가 생겼나요?"
+  },
+  "bugCardText": {
+    "message": "모든 \"버그 신고\" 버튼은 전체 진단 보고서를 복사하고 내용이 채워진 GitHub 이슈를 엽니다."
+  },
+  "starCardTitle": {
+    "message": "⭐ 마음에 드시나요?"
+  },
+  "starCardText": {
+    "message": "GitHub의 별 하나가 더 많은 모더에게 이 확장 프로그램을 알립니다."
+  },
+  "openNexusBtn": {
+    "message": "Nexus Mods 열기"
+  },
+  "starBtn": {
+    "message": "GitHub에서 별 주기"
+  },
+  "disclaimer": {
+    "message": "Nexus Mods와 제휴 관계가 없습니다. 본인의 Nexus Mods 계정이 필요하며, Premium 전용 콘텐츠는 그대로 Premium 전용입니다."
+  },
+  "errMissingFileMsg": {
+    "message": "이 다운로드 링크에는 파일 식별자가 없습니다."
+  },
+  "errMissingFileFix": {
+    "message": "파일 페이지를 열고 다시 시도하세요."
+  },
+  "errTimeoutMsg": {
+    "message": "Nexus Mods의 응답이 너무 오래 걸렸습니다."
+  },
+  "errTimeoutFix": {
+    "message": "연결을 확인한 뒤 다시 시도하세요."
+  },
+  "errOfflineMsg": {
+    "message": "오프라인 상태로 보입니다."
+  },
+  "errOfflineFix": {
+    "message": "인터넷에 다시 연결한 뒤 시도하세요."
+  },
+  "errNetworkErrorMsg": {
+    "message": "Nexus Mods에 대한 요청을 완료하지 못했습니다."
+  },
+  "errNetworkErrorFix": {
+    "message": "연결을 확인하고 다시 시도하세요."
+  },
+  "errRequiresLoginMsg": {
+    "message": "Nexus Mods에 로그인되어 있지 않습니다."
+  },
+  "errRequiresLoginFix": {
+    "message": "로그인한 뒤 이 페이지로 돌아와 다운로드를 다시 시도하세요."
+  },
+  "errCloudflareMsg": {
+    "message": "계속하려면 Nexus Mods의 브라우저 확인이 필요합니다."
+  },
+  "errCloudflareFix": {
+    "message": "파일 페이지에서 확인을 완료한 뒤 다시 시도하세요."
+  },
+  "errRateLimitedMsg": {
+    "message": "Nexus Mods가 일시적으로 요청을 제한하고 있습니다."
+  },
+  "errRateLimitedFix": {
+    "message": "몇 분 기다린 뒤 다시 시도하세요."
+  },
+  "errAccountSuspendedMsg": {
+    "message": "Nexus Mods가 추가 다운로드 요청을 일시적으로 중단했습니다."
+  },
+  "errAccountSuspendedFix": {
+    "message": "중단 기간이 늘어나지 않도록 잠시 기다린 뒤 시도하세요."
+  },
+  "errAccessDeniedMsg": {
+    "message": "Nexus Mods가 이 다운로드에 대한 접근을 거부했습니다."
+  },
+  "errAccessDeniedFix": {
+    "message": "계정 권한과 파일 페이지를 확인한 뒤 다시 시도하세요."
+  },
+  "errFileNotFoundMsg": {
+    "message": "요청한 파일을 Nexus Mods에서 찾을 수 없습니다."
+  },
+  "errFileNotFoundFix": {
+    "message": "파일이 삭제되었거나 링크가 오래된 것일 수 있습니다."
+  },
+  "errModerationHoldMsg": {
+    "message": "이 파일은 검토 중입니다."
+  },
+  "errModerationHoldFix": {
+    "message": "다운로드하기 전에 Nexus Mods의 승인을 기다리세요."
+  },
+  "errServerErrorMsg": {
+    "message": "Nexus Mods에 서버 측 문제가 발생했습니다."
+  },
+  "errServerErrorFix": {
+    "message": "잠시 기다린 뒤 다시 시도하세요."
+  },
+  "errInvalidResponseMsg": {
+    "message": "Nexus Mods가 예상치 못한 응답을 반환했습니다."
+  },
+  "errInvalidResponseFix": {
+    "message": "파일 페이지를 새로고침한 뒤 다시 시도하세요."
+  },
+  "errNoDownloadUrlMsg": {
+    "message": "Nexus Mods가 사용할 수 있는 다운로드 링크를 반환하지 않았습니다."
+  },
+  "errNoDownloadUrlFix": {
+    "message": "파일 페이지를 열고 로그인 상태를 확인한 뒤 다시 시도하세요."
+  },
+  "errNoNmmLinkMsg": {
+    "message": "Nexus Mods가 유효한 Vortex 링크를 반환하지 않았습니다."
+  },
+  "errNoNmmLinkFix": {
+    "message": "파일 페이지를 확인하고 다시 시도하거나 브라우저 다운로드로 전환하세요."
+  },
+  "errAbortedMsg": {
+    "message": "요청이 취소되었습니다."
+  },
+  "errUnsafeDownloadUrlMsg": {
+    "message": "Nexus Mods가 반환한 링크는 인식된 다운로드 대상이 아닙니다."
+  },
+  "errUnsafeDownloadUrlFix": {
+    "message": "파일 페이지를 열어 직접 다운로드하세요. 계속 발생하면 문제를 신고해 주세요."
+  },
+  "errContextInvalidMsg": {
+    "message": "이 페이지가 열려 있는 동안 확장 프로그램이 업데이트되거나 다시 로드되었습니다."
+  },
+  "errContextInvalidFix": {
+    "message": "이 Nexus Mods 페이지를 새로고침한 뒤 다시 시도하세요."
+  },
+  "errRequestFailedMsg": {
+    "message": "다운로드 요청에 실패했습니다."
+  },
+  "errRequestFailedFix": {
+    "message": "다운로드를 다시 시도하세요. 계속 발생하면 문제를 신고해 주세요."
+  },
+  "dlgDownloadIssue": {
+    "message": "다운로드 문제"
+  },
+  "dlgSignInRequired": {
+    "message": "로그인 필요"
+  },
+  "dlgErrorId": {
+    "message": "오류 ID"
+  },
+  "dlgReportBug": {
+    "message": "버그 신고"
+  },
+  "btnSignIn": {
+    "message": "Nexus Mods에 로그인"
+  },
+  "btnRetry": {
+    "message": "다시 시도"
+  },
+  "btnDone": {
+    "message": "완료"
+  },
+  "ariaCloseErrorDialog": {
+    "message": "오류 대화상자 닫기"
+  },
+  "deckTitle": {
+    "message": "Collection Downloader"
+  },
+  "deckReadyQueue": {
+    "message": "대기열 준비됨"
+  },
+  "deckSubtitle": {
+    "message": "컬렉션 전체를 대기열에 넣고, 완료된 다운로드를 가져오고, 다운로드 속도를 한 곳에서 조정하세요."
+  },
+  "deckDownloadMethod": {
+    "message": "다운로드 방식"
+  },
+  "deckMethodVortex": {
+    "message": "Vortex로 보내기"
+  },
+  "deckMethodVortexHint": {
+    "message": "클릭 한 번으로 Vortex 대기열에 넘기기에 가장 적합합니다."
+  },
+  "deckMethodBrowser": {
+    "message": "브라우저 다운로드"
+  },
+  "deckMethodBrowserHint": {
+    "message": "Vortex가 링크를 처리하지 않을 때 브라우저 기본 다운로드를 사용합니다."
+  },
+  "deckActions": {
+    "message": "작업"
+  },
+  "deckImportMods": {
+    "message": "다운로드한 모드 가져오기"
+  },
+  "tipImportInfo": {
+    "message": "가져오기 안내"
+  },
+  "deckDownloadAll": {
+    "message": "모든 모드 다운로드"
+  },
+  "deckDownloadMandatory": {
+    "message": "필수 항목 다운로드"
+  },
+  "deckDownloadMandatoryHint": {
+    "message": "핵심 파일만"
+  },
+  "deckDownloadOptional": {
+    "message": "선택 항목 다운로드"
+  },
+  "deckDownloadOptionalHint": {
+    "message": "선택적 추가 요소"
+  },
+  "deckSelectMods": {
+    "message": "다운로드할 모드 선택"
+  },
+  "deckSelectModsHint": {
+    "message": "직접 선택 목록"
+  },
+  "deckUpdateCollection": {
+    "message": "컬렉션 업데이트"
+  },
+  "deckUpdateCollectionHint": {
+    "message": "리비전 비교"
+  },
+  "deckProgress": {
+    "message": "다운로드 진행 상황"
+  },
+  "deckAdaptivePacing": {
+    "message": "적응형 속도 조절"
+  },
+  "deckLogs": {
+    "message": "로그"
+  },
+  "deckLogsCaption": {
+    "message": "실시간 활동 기록"
+  },
+  "statusDownloading": {
+    "message": "다운로드 중..."
+  },
+  "statusPaused": {
+    "message": "일시정지됨"
+  },
+  "statusFinished": {
+    "message": "완료됨"
+  },
+  "statusStopped": {
+    "message": "중지됨"
+  },
+  "outcomePartial": {
+    "message": "오류와 함께 완료"
+  },
+  "outcomeBlocked": {
+    "message": "조치 필요"
+  },
+  "outcomeFailed": {
+    "message": "실패"
+  },
+  "logDownloadStarted": {
+    "message": "다운로드를 시작했습니다."
+  },
+  "logDownloadFinished": {
+    "message": "다운로드를 완료했습니다."
+  },
+  "logDownloadPartial": {
+    "message": "오류와 함께 완료되었습니다. 다시 시도하면 성공한 파일은 건너뜁니다."
+  },
+  "logDownloadStopped": {
+    "message": "다운로드를 중지했습니다."
+  },
+  "logDownloadNeedsLogin": {
+    "message": "로그인할 때까지 다운로드를 일시정지했습니다."
+  },
+  "logDownloadBlocked": {
+    "message": "다운로드를 일시정지했습니다. 다시 시도하기 전에 오류 안내를 따르세요."
+  },
+  "logDownloadError": {
+    "message": "다운로드가 오류로 종료되었습니다."
+  },
+  "annPaused": {
+    "message": "다운로드를 일시정지했습니다."
+  },
+  "annResumed": {
+    "message": "다운로드를 재개했습니다."
+  },
+  "ariaProgress": {
+    "message": "컬렉션 다운로드 진행 상황"
+  },
+  "ariaPause": {
+    "message": "다운로드 일시정지"
+  },
+  "ariaResume": {
+    "message": "다운로드 재개"
+  },
+  "ariaStop": {
+    "message": "다운로드 중지"
+  },
+  "tipPauseResume": {
+    "message": "일시정지/재개"
+  },
+  "tipStop": {
+    "message": "중지"
+  },
+  "btnStatePleaseWait": {
+    "message": "잠시 기다려 주세요..."
+  },
+  "btnStateDownloading": {
+    "message": "다운로드 중!"
+  },
+  "btnStateError": {
+    "message": "오류"
+  },
+  "btnStateOpeningPage": {
+    "message": "파일 페이지 여는 중..."
+  },
+  "btnFileArchive": {
+    "message": "파일 보관함"
+  },
+  "btnModManagerDownload": {
+    "message": "모드 매니저로 다운로드"
+  },
+  "btnManualDownload": {
+    "message": "직접 다운로드"
+  },
+  "annOutcome": {
+    "message": "$1. $2.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "btnCancel": {
+    "message": "취소"
+  },
+  "btnClose": {
+    "message": "닫기"
+  },
+  "btnOk": {
+    "message": "확인"
+  },
+  "btnGotIt": {
+    "message": "알겠습니다"
+  },
+  "btnRestore": {
+    "message": "복원"
+  },
+  "ariaClose": {
+    "message": "닫기"
+  },
+  "dlgConfirmTitle": {
+    "message": "작업 확인"
+  },
+  "setTitle": {
+    "message": "다운로드 도우미 설정"
+  },
+  "setSubtitle": {
+    "message": "변경 사항은 즉시 저장됩니다. 기본값 복원 시 이 페이지가 다시 로드됩니다."
+  },
+  "setSectionFlow": {
+    "message": "다운로드 흐름"
+  },
+  "setSectionPacing": {
+    "message": "파일 및 속도"
+  },
+  "setSectionAdvanced": {
+    "message": "고급"
+  },
+  "setRestoreDefaults": {
+    "message": "기본값 복원 후 새로고침"
+  },
+  "setNeedHelp": {
+    "message": "다운로드에 도움이 필요하신가요?"
+  },
+  "setReportOnGithub": {
+    "message": "GitHub에서 버그 신고"
+  },
+  "setRestoreTitle": {
+    "message": "기본값 복원"
+  },
+  "setRestoreConfirm": {
+    "message": "기본 설정을 복원하고 이 Nexus 페이지를 새로고침할까요?"
+  },
+  "unitSeconds": {
+    "message": "초"
+  },
+  "setAutoStartDownloadLabel": {
+    "message": "다운로드 자동 시작"
+  },
+  "setAutoStartDownloadDesc": {
+    "message": "Nexus 파일 다운로드 페이지를 열면 추가 클릭 없이 Vortex 전달 또는 브라우저 다운로드를 시작합니다."
+  },
+  "setAutoCloseTabDesc": {
+    "message": "Vortex로 링크를 보낸 뒤 아래 지연 시간이 지나면 임시 Nexus 탭을 닫습니다."
+  },
+  "setSkipRequirementsLabel": {
+    "message": "필수 항목 화면 건너뛰기"
+  },
+  "setSkipRequirementsDesc": {
+    "message": "Nexus의 필수 항목 팝업을 지나 바로 다운로드 단계로 이동합니다."
+  },
+  "setShowAlertsOnErrorLabel": {
+    "message": "오류 팝업 표시"
+  },
+  "setShowAlertsOnErrorDesc": {
+    "message": "Nexus가 사용 가능한 다운로드 링크를 반환하지 않을 때 명확한 메시지를 표시합니다."
+  },
+  "setHidePremiumUpsellsLabel": {
+    "message": "광고 및 Premium 패널 숨기기"
+  },
+  "setHidePremiumUpsellsDesc": {
+    "message": "탐색 중 Nexus의 광고 영역, 빈 광고 컨테이너, Premium 배너, 업그레이드 패널을 숨깁니다."
+  },
+  "setHandleArchivedFilesDesc": {
+    "message": "Nexus가 숨기는 보관된 파일 항목에 Vortex 및 브라우저 다운로드 버튼을 추가합니다."
+  },
+  "setDebugLogsDesc": {
+    "message": "NexusMods Bypass의 상세 동작을 콘솔에 출력합니다. 오류는 항상 표시되며 이 설정은 버그 보고서에 영향을 주지 않습니다."
+  },
+  "setHideDownloadBarLabel": {
+    "message": "브라우저 다운로드 버튼 숨기기"
+  },
+  "setHideDownloadBarDesc": {
+    "message": "도구 모음에서 다운로드 버튼과 진행률 팝업을 제거합니다. Nexus뿐 아니라 이 브라우저 프로필의 모든 다운로드에 적용됩니다. 다운로드한 파일은 Ctrl+J로 언제든 확인할 수 있습니다."
+  },
+  "setDownloadFolderLabel": {
+    "message": "브라우저 다운로드 폴더"
+  },
+  "setDownloadFolderDesc": {
+    "message": "브라우저 다운로드 폴더 안의 하위 폴더입니다(Browser Download 모드용). 비워 두면 다운로드 폴더에 바로 저장됩니다 — 일부 모드 관리자는 이 폴더만 감시하고 하위 폴더는 보지 않습니다. Vortex 다운로드는 Vortex가 처리하므로 영향이 없습니다."
+  },
+  "setRequestTimeoutLabel": {
+    "message": "다운로드 요청 제한 시간"
+  },
+  "setRequestTimeoutDesc": {
+    "message": "확장 프로그램이 Nexus의 다운로드 링크 응답을 기다리는 시간입니다."
+  },
+  "setCloseTabDelayLabel": {
+    "message": "탭 닫기 지연"
+  },
+  "setCloseTabDelayDesc": {
+    "message": "자동으로 시작되어 탭을 닫는 Vortex 다운로드에만 적용됩니다. Vortex가 링크를 놓치면 값을 늘리세요."
+  },
+  "setDownloadSpeedLabel": {
+    "message": "내 Nexus 다운로드 속도"
+  },
+  "setDownloadSpeedDesc": {
+    "message": "Vortex 모드 전용입니다. 브라우저는 Vortex 내부의 전송을 볼 수 없으므로, 이 값으로 각 파일의 소요 시간을 추정하고 전달 간격을 둡니다. 실제로 나오는 속도를 입력하세요. 너무 낮으면 대기열이 필요 이상으로 오래 기다립니다."
+  },
+  "setPauseBetweenModsLabel": {
+    "message": "모드 사이 대기"
+  },
+  "setPauseBetweenModsDesc": {
+    "message": "Vortex 모드 전용입니다. 위 추정치에 더해집니다. 0으로 설정하면 크기 기반 추정을 포함해 대기를 완전히 끄고, 모든 파일을 연달아 Vortex에 넘겨 Vortex가 직접 대기열을 관리하게 합니다."
+  },
+  "dlgHistoryTitle": {
+    "message": "다운로드된 모드를 찾았습니다"
+  },
+  "dlgHistoryHelp": {
+    "message": "시작하기 전에 이번 실행의 동작을 선택하세요. 파일이 없다면 전체 다시 다운로드를 선택하세요."
+  },
+  "dlgHistorySkip": {
+    "message": "다운로드된 항목 건너뛰기"
+  },
+  "dlgHistorySkipHint": {
+    "message": "남은 모드만 계속 진행합니다."
+  },
+  "dlgHistoryRedownload": {
+    "message": "전체 다시 다운로드"
+  },
+  "dlgHistoryRedownloadHint": {
+    "message": "저장된 기록을 지우고 전체 목록을 처음부터 다시 시작합니다."
+  },
+  "dlgImportTitle": {
+    "message": "다운로드한 모드 가져오기"
+  },
+  "dlgImportLead": {
+    "message": "이미 가지고 있는 파일을 다시 받지 않도록 합니다."
+  },
+  "dlgImportHelp": {
+    "message": "모드 폴더의 모든 파일을 선택하면 이 컬렉션의 기록과 대조합니다."
+  },
+  "dlgImportPathLabel": {
+    "message": "기본 Vortex 경로"
+  },
+  "dlgSelectTitle": {
+    "message": "모드 선택"
+  },
+  "selSelectAll": {
+    "message": "모두 선택"
+  },
+  "selDeselectAll": {
+    "message": "선택 해제"
+  },
+  "selInvert": {
+    "message": "선택 반전"
+  },
+  "selExport": {
+    "message": "선택 항목 내보내기"
+  },
+  "selImport": {
+    "message": "선택 항목 가져오기"
+  },
+  "selSearchPlaceholder": {
+    "message": "모드 검색..."
+  },
+  "selDownloadSelected": {
+    "message": "선택 항목 다운로드"
+  },
+  "sortModAsc": {
+    "message": "모드 이름 A-Z"
+  },
+  "sortModDesc": {
+    "message": "모드 이름 Z-A"
+  },
+  "sortFileAsc": {
+    "message": "파일 이름 A-Z"
+  },
+  "sortFileDesc": {
+    "message": "파일 이름 Z-A"
+  },
+  "sortSizeAsc": {
+    "message": "크기 오름차순"
+  },
+  "sortSizeDesc": {
+    "message": "크기 내림차순"
+  },
+  "colModName": {
+    "message": "모드 이름"
+  },
+  "colFileName": {
+    "message": "파일 이름"
+  },
+  "colSize": {
+    "message": "크기"
+  },
+  "colType": {
+    "message": "유형"
+  },
+  "tagOptional": {
+    "message": "선택"
+  },
+  "tagMandatory": {
+    "message": "필수"
+  },
+  "dlgUpdateTitle": {
+    "message": "컬렉션 업데이트"
+  },
+  "dlgUpdateCurrentRev": {
+    "message": "현재 리비전"
+  },
+  "dlgUpdateToRev": {
+    "message": "업데이트할 리비전"
+  },
+  "dlgUpdateSelectRev": {
+    "message": "리비전 선택"
+  },
+  "dlgUpdateDownload": {
+    "message": "업데이트 다운로드"
+  },
+  "dlgUpdateFetchFailed": {
+    "message": "리비전을 가져오지 못했습니다. 나중에 다시 시도하세요."
+  },
+  "dlgUpdateCompareFailed": {
+    "message": "리비전을 비교하지 못했습니다. 나중에 다시 시도하세요."
+  },
+  "dlgUpdateNone": {
+    "message": "없음"
+  },
+  "dlgUpdateColUpdated": {
+    "message": "업데이트됨"
+  },
+  "dlgUpdateColAdded": {
+    "message": "추가됨"
+  },
+  "dlgUpdateColRemoved": {
+    "message": "제거됨"
+  },
+  "dlgCantOpenSettings": {
+    "message": "설정을 열 수 없습니다"
+  },
+  "dlgCollectionIssue": {
+    "message": "컬렉션 다운로드 문제"
+  },
+  "dlgCantLoadRevisions": {
+    "message": "리비전을 불러올 수 없습니다"
+  },
+  "dlgCantCompareRevisions": {
+    "message": "리비전을 비교할 수 없습니다"
+  },
+  "alertContextInvalid": {
+    "message": "NexusMods Bypass가 업데이트되었거나 다시 로드되었습니다.\n설정을 열려면 이 페이지를 새로고침하세요."
+  },
+  "alertPickOneToExport": {
+    "message": "내보낼 모드를 하나 이상 선택하세요."
+  },
+  "alertPickOneMod": {
+    "message": "모드를 하나 이상 선택하세요."
+  },
+  "alertSelectionUnreadable": {
+    "message": "선택 파일을 읽을 수 없습니다."
+  },
+  "alertSelectionInvalid": {
+    "message": "이 파일은 유효한 NexusMods Bypass 선택 파일이 아닙니다."
+  },
+  "popupReloadFirst": {
+    "message": "페이지 설정을 열기 전에 Nexus Mods 페이지를 새로고침하세요."
+  },
+  "popupReportFull": {
+    "message": "전체 보고서와 함께 GitHub가 열립니다 — 무슨 일이 있었는지만 적어 주세요."
+  },
+  "popupReportShortened": {
+    "message": "분량에 맞게 보고서를 줄였습니다 — 전체 사본은 클립보드에 있습니다."
+  },
+  "popupReportNoCopy": {
+    "message": "GitHub가 내용이 채워진 상태로 열립니다 — 전체 보고서는 복사하지 못했습니다."
+  },
+  "popupLoadFailed": {
+    "message": "팝업을 다 불러오지 못했습니다. 확장 프로그램을 다시 로드한 뒤 시도하세요."
+  },
+  "alertSelectionTooLarge": {
+    "message": "선택 파일이 너무 큽니다(제한 $1 KB).",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logPauseComplete": {
+    "message": "대기가 끝났습니다($2에 대해 $1).",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "logPausing": {
+    "message": "다음 다운로드까지 $1 대기 중($2 @ $3 MB/s $4)... $5 남음",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      },
+      "c": {
+        "content": "$3"
+      },
+      "d": {
+        "content": "$4"
+      },
+      "e": {
+        "content": "$5"
+      }
+    }
+  },
+  "logAlreadyRunning": {
+    "message": "이미 다운로드가 진행 중입니다. 기다리거나 먼저 중지하세요."
+  },
+  "logNothingToDownload": {
+    "message": "이 선택에는 다운로드할 모드가 없습니다."
+  },
+  "logCanceledBeforeStart": {
+    "message": "시작 전에 다운로드를 취소했습니다."
+  },
+  "logCollectionPaused": {
+    "message": "컬렉션을 일시정지했습니다. 완료된 파일은 기록에 남으므로 문제를 해결한 뒤 안전하게 다시 시도할 수 있습니다."
+  },
+  "logQueueRateLimited": {
+    "message": "Nexus Mods 요청 제한에 도달했습니다. 백그라운드 대기열이 자동으로 재개됩니다."
+  },
+  "logReconnectedAdopted": {
+    "message": "백그라운드에서 이미 진행 중인 다운로드에 다시 연결했습니다."
+  },
+  "logProgressRestored": {
+    "message": "이 탭에서 진행 중인 다운로드의 진행 상황을 복원했습니다."
+  },
+  "logReconnectedBackground": {
+    "message": "백그라운드에서 진행 중인 컬렉션 다운로드에 다시 연결했습니다."
+  },
+  "logRetryIgnored": {
+    "message": "다시 시도를 무시했습니다. 이 실행은 중지되었습니다."
+  },
+  "logVortexNotice": {
+    "message": "Vortex가 실행 중이어야 합니다. 파일은 전송된 시점에 기록됩니다 — 브라우저는 Vortex가 실제로 받았는지 알 수 없습니다."
+  },
+  "logSignInFirst": {
+    "message": "이 컬렉션을 시작하기 전에 Nexus Mods에 로그인하세요."
+  },
+  "logOpenLogin": {
+    "message": "로그인 열기"
+  },
+  "logSendingToVortex": {
+    "message": "Vortex로 전송 중:"
+  },
+  "logAlreadyDownloaded": {
+    "message": "이미 다운로드함"
+  },
+  "logRateLimitCleared": {
+    "message": "요청 제한이 해제되었습니다. 다운로드를 재개합니다."
+  },
+  "logPausedRateLimitDone": {
+    "message": "일시정지됨. 요청 제한이 해제되었습니다 — 계속하려면 재생을 누르세요."
+  },
+  "logClaimBackground": {
+    "message": "이 컬렉션의 백그라운드 다운로드가 아직 실행 중입니다. 해당 탭을 열어 중지하거나 그 탭을 닫으세요."
+  },
+  "logClaimOtherTab": {
+    "message": "이 컬렉션은 이미 다른 탭에서 다운로드 중입니다. 거기서 중지하거나 그 탭을 닫으세요."
+  },
+  "alertAllDownloaded": {
+    "message": "모든 모드를 이미 다운로드했습니다."
+  },
+  "dlgCantLoadCollection": {
+    "message": "컬렉션을 불러올 수 없습니다"
+  },
+  "dlgStartupIssue": {
+    "message": "확장 프로그램 시작 문제"
+  },
+  "unitSecondsShort": {
+    "message": "초"
+  },
+  "logDownloading": {
+    "message": "다운로드 중: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logCompleted": {
+    "message": "완료: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRetryingInterrupted": {
+    "message": "중단된 다운로드를 다시 시도 중: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logFailedItem": {
+    "message": "실패: $1($2)",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "logBackgroundError": {
+    "message": "백그라운드 컬렉션 오류: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRunStopped": {
+    "message": "컬렉션 다운로드가 중지되었습니다: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRetryFailed": {
+    "message": "다시 시도에 실패했습니다: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logBackingOff": {
+    "message": "Nexus Mods가 요청을 제한하고 있습니다. $1 대기합니다.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRateLimitWaiting": {
+    "message": "Nexus Mods가 요청을 제한하고 있습니다. $1 대기 중...",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logPausedRateLimit": {
+    "message": "일시정지됨. Nexus 요청 제한이 $1 후 해제됩니다.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantOpenPage": {
+    "message": "이 페이지를 열 수 없습니다: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantLoadSettings": {
+    "message": "저장된 설정을 불러올 수 없습니다: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantSaveSettings": {
+    "message": "설정이 저장되지 않았습니다: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantOpenPageSettings": {
+    "message": "페이지 설정을 열 수 없습니다: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertImportedMods": {
+    "message": "컬렉션 모드 $2개 중 $1개를 기록에 가져왔습니다.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertImportedIds": {
+    "message": "파일 ID $2개 중 $1개를 가져왔습니다.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertSelectedNotDownloaded_other": {
+    "message": "아직 다운로드하지 않은 모드 $1개를 선택했습니다.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertUnmatchedFiles_other": {
+    "message": "선택한 파일 $1개가 이 컬렉션과 일치하지 않습니다.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "annReconnected_other": {
+    "message": "진행 중인 다운로드에 다시 연결: 모드 $1개.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annStarted_other": {
+    "message": "다운로드 시작: 모드 $1개.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "deckModCount_other": {
+    "message": "모드 $1개",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "logFailedSummary_other": {
+    "message": "모드 $1개의 다운로드에 실패했습니다:",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "progressOfTotal_other": {
+    "message": "모드 $2개 중 $1개",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "setSectionLanguage": {
+    "message": "언어"
+  },
+  "setForceEnglishLabel": {
+    "message": "항상 영어 사용"
+  },
+  "setForceEnglishDesc": {
+    "message": "브라우저가 다른 언어로 설정되어 있어도 이 확장 프로그램을 영어로 표시합니다. 영어로 작성된 가이드를 따를 때 유용합니다. 브라우저 목록에 표시되는 확장 프로그램 이름은 계속 브라우저 언어를 따릅니다."
+  },
+  "supportEntryTitle": {
+    "message": "프로젝트 후원"
+  },
+  "supportEntrySubtitle": {
+    "message": "독립적이고 사적이며 광고 없음"
+  },
+  "supportBackAria": {
+    "message": "빠른 설정으로 돌아가기"
+  },
+  "supportBack": {
+    "message": "뒤로"
+  },
+  "supportBadge": {
+    "message": "커뮤니티의 지원으로"
+  },
+  "supportKicker": {
+    "message": "커뮤니티를 위해 제작"
+  },
+  "supportTitle": {
+    "message": "NexusMods Bypass의 독립성을 지켜 주세요"
+  },
+  "supportDescription": {
+    "message": "이 확장 프로그램이 시간을 아껴 주었다면, 유지 관리와 브라우저 호환성, 향후 개선에 필요한 비용을 후원할 수 있습니다."
+  },
+  "supportValuesAria": {
+    "message": "프로젝트 약속"
+  },
+  "supportValuePrivate": {
+    "message": "비공개"
+  },
+  "supportValueAdFree": {
+    "message": "광고 없음"
+  },
+  "supportValueFree": {
+    "message": "항상 무료"
+  },
+  "supportPrimary": {
+    "message": "Ko-fi에서 후원하기"
+  },
+  "supportPrimaryHint": {
+    "message": "일회성 또는 매월 — 선택은 자유입니다"
+  },
+  "supportPrimaryPending": {
+    "message": "Ko-fi 페이지 준비 중"
+  },
+  "supportPrimaryPendingHint": {
+    "message": "안전한 후원 수단을 연결하는 중입니다"
+  },
+  "supportTrust": {
+    "message": "Ko-fi에서 안전하게 결제합니다. 새 탭에서 열립니다."
+  },
+  "supportFreeTitle": {
+    "message": "무료로도 도울 수 있습니다"
+  },
+  "supportGithub": {
+    "message": "GitHub에서 별 주기"
+  },
+  "supportCopy": {
+    "message": "프로젝트 링크 복사"
+  },
+  "supportCopied": {
+    "message": "프로젝트 링크를 클립보드에 복사했습니다."
+  },
+  "supportCopyFailed": {
+    "message": "프로젝트 링크를 복사하지 못했습니다."
+  },
+  "supportPromise": {
+    "message": "후원은 전적으로 선택 사항입니다. 기능을 잠금 해제하거나 제한하지 않습니다."
+  },
+  "dlgReportOpeningFull": {
+    "message": "전체 보고서와 함께 GitHub를 여는 중…",
+    "description": "Report button state when the whole report fits in the GitHub form."
+  },
+  "dlgReportOpeningCopied": {
+    "message": "보고서를 복사했습니다 — 미리 채워진 GitHub를 여는 중…",
+    "description": "Report button state when the report was copied and the form is prefilled."
+  },
+  "dlgReportOpeningPrefilled": {
+    "message": "미리 채워진 GitHub를 여는 중…",
+    "description": "Report button state when only the shortened report could be sent."
+  },
+  "dlgHistoryMarked": {
+    "message": "$2개 중 $1개의 모드가 다운로드됨으로 표시되어 있습니다.",
+    "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "selSelectedCount_other": {
+    "message": "$1개의 모드를 선택함",
+    "description": "Plural form \"other\". $1 selected count.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertSelectionForeign": {
+    "message": "이 파일은 다른 컬렉션($1/$2)에서 내보낸 것입니다.",
+    "description": "Import note. $1 game domain, $2 collection slug the file came from.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertSelectionRest": {
+    "message": "나머지는 이 컬렉션 리비전에 없습니다.",
+    "description": "Import note when some ids matched nothing in this revision."
+  },
+  "dlgUpdateRevisionLabel": {
+    "message": "리비전 $1 — $2 MB — $3",
+    "description": "Revision picker option. $1 revision number, $2 size in MB, $3 date.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      },
+      "c": {
+        "content": "$3"
+      }
+    }
+  },
+  "dlgDownloadPaused": {
+    "message": "다운로드 일시중지됨",
+    "description": "Error dialog title when a blocking error halted the collection run."
+  },
+  "speedSourceCustom": {
+    "message": "사용자 설정",
+    "description": "Names the speed used in the pause countdown: the user set it."
+  },
+  "speedSourceDefault": {
+    "message": "기본값",
+    "description": "Names the speed used in the pause countdown: the stock value."
+  }
+}

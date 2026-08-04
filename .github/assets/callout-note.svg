@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="87" height="30" viewBox="0 0 86.54 30" role="img" aria-label="Note">
+  <defs>
+    <linearGradient id="p" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#71a8ff" stop-opacity=".20"/>
+      <stop offset="1" stop-color="#71a8ff" stop-opacity=".07"/>
+    </linearGradient>
+  </defs>
+  <rect x=".6" y=".6" width="85.34" height="28.8" rx="8.4" fill="#0c1524"/>
+  <rect x=".6" y=".6" width="85.34" height="28.8" rx="8.4" fill="url(#p)"/>
+  <rect x=".6" y=".6" width="85.34" height="28.8" rx="8.4" fill="none" stroke="#71a8ff" stroke-opacity=".45" stroke-width="1.2"/>
+  <rect x=".6" y=".6" width="3.4" height="28.8" rx="1.7" fill="#71a8ff"/>
+  <g transform="translate(12.0,7.0) scale(0.6667)" fill="none" stroke="#71a8ff"
+     stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.8"/><path d="M12 11.4v5.2"/><path d="M12 7.7h.01"/></g>
+  <g transform="translate(36.50,19.26)" fill="#71a8ff"><path transform="translate(0.00,0) scale(0.01200,-0.01200)" d="M690.00 0.00H519.00L233.00 433.00V0.00H62.00V702.00H233.00L519.00 267.00V702.00H690.00Z"/><path transform="translate(10.02,0) scale(0.01200,-0.01200)" d="M33.00 353.00Q33.00 456.00 81.50 538.00Q130.00 620.00 212.50 666.00Q295.00 712.00 394.00 712.00Q493.00 712.00 575.50 666.00Q658.00 620.00 705.50 538.00Q753.00 456.00 753.00 353.00Q753.00 250.00 705.00 167.50Q657.00 85.00 575.00 39.00Q493.00 -7.00 394.00 -7.00Q295.00 -7.00 212.50 39.00Q130.00 85.00 81.50 167.50Q33.00 250.00 33.00 353.00ZM579.00 353.00Q579.00 446.00 528.50 501.50Q478.00 557.00 394.00 557.00Q309.00 557.00 258.50 502.00Q208.00 447.00 208.00 353.00Q208.00 260.00 258.50 204.50Q309.00 149.00 394.00 149.00Q478.00 149.00 528.50 205.00Q579.00 261.00 579.00 353.00Z"/><path transform="translate(20.46,0) scale(0.01200,-0.01200)" d="M567.00 702.00V565.00H381.00V0.00H210.00V565.00H24.00V702.00Z"/><path transform="translate(28.55,0) scale(0.01200,-0.01200)" d="M233.00 565.00V423.00H462.00V291.00H233.00V137.00H492.00V0.00H62.00V702.00H492.00V565.00Z"/></g>
+</svg>

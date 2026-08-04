@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 240" width="1200" height="240" role="img" aria-label="Auto Liker">
+  <defs>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0c1727"/><stop offset=".55" stop-color="#08121f"/><stop offset="1" stop-color="#060e18"/>
+    </linearGradient>
+    <radialGradient id="gm" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#63e0c7" stop-opacity=".55"/><stop offset="1" stop-color="#63e0c7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="gs" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#71a8ff" stop-opacity=".55"/><stop offset="1" stop-color="#71a8ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="gr" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#ff8fab" stop-opacity=".38"/><stop offset="1" stop-color="#ff8fab" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="title" gradientUnits="userSpaceOnUse" x1="60" y1="0" x2="760" y2="0">
+      <stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#b9f2e4"/><stop offset="1" stop-color="#8fbcff"/>
+    </linearGradient>
+    <linearGradient id="hair" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".30"/><stop offset="1" stop-color="#ffffff" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#ffffff" stop-opacity=".07"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="rule" gradientUnits="userSpaceOnUse" x1="64" y1="0" x2="112" y2="0">
+      <stop offset="0" stop-color="#63e0c7" stop-opacity=".9"/>
+      <stop offset=".5" stop-color="#71a8ff" stop-opacity=".7"/>
+      <stop offset="1" stop-color="#71a8ff" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="grid" width="44" height="44" patternUnits="userSpaceOnUse">
+      <path d="M44 0H0v44" fill="none" stroke="#9fb4d0" stroke-opacity=".05" stroke-width="1"/>
+    </pattern>
+
+    <clipPath id="clip"><rect x="0" y="0" width="1200" height="240" rx="24"/></clipPath>
+    <radialGradient id="acc" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#ff8fab" stop-opacity=".42"/><stop offset="1" stop-color="#ff8fab" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ink" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="24" y2="24">
+      <stop offset="0" stop-color="#7bead2"/><stop offset="1" stop-color="#7fb2ff"/>
+    </linearGradient>
+  </defs>
+  <style>
+    @keyframes drift1 { 0%,100% { transform: translate(0,0) } 50% { transform: translate(26px,-16px) } }
+    @keyframes drift2 { 0%,100% { transform: translate(0,0) } 50% { transform: translate(-22px,14px) } }
+    @keyframes breathe { 0%,100% { opacity:.55 } 50% { opacity:.95 } }
+    @keyframes sweepx  { 0% { transform: translateX(-560px) } 100% { transform: translateX(1360px) } }
+    @keyframes floaty  { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-9px) } }
+    .d1 { animation: drift1 15s ease-in-out infinite; }
+    .d2 { animation: drift2 19s ease-in-out infinite; }
+    .br { animation: breathe 8s ease-in-out infinite; }
+    .sw { animation: sweepx 9s linear infinite; }
+    .f1 { animation: floaty 7s ease-in-out infinite; }
+    .f2 { animation: floaty 7s ease-in-out infinite .9s; }
+    .f3 { animation: floaty 7s ease-in-out infinite 1.8s; }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important } }
+</style>
+  <g clip-path="url(#clip)">
+    <rect width="1200" height="240" fill="url(#card)"/>
+    <rect width="1200" height="240" fill="url(#grid)"/>
+    <g class="d1"><ellipse cx="150" cy="0" rx="400" ry="230" fill="url(#acc)"/></g>
+    <g class="d2"><ellipse cx="1060" cy="240" rx="420" ry="240" fill="url(#gs)"/></g>
+    <g class="f1" opacity=".55" transform="translate(1004,52)">
+      <rect width="136" height="136" rx="38" fill="#ffffff" fill-opacity=".045" stroke="url(#hair)" stroke-width="1.2"/>
+      <g transform="translate(44,44) scale(2)" fill="none" stroke="url(#ink)" stroke-width="1.9"
+         stroke-linecap="round" stroke-linejoin="round" opacity=".95">
+        <path d="M12 20.2S4.5 15.5 4.5 10.4A4.2 4.2 0 0112 7.9a4.2 4.2 0 017.5 2.5c0 5.1-7.5 9.8-7.5 9.8z"/>
+      </g>
+    </g>
+    <rect class="sw" x="-560" y="0" width="560" height="240" fill="url(#sweep)"/>
+  </g>
+  <rect x=".75" y=".75" width="1198.5" height="238.5" rx="24" fill="none" stroke="url(#hair)" stroke-width="1.5"/>
+  <g font-family='"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif'>
+    <rect x="64" y="46" width="40" height="3" rx="1.5" fill="url(#rule)" class="br"/>
+    <text x="64" y="80" font-size="13" font-weight="700" letter-spacing="3.1" fill="#ff8fab" fill-opacity=".95">TINDER &amp; BOO</text>
+    <text x="62" y="146" font-size="50" font-weight="800" letter-spacing="-1.2" fill="url(#title)">Auto Liker</text>
+    <text x="64" y="185" font-size="19.5" font-weight="500" fill="#a8b6cb">A neon button that swipes right for you, with a live counter and smart pause.</text>
+    <g>
+      <rect x="1054" y="196" width="82" height="30" rx="15" fill="#ffffff" fill-opacity=".05" stroke="url(#hair)" stroke-width="1"/>
+      <text x="1095.0" y="216" text-anchor="middle" font-size="14" font-weight="700" letter-spacing=".4" fill="#c9d6e8">v4.8</text>
+    </g>
+  </g>
+</svg>

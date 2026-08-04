@@ -1,0 +1,1220 @@
+{
+  "appName": {
+    "message": "NexusMods Bypass"
+  },
+  "appDesc": {
+    "message": "Simplifie les téléchargements Nexus Mods, gère les files d’attente de collections et conserve un historique local."
+  },
+  "sectionQuickControls": {
+    "message": "Réglages rapides"
+  },
+  "toggleAutoStart": {
+    "message": "Démarrer les téléchargements automatiquement"
+  },
+  "setAutoCloseTabLabel": {
+    "message": "Fermer les onglets Vortex"
+  },
+  "toggleSkipReq": {
+    "message": "Ignorer les écrans d'exigences"
+  },
+  "toggleHideUpsells": {
+    "message": "Masquer les publicités et encarts premium"
+  },
+  "toggleHideDownloadBar": {
+    "message": "Masquer le bouton de téléchargement"
+  },
+  "setHandleArchivedFilesLabel": {
+    "message": "Boutons des fichiers archivés"
+  },
+  "setDebugLogsLabel": {
+    "message": "Journaux détaillés de l'extension"
+  },
+  "btnPageSettings": {
+    "message": "Réglages de la page"
+  },
+  "btnGoNexus": {
+    "message": "NexusMods"
+  },
+  "btnReportBug": {
+    "message": "Signaler un bug — copie le rapport"
+  },
+  "popupFooter": {
+    "message": "Assistant de téléchargement pour Nexus Mods & Vortex"
+  },
+  "ratingPrompt": {
+    "message": "Ça vous plaît ? ⭐ Une étoile sur GitHub"
+  },
+  "ratingDismiss": {
+    "message": "Fermer"
+  },
+  "welcomeTitle": {
+    "message": "NexusMods Bypass est prêt !"
+  },
+  "welcomeSubtitle": {
+    "message": "Téléchargez des fichiers Nexus Mods et des collections entières avec moins de clics — mis en file, cadencés et reprenables."
+  },
+  "quickStartTitle": {
+    "message": "Démarrage rapide"
+  },
+  "step1Title": {
+    "message": "Ouvrez n'importe quelle page de fichier Nexus Mods"
+  },
+  "step1Text": {
+    "message": "Cliquez sur un bouton de téléchargement — l’extension prépare le lien et lance le téléchargement."
+  },
+  "step2Title": {
+    "message": "Essayez une collection"
+  },
+  "step2Text": {
+    "message": "Ouvrez une page de collection et récupérez tous les mods en un clic avec le Collection Downloader."
+  },
+  "step3Title": {
+    "message": "Personnalisez-le"
+  },
+  "step3Text": {
+    "message": "Cliquez sur l'icône de l'extension pour les réglages rapides, ou sur ⚙ sur une page Nexus pour tout configurer."
+  },
+  "privacyCardTitle": {
+    "message": "🔒 Conçu pour la vie privée"
+  },
+  "privacyCardText": {
+    "message": "Pas d'analytique, pas de comptes, pas de serveurs externes. Tout reste dans votre navigateur."
+  },
+  "bugCardTitle": {
+    "message": "🐛 Un problème ?"
+  },
+  "bugCardText": {
+    "message": "Chaque bouton « Signaler un bug » copie un rapport complet et ouvre une issue GitHub préremplie."
+  },
+  "starCardTitle": {
+    "message": "⭐ Ça vous plaît ?"
+  },
+  "starCardText": {
+    "message": "Une étoile sur GitHub aide d'autres moddeurs à trouver l'extension."
+  },
+  "openNexusBtn": {
+    "message": "Ouvrir Nexus Mods"
+  },
+  "starBtn": {
+    "message": "Étoile sur GitHub"
+  },
+  "disclaimer": {
+    "message": "Non affilié à Nexus Mods. Il vous faut votre propre compte Nexus Mods ; le contenu premium reste premium."
+  },
+  "errMissingFileMsg": {
+    "message": "Ce lien de téléchargement ne contient pas d'identifiant de fichier."
+  },
+  "errMissingFileFix": {
+    "message": "Ouvrez la page du fichier et réessayez."
+  },
+  "errTimeoutMsg": {
+    "message": "Nexus Mods a mis trop de temps à répondre."
+  },
+  "errTimeoutFix": {
+    "message": "Vérifiez votre connexion, puis réessayez."
+  },
+  "errOfflineMsg": {
+    "message": "Vous semblez être hors ligne."
+  },
+  "errOfflineFix": {
+    "message": "Reconnectez-vous à Internet, puis réessayez."
+  },
+  "errNetworkErrorMsg": {
+    "message": "La requête vers Nexus Mods n'a pas pu aboutir."
+  },
+  "errNetworkErrorFix": {
+    "message": "Vérifiez votre connexion et réessayez."
+  },
+  "errRequiresLoginMsg": {
+    "message": "Vous n'êtes pas connecté à Nexus Mods."
+  },
+  "errRequiresLoginFix": {
+    "message": "Connectez-vous, revenez sur cette page, puis relancez le téléchargement."
+  },
+  "errCloudflareMsg": {
+    "message": "Nexus Mods exige une vérification du navigateur avant de continuer."
+  },
+  "errCloudflareFix": {
+    "message": "Effectuez la vérification sur la page du fichier, puis réessayez."
+  },
+  "errRateLimitedMsg": {
+    "message": "Nexus Mods limite temporairement le nombre de requêtes."
+  },
+  "errRateLimitedFix": {
+    "message": "Patientez quelques minutes avant de réessayer."
+  },
+  "errAccountSuspendedMsg": {
+    "message": "Nexus Mods a temporairement suspendu les demandes de téléchargement."
+  },
+  "errAccountSuspendedFix": {
+    "message": "Attendez avant de réessayer afin de ne pas prolonger la suspension."
+  },
+  "errAccessDeniedMsg": {
+    "message": "Nexus Mods a refusé l'accès à ce téléchargement."
+  },
+  "errAccessDeniedFix": {
+    "message": "Vérifiez les autorisations de votre compte et la page du fichier, puis réessayez."
+  },
+  "errFileNotFoundMsg": {
+    "message": "Le fichier demandé est introuvable sur Nexus Mods."
+  },
+  "errFileNotFoundFix": {
+    "message": "Le fichier a peut-être été supprimé ou le lien est obsolète."
+  },
+  "errModerationHoldMsg": {
+    "message": "Ce fichier est en cours de modération."
+  },
+  "errModerationHoldFix": {
+    "message": "Attendez que Nexus Mods approuve le fichier avant de le télécharger."
+  },
+  "errServerErrorMsg": {
+    "message": "Nexus Mods rencontre un problème côté serveur."
+  },
+  "errServerErrorFix": {
+    "message": "Patientez un instant et réessayez."
+  },
+  "errInvalidResponseMsg": {
+    "message": "Nexus Mods a renvoyé une réponse inattendue."
+  },
+  "errInvalidResponseFix": {
+    "message": "Actualisez la page du fichier et réessayez."
+  },
+  "errNoDownloadUrlMsg": {
+    "message": "Nexus Mods n'a pas renvoyé de lien de téléchargement exploitable."
+  },
+  "errNoDownloadUrlFix": {
+    "message": "Ouvrez la page du fichier, vérifiez que vous êtes connecté, puis réessayez."
+  },
+  "errNoNmmLinkMsg": {
+    "message": "Nexus Mods n'a pas renvoyé de lien Vortex valide."
+  },
+  "errNoNmmLinkFix": {
+    "message": "Vérifiez la page du fichier et réessayez, ou passez au téléchargement par navigateur."
+  },
+  "errAbortedMsg": {
+    "message": "La requête a été annulée."
+  },
+  "errUnsafeDownloadUrlMsg": {
+    "message": "Le lien renvoyé par Nexus Mods n'est pas une cible de téléchargement reconnue."
+  },
+  "errUnsafeDownloadUrlFix": {
+    "message": "Ouvrez la page du fichier et téléchargez manuellement. Si cela persiste, signalez le problème."
+  },
+  "errContextInvalidMsg": {
+    "message": "L'extension a été mise à jour ou rechargée pendant que cette page était ouverte."
+  },
+  "errContextInvalidFix": {
+    "message": "Actualisez cette page Nexus Mods, puis réessayez."
+  },
+  "errRequestFailedMsg": {
+    "message": "La demande de téléchargement a échoué."
+  },
+  "errRequestFailedFix": {
+    "message": "Relancez le téléchargement. Si cela persiste, signalez le problème."
+  },
+  "dlgDownloadIssue": {
+    "message": "Problème de téléchargement"
+  },
+  "dlgSignInRequired": {
+    "message": "Connexion requise"
+  },
+  "dlgErrorId": {
+    "message": "ID d'erreur"
+  },
+  "dlgReportBug": {
+    "message": "Signaler un bug"
+  },
+  "btnSignIn": {
+    "message": "Se connecter à Nexus Mods"
+  },
+  "btnRetry": {
+    "message": "Réessayer"
+  },
+  "btnDone": {
+    "message": "Terminé"
+  },
+  "ariaCloseErrorDialog": {
+    "message": "Fermer la boîte de dialogue d'erreur"
+  },
+  "deckTitle": {
+    "message": "Téléchargeur de collections"
+  },
+  "deckReadyQueue": {
+    "message": "File prête"
+  },
+  "deckSubtitle": {
+    "message": "Mettez des collections entières en file, importez les téléchargements terminés et réglez le rythme depuis un seul panneau."
+  },
+  "deckDownloadMethod": {
+    "message": "Méthode de téléchargement"
+  },
+  "deckMethodVortex": {
+    "message": "Envoyer vers Vortex"
+  },
+  "deckMethodVortexHint": {
+    "message": "Idéal pour un transfert en un clic vers votre file Vortex."
+  },
+  "deckMethodBrowser": {
+    "message": "Téléchargement par navigateur"
+  },
+  "deckMethodBrowserHint": {
+    "message": "Utilisez les téléchargements natifs du navigateur quand Vortex ne gère pas les liens."
+  },
+  "deckActions": {
+    "message": "Actions"
+  },
+  "deckImportMods": {
+    "message": "Importer les mods téléchargés"
+  },
+  "tipImportInfo": {
+    "message": "Infos sur l'importation"
+  },
+  "deckDownloadAll": {
+    "message": "Télécharger tous les mods"
+  },
+  "deckDownloadMandatory": {
+    "message": "Télécharger les obligatoires"
+  },
+  "deckDownloadMandatoryHint": {
+    "message": "Fichiers essentiels uniquement"
+  },
+  "deckDownloadOptional": {
+    "message": "Télécharger les optionnels"
+  },
+  "deckDownloadOptionalHint": {
+    "message": "Suppléments optionnels"
+  },
+  "deckSelectMods": {
+    "message": "Sélectionner les mods à télécharger"
+  },
+  "deckSelectModsHint": {
+    "message": "Sélection manuelle"
+  },
+  "deckUpdateCollection": {
+    "message": "Mettre à jour la collection"
+  },
+  "deckUpdateCollectionHint": {
+    "message": "Comparer les révisions"
+  },
+  "deckProgress": {
+    "message": "Progression du téléchargement"
+  },
+  "deckAdaptivePacing": {
+    "message": "Rythme adaptatif"
+  },
+  "deckLogs": {
+    "message": "Journaux"
+  },
+  "deckLogsCaption": {
+    "message": "Flux d'activité en direct"
+  },
+  "statusDownloading": {
+    "message": "Téléchargement…"
+  },
+  "statusPaused": {
+    "message": "En pause"
+  },
+  "statusFinished": {
+    "message": "Terminé"
+  },
+  "statusStopped": {
+    "message": "Arrêté"
+  },
+  "outcomePartial": {
+    "message": "Terminé avec des erreurs"
+  },
+  "outcomeBlocked": {
+    "message": "Action requise"
+  },
+  "outcomeFailed": {
+    "message": "Échec"
+  },
+  "logDownloadStarted": {
+    "message": "Téléchargement démarré."
+  },
+  "logDownloadFinished": {
+    "message": "Téléchargement terminé."
+  },
+  "logDownloadPartial": {
+    "message": "Téléchargement terminé avec des erreurs. Une nouvelle tentative ignorera les fichiers réussis."
+  },
+  "logDownloadStopped": {
+    "message": "Téléchargement arrêté."
+  },
+  "logDownloadNeedsLogin": {
+    "message": "Téléchargement en pause jusqu'à votre connexion."
+  },
+  "logDownloadBlocked": {
+    "message": "Téléchargement en pause. Suivez les instructions d'erreur avant de réessayer."
+  },
+  "logDownloadError": {
+    "message": "Le téléchargement a échoué."
+  },
+  "annPaused": {
+    "message": "Téléchargement en pause."
+  },
+  "annResumed": {
+    "message": "Téléchargement repris."
+  },
+  "ariaProgress": {
+    "message": "Progression du téléchargement de la collection"
+  },
+  "ariaPause": {
+    "message": "Mettre en pause"
+  },
+  "ariaResume": {
+    "message": "Reprendre le téléchargement"
+  },
+  "ariaStop": {
+    "message": "Arrêter le téléchargement"
+  },
+  "tipPauseResume": {
+    "message": "Pause/Reprise"
+  },
+  "tipStop": {
+    "message": "Arrêter"
+  },
+  "btnStatePleaseWait": {
+    "message": "Veuillez patienter…"
+  },
+  "btnStateDownloading": {
+    "message": "Téléchargement !"
+  },
+  "btnStateError": {
+    "message": "Erreur"
+  },
+  "btnStateOpeningPage": {
+    "message": "Ouverture de la page du fichier…"
+  },
+  "btnFileArchive": {
+    "message": "Archive des fichiers"
+  },
+  "btnModManagerDownload": {
+    "message": "Téléchargement via gestionnaire de mods"
+  },
+  "btnManualDownload": {
+    "message": "Téléchargement manuel"
+  },
+  "annOutcome": {
+    "message": "$1. $2.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "deckModCount_one": {
+    "message": "$1 mod",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "deckModCount_other": {
+    "message": "$1 mods",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annStarted_one": {
+    "message": "Téléchargement démarré : $1 mod.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annStarted_other": {
+    "message": "Téléchargement démarré : $1 mods.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annReconnected_one": {
+    "message": "Reconnecté à un téléchargement en cours : $1 mod.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annReconnected_other": {
+    "message": "Reconnecté à un téléchargement en cours : $1 mods.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "progressOfTotal_one": {
+    "message": "$1 sur $2 mod",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "progressOfTotal_other": {
+    "message": "$1 sur $2 mods",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "btnCancel": {
+    "message": "Annuler"
+  },
+  "btnClose": {
+    "message": "Fermer"
+  },
+  "btnOk": {
+    "message": "OK"
+  },
+  "btnGotIt": {
+    "message": "J'ai compris"
+  },
+  "btnRestore": {
+    "message": "Restaurer"
+  },
+  "ariaClose": {
+    "message": "Fermer"
+  },
+  "dlgConfirmTitle": {
+    "message": "Confirmer l'action"
+  },
+  "setTitle": {
+    "message": "Paramètres de l'assistant de téléchargement"
+  },
+  "setSubtitle": {
+    "message": "Les modifications sont enregistrées immédiatement. La restauration rechargera la page."
+  },
+  "setSectionFlow": {
+    "message": "Déroulement du téléchargement"
+  },
+  "setSectionPacing": {
+    "message": "Fichiers et rythme"
+  },
+  "setSectionAdvanced": {
+    "message": "Avancé"
+  },
+  "setRestoreDefaults": {
+    "message": "Restaurer les valeurs par défaut et recharger"
+  },
+  "setNeedHelp": {
+    "message": "Besoin d'aide pour un téléchargement ?"
+  },
+  "setReportOnGithub": {
+    "message": "Signaler un bug sur GitHub"
+  },
+  "setRestoreTitle": {
+    "message": "Restaurer les valeurs par défaut"
+  },
+  "setRestoreConfirm": {
+    "message": "Restaurer les paramètres par défaut et recharger cette page Nexus ?"
+  },
+  "unitSeconds": {
+    "message": "Secondes"
+  },
+  "setAutoStartDownloadLabel": {
+    "message": "Démarrer les téléchargements automatiquement"
+  },
+  "setAutoStartDownloadDesc": {
+    "message": "À l'ouverture d'une page de téléchargement Nexus, lance le transfert Vortex ou le téléchargement navigateur sans clic supplémentaire."
+  },
+  "setAutoCloseTabDesc": {
+    "message": "Après l'envoi d'un lien Vortex, ferme l'onglet Nexus temporaire après le délai ci-dessous."
+  },
+  "setSkipRequirementsLabel": {
+    "message": "Ignorer les écrans de prérequis"
+  },
+  "setSkipRequirementsDesc": {
+    "message": "Passe les fenêtres de prérequis Nexus et va directement à l’étape de téléchargement."
+  },
+  "setShowAlertsOnErrorLabel": {
+    "message": "Afficher les fenêtres d'erreur"
+  },
+  "setShowAlertsOnErrorDesc": {
+    "message": "Affiche un message clair quand Nexus ne renvoie pas de lien exploitable."
+  },
+  "setHidePremiumUpsellsLabel": {
+    "message": "Masquer les publicités et les panneaux Premium"
+  },
+  "setHidePremiumUpsellsDesc": {
+    "message": "Masque les emplacements publicitaires, conteneurs vides, bannières Premium et panneaux de mise à niveau."
+  },
+  "setHandleArchivedFilesDesc": {
+    "message": "Ajoute des boutons de téléchargement Vortex et navigateur aux fichiers archivés masqués par Nexus."
+  },
+  "setDebugLogsDesc": {
+    "message": "Affiche dans la console l'activité détaillée de NexusMods Bypass. Les erreurs sont toujours affichées et les rapports ne sont pas affectés."
+  },
+  "setHideDownloadBarLabel": {
+    "message": "Masquer le bouton de téléchargement du navigateur"
+  },
+  "setHideDownloadBarDesc": {
+    "message": "Retire le bouton de téléchargement et sa fenêtre de progression de la barre d'outils. Cela s'applique à tous les téléchargements de ce profil de navigateur, pas seulement à ceux de Nexus. Vos téléchargements restent accessibles via Ctrl+J."
+  },
+  "setDownloadFolderLabel": {
+    "message": "Dossier de téléchargement du navigateur"
+  },
+  "setDownloadFolderDesc": {
+    "message": "Sous-dossier dans le répertoire de téléchargement du navigateur, pour le mode Browser Download. Laissez le champ vide pour enregistrer directement dans Téléchargements — certains gestionnaires de mods ne surveillent que ce dossier et n'inspectent pas les sous-dossiers. Les téléchargements Vortex sont gérés par Vortex et ne sont pas concernés."
+  },
+  "setRequestTimeoutLabel": {
+    "message": "Délai des requêtes de téléchargement"
+  },
+  "setRequestTimeoutDesc": {
+    "message": "Durée d'attente d'un lien de téléchargement avant abandon."
+  },
+  "setCloseTabDelayLabel": {
+    "message": "Délai avant fermeture de l'onglet"
+  },
+  "setCloseTabDelayDesc": {
+    "message": "Ne s'applique qu'aux téléchargements Vortex auto-démarrés qui ferment leur onglet. Augmentez si Vortex rate des liens."
+  },
+  "setDownloadSpeedLabel": {
+    "message": "Votre vitesse de téléchargement Nexus"
+  },
+  "setDownloadSpeedDesc": {
+    "message": "Mode Vortex uniquement. Le navigateur ne voit pas le transfert dans Vortex ; cette valeur estime la durée et espace les transferts. Indiquez la vitesse réellement observée — trop basse, la file attend inutilement."
+  },
+  "setPauseBetweenModsLabel": {
+    "message": "Pause entre les mods"
+  },
+  "setPauseBetweenModsDesc": {
+    "message": "Mode Vortex uniquement. S'ajoute à l'estimation ci-dessus. Mettez 0 pour désactiver complètement l'attente — y compris l'estimation de taille — et transmettre chaque fichier à Vortex à la suite."
+  },
+  "dlgHistoryTitle": {
+    "message": "Mods déjà téléchargés détectés"
+  },
+  "dlgHistoryHelp": {
+    "message": "Choisissez le comportement de cette exécution avant de commencer. S'il manque des fichiers, choisissez tout retélécharger."
+  },
+  "dlgHistorySkip": {
+    "message": "Ignorer les téléchargés"
+  },
+  "dlgHistorySkipHint": {
+    "message": "Continuer avec les mods restants uniquement."
+  },
+  "dlgHistoryRedownload": {
+    "message": "Tout retélécharger"
+  },
+  "dlgHistoryRedownloadHint": {
+    "message": "Effacer l'historique enregistré et recommencer la liste complète."
+  },
+  "dlgImportTitle": {
+    "message": "Importer les mods téléchargés"
+  },
+  "dlgImportLead": {
+    "message": "Évitez de retélécharger des fichiers que vous possédez déjà."
+  },
+  "dlgImportHelp": {
+    "message": "Sélectionnez tous les fichiers de votre dossier mods ; ils seront comparés à l’historique de cette collection."
+  },
+  "dlgImportPathLabel": {
+    "message": "Chemin Vortex par défaut"
+  },
+  "dlgSelectTitle": {
+    "message": "Sélectionner les mods"
+  },
+  "selSelectAll": {
+    "message": "Tout sélectionner"
+  },
+  "selDeselectAll": {
+    "message": "Tout désélectionner"
+  },
+  "selInvert": {
+    "message": "Inverser la sélection"
+  },
+  "selExport": {
+    "message": "Exporter la sélection"
+  },
+  "selImport": {
+    "message": "Importer la sélection"
+  },
+  "selSearchPlaceholder": {
+    "message": "Rechercher des mods…"
+  },
+  "selDownloadSelected": {
+    "message": "Télécharger la sélection"
+  },
+  "sortModAsc": {
+    "message": "Nom du mod A-Z"
+  },
+  "sortModDesc": {
+    "message": "Nom du mod Z-A"
+  },
+  "sortFileAsc": {
+    "message": "Nom de fichier A-Z"
+  },
+  "sortFileDesc": {
+    "message": "Nom de fichier Z-A"
+  },
+  "sortSizeAsc": {
+    "message": "Taille croissante"
+  },
+  "sortSizeDesc": {
+    "message": "Taille décroissante"
+  },
+  "colModName": {
+    "message": "Nom du mod"
+  },
+  "colFileName": {
+    "message": "Nom de fichier"
+  },
+  "colSize": {
+    "message": "Taille"
+  },
+  "colType": {
+    "message": "Type"
+  },
+  "tagOptional": {
+    "message": "Optionnel"
+  },
+  "tagMandatory": {
+    "message": "Obligatoire"
+  },
+  "dlgUpdateTitle": {
+    "message": "Mettre à jour la collection"
+  },
+  "dlgUpdateCurrentRev": {
+    "message": "Votre révision actuelle"
+  },
+  "dlgUpdateToRev": {
+    "message": "Mettre à jour vers la révision"
+  },
+  "dlgUpdateSelectRev": {
+    "message": "Sélectionner une révision"
+  },
+  "dlgUpdateDownload": {
+    "message": "Télécharger les mises à jour"
+  },
+  "dlgUpdateFetchFailed": {
+    "message": "Impossible de récupérer les révisions. Réessayez plus tard."
+  },
+  "dlgUpdateCompareFailed": {
+    "message": "Impossible de comparer les révisions. Réessayez plus tard."
+  },
+  "dlgUpdateNone": {
+    "message": "Aucun"
+  },
+  "dlgUpdateColUpdated": {
+    "message": "Mis à jour"
+  },
+  "dlgUpdateColAdded": {
+    "message": "Ajoutés"
+  },
+  "dlgUpdateColRemoved": {
+    "message": "Supprimés"
+  },
+  "logFailedSummary_one": {
+    "message": "Échec du téléchargement de $1 mod :",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "logFailedSummary_other": {
+    "message": "Échec du téléchargement de $1 mods :",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dlgCantOpenSettings": {
+    "message": "Impossible d'ouvrir les paramètres"
+  },
+  "dlgCollectionIssue": {
+    "message": "Problème de téléchargement de la collection"
+  },
+  "dlgCantLoadRevisions": {
+    "message": "Impossible de charger les révisions"
+  },
+  "dlgCantCompareRevisions": {
+    "message": "Impossible de comparer les révisions"
+  },
+  "alertContextInvalid": {
+    "message": "NexusMods Bypass a été mis à jour ou rechargé.\nActualisez cette page pour ouvrir les paramètres."
+  },
+  "alertPickOneToExport": {
+    "message": "Sélectionnez au moins un mod à exporter."
+  },
+  "alertPickOneMod": {
+    "message": "Sélectionnez au moins un mod."
+  },
+  "alertSelectionUnreadable": {
+    "message": "Le fichier de sélection est illisible."
+  },
+  "alertSelectionInvalid": {
+    "message": "Ce fichier n'est pas une sélection NexusMods Bypass valide."
+  },
+  "popupReloadFirst": {
+    "message": "Rechargez la page Nexus Mods avant d'ouvrir les paramètres."
+  },
+  "popupReportFull": {
+    "message": "GitHub s’ouvre avec le rapport complet — décrivez simplement ce qui s’est passé."
+  },
+  "popupReportShortened": {
+    "message": "Rapport raccourci — la copie complète est dans le presse-papiers."
+  },
+  "popupReportNoCopy": {
+    "message": "GitHub s’ouvre prérempli — le rapport complet n’a pas pu être copié."
+  },
+  "popupLoadFailed": {
+    "message": "La fenêtre n'a pas fini de charger. Rechargez l'extension et réessayez."
+  },
+  "alertSelectionTooLarge": {
+    "message": "Le fichier de sélection est trop volumineux (limite $1 Ko).",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logPauseComplete": {
+    "message": "Pause terminée ($1 pour $2).",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "logPausing": {
+    "message": "Pause de $1 avant le prochain téléchargement ($2 @ $3 Mo/s $4)… $5 restant",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      },
+      "c": {
+        "content": "$3"
+      },
+      "d": {
+        "content": "$4"
+      },
+      "e": {
+        "content": "$5"
+      }
+    }
+  },
+  "logAlreadyRunning": {
+    "message": "Un téléchargement est déjà en cours. Patientez ou arrêtez-le d’abord."
+  },
+  "logNothingToDownload": {
+    "message": "Aucun mod à télécharger pour cette sélection."
+  },
+  "logCanceledBeforeStart": {
+    "message": "Téléchargement annulé avant le démarrage."
+  },
+  "logCollectionPaused": {
+    "message": "Collection en pause. Les fichiers terminés restent dans l’historique, vous pouvez réessayer sans risque."
+  },
+  "logQueueRateLimited": {
+    "message": "Limite Nexus Mods atteinte. La file d’attente reprendra automatiquement."
+  },
+  "logReconnectedAdopted": {
+    "message": "Reconnecté au téléchargement déjà en cours en arrière-plan."
+  },
+  "logProgressRestored": {
+    "message": "Progression restaurée pour le téléchargement encore actif dans cet onglet."
+  },
+  "logReconnectedBackground": {
+    "message": "Reconnecté à un téléchargement de collection encore actif en arrière-plan."
+  },
+  "logRetryIgnored": {
+    "message": "Nouvelle tentative ignorée : cette exécution a été arrêtée."
+  },
+  "logVortexNotice": {
+    "message": "Vortex doit être lancé. Les fichiers sont enregistrés à l’envoi — le navigateur ne voit pas si Vortex les a reçus."
+  },
+  "logSignInFirst": {
+    "message": "Connectez-vous à Nexus Mods avant de lancer cette collection."
+  },
+  "logOpenLogin": {
+    "message": "Ouvrir la connexion"
+  },
+  "logSendingToVortex": {
+    "message": "Envoi vers Vortex :"
+  },
+  "logAlreadyDownloaded": {
+    "message": "Déjà téléchargé"
+  },
+  "logRateLimitCleared": {
+    "message": "Limite levée. Reprise des téléchargements."
+  },
+  "logPausedRateLimitDone": {
+    "message": "En pause. La limite est levée — appuyez sur lecture pour continuer."
+  },
+  "logClaimBackground": {
+    "message": "Un téléchargement en arrière-plan est encore actif pour cette collection. Ouvrez son onglet et arrêtez-le, ou fermez cet onglet."
+  },
+  "logClaimOtherTab": {
+    "message": "Cette collection est déjà en cours de téléchargement dans un autre onglet. Arrêtez-la là ou fermez cet onglet."
+  },
+  "alertAllDownloaded": {
+    "message": "Tous les mods sont déjà téléchargés."
+  },
+  "dlgCantLoadCollection": {
+    "message": "Impossible de charger la collection"
+  },
+  "dlgStartupIssue": {
+    "message": "Problème de démarrage de l’extension"
+  },
+  "unitSecondsShort": {
+    "message": "s"
+  },
+  "logDownloading": {
+    "message": "Téléchargement : $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logCompleted": {
+    "message": "Terminé : $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRetryingInterrupted": {
+    "message": "Reprise du téléchargement interrompu : $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logFailedItem": {
+    "message": "Échec : $1 ($2)",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "logBackgroundError": {
+    "message": "Erreur de collection en arrière-plan : $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRunStopped": {
+    "message": "Téléchargement de la collection arrêté : $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRetryFailed": {
+    "message": "Nouvelle tentative échouée : $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logBackingOff": {
+    "message": "Nexus Mods limite les requêtes. Attente de $1.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRateLimitWaiting": {
+    "message": "Nexus Mods limite les requêtes. Attente $1…",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logPausedRateLimit": {
+    "message": "En pause. La limite Nexus expire dans $1.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantOpenPage": {
+    "message": "Impossible d’ouvrir cette page : $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantLoadSettings": {
+    "message": "Impossible de charger les paramètres : $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantSaveSettings": {
+    "message": "Les paramètres n’ont pas été enregistrés : $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantOpenPageSettings": {
+    "message": "Impossible d’ouvrir les paramètres de la page : $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertImportedMods": {
+    "message": "$1 mods sur $2 de la collection importés dans l’historique.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertImportedIds": {
+    "message": "$1 identifiants de fichier sur $2 importés.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertUnmatchedFiles_one": {
+    "message": "$1 fichier sélectionné ne correspond pas à cette collection.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertUnmatchedFiles_other": {
+    "message": "$1 fichiers sélectionnés ne correspondent pas à cette collection.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertSelectedNotDownloaded_one": {
+    "message": "$1 mod non téléchargé sélectionné.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertSelectedNotDownloaded_other": {
+    "message": "$1 mods non téléchargés sélectionnés.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "setSectionLanguage": {
+    "message": "Langue"
+  },
+  "setForceEnglishLabel": {
+    "message": "Toujours utiliser l’anglais"
+  },
+  "setForceEnglishDesc": {
+    "message": "Affiche cette extension en anglais même si votre navigateur est dans une autre langue. Pratique pour suivre des guides rédigés en anglais. Le nom de l’extension dans la liste du navigateur suit toujours la langue du navigateur."
+  },
+  "supportEntryTitle": {
+    "message": "Soutenir le projet"
+  },
+  "supportEntrySubtitle": {
+    "message": "Indépendant, privé et sans publicité"
+  },
+  "supportBackAria": {
+    "message": "Retour aux réglages rapides"
+  },
+  "supportBack": {
+    "message": "Retour"
+  },
+  "supportBadge": {
+    "message": "Soutenu par la communauté"
+  },
+  "supportKicker": {
+    "message": "Conçu pour la communauté"
+  },
+  "supportTitle": {
+    "message": "Gardez NexusMods Bypass indépendant"
+  },
+  "supportDescription": {
+    "message": "Si l’extension vous a fait gagner du temps, vous pouvez aider à financer la maintenance, la compatibilité navigateur et les améliorations à venir."
+  },
+  "supportValuesAria": {
+    "message": "Engagements du projet"
+  },
+  "supportValuePrivate": {
+    "message": "Privé"
+  },
+  "supportValueAdFree": {
+    "message": "Sans publicité"
+  },
+  "supportValueFree": {
+    "message": "Toujours gratuit"
+  },
+  "supportPrimary": {
+    "message": "Soutenir sur Ko-fi"
+  },
+  "supportPrimaryHint": {
+    "message": "Une fois ou chaque mois — à vous de choisir"
+  },
+  "supportPrimaryPending": {
+    "message": "Page Ko-fi bientôt disponible"
+  },
+  "supportPrimaryPendingHint": {
+    "message": "Le soutien sécurisé est en cours de mise en place"
+  },
+  "supportTrust": {
+    "message": "Paiement sécurisé sur Ko-fi. Ouvre un nouvel onglet."
+  },
+  "supportFreeTitle": {
+    "message": "Vous pouvez aussi aider gratuitement"
+  },
+  "supportGithub": {
+    "message": "Mettre une étoile sur GitHub"
+  },
+  "supportCopy": {
+    "message": "Copier le lien du projet"
+  },
+  "supportCopied": {
+    "message": "Lien du projet copié dans le presse-papiers."
+  },
+  "supportCopyFailed": {
+    "message": "Le lien du projet n’a pas pu être copié."
+  },
+  "supportPromise": {
+    "message": "Le soutien est entièrement facultatif. Il ne débloque ni ne limite jamais de fonctionnalités."
+  },
+  "dlgReportOpeningFull": {
+    "message": "GitHub s’ouvre avec le rapport complet…",
+    "description": "Report button state when the whole report fits in the GitHub form."
+  },
+  "dlgReportOpeningCopied": {
+    "message": "Rapport copié — GitHub s’ouvre prérempli…",
+    "description": "Report button state when the report was copied and the form is prefilled."
+  },
+  "dlgReportOpeningPrefilled": {
+    "message": "GitHub s’ouvre prérempli…",
+    "description": "Report button state when only the shortened report could be sent."
+  },
+  "dlgHistoryMarked": {
+    "message": "$1 mods sur $2 sont marqués comme téléchargés.",
+    "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "selSelectedCount_one": {
+    "message": "$1 mod sélectionné",
+    "description": "Plural form \"one\". $1 selected count.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "selSelectedCount_other": {
+    "message": "$1 mods sélectionnés",
+    "description": "Plural form \"other\". $1 selected count.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertSelectionForeign": {
+    "message": "Ce fichier a été exporté depuis une autre collection ($1/$2).",
+    "description": "Import note. $1 game domain, $2 collection slug the file came from.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertSelectionRest": {
+    "message": "Les autres ne figurent pas dans cette révision de la collection.",
+    "description": "Import note when some ids matched nothing in this revision."
+  },
+  "dlgUpdateRevisionLabel": {
+    "message": "Révision $1 — $2 Mo — $3",
+    "description": "Revision picker option. $1 revision number, $2 size in MB, $3 date.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      },
+      "c": {
+        "content": "$3"
+      }
+    }
+  },
+  "dlgDownloadPaused": {
+    "message": "Téléchargement en pause",
+    "description": "Error dialog title when a blocking error halted the collection run."
+  },
+  "speedSourceCustom": {
+    "message": "votre réglage",
+    "description": "Names the speed used in the pause countdown: the user set it."
+  },
+  "speedSourceDefault": {
+    "message": "par défaut",
+    "description": "Names the speed used in the pause countdown: the stock value."
+  }
+}

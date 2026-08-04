@@ -1,0 +1,1356 @@
+{
+  "appName": {
+    "message": "NexusMods Bypass"
+  },
+  "appDesc": {
+    "message": "Упрощает загрузки с Nexus Mods, управляет очередями загрузки коллекций и хранит локальную историю."
+  },
+  "sectionQuickControls": {
+    "message": "Быстрые настройки"
+  },
+  "toggleAutoStart": {
+    "message": "Автоматически начинать загрузки"
+  },
+  "setAutoCloseTabLabel": {
+    "message": "Закрывать вкладки Vortex"
+  },
+  "toggleSkipReq": {
+    "message": "Пропускать экраны требований"
+  },
+  "toggleHideUpsells": {
+    "message": "Скрывать рекламу и премиум-баннеры"
+  },
+  "toggleHideDownloadBar": {
+    "message": "Скрывать кнопку загрузок"
+  },
+  "setHandleArchivedFilesLabel": {
+    "message": "Кнопки для архивных файлов"
+  },
+  "setDebugLogsLabel": {
+    "message": "Подробные логи расширения"
+  },
+  "btnPageSettings": {
+    "message": "Настройки страницы"
+  },
+  "btnGoNexus": {
+    "message": "NexusMods"
+  },
+  "btnReportBug": {
+    "message": "Сообщить об ошибке — копирует отчёт"
+  },
+  "popupFooter": {
+    "message": "Помощник загрузок для Nexus Mods и Vortex"
+  },
+  "ratingPrompt": {
+    "message": "Нравится? ⭐ Поставьте звезду на GitHub"
+  },
+  "ratingDismiss": {
+    "message": "Скрыть"
+  },
+  "welcomeTitle": {
+    "message": "NexusMods Bypass готов!"
+  },
+  "welcomeSubtitle": {
+    "message": "Загружайте файлы и целые коллекции Nexus Mods меньшим числом кликов — очередь, темп и возобновление."
+  },
+  "quickStartTitle": {
+    "message": "Быстрый старт"
+  },
+  "step1Title": {
+    "message": "Откройте любую страницу файла на Nexus Mods"
+  },
+  "step1Text": {
+    "message": "Нажмите кнопку загрузки — расширение подготовит ссылку и начнёт загрузку."
+  },
+  "step2Title": {
+    "message": "Попробуйте коллекцию"
+  },
+  "step2Text": {
+    "message": "Откройте страницу коллекции и скачайте все моды одним кликом через Collection Downloader."
+  },
+  "step3Title": {
+    "message": "Настройте под себя"
+  },
+  "step3Text": {
+    "message": "Нажмите на значок расширения для быстрых настроек или на ⚙ на любой странице Nexus для полных настроек."
+  },
+  "privacyCardTitle": {
+    "message": "🔒 Приватность по умолчанию"
+  },
+  "privacyCardText": {
+    "message": "Без аналитики, аккаунтов и внешних серверов. Всё остаётся в вашем браузере."
+  },
+  "bugCardTitle": {
+    "message": "🐛 Что-то сломалось?"
+  },
+  "bugCardText": {
+    "message": "Каждая кнопка «Сообщить об ошибке» копирует полный отчёт и открывает предзаполненный GitHub issue."
+  },
+  "starCardTitle": {
+    "message": "⭐ Нравится?"
+  },
+  "starCardText": {
+    "message": "Звезда на GitHub помогает большему числу моддеров найти расширение."
+  },
+  "openNexusBtn": {
+    "message": "Открыть Nexus Mods"
+  },
+  "starBtn": {
+    "message": "Звезда на GitHub"
+  },
+  "disclaimer": {
+    "message": "Не связано с Nexus Mods. Нужен собственный аккаунт Nexus Mods; премиум-контент остаётся премиум."
+  },
+  "errMissingFileMsg": {
+    "message": "Эта ссылка для скачивания не содержит идентификатор файла."
+  },
+  "errMissingFileFix": {
+    "message": "Откройте страницу файла и попробуйте снова."
+  },
+  "errTimeoutMsg": {
+    "message": "Nexus Mods слишком долго не отвечает."
+  },
+  "errTimeoutFix": {
+    "message": "Проверьте подключение и повторите попытку."
+  },
+  "errOfflineMsg": {
+    "message": "Похоже, вы не в сети."
+  },
+  "errOfflineFix": {
+    "message": "Подключитесь к интернету и повторите попытку."
+  },
+  "errNetworkErrorMsg": {
+    "message": "Не удалось выполнить запрос к Nexus Mods."
+  },
+  "errNetworkErrorFix": {
+    "message": "Проверьте подключение и повторите попытку."
+  },
+  "errRequiresLoginMsg": {
+    "message": "Вы не вошли в Nexus Mods."
+  },
+  "errRequiresLoginFix": {
+    "message": "Войдите в аккаунт, вернитесь на эту страницу и повторите загрузку."
+  },
+  "errCloudflareMsg": {
+    "message": "Nexus Mods требует проверку браузера перед продолжением."
+  },
+  "errCloudflareFix": {
+    "message": "Пройдите проверку на странице файла и повторите попытку."
+  },
+  "errRateLimitedMsg": {
+    "message": "Nexus Mods временно ограничивает частоту запросов."
+  },
+  "errRateLimitedFix": {
+    "message": "Подождите несколько минут и повторите попытку."
+  },
+  "errAccountSuspendedMsg": {
+    "message": "Nexus Mods временно приостановил дальнейшие запросы на скачивание."
+  },
+  "errAccountSuspendedFix": {
+    "message": "Подождите, прежде чем повторять, чтобы не продлить ограничение."
+  },
+  "errAccessDeniedMsg": {
+    "message": "Nexus Mods отказал в доступе к этой загрузке."
+  },
+  "errAccessDeniedFix": {
+    "message": "Проверьте права вашей учётной записи и страницу файла, затем повторите."
+  },
+  "errFileNotFoundMsg": {
+    "message": "Запрошенный файл не найден на Nexus Mods."
+  },
+  "errFileNotFoundFix": {
+    "message": "Файл мог быть удалён, либо ссылка устарела."
+  },
+  "errModerationHoldMsg": {
+    "message": "Этот файл находится на модерации."
+  },
+  "errModerationHoldFix": {
+    "message": "Дождитесь одобрения файла со стороны Nexus Mods."
+  },
+  "errServerErrorMsg": {
+    "message": "На стороне сервера Nexus Mods возникла проблема."
+  },
+  "errServerErrorFix": {
+    "message": "Подождите немного и повторите попытку."
+  },
+  "errInvalidResponseMsg": {
+    "message": "Nexus Mods вернул неожиданный ответ."
+  },
+  "errInvalidResponseFix": {
+    "message": "Обновите страницу файла и повторите попытку."
+  },
+  "errNoDownloadUrlMsg": {
+    "message": "Nexus Mods не вернул рабочую ссылку для скачивания."
+  },
+  "errNoDownloadUrlFix": {
+    "message": "Откройте страницу файла, убедитесь, что вы вошли, и повторите попытку."
+  },
+  "errNoNmmLinkMsg": {
+    "message": "Nexus Mods не вернул корректную ссылку Vortex."
+  },
+  "errNoNmmLinkFix": {
+    "message": "Проверьте страницу файла и повторите попытку либо переключитесь на загрузку через браузер."
+  },
+  "errAbortedMsg": {
+    "message": "Запрос был отменён."
+  },
+  "errUnsafeDownloadUrlMsg": {
+    "message": "Ссылка, возвращённая Nexus Mods, не является допустимой целью загрузки."
+  },
+  "errUnsafeDownloadUrlFix": {
+    "message": "Откройте страницу файла и скачайте вручную. Если повторяется, сообщите о проблеме."
+  },
+  "errContextInvalidMsg": {
+    "message": "Расширение было обновлено или перезагружено, пока страница была открыта."
+  },
+  "errContextInvalidFix": {
+    "message": "Обновите эту страницу Nexus Mods и повторите попытку."
+  },
+  "errRequestFailedMsg": {
+    "message": "Не удалось выполнить запрос на скачивание."
+  },
+  "errRequestFailedFix": {
+    "message": "Повторите загрузку. Если повторяется, сообщите о проблеме."
+  },
+  "dlgDownloadIssue": {
+    "message": "Проблема загрузки"
+  },
+  "dlgSignInRequired": {
+    "message": "Требуется вход"
+  },
+  "dlgErrorId": {
+    "message": "Код ошибки"
+  },
+  "dlgReportBug": {
+    "message": "Сообщить об ошибке"
+  },
+  "btnSignIn": {
+    "message": "Войти в Nexus Mods"
+  },
+  "btnRetry": {
+    "message": "Повторить"
+  },
+  "btnDone": {
+    "message": "Готово"
+  },
+  "ariaCloseErrorDialog": {
+    "message": "Закрыть окно ошибки"
+  },
+  "deckTitle": {
+    "message": "Загрузчик коллекций"
+  },
+  "deckReadyQueue": {
+    "message": "Очередь готова"
+  },
+  "deckSubtitle": {
+    "message": "Ставьте коллекции в очередь, импортируйте завершённые загрузки и настраивайте темп в одном месте."
+  },
+  "deckDownloadMethod": {
+    "message": "Способ загрузки"
+  },
+  "deckMethodVortex": {
+    "message": "Отправить в Vortex"
+  },
+  "deckMethodVortexHint": {
+    "message": "Лучший вариант для передачи в очередь Vortex одним щелчком."
+  },
+  "deckMethodBrowser": {
+    "message": "Загрузка через браузер"
+  },
+  "deckMethodBrowserHint": {
+    "message": "Используйте загрузки браузера, когда Vortex не обрабатывает ссылки."
+  },
+  "deckActions": {
+    "message": "Действия"
+  },
+  "deckImportMods": {
+    "message": "Импортировать скачанные моды"
+  },
+  "tipImportInfo": {
+    "message": "Об импорте"
+  },
+  "deckDownloadAll": {
+    "message": "Скачать все моды"
+  },
+  "deckDownloadMandatory": {
+    "message": "Скачать обязательные"
+  },
+  "deckDownloadMandatoryHint": {
+    "message": "Только основные файлы"
+  },
+  "deckDownloadOptional": {
+    "message": "Скачать необязательные"
+  },
+  "deckDownloadOptionalHint": {
+    "message": "Дополнительные файлы"
+  },
+  "deckSelectMods": {
+    "message": "Выбрать моды для загрузки"
+  },
+  "deckSelectModsHint": {
+    "message": "Ручной выбор"
+  },
+  "deckUpdateCollection": {
+    "message": "Обновить коллекцию"
+  },
+  "deckUpdateCollectionHint": {
+    "message": "Сравнить ревизии"
+  },
+  "deckProgress": {
+    "message": "Ход загрузки"
+  },
+  "deckAdaptivePacing": {
+    "message": "Адаптивный темп"
+  },
+  "deckLogs": {
+    "message": "Журнал"
+  },
+  "deckLogsCaption": {
+    "message": "Лента активности"
+  },
+  "statusDownloading": {
+    "message": "Загрузка…"
+  },
+  "statusPaused": {
+    "message": "Приостановлено"
+  },
+  "statusFinished": {
+    "message": "Завершено"
+  },
+  "statusStopped": {
+    "message": "Остановлено"
+  },
+  "outcomePartial": {
+    "message": "Завершено с ошибками"
+  },
+  "outcomeBlocked": {
+    "message": "Требуется действие"
+  },
+  "outcomeFailed": {
+    "message": "Ошибка"
+  },
+  "logDownloadStarted": {
+    "message": "Загрузка началась."
+  },
+  "logDownloadFinished": {
+    "message": "Загрузка завершена."
+  },
+  "logDownloadPartial": {
+    "message": "Загрузка завершена с ошибками. При повторе успешные файлы будут пропущены."
+  },
+  "logDownloadStopped": {
+    "message": "Загрузка остановлена."
+  },
+  "logDownloadNeedsLogin": {
+    "message": "Загрузка приостановлена до входа в аккаунт."
+  },
+  "logDownloadBlocked": {
+    "message": "Загрузка приостановлена. Следуйте инструкциям в сообщении об ошибке."
+  },
+  "logDownloadError": {
+    "message": "Загрузка завершилась ошибкой."
+  },
+  "annPaused": {
+    "message": "Загрузка приостановлена."
+  },
+  "annResumed": {
+    "message": "Загрузка возобновлена."
+  },
+  "ariaProgress": {
+    "message": "Ход загрузки коллекции"
+  },
+  "ariaPause": {
+    "message": "Приостановить загрузку"
+  },
+  "ariaResume": {
+    "message": "Возобновить загрузку"
+  },
+  "ariaStop": {
+    "message": "Остановить загрузку"
+  },
+  "tipPauseResume": {
+    "message": "Пауза/Продолжить"
+  },
+  "tipStop": {
+    "message": "Стоп"
+  },
+  "btnStatePleaseWait": {
+    "message": "Пожалуйста, подождите…"
+  },
+  "btnStateDownloading": {
+    "message": "Загрузка!"
+  },
+  "btnStateError": {
+    "message": "Ошибка"
+  },
+  "btnStateOpeningPage": {
+    "message": "Открытие страницы файла…"
+  },
+  "btnFileArchive": {
+    "message": "Архив файлов"
+  },
+  "btnModManagerDownload": {
+    "message": "Загрузка через менеджер модов"
+  },
+  "btnManualDownload": {
+    "message": "Ручная загрузка"
+  },
+  "annOutcome": {
+    "message": "$1. $2.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "deckModCount_one": {
+    "message": "$1 мод",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "deckModCount_few": {
+    "message": "$1 мода",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "deckModCount_many": {
+    "message": "$1 модов",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "deckModCount_other": {
+    "message": "$1 мода",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annStarted_one": {
+    "message": "Загрузка началась: $1 мод.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annStarted_few": {
+    "message": "Загрузка началась: $1 мода.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annStarted_many": {
+    "message": "Загрузка началась: $1 модов.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annStarted_other": {
+    "message": "Загрузка началась: $1 мода.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annReconnected_one": {
+    "message": "Подключение к текущей загрузке: $1 мод.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annReconnected_few": {
+    "message": "Подключение к текущей загрузке: $1 мода.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annReconnected_many": {
+    "message": "Подключение к текущей загрузке: $1 модов.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annReconnected_other": {
+    "message": "Подключение к текущей загрузке: $1 мода.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "progressOfTotal_one": {
+    "message": "$1 из $2 мода",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "progressOfTotal_few": {
+    "message": "$1 из $2 модов",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "progressOfTotal_many": {
+    "message": "$1 из $2 модов",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "progressOfTotal_other": {
+    "message": "$1 из $2 мода",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "btnCancel": {
+    "message": "Отмена"
+  },
+  "btnClose": {
+    "message": "Закрыть"
+  },
+  "btnOk": {
+    "message": "ОК"
+  },
+  "btnGotIt": {
+    "message": "Понятно"
+  },
+  "btnRestore": {
+    "message": "Восстановить"
+  },
+  "ariaClose": {
+    "message": "Закрыть"
+  },
+  "dlgConfirmTitle": {
+    "message": "Подтвердите действие"
+  },
+  "setTitle": {
+    "message": "Настройки помощника загрузок"
+  },
+  "setSubtitle": {
+    "message": "Изменения сохраняются сразу. Восстановление настроек перезагрузит страницу."
+  },
+  "setSectionFlow": {
+    "message": "Процесс загрузки"
+  },
+  "setSectionPacing": {
+    "message": "Файлы и темп"
+  },
+  "setSectionAdvanced": {
+    "message": "Дополнительно"
+  },
+  "setRestoreDefaults": {
+    "message": "Сбросить настройки и обновить"
+  },
+  "setNeedHelp": {
+    "message": "Нужна помощь с загрузкой?"
+  },
+  "setReportOnGithub": {
+    "message": "Сообщить об ошибке на GitHub"
+  },
+  "setRestoreTitle": {
+    "message": "Сброс настроек"
+  },
+  "setRestoreConfirm": {
+    "message": "Восстановить настройки по умолчанию и обновить страницу Nexus?"
+  },
+  "unitSeconds": {
+    "message": "Секунды"
+  },
+  "setAutoStartDownloadLabel": {
+    "message": "Начинать загрузки автоматически"
+  },
+  "setAutoStartDownloadDesc": {
+    "message": "При открытии страницы файла Nexus загрузка или передача в Vortex начинается без дополнительного щелчка."
+  },
+  "setAutoCloseTabDesc": {
+    "message": "После отправки ссылки в Vortex закрывает временную вкладку Nexus по истечении задержки ниже."
+  },
+  "setSkipRequirementsLabel": {
+    "message": "Пропускать экраны требований"
+  },
+  "setSkipRequirementsDesc": {
+    "message": "Пропускает всплывающие окна требований Nexus и переходит сразу к загрузке."
+  },
+  "setShowAlertsOnErrorLabel": {
+    "message": "Показывать окна ошибок"
+  },
+  "setShowAlertsOnErrorDesc": {
+    "message": "Показывать понятное сообщение, когда Nexus не возвращает рабочую ссылку."
+  },
+  "setHidePremiumUpsellsLabel": {
+    "message": "Скрывать рекламу и панели Premium"
+  },
+  "setHidePremiumUpsellsDesc": {
+    "message": "Скрывает рекламные блоки, пустые контейнеры, баннеры Premium и панели апгрейда."
+  },
+  "setHandleArchivedFilesDesc": {
+    "message": "Добавляет кнопки загрузки Vortex и браузера к архивным файлам, скрытым Nexus."
+  },
+  "setDebugLogsDesc": {
+    "message": "Выводит подробную активность NexusMods Bypass в консоль. Ошибки показываются всегда, на отчёты это не влияет."
+  },
+  "setHideDownloadBarLabel": {
+    "message": "Скрывать кнопку загрузок браузера"
+  },
+  "setHideDownloadBarDesc": {
+    "message": "Убирает кнопку загрузок и всплывающее окно прогресса с панели инструментов браузера. Действует на все загрузки этого профиля, а не только на загрузки с Nexus. Загрузки всегда остаются доступны по Ctrl+J."
+  },
+  "setDownloadFolderLabel": {
+    "message": "Папка загрузок браузера"
+  },
+  "setDownloadFolderDesc": {
+    "message": "Подпапка внутри папки «Загрузки» браузера, для режима Browser Download. Оставьте поле пустым, чтобы файлы сохранялись прямо в «Загрузки» — некоторые менеджеры модов следят только за этой папкой и не заглядывают в подпапки. На загрузки через Vortex это не влияет."
+  },
+  "setRequestTimeoutLabel": {
+    "message": "Тайм-аут запроса загрузки"
+  },
+  "setRequestTimeoutDesc": {
+    "message": "Сколько расширение ждёт ссылку от Nexus, прежде чем прекратить попытку."
+  },
+  "setCloseTabDelayLabel": {
+    "message": "Задержка закрытия вкладки"
+  },
+  "setCloseTabDelayDesc": {
+    "message": "Действует только для автозапущенных загрузок Vortex, закрывающих вкладку. Увеличьте, если Vortex теряет ссылки."
+  },
+  "setDownloadSpeedLabel": {
+    "message": "Ваша скорость загрузки в Nexus"
+  },
+  "setDownloadSpeedDesc": {
+    "message": "Только в режиме Vortex. Браузер не видит передачу внутри Vortex, поэтому это значение оценивает длительность и распределяет передачи. Укажите реальную скорость — заниженная заставит очередь ждать дольше необходимого."
+  },
+  "setPauseBetweenModsLabel": {
+    "message": "Пауза между модами"
+  },
+  "setPauseBetweenModsDesc": {
+    "message": "Только в режиме Vortex. Добавляется к оценке выше. Установите 0, чтобы полностью отключить ожидание — включая оценку по размеру — и передавать файлы в Vortex подряд."
+  },
+  "dlgHistoryTitle": {
+    "message": "Найдены скачанные моды"
+  },
+  "dlgHistoryHelp": {
+    "message": "Выберите поведение этого запуска до начала. Если файлов не хватает, выберите повторную загрузку всех."
+  },
+  "dlgHistorySkip": {
+    "message": "Пропустить скачанные"
+  },
+  "dlgHistorySkipHint": {
+    "message": "Продолжить только с оставшимися модами."
+  },
+  "dlgHistoryRedownload": {
+    "message": "Скачать всё заново"
+  },
+  "dlgHistoryRedownloadHint": {
+    "message": "Очистить сохранённую историю и начать весь список заново."
+  },
+  "dlgImportTitle": {
+    "message": "Импорт скачанных модов"
+  },
+  "dlgImportLead": {
+    "message": "Не скачивайте повторно файлы, которые уже есть."
+  },
+  "dlgImportHelp": {
+    "message": "Выберите все файлы из папки модов — они будут сопоставлены с историей этой коллекции."
+  },
+  "dlgImportPathLabel": {
+    "message": "Стандартный путь Vortex"
+  },
+  "dlgSelectTitle": {
+    "message": "Выбор модов"
+  },
+  "selSelectAll": {
+    "message": "Выбрать все"
+  },
+  "selDeselectAll": {
+    "message": "Снять выделение"
+  },
+  "selInvert": {
+    "message": "Инвертировать выбор"
+  },
+  "selExport": {
+    "message": "Экспорт выбора"
+  },
+  "selImport": {
+    "message": "Импорт выбора"
+  },
+  "selSearchPlaceholder": {
+    "message": "Поиск модов…"
+  },
+  "selDownloadSelected": {
+    "message": "Скачать выбранные"
+  },
+  "sortModAsc": {
+    "message": "Название мода А-Я"
+  },
+  "sortModDesc": {
+    "message": "Название мода Я-А"
+  },
+  "sortFileAsc": {
+    "message": "Имя файла А-Я"
+  },
+  "sortFileDesc": {
+    "message": "Имя файла Я-А"
+  },
+  "sortSizeAsc": {
+    "message": "Размер по возрастанию"
+  },
+  "sortSizeDesc": {
+    "message": "Размер по убыванию"
+  },
+  "colModName": {
+    "message": "Название мода"
+  },
+  "colFileName": {
+    "message": "Имя файла"
+  },
+  "colSize": {
+    "message": "Размер"
+  },
+  "colType": {
+    "message": "Тип"
+  },
+  "tagOptional": {
+    "message": "Необязательный"
+  },
+  "tagMandatory": {
+    "message": "Обязательный"
+  },
+  "dlgUpdateTitle": {
+    "message": "Обновление коллекции"
+  },
+  "dlgUpdateCurrentRev": {
+    "message": "Ваша текущая ревизия"
+  },
+  "dlgUpdateToRev": {
+    "message": "Обновить до ревизии"
+  },
+  "dlgUpdateSelectRev": {
+    "message": "Выберите ревизию"
+  },
+  "dlgUpdateDownload": {
+    "message": "Скачать обновления"
+  },
+  "dlgUpdateFetchFailed": {
+    "message": "Не удалось получить ревизии. Попробуйте позже."
+  },
+  "dlgUpdateCompareFailed": {
+    "message": "Не удалось сравнить ревизии. Попробуйте позже."
+  },
+  "dlgUpdateNone": {
+    "message": "Нет"
+  },
+  "dlgUpdateColUpdated": {
+    "message": "Обновлённые"
+  },
+  "dlgUpdateColAdded": {
+    "message": "Добавленные"
+  },
+  "dlgUpdateColRemoved": {
+    "message": "Удалённые"
+  },
+  "logFailedSummary_one": {
+    "message": "Не удалось скачать $1 мод:",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "logFailedSummary_few": {
+    "message": "Не удалось скачать $1 мода:",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "logFailedSummary_many": {
+    "message": "Не удалось скачать $1 модов:",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "logFailedSummary_other": {
+    "message": "Не удалось скачать $1 мода:",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dlgCantOpenSettings": {
+    "message": "Не удалось открыть настройки"
+  },
+  "dlgCollectionIssue": {
+    "message": "Проблема загрузки коллекции"
+  },
+  "dlgCantLoadRevisions": {
+    "message": "Не удалось загрузить ревизии"
+  },
+  "dlgCantCompareRevisions": {
+    "message": "Не удалось сравнить ревизии"
+  },
+  "alertContextInvalid": {
+    "message": "NexusMods Bypass был обновлён или перезагружен.\nОбновите страницу, чтобы открыть настройки."
+  },
+  "alertPickOneToExport": {
+    "message": "Выберите хотя бы один мод для экспорта."
+  },
+  "alertPickOneMod": {
+    "message": "Выберите хотя бы один мод."
+  },
+  "alertSelectionUnreadable": {
+    "message": "Не удалось прочитать файл выбора."
+  },
+  "alertSelectionInvalid": {
+    "message": "Файл не является корректным выбором NexusMods Bypass."
+  },
+  "popupReloadFirst": {
+    "message": "Обновите страницу Nexus Mods, прежде чем открывать настройки."
+  },
+  "popupReportFull": {
+    "message": "GitHub откроется с полным отчётом — просто опишите, что произошло."
+  },
+  "popupReportShortened": {
+    "message": "Отчёт сокращён — полная копия в буфере обмена."
+  },
+  "popupReportNoCopy": {
+    "message": "GitHub открыт с заполненной формой — полный отчёт скопировать не удалось."
+  },
+  "popupLoadFailed": {
+    "message": "Всплывающее окно не загрузилось. Перезагрузите расширение и повторите."
+  },
+  "alertSelectionTooLarge": {
+    "message": "Файл выбора слишком велик (лимит $1 КБ).",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logPauseComplete": {
+    "message": "Пауза завершена ($1 для $2).",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "logPausing": {
+    "message": "Пауза $1 перед следующей загрузкой ($2 @ $3 МБ/с $4)… осталось $5",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      },
+      "c": {
+        "content": "$3"
+      },
+      "d": {
+        "content": "$4"
+      },
+      "e": {
+        "content": "$5"
+      }
+    }
+  },
+  "logAlreadyRunning": {
+    "message": "Загрузка уже выполняется. Подождите или сначала остановите её."
+  },
+  "logNothingToDownload": {
+    "message": "Для этого выбора нет модов для загрузки."
+  },
+  "logCanceledBeforeStart": {
+    "message": "Загрузка отменена до начала."
+  },
+  "logCollectionPaused": {
+    "message": "Коллекция приостановлена. Завершённые файлы остаются в истории, поэтому повтор безопасен."
+  },
+  "logQueueRateLimited": {
+    "message": "Достигнут лимит Nexus Mods. Очередь продолжится автоматически."
+  },
+  "logReconnectedAdopted": {
+    "message": "Подключение к загрузке, уже идущей в фоне."
+  },
+  "logProgressRestored": {
+    "message": "Прогресс восстановлен для загрузки, идущей в этой вкладке."
+  },
+  "logReconnectedBackground": {
+    "message": "Подключение к загрузке коллекции, всё ещё идущей в фоне."
+  },
+  "logRetryIgnored": {
+    "message": "Повтор проигнорирован: этот запуск был остановлен."
+  },
+  "logVortexNotice": {
+    "message": "Vortex должен быть запущен. Файлы записываются в момент отправки — браузер не видит, получил ли их Vortex."
+  },
+  "logSignInFirst": {
+    "message": "Войдите в Nexus Mods, прежде чем запускать эту коллекцию."
+  },
+  "logOpenLogin": {
+    "message": "Открыть вход"
+  },
+  "logSendingToVortex": {
+    "message": "Отправка в Vortex:"
+  },
+  "logAlreadyDownloaded": {
+    "message": "Уже скачано"
+  },
+  "logRateLimitCleared": {
+    "message": "Ограничение снято. Загрузки возобновляются."
+  },
+  "logPausedRateLimitDone": {
+    "message": "Приостановлено. Ограничение снято — нажмите воспроизведение."
+  },
+  "logClaimBackground": {
+    "message": "Для этой коллекции ещё выполняется фоновая загрузка. Откройте её вкладку и остановите либо закройте вкладку."
+  },
+  "logClaimOtherTab": {
+    "message": "Эта коллекция уже загружается в другой вкладке. Остановите её там или закройте вкладку."
+  },
+  "alertAllDownloaded": {
+    "message": "Все моды уже скачаны."
+  },
+  "dlgCantLoadCollection": {
+    "message": "Не удалось загрузить коллекцию"
+  },
+  "dlgStartupIssue": {
+    "message": "Проблема запуска расширения"
+  },
+  "unitSecondsShort": {
+    "message": "с"
+  },
+  "logDownloading": {
+    "message": "Загрузка: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logCompleted": {
+    "message": "Завершено: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRetryingInterrupted": {
+    "message": "Повтор прерванной загрузки: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logFailedItem": {
+    "message": "Ошибка: $1 ($2)",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "logBackgroundError": {
+    "message": "Ошибка фоновой коллекции: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRunStopped": {
+    "message": "Загрузка коллекции остановлена: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRetryFailed": {
+    "message": "Повтор не удался: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logBackingOff": {
+    "message": "Nexus Mods ограничивает запросы. Пауза $1.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRateLimitWaiting": {
+    "message": "Nexus Mods ограничивает запросы. Ожидание $1…",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logPausedRateLimit": {
+    "message": "Приостановлено. Ограничение Nexus снимется через $1.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantOpenPage": {
+    "message": "Не удалось открыть страницу: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantLoadSettings": {
+    "message": "Не удалось загрузить настройки: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantSaveSettings": {
+    "message": "Настройки не сохранены: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantOpenPageSettings": {
+    "message": "Не удалось открыть настройки страницы: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertImportedMods": {
+    "message": "В историю импортировано $1 из $2 модов коллекции.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertImportedIds": {
+    "message": "Импортировано $1 из $2 идентификаторов файлов.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertUnmatchedFiles_one": {
+    "message": "$1 выбранный файл не соответствует этой коллекции.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertUnmatchedFiles_few": {
+    "message": "$1 выбранных файла не соответствуют этой коллекции.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertUnmatchedFiles_many": {
+    "message": "$1 выбранных файлов не соответствуют этой коллекции.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertUnmatchedFiles_other": {
+    "message": "$1 выбранного файла не соответствуют этой коллекции.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertSelectedNotDownloaded_one": {
+    "message": "Выбран $1 нескачанный мод.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertSelectedNotDownloaded_few": {
+    "message": "Выбрано $1 нескачанных мода.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertSelectedNotDownloaded_many": {
+    "message": "Выбрано $1 нескачанных модов.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertSelectedNotDownloaded_other": {
+    "message": "Выбрано $1 нескачанного мода.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "setSectionLanguage": {
+    "message": "Язык"
+  },
+  "setForceEnglishLabel": {
+    "message": "Всегда использовать английский"
+  },
+  "setForceEnglishDesc": {
+    "message": "Показывает расширение на английском, даже если браузер настроен на другой язык. Удобно, когда вы следуете руководствам на английском. Название расширения в списке браузера по-прежнему зависит от языка браузера."
+  },
+  "supportEntryTitle": {
+    "message": "Поддержать проект"
+  },
+  "supportEntrySubtitle": {
+    "message": "Независимое, приватное, без рекламы"
+  },
+  "supportBackAria": {
+    "message": "Назад к быстрым настройкам"
+  },
+  "supportBack": {
+    "message": "Назад"
+  },
+  "supportBadge": {
+    "message": "При поддержке сообщества"
+  },
+  "supportKicker": {
+    "message": "Создано для сообщества"
+  },
+  "supportTitle": {
+    "message": "Сохраните независимость NexusMods Bypass"
+  },
+  "supportDescription": {
+    "message": "Если расширение сэкономило вам время, вы можете помочь оплатить поддержку, совместимость с браузерами и будущие улучшения."
+  },
+  "supportValuesAria": {
+    "message": "Обязательства проекта"
+  },
+  "supportValuePrivate": {
+    "message": "Приватно"
+  },
+  "supportValueAdFree": {
+    "message": "Без рекламы"
+  },
+  "supportValueFree": {
+    "message": "Всегда бесплатно"
+  },
+  "supportPrimary": {
+    "message": "Поддержать на Ko-fi"
+  },
+  "supportPrimaryHint": {
+    "message": "Разово или ежемесячно — на ваш выбор"
+  },
+  "supportPrimaryPending": {
+    "message": "Страница Ko-fi скоро появится"
+  },
+  "supportPrimaryPendingHint": {
+    "message": "Безопасная поддержка настраивается"
+  },
+  "supportTrust": {
+    "message": "Безопасная оплата на Ko-fi. Откроется в новой вкладке."
+  },
+  "supportFreeTitle": {
+    "message": "Помочь можно и бесплатно"
+  },
+  "supportGithub": {
+    "message": "Поставить звезду на GitHub"
+  },
+  "supportCopy": {
+    "message": "Скопировать ссылку на проект"
+  },
+  "supportCopied": {
+    "message": "Ссылка на проект скопирована в буфер обмена."
+  },
+  "supportCopyFailed": {
+    "message": "Не удалось скопировать ссылку на проект."
+  },
+  "supportPromise": {
+    "message": "Поддержка полностью добровольна. Она никогда не открывает и не ограничивает функции."
+  },
+  "dlgReportOpeningFull": {
+    "message": "GitHub откроется с полным отчётом…",
+    "description": "Report button state when the whole report fits in the GitHub form."
+  },
+  "dlgReportOpeningCopied": {
+    "message": "Отчёт скопирован — GitHub откроется заполненным…",
+    "description": "Report button state when the report was copied and the form is prefilled."
+  },
+  "dlgReportOpeningPrefilled": {
+    "message": "GitHub откроется заполненным…",
+    "description": "Report button state when only the shortened report could be sent."
+  },
+  "dlgHistoryMarked": {
+    "message": "$1 из $2 модов отмечены как загруженные.",
+    "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "selSelectedCount_one": {
+    "message": "Выбран $1 мод",
+    "description": "Plural form \"one\". $1 selected count.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "selSelectedCount_few": {
+    "message": "Выбрано $1 мода",
+    "description": "Plural form \"few\". $1 selected count.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "selSelectedCount_many": {
+    "message": "Выбрано $1 модов",
+    "description": "Plural form \"many\". $1 selected count.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "selSelectedCount_other": {
+    "message": "Выбрано $1 модов",
+    "description": "Plural form \"other\". $1 selected count.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertSelectionForeign": {
+    "message": "Этот файл экспортирован из другой коллекции ($1/$2).",
+    "description": "Import note. $1 game domain, $2 collection slug the file came from.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertSelectionRest": {
+    "message": "Остальные отсутствуют в этой ревизии коллекции.",
+    "description": "Import note when some ids matched nothing in this revision."
+  },
+  "dlgUpdateRevisionLabel": {
+    "message": "Ревизия $1 — $2 МБ — $3",
+    "description": "Revision picker option. $1 revision number, $2 size in MB, $3 date.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      },
+      "c": {
+        "content": "$3"
+      }
+    }
+  },
+  "dlgDownloadPaused": {
+    "message": "Загрузка приостановлена",
+    "description": "Error dialog title when a blocking error halted the collection run."
+  },
+  "speedSourceCustom": {
+    "message": "ваша настройка",
+    "description": "Names the speed used in the pause countdown: the user set it."
+  },
+  "speedSourceDefault": {
+    "message": "по умолчанию",
+    "description": "Names the speed used in the pause countdown: the stock value."
+  }
+}

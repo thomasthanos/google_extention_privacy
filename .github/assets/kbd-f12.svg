@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="41" height="29.2" viewBox="0 0 41.42 29.2" role="img" aria-label="F12 key" data-padded="1">
+  <defs>
+    <linearGradient id="side" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#243450"/><stop offset="1" stop-color="#0d1729"/>
+    </linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b3d5c"/><stop offset="1" stop-color="#1a2740"/>
+    </linearGradient>
+    <linearGradient id="lip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".42"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity=".06"/>
+    </linearGradient>
+  </defs>
+  <rect x=".6" y="2.6" width="40.22" height="22.8" rx="7.0" fill="url(#side)"/>
+  <rect x="1.8" y=".6" width="37.82" height="22.0" rx="6.0" fill="url(#face)"/>
+  <rect x="1.8" y=".6" width="37.82" height="22.0" rx="6.0" fill="none" stroke="url(#lip)" stroke-width="1.1"/>
+  <rect x="4.2" y="1.9" width="33.02" height="1.1" rx=".55" fill="#ff8fab" opacity=".5"/>
+  <g transform="translate(11.00,16.17)" fill="#eaf2ff"><path transform="translate(0.00,0) scale(0.01260,-0.01260)" d="M519.00 702.00V565.00H233.00V417.00H447.00V284.00H233.00V0.00H62.00V702.00Z"/><path transform="translate(7.19,0) scale(0.01260,-0.01260)" d="M27.00 571.00V730.00H304.00V0.00H126.00V571.00Z"/><path transform="translate(12.23,0) scale(0.01260,-0.01260)" d="M70.00 162.00Q168.00 243.00 224.50 295.00Q281.00 347.00 320.00 404.00Q359.00 461.00 359.00 515.00Q359.00 556.00 340.00 579.00Q321.00 602.00 283.00 602.00Q245.00 602.00 223.50 573.50Q202.00 545.00 202.00 493.00H37.00Q39.00 578.00 73.50 635.00Q108.00 692.00 164.50 719.00Q221.00 746.00 290.00 746.00Q409.00 746.00 469.50 685.00Q530.00 624.00 530.00 526.00Q530.00 419.00 457.00 327.50Q384.00 236.00 271.00 149.00H541.00V10.00H39.00V137.00Q73.00 164.00 70.00 162.00Z"/></g>
+</svg>

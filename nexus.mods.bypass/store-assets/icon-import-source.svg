@@ -1,0 +1,29 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="16" y1="12" x2="116" y2="118" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#252228"/>
+      <stop offset="1" stop-color="#161318"/>
+    </linearGradient>
+    <linearGradient id="orb" x1="33" y1="28" x2="97" y2="103" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFB84E"/>
+      <stop offset="1" stop-color="#D17A17"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="128" height="128" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <rect x="8" y="8" width="112" height="112" rx="28" fill="url(#bg)"/>
+    <rect x="8.75" y="8.75" width="110.5" height="110.5" rx="27.25" stroke="rgba(255,255,255,0.18)"/>
+  </g>
+
+  <circle cx="64" cy="64" r="46" fill="#FFAE32" fill-opacity="0.18"/>
+  <circle cx="64" cy="64" r="42" fill="url(#orb)"/>
+  <ellipse cx="55" cy="44" rx="24" ry="15" fill="#FFF3D7" fill-opacity="0.16"/>
+  <circle cx="64" cy="64" r="41" stroke="#FFE9C8" stroke-opacity="0.4" stroke-width="2"/>
+  <path d="M39 82L48 91H80L89 82" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M64 31V64" stroke="white" stroke-width="8" stroke-linecap="round"/>
+  <path d="M48 56H80L64 76L48 56Z" fill="white"/>
+  <path d="M31 58C35 43 46 32 61 28" stroke="#FFE0B2" stroke-opacity="0.5" stroke-width="2" stroke-linecap="round"/>
+</svg>

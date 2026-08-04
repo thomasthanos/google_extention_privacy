@@ -1,0 +1,1220 @@
+{
+  "appName": {
+    "message": "NexusMods Bypass"
+  },
+  "appDesc": {
+    "message": "Nexus Mods indirmelerini kolaylaştırır, koleksiyon indirme kuyruklarını yönetir ve tamamlanan dosyaların yerel geçmişini tutar."
+  },
+  "sectionQuickControls": {
+    "message": "Hızlı ayarlar"
+  },
+  "toggleAutoStart": {
+    "message": "İndirmeleri otomatik başlat"
+  },
+  "setAutoCloseTabLabel": {
+    "message": "Vortex sekmelerini kapat"
+  },
+  "toggleSkipReq": {
+    "message": "Gereksinim ekranlarını atla"
+  },
+  "toggleHideUpsells": {
+    "message": "Reklamları ve Premium panellerini gizle"
+  },
+  "toggleHideDownloadBar": {
+    "message": "İndirme düğmesini gizle"
+  },
+  "setHandleArchivedFilesLabel": {
+    "message": "Arşivlenmiş dosya düğmeleri"
+  },
+  "setDebugLogsLabel": {
+    "message": "Ayrıntılı eklenti günlükleri"
+  },
+  "btnPageSettings": {
+    "message": "Sayfa ayarları"
+  },
+  "btnGoNexus": {
+    "message": "NexusMods"
+  },
+  "btnReportBug": {
+    "message": "Hata bildir — hata raporunu kopyalar"
+  },
+  "popupFooter": {
+    "message": "Nexus Mods ve Vortex için indirme yardımcısı"
+  },
+  "ratingPrompt": {
+    "message": "Beğendiniz mi? ⭐ GitHub'da yıldız verin"
+  },
+  "ratingDismiss": {
+    "message": "Kapat"
+  },
+  "welcomeTitle": {
+    "message": "NexusMods Bypass hazır!"
+  },
+  "welcomeSubtitle": {
+    "message": "Nexus Mods dosyalarını ve tüm koleksiyonları daha az tıklamayla indirin — kuyruklu, hız ayarlı ve devam ettirilebilir."
+  },
+  "quickStartTitle": {
+    "message": "Hızlı başlangıç"
+  },
+  "step1Title": {
+    "message": "Herhangi bir Nexus Mods dosya sayfasını açın"
+  },
+  "step1Text": {
+    "message": "Bir indirme düğmesine tıklayın — eklenti bağlantıyı hazırlar ve indirmeyi sizin için başlatır."
+  },
+  "step2Title": {
+    "message": "Bir koleksiyon deneyin"
+  },
+  "step2Text": {
+    "message": "Bir koleksiyon sayfası açın ve Collection Downloader panelinden tek tıkla tüm modları indirin."
+  },
+  "step3Title": {
+    "message": "Kendinize göre ayarlayın"
+  },
+  "step3Text": {
+    "message": "Hızlı anahtarlar için eklenti simgesine, tüm ayarlar için herhangi bir Nexus sayfasındaki ⚙ düğmesine tıklayın."
+  },
+  "privacyCardTitle": {
+    "message": "🔒 Tasarımı gereği gizli"
+  },
+  "privacyCardText": {
+    "message": "Analitik yok, hesap yok, harici sunucu yok. Her şey tarayıcınızda kalır."
+  },
+  "bugCardTitle": {
+    "message": "🐛 Bir şey mi bozuldu?"
+  },
+  "bugCardText": {
+    "message": "Her \"Hata bildir\" düğmesi tam bir tanılama raporu kopyalar ve önceden doldurulmuş bir GitHub konusu açar."
+  },
+  "starCardTitle": {
+    "message": "⭐ Beğendiniz mi?"
+  },
+  "starCardText": {
+    "message": "GitHub'daki bir yıldız, daha çok modcunun eklentiyi bulmasına yardımcı olur."
+  },
+  "openNexusBtn": {
+    "message": "Nexus Mods'u aç"
+  },
+  "starBtn": {
+    "message": "GitHub'da yıldız ver"
+  },
+  "disclaimer": {
+    "message": "Nexus Mods ile bağlantılı değildir. Kendi Nexus Mods hesabınız gerekir; yalnızca Premium içerikler Premium olarak kalır."
+  },
+  "errMissingFileMsg": {
+    "message": "Bu indirme bağlantısı bir dosya tanımlayıcısı içermiyor."
+  },
+  "errMissingFileFix": {
+    "message": "Dosya sayfasını açıp tekrar deneyin."
+  },
+  "errTimeoutMsg": {
+    "message": "Nexus Mods yanıt vermekte çok gecikti."
+  },
+  "errTimeoutFix": {
+    "message": "Bağlantınızı kontrol edip tekrar deneyin."
+  },
+  "errOfflineMsg": {
+    "message": "Çevrimdışı görünüyorsunuz."
+  },
+  "errOfflineFix": {
+    "message": "İnternete yeniden bağlanıp tekrar deneyin."
+  },
+  "errNetworkErrorMsg": {
+    "message": "Nexus Mods'a yapılan istek tamamlanamadı."
+  },
+  "errNetworkErrorFix": {
+    "message": "Bağlantınızı kontrol edip tekrar deneyin."
+  },
+  "errRequiresLoginMsg": {
+    "message": "Nexus Mods'ta oturum açmamışsınız."
+  },
+  "errRequiresLoginFix": {
+    "message": "Oturum açın, bu sayfaya dönün ve indirmeyi tekrar deneyin."
+  },
+  "errCloudflareMsg": {
+    "message": "Devam etmeden önce Nexus Mods tarayıcı doğrulaması istiyor."
+  },
+  "errCloudflareFix": {
+    "message": "Doğrulamayı dosya sayfasında tamamlayıp tekrar deneyin."
+  },
+  "errRateLimitedMsg": {
+    "message": "Nexus Mods geçici olarak istekleri sınırlıyor."
+  },
+  "errRateLimitedFix": {
+    "message": "Tekrar denemeden önce birkaç dakika bekleyin."
+  },
+  "errAccountSuspendedMsg": {
+    "message": "Nexus Mods, sonraki indirme isteklerini geçici olarak durdurdu."
+  },
+  "errAccountSuspendedFix": {
+    "message": "Sürenin uzamaması için tekrar denemeden önce bekleyin."
+  },
+  "errAccessDeniedMsg": {
+    "message": "Nexus Mods bu indirmeye erişimi reddetti."
+  },
+  "errAccessDeniedFix": {
+    "message": "Hesap izinlerinizi ve dosya sayfasını kontrol edip tekrar deneyin."
+  },
+  "errFileNotFoundMsg": {
+    "message": "İstenen dosya Nexus Mods'ta bulunamadı."
+  },
+  "errFileNotFoundFix": {
+    "message": "Dosya kaldırılmış ya da bağlantı eskimiş olabilir."
+  },
+  "errModerationHoldMsg": {
+    "message": "Bu dosya inceleme aşamasında."
+  },
+  "errModerationHoldFix": {
+    "message": "İndirmeden önce Nexus Mods'un dosyayı onaylamasını bekleyin."
+  },
+  "errServerErrorMsg": {
+    "message": "Nexus Mods tarafında bir sunucu sorunu var."
+  },
+  "errServerErrorFix": {
+    "message": "Biraz bekleyip tekrar deneyin."
+  },
+  "errInvalidResponseMsg": {
+    "message": "Nexus Mods beklenmeyen bir yanıt döndürdü."
+  },
+  "errInvalidResponseFix": {
+    "message": "Dosya sayfasını yenileyip tekrar deneyin."
+  },
+  "errNoDownloadUrlMsg": {
+    "message": "Nexus Mods kullanılabilir bir indirme bağlantısı döndürmedi."
+  },
+  "errNoDownloadUrlFix": {
+    "message": "Dosya sayfasını açın, oturumunuzun açık olduğunu doğrulayın ve tekrar deneyin."
+  },
+  "errNoNmmLinkMsg": {
+    "message": "Nexus Mods geçerli bir Vortex bağlantısı döndürmedi."
+  },
+  "errNoNmmLinkFix": {
+    "message": "Dosya sayfasını kontrol edip tekrar deneyin ya da tarayıcı indirmesine geçin."
+  },
+  "errAbortedMsg": {
+    "message": "İstek iptal edildi."
+  },
+  "errUnsafeDownloadUrlMsg": {
+    "message": "Nexus Mods'un döndürdüğü bağlantı tanınan bir indirme hedefi değil."
+  },
+  "errUnsafeDownloadUrlFix": {
+    "message": "Dosya sayfasını açıp elle indirin. Tekrarlarsa sorunu bildirin."
+  },
+  "errContextInvalidMsg": {
+    "message": "Bu sayfa açıkken eklenti güncellendi veya yeniden yüklendi."
+  },
+  "errContextInvalidFix": {
+    "message": "Bu Nexus Mods sayfasını yenileyip tekrar deneyin."
+  },
+  "errRequestFailedMsg": {
+    "message": "İndirme isteği başarısız oldu."
+  },
+  "errRequestFailedFix": {
+    "message": "İndirmeyi tekrar deneyin. Sürerse sorunu bildirin."
+  },
+  "dlgDownloadIssue": {
+    "message": "İndirme sorunu"
+  },
+  "dlgSignInRequired": {
+    "message": "Oturum açmanız gerekiyor"
+  },
+  "dlgErrorId": {
+    "message": "Hata kimliği"
+  },
+  "dlgReportBug": {
+    "message": "Hata bildir"
+  },
+  "btnSignIn": {
+    "message": "Nexus Mods'ta oturum aç"
+  },
+  "btnRetry": {
+    "message": "Tekrar dene"
+  },
+  "btnDone": {
+    "message": "Tamam"
+  },
+  "ariaCloseErrorDialog": {
+    "message": "Hata penceresini kapat"
+  },
+  "deckTitle": {
+    "message": "Collection Downloader"
+  },
+  "deckReadyQueue": {
+    "message": "Kuyruk hazır"
+  },
+  "deckSubtitle": {
+    "message": "Tüm koleksiyonları kuyruğa alın, tamamlanmış indirmeleri içe aktarın ve indirme hızını tek bir panelden ayarlayın."
+  },
+  "deckDownloadMethod": {
+    "message": "İndirme yöntemi"
+  },
+  "deckMethodVortex": {
+    "message": "Vortex'e gönder"
+  },
+  "deckMethodVortexHint": {
+    "message": "Tek tıkla Vortex kuyruğuna aktarmak için en uygunu."
+  },
+  "deckMethodBrowser": {
+    "message": "Tarayıcıyla indir"
+  },
+  "deckMethodBrowserHint": {
+    "message": "Vortex bağlantıları işlemediğinde tarayıcının kendi indirmesini kullanın."
+  },
+  "deckActions": {
+    "message": "İşlemler"
+  },
+  "deckImportMods": {
+    "message": "İndirilmiş modları içe aktar"
+  },
+  "tipImportInfo": {
+    "message": "İçe aktarma hakkında bilgi"
+  },
+  "deckDownloadAll": {
+    "message": "Tüm modları indir"
+  },
+  "deckDownloadMandatory": {
+    "message": "Zorunlu olanları indir"
+  },
+  "deckDownloadMandatoryHint": {
+    "message": "Yalnızca temel dosyalar"
+  },
+  "deckDownloadOptional": {
+    "message": "İsteğe bağlı olanları indir"
+  },
+  "deckDownloadOptionalHint": {
+    "message": "İsteğe bağlı ekler"
+  },
+  "deckSelectMods": {
+    "message": "İndirilecek modları seç"
+  },
+  "deckSelectModsHint": {
+    "message": "Elle seçim listesi"
+  },
+  "deckUpdateCollection": {
+    "message": "Koleksiyonu güncelle"
+  },
+  "deckUpdateCollectionHint": {
+    "message": "Sürümleri karşılaştır"
+  },
+  "deckProgress": {
+    "message": "İndirme ilerlemesi"
+  },
+  "deckAdaptivePacing": {
+    "message": "Uyarlanabilir hız"
+  },
+  "deckLogs": {
+    "message": "Günlükler"
+  },
+  "deckLogsCaption": {
+    "message": "Canlı etkinlik akışı"
+  },
+  "statusDownloading": {
+    "message": "İndiriliyor..."
+  },
+  "statusPaused": {
+    "message": "Duraklatıldı"
+  },
+  "statusFinished": {
+    "message": "Tamamlandı"
+  },
+  "statusStopped": {
+    "message": "Durduruldu"
+  },
+  "outcomePartial": {
+    "message": "Hatalarla tamamlandı"
+  },
+  "outcomeBlocked": {
+    "message": "İşlem gerekli"
+  },
+  "outcomeFailed": {
+    "message": "Başarısız"
+  },
+  "logDownloadStarted": {
+    "message": "İndirme başladı."
+  },
+  "logDownloadFinished": {
+    "message": "İndirme tamamlandı."
+  },
+  "logDownloadPartial": {
+    "message": "İndirme hatalarla tamamlandı. Tekrar denerseniz başarılı dosyalar atlanır."
+  },
+  "logDownloadStopped": {
+    "message": "İndirme durduruldu."
+  },
+  "logDownloadNeedsLogin": {
+    "message": "Oturum açana kadar indirme duraklatıldı."
+  },
+  "logDownloadBlocked": {
+    "message": "İndirme duraklatıldı. Tekrar denemeden önce hata yönergelerini izleyin."
+  },
+  "logDownloadError": {
+    "message": "İndirme bir hatayla sona erdi."
+  },
+  "annPaused": {
+    "message": "İndirme duraklatıldı."
+  },
+  "annResumed": {
+    "message": "İndirme sürdürüldü."
+  },
+  "ariaProgress": {
+    "message": "Koleksiyon indirme ilerlemesi"
+  },
+  "ariaPause": {
+    "message": "İndirmeyi duraklat"
+  },
+  "ariaResume": {
+    "message": "İndirmeyi sürdür"
+  },
+  "ariaStop": {
+    "message": "İndirmeyi durdur"
+  },
+  "tipPauseResume": {
+    "message": "Duraklat/Sürdür"
+  },
+  "tipStop": {
+    "message": "Durdur"
+  },
+  "btnStatePleaseWait": {
+    "message": "Lütfen bekleyin..."
+  },
+  "btnStateDownloading": {
+    "message": "İndiriliyor!"
+  },
+  "btnStateError": {
+    "message": "Hata"
+  },
+  "btnStateOpeningPage": {
+    "message": "Dosya sayfası açılıyor..."
+  },
+  "btnFileArchive": {
+    "message": "Dosya arşivi"
+  },
+  "btnModManagerDownload": {
+    "message": "Mod yöneticisiyle indir"
+  },
+  "btnManualDownload": {
+    "message": "Elle indir"
+  },
+  "annOutcome": {
+    "message": "$1. $2.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "btnCancel": {
+    "message": "İptal"
+  },
+  "btnClose": {
+    "message": "Kapat"
+  },
+  "btnOk": {
+    "message": "Tamam"
+  },
+  "btnGotIt": {
+    "message": "Anladım"
+  },
+  "btnRestore": {
+    "message": "Geri yükle"
+  },
+  "ariaClose": {
+    "message": "Kapat"
+  },
+  "dlgConfirmTitle": {
+    "message": "İşlemi onayla"
+  },
+  "setTitle": {
+    "message": "İndirme yardımcısı ayarları"
+  },
+  "setSubtitle": {
+    "message": "Değişiklikler anında kaydedilir. Varsayılanları geri yüklemek bu sayfayı yeniden yükler."
+  },
+  "setSectionFlow": {
+    "message": "İndirme akışı"
+  },
+  "setSectionPacing": {
+    "message": "Dosyalar ve hız"
+  },
+  "setSectionAdvanced": {
+    "message": "Gelişmiş"
+  },
+  "setRestoreDefaults": {
+    "message": "Varsayılanları geri yükle ve yenile"
+  },
+  "setNeedHelp": {
+    "message": "İndirme konusunda yardıma mı ihtiyacınız var?"
+  },
+  "setReportOnGithub": {
+    "message": "GitHub'da hata bildir"
+  },
+  "setRestoreTitle": {
+    "message": "Varsayılanları geri yükle"
+  },
+  "setRestoreConfirm": {
+    "message": "Varsayılan ayarlar geri yüklensin ve bu Nexus sayfası yenilensin mi?"
+  },
+  "unitSeconds": {
+    "message": "Saniye"
+  },
+  "setAutoStartDownloadLabel": {
+    "message": "İndirmeleri otomatik başlat"
+  },
+  "setAutoStartDownloadDesc": {
+    "message": "Bir Nexus dosya indirme sayfası açtığınızda, ek bir tıklama olmadan Vortex aktarımını veya tarayıcı indirmesini başlatır."
+  },
+  "setAutoCloseTabDesc": {
+    "message": "Vortex'e bir bağlantı gönderildikten sonra, aşağıdaki gecikmenin ardından geçici Nexus sekmesini kapatır."
+  },
+  "setSkipRequirementsLabel": {
+    "message": "Gereksinim ekranlarını atla"
+  },
+  "setSkipRequirementsDesc": {
+    "message": "Nexus gereksinim pencerelerini geçip doğrudan indirme adımına gider."
+  },
+  "setShowAlertsOnErrorLabel": {
+    "message": "Hata pencerelerini göster"
+  },
+  "setShowAlertsOnErrorDesc": {
+    "message": "Nexus kullanılabilir bir indirme bağlantısı döndürmediğinde net bir mesaj gösterir."
+  },
+  "setHidePremiumUpsellsLabel": {
+    "message": "Reklamları ve Premium panellerini gizle"
+  },
+  "setHidePremiumUpsellsDesc": {
+    "message": "Gezinirken Nexus reklam alanlarını, boş reklam kutularını, Premium afişlerini ve yükseltme panellerini gizler."
+  },
+  "setHandleArchivedFilesDesc": {
+    "message": "Nexus gizlediğinde, arşivlenmiş dosya girişlerine Vortex ve tarayıcı indirme düğmeleri ekler."
+  },
+  "setDebugLogsDesc": {
+    "message": "NexusMods Bypass etkinliğini konsola ayrıntılı yazar. Hatalar her zaman gösterilir ve bu ayar hata raporlarını etkilemez."
+  },
+  "setHideDownloadBarLabel": {
+    "message": "Tarayıcının indirme düğmesini gizle"
+  },
+  "setHideDownloadBarDesc": {
+    "message": "İndirme düğmesini ve ilerleme penceresini tarayıcı araç çubuğundan kaldırır. Yalnızca Nexus indirmelerini değil, bu tarayıcı profilindeki tüm indirmeleri etkiler. İndirdiğiniz dosyalara her zaman Ctrl+J ile ulaşabilirsiniz."
+  },
+  "setDownloadFolderLabel": {
+    "message": "Tarayıcı indirme klasörü"
+  },
+  "setDownloadFolderDesc": {
+    "message": "Tarayıcının İndirilenler klasörü içindeki alt klasör (Browser Download modu için). Doğrudan İndirilenler klasörüne kaydetmek için boş bırakın — bazı mod yöneticileri yalnızca bu klasörü izler ve alt klasörlere bakmaz. Vortex indirmelerini Vortex yönetir ve bundan etkilenmez."
+  },
+  "setRequestTimeoutLabel": {
+    "message": "İndirme isteği zaman aşımı"
+  },
+  "setRequestTimeoutDesc": {
+    "message": "Eklentinin, Nexus'un bir indirme bağlantısı döndürmesini vazgeçmeden önce ne kadar bekleyeceği."
+  },
+  "setCloseTabDelayLabel": {
+    "message": "Sekme kapatma gecikmesi"
+  },
+  "setCloseTabDelayDesc": {
+    "message": "Yalnızca kendi sekmesini kapatan, otomatik başlatılmış Vortex indirmeleri için geçerlidir. Vortex bağlantıları kaçırıyorsa artırın."
+  },
+  "setDownloadSpeedLabel": {
+    "message": "Nexus indirme hızınız"
+  },
+  "setDownloadSpeedDesc": {
+    "message": "Yalnızca Vortex modu. Tarayıcı, Vortex içinde gerçekleşen aktarımı göremez; bu yüzden bu değer her dosyanın süresini tahmin eder ve aktarımları aralıklandırır. Gerçekte gördüğünüz hızı girin — çok düşük olursa kuyruk gereğinden çok daha uzun bekler."
+  },
+  "setPauseBetweenModsLabel": {
+    "message": "Modlar arası bekleme"
+  },
+  "setPauseBetweenModsDesc": {
+    "message": "Yalnızca Vortex modu. Yukarıdaki tahmine eklenir. 0 yaparsanız — boyuta dayalı tahmin dahil — bekleme tamamen kapanır ve her dosya art arda Vortex'e verilir, kuyruğu Vortex kendi yönetir."
+  },
+  "dlgHistoryTitle": {
+    "message": "İndirilmiş modlar bulundu"
+  },
+  "dlgHistoryHelp": {
+    "message": "Başlamadan önce bu çalışmanın nasıl davranacağını seçin. Dosyalar eksikse Tümünü yeniden indir'i seçin."
+  },
+  "dlgHistorySkip": {
+    "message": "İndirilmiş olanları atla"
+  },
+  "dlgHistorySkipHint": {
+    "message": "Yalnızca kalan modlarla devam et."
+  },
+  "dlgHistoryRedownload": {
+    "message": "Tümünü yeniden indir"
+  },
+  "dlgHistoryRedownloadHint": {
+    "message": "Kayıtlı geçmişi temizler ve tüm listeye baştan başlar."
+  },
+  "dlgImportTitle": {
+    "message": "İndirilmiş modları içe aktar"
+  },
+  "dlgImportLead": {
+    "message": "Zaten sahip olduğunuz dosyaları yeniden indirmekten kaçının."
+  },
+  "dlgImportHelp": {
+    "message": "Mod klasörünüzdeki tüm dosyaları seçin; bu koleksiyonun geçmişiyle eşleştirilecekler."
+  },
+  "dlgImportPathLabel": {
+    "message": "Varsayılan Vortex yolu"
+  },
+  "dlgSelectTitle": {
+    "message": "Modları seç"
+  },
+  "selSelectAll": {
+    "message": "Tümünü seç"
+  },
+  "selDeselectAll": {
+    "message": "Seçimi kaldır"
+  },
+  "selInvert": {
+    "message": "Seçimi tersine çevir"
+  },
+  "selExport": {
+    "message": "Seçimi dışa aktar"
+  },
+  "selImport": {
+    "message": "Seçimi içe aktar"
+  },
+  "selSearchPlaceholder": {
+    "message": "Mod ara..."
+  },
+  "selDownloadSelected": {
+    "message": "Seçilenleri indir"
+  },
+  "sortModAsc": {
+    "message": "Mod adı A-Z"
+  },
+  "sortModDesc": {
+    "message": "Mod adı Z-A"
+  },
+  "sortFileAsc": {
+    "message": "Dosya adı A-Z"
+  },
+  "sortFileDesc": {
+    "message": "Dosya adı Z-A"
+  },
+  "sortSizeAsc": {
+    "message": "Boyut artan"
+  },
+  "sortSizeDesc": {
+    "message": "Boyut azalan"
+  },
+  "colModName": {
+    "message": "Mod adı"
+  },
+  "colFileName": {
+    "message": "Dosya adı"
+  },
+  "colSize": {
+    "message": "Boyut"
+  },
+  "colType": {
+    "message": "Tür"
+  },
+  "tagOptional": {
+    "message": "İsteğe bağlı"
+  },
+  "tagMandatory": {
+    "message": "Zorunlu"
+  },
+  "dlgUpdateTitle": {
+    "message": "Koleksiyonu güncelle"
+  },
+  "dlgUpdateCurrentRev": {
+    "message": "Mevcut sürümünüz"
+  },
+  "dlgUpdateToRev": {
+    "message": "Şu sürüme güncelle"
+  },
+  "dlgUpdateSelectRev": {
+    "message": "Bir sürüm seçin"
+  },
+  "dlgUpdateDownload": {
+    "message": "Güncellemeleri indir"
+  },
+  "dlgUpdateFetchFailed": {
+    "message": "Sürümler alınamadı. Daha sonra tekrar deneyin."
+  },
+  "dlgUpdateCompareFailed": {
+    "message": "Sürümler karşılaştırılamadı. Daha sonra tekrar deneyin."
+  },
+  "dlgUpdateNone": {
+    "message": "Yok"
+  },
+  "dlgUpdateColUpdated": {
+    "message": "Güncellenenler"
+  },
+  "dlgUpdateColAdded": {
+    "message": "Eklenenler"
+  },
+  "dlgUpdateColRemoved": {
+    "message": "Kaldırılanlar"
+  },
+  "dlgCantOpenSettings": {
+    "message": "Ayarlar açılamadı"
+  },
+  "dlgCollectionIssue": {
+    "message": "Koleksiyon indirme sorunu"
+  },
+  "dlgCantLoadRevisions": {
+    "message": "Sürümler yüklenemedi"
+  },
+  "dlgCantCompareRevisions": {
+    "message": "Sürümler karşılaştırılamadı"
+  },
+  "alertContextInvalid": {
+    "message": "NexusMods Bypass güncellendi veya yeniden yüklendi.\nAyarları açmak için bu sayfayı yenileyin."
+  },
+  "alertPickOneToExport": {
+    "message": "Dışa aktarmak için en az bir mod seçin."
+  },
+  "alertPickOneMod": {
+    "message": "En az bir mod seçin."
+  },
+  "alertSelectionUnreadable": {
+    "message": "Seçim dosyası okunamadı."
+  },
+  "alertSelectionInvalid": {
+    "message": "Dosya geçerli bir NexusMods Bypass seçimi değil."
+  },
+  "popupReloadFirst": {
+    "message": "Sayfa ayarlarını açmadan önce Nexus Mods sayfasını yenileyin."
+  },
+  "popupReportFull": {
+    "message": "GitHub tam raporla açılıyor — yalnızca ne olduğunu yazmanız yeterli."
+  },
+  "popupReportShortened": {
+    "message": "Rapor sığması için kısaltıldı — tam kopya panonuzda."
+  },
+  "popupReportNoCopy": {
+    "message": "GitHub önceden doldurulmuş açılıyor — tam rapor kopyalanamadı."
+  },
+  "popupLoadFailed": {
+    "message": "Açılır pencere yüklenemedi. Eklentiyi yeniden yükleyip tekrar deneyin."
+  },
+  "alertSelectionTooLarge": {
+    "message": "Seçim dosyası çok büyük (sınır $1 KB).",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logPauseComplete": {
+    "message": "Bekleme tamamlandı ($2 için $1).",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "logPausing": {
+    "message": "Sonraki indirmeden önce $1 bekleniyor ($2 @ $3 MB/s $4)... $5 kaldı",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      },
+      "c": {
+        "content": "$3"
+      },
+      "d": {
+        "content": "$4"
+      },
+      "e": {
+        "content": "$5"
+      }
+    }
+  },
+  "logAlreadyRunning": {
+    "message": "Zaten bir indirme sürüyor. Lütfen bekleyin ya da önce durdurun."
+  },
+  "logNothingToDownload": {
+    "message": "Bu seçim için indirilecek mod yok."
+  },
+  "logCanceledBeforeStart": {
+    "message": "İndirme başlamadan iptal edildi."
+  },
+  "logCollectionPaused": {
+    "message": "Koleksiyon duraklatıldı. Tamamlanan dosyalar geçmişte kalır, bu yüzden sorunu çözdükten sonra güvenle tekrar deneyebilirsiniz."
+  },
+  "logQueueRateLimited": {
+    "message": "Nexus Mods istek sınırına ulaşıldı. Arka plan kuyruğu otomatik olarak sürdürülecek."
+  },
+  "logReconnectedAdopted": {
+    "message": "Arka planda süren indirmeye yeniden bağlanıldı."
+  },
+  "logProgressRestored": {
+    "message": "Bu sekmede süren indirmenin ilerlemesi geri yüklendi."
+  },
+  "logReconnectedBackground": {
+    "message": "Arka planda süren koleksiyon indirmesine yeniden bağlanıldı."
+  },
+  "logRetryIgnored": {
+    "message": "Tekrar deneme yok sayıldı: bu çalışma durdurulmuştu."
+  },
+  "logVortexNotice": {
+    "message": "Vortex çalışıyor olmalı. Dosyalar gönderildikleri anda kaydedilir — tarayıcı, Vortex'in bunları gerçekten alıp almadığını göremez."
+  },
+  "logSignInFirst": {
+    "message": "Bu koleksiyonu başlatmadan önce Nexus Mods'ta oturum açın."
+  },
+  "logOpenLogin": {
+    "message": "Oturum açmayı aç"
+  },
+  "logSendingToVortex": {
+    "message": "Vortex'e gönderiliyor:"
+  },
+  "logAlreadyDownloaded": {
+    "message": "Zaten indirildi"
+  },
+  "logRateLimitCleared": {
+    "message": "İstek sınırı kalktı. İndirmeler sürdürülüyor."
+  },
+  "logPausedRateLimitDone": {
+    "message": "Duraklatıldı. İstek sınırı kalktı — devam etmek için oynat'a basın."
+  },
+  "logClaimBackground": {
+    "message": "Bu koleksiyon için bir arka plan indirmesi hâlâ sürüyor. Sekmesini açıp orada durdurun ya da o sekmeyi kapatın."
+  },
+  "logClaimOtherTab": {
+    "message": "Bu koleksiyon başka bir sekmede zaten indiriliyor. Önce orada durdurun ya da o sekmeyi kapatın."
+  },
+  "alertAllDownloaded": {
+    "message": "Tüm modlar zaten indirilmiş."
+  },
+  "dlgCantLoadCollection": {
+    "message": "Koleksiyon yüklenemedi"
+  },
+  "dlgStartupIssue": {
+    "message": "Eklenti başlatma sorunu"
+  },
+  "unitSecondsShort": {
+    "message": "sn"
+  },
+  "logDownloading": {
+    "message": "İndiriliyor: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logCompleted": {
+    "message": "Tamamlandı: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRetryingInterrupted": {
+    "message": "Kesilen indirme yeniden deneniyor: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logFailedItem": {
+    "message": "Başarısız: $1 ($2)",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "logBackgroundError": {
+    "message": "Arka plan koleksiyon hatası: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRunStopped": {
+    "message": "Koleksiyon indirmesi durduruldu: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRetryFailed": {
+    "message": "Tekrar deneme başarısız: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logBackingOff": {
+    "message": "Nexus Mods istekleri sınırlıyor. $1 bekleniyor.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRateLimitWaiting": {
+    "message": "Nexus Mods istekleri sınırlıyor. $1 bekleniyor...",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logPausedRateLimit": {
+    "message": "Duraklatıldı. Nexus istek sınırı $1 içinde kalkacak.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantOpenPage": {
+    "message": "Bu sayfa açılamadı: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantLoadSettings": {
+    "message": "Kayıtlı ayarlar yüklenemedi: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantSaveSettings": {
+    "message": "Ayarlar kaydedilmedi: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantOpenPageSettings": {
+    "message": "Sayfa ayarları açılamadı: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertImportedMods": {
+    "message": "$2 koleksiyon modundan $1 tanesi geçmişe aktarıldı.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertImportedIds": {
+    "message": "$2 dosya kimliğinden $1 tanesi içe aktarıldı.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertSelectedNotDownloaded_one": {
+    "message": "Henüz indirilmemiş $1 mod seçildi.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertSelectedNotDownloaded_other": {
+    "message": "Henüz indirilmemiş $1 mod seçildi.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertUnmatchedFiles_one": {
+    "message": "Seçilen $1 dosya bu koleksiyonla eşleşmedi.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertUnmatchedFiles_other": {
+    "message": "Seçilen $1 dosya bu koleksiyonla eşleşmedi.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "annReconnected_one": {
+    "message": "Süren indirmeye yeniden bağlanıldı: $1 mod.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annReconnected_other": {
+    "message": "Süren indirmeye yeniden bağlanıldı: $1 mod.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annStarted_one": {
+    "message": "İndirme başladı: $1 mod.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annStarted_other": {
+    "message": "İndirme başladı: $1 mod.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "deckModCount_one": {
+    "message": "$1 mod",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "deckModCount_other": {
+    "message": "$1 mod",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "logFailedSummary_one": {
+    "message": "$1 mod indirilemedi:",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "logFailedSummary_other": {
+    "message": "$1 mod indirilemedi:",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "progressOfTotal_one": {
+    "message": "$2 moddan $1 tanesi",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "progressOfTotal_other": {
+    "message": "$2 moddan $1 tanesi",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "setSectionLanguage": {
+    "message": "Dil"
+  },
+  "setForceEnglishLabel": {
+    "message": "Her zaman İngilizce kullan"
+  },
+  "setForceEnglishDesc": {
+    "message": "Tarayıcınız başka bir dile ayarlı olsa bile bu eklentiyi İngilizce gösterir. İngilizce yazılmış rehberleri takip ederken kullanışlıdır. Tarayıcı listesindeki eklenti adı yine tarayıcı dilini izler."
+  },
+  "supportEntryTitle": {
+    "message": "Projeye destek ol"
+  },
+  "supportEntrySubtitle": {
+    "message": "Bağımsız, gizli ve reklamsız"
+  },
+  "supportBackAria": {
+    "message": "Hızlı ayarlara dön"
+  },
+  "supportBack": {
+    "message": "Geri"
+  },
+  "supportBadge": {
+    "message": "Toplulukça destekleniyor"
+  },
+  "supportKicker": {
+    "message": "Topluluk için yapıldı"
+  },
+  "supportTitle": {
+    "message": "NexusMods Bypass'ı bağımsız tutun"
+  },
+  "supportDescription": {
+    "message": "Eklenti size zaman kazandırdıysa bakım, tarayıcı uyumluluğu ve gelecekteki geliştirmelerin finansmanına katkıda bulunabilirsiniz."
+  },
+  "supportValuesAria": {
+    "message": "Proje taahhütleri"
+  },
+  "supportValuePrivate": {
+    "message": "Gizli"
+  },
+  "supportValueAdFree": {
+    "message": "Reklamsız"
+  },
+  "supportValueFree": {
+    "message": "Her zaman ücretsiz"
+  },
+  "supportPrimary": {
+    "message": "Ko-fi'de destekle"
+  },
+  "supportPrimaryHint": {
+    "message": "Tek seferlik ya da aylık — seçim sizin"
+  },
+  "supportPrimaryPending": {
+    "message": "Ko-fi sayfası çok yakında"
+  },
+  "supportPrimaryPendingHint": {
+    "message": "Güvenli destek bağlanıyor"
+  },
+  "supportTrust": {
+    "message": "Ko-fi üzerinden güvenli ödeme. Yeni sekmede açılır."
+  },
+  "supportFreeTitle": {
+    "message": "Ücretsiz olarak da yardım edebilirsiniz"
+  },
+  "supportGithub": {
+    "message": "GitHub'da yıldız ver"
+  },
+  "supportCopy": {
+    "message": "Proje bağlantısını kopyala"
+  },
+  "supportCopied": {
+    "message": "Proje bağlantısı panoya kopyalandı."
+  },
+  "supportCopyFailed": {
+    "message": "Proje bağlantısı kopyalanamadı."
+  },
+  "supportPromise": {
+    "message": "Destek tamamen isteğe bağlıdır. Hiçbir zaman özellik açmaz veya kısıtlamaz."
+  },
+  "dlgReportOpeningFull": {
+    "message": "GitHub tam raporla açılıyor…",
+    "description": "Report button state when the whole report fits in the GitHub form."
+  },
+  "dlgReportOpeningCopied": {
+    "message": "Rapor kopyalandı — GitHub önceden doldurulmuş açılıyor…",
+    "description": "Report button state when the report was copied and the form is prefilled."
+  },
+  "dlgReportOpeningPrefilled": {
+    "message": "GitHub önceden doldurulmuş açılıyor…",
+    "description": "Report button state when only the shortened report could be sent."
+  },
+  "dlgHistoryMarked": {
+    "message": "$2 moddan $1 tanesi indirilmiş olarak işaretli.",
+    "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "selSelectedCount_one": {
+    "message": "$1 mod seçildi",
+    "description": "Plural form \"one\". $1 selected count.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "selSelectedCount_other": {
+    "message": "$1 mod seçildi",
+    "description": "Plural form \"other\". $1 selected count.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertSelectionForeign": {
+    "message": "Bu dosya farklı bir koleksiyondan ($1/$2) dışa aktarılmış.",
+    "description": "Import note. $1 game domain, $2 collection slug the file came from.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertSelectionRest": {
+    "message": "Geri kalanlar bu koleksiyon revizyonunda yok.",
+    "description": "Import note when some ids matched nothing in this revision."
+  },
+  "dlgUpdateRevisionLabel": {
+    "message": "Revizyon $1 — $2 MB — $3",
+    "description": "Revision picker option. $1 revision number, $2 size in MB, $3 date.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      },
+      "c": {
+        "content": "$3"
+      }
+    }
+  },
+  "dlgDownloadPaused": {
+    "message": "İndirme duraklatıldı",
+    "description": "Error dialog title when a blocking error halted the collection run."
+  },
+  "speedSourceCustom": {
+    "message": "senin ayarın",
+    "description": "Names the speed used in the pause countdown: the user set it."
+  },
+  "speedSourceDefault": {
+    "message": "varsayılan",
+    "description": "Names the speed used in the pause countdown: the stock value."
+  }
+}

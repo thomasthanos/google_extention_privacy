@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Anime Tracker</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="src/icons/icon32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="src/icons/icon16.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Bebas+Neue&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+
+  <body>
+    <div class="app">
+      <!-- Auth Section (shown when not logged in) -->
+      <div class="auth-section" id="authSection">
+        <div class="auth-content">
+          <div class="japanese-header">
+            <div class="torii-gate">
+              <svg viewBox="0 0 80 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="8" y="0" width="10" height="7" rx="2" fill="#c0390e" />
+                <rect x="62" y="0" width="10" height="7" rx="2" fill="#c0390e" />
+                <rect x="0" y="6" width="80" height="9" rx="3" fill="#e0501e" />
+                <rect x="13" y="22" width="54" height="7" rx="2" fill="#e0501e" />
+                <rect x="15" y="29" width="9" height="39" rx="2" fill="#e0501e" />
+                <rect x="56" y="29" width="9" height="39" rx="2" fill="#e0501e" />
+              </svg>
+            </div>
+            <h1 class="auth-anime-title">
+              <span class="jp-text">アニメトラッカー</span>
+              <span class="en-text">ANIME TRACKER</span>
+            </h1>
+            <div class="jp-subtitle">〜 あなたのアニメ記録 〜</div>
+          </div>
+          <button class="btn-google-primary" id="googleSignIn">
+            <span class="btn-content">
+              <svg class="google-icon" viewBox="0 0 24 24">
+                <path fill="#fff" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="#fff" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#fff" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                <path fill="#fff" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+              </svg>
+              <span>Sign in with Google</span>
+            </span>
+          </button>
+          <div class="auth-or-divider"><span>OR</span></div>
+          <form class="auth-email-form" id="authEmailForm" novalidate>
+            <div class="auth-field">
+              <label class="auth-field-label" for="authEmailInput">Email</label>
+              <input class="auth-input" type="email" id="authEmailInput" autocomplete="email" placeholder="you@example.com" required />
+            </div>
+            <div class="auth-field">
+              <label class="auth-field-label" for="authPasswordInput">Password</label>
+              <input class="auth-input" type="password" id="authPasswordInput" autocomplete="current-password" placeholder="••••••••" minlength="6" required />
+            </div>
+            <p class="auth-error" id="authEmailError" style="display: none"></p>
+            <button class="btn-auth-primary" id="emailSignInBtn" type="submit">
+              <span class="btn-auth-label">Sign in</span>
+            </button>
+            <div class="auth-secondary-links">
+              <button type="button" class="auth-link" id="authForgotPasswordBtn">Forgot password?</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Main App (shown when logged in) -->
+      <div class="main-app" id="mainApp" style="display: none">
+        <header class="header">
+          <div class="header-content">
+            <div class="logo">
+              <span class="logo-mark" aria-hidden="true">
+                <svg class="logo-icon" viewBox="0 0 28 28" fill="none">
+                  <path class="logo-mark-panel" d="M8.4 4.5h11.2c2.1 0 3.9 1.8 3.9 3.9v11.2c0 2.1-1.8 3.9-3.9 3.9H8.4c-2.1 0-3.9-1.8-3.9-3.9V8.4c0-2.1 1.8-3.9 3.9-3.9Z" />
+                  <path class="logo-mark-play" d="M12.2 9.4 18.9 14l-6.7 4.6V9.4Z" />
+                  <path class="logo-mark-shine" d="M8.7 7.3c1.2-.8 3.3-1.3 6.2-1.3 2 0 3.8.2 5.4.7" />
+                </svg>
+              </span>
+              <h1 class="logo-wordmark" aria-label="AN1ME Tracker">
+                <span class="logo-wordmark-main">AN<span>1</span>ME</span>
+                <span class="logo-wordmark-sub">TRACKER</span>
+              </h1>
+            </div>
+            <div class="header-actions">
+              <button class="btn-icon view-toggle" id="viewStatsBtn" data-view="stats" title="Stats" aria-label="Open stats view" aria-pressed="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                  <line x1="18" y1="20" x2="18" y2="10" />
+                  <line x1="12" y1="20" x2="12" y2="4" />
+                  <line x1="6" y1="20" x2="6" y2="14" />
+                </svg>
+              </button>
+              <button class="btn-icon view-toggle" id="viewGoalsBtn" data-view="goals" title="Goals &amp; Achievements" aria-label="Open goals and achievements" aria-pressed="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="8" r="6" />
+                  <polyline points="8.21 13.89 7 22 12 19 17 22 15.79 13.88" />
+                </svg>
+              </button>
+              <button class="btn-icon view-toggle" id="settingsBtn" data-view="settings" title="Settings" aria-label="Open settings" aria-pressed="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="3" />
+                  <path
+                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div class="stats-bar" id="statsBar">
+          <div class="stat"><span class="stat-value" id="totalAnime">0</span><span class="stat-label">Anime</span></div>
+          <div class="stat-divider"></div>
+          <div class="stat"><span class="stat-value" id="totalMovies">0</span><span class="stat-label">Movies</span></div>
+          <div class="stat-divider"></div>
+          <div class="stat"><span class="stat-value" id="totalEpisodes">0</span><span class="stat-label">Episodes</span></div>
+          <div class="stat-divider"></div>
+          <div class="stat"><span class="stat-value" id="totalTime">0h</span><span class="stat-label">Time</span></div>
+        </div>
+
+        <main class="main-content">
+          <div class="category-tabs" id="categoryTabs">
+            <button class="category-tab active" data-category="all">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3v18" />
+                <path d="M3 12h18" />
+                <rect x="3" y="3" width="18" height="18" rx="2" /></svg
+              >All
+            </button>
+            <button class="category-tab" data-category="series">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M7 21h10" />
+                <rect width="20" height="14" x="2" y="3" rx="2" /></svg
+              >Series
+            </button>
+            <button class="category-tab" data-category="movies">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 5h20" />
+                <path d="M6 12h12" />
+                <path d="M9 19h6" /></svg
+              >Movies
+            </button>
+          </div>
+          <div class="toolbar">
+            <div class="search-container">
+              <span class="search-icon-badge" aria-hidden="true">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" focusable="false">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </span>
+              <input type="text" class="search-input" id="searchInput" placeholder="Search anime..." aria-label="Search anime" />
+              <div class="search-actions">
+                <button class="btn-add-anime" id="addAnimeBtn" type="button" title="Add watched anime" aria-label="Add watched anime">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                </button>
+                <button class="btn-sort" id="sortBtn" type="button" title="Sort" aria-label="Sort options" aria-haspopup="menu" aria-expanded="false">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                    <line x1="4" y1="6" x2="11" y2="6" />
+                    <line x1="4" y1="12" x2="16" y2="12" />
+                    <line x1="4" y1="18" x2="20" y2="18" />
+                  </svg>
+                </button>
+              </div>
+              <div class="sort-dropdown" id="sortDropdown">
+                <div class="sort-dropdown-content">
+                  <button class="sort-option active" data-sort="date">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                      <line x1="16" y1="2" x2="16" y2="6" />
+                      <line x1="8" y1="2" x2="8" y2="6" />
+                      <line x1="3" y1="10" x2="21" y2="10" /></svg
+                    >Date
+                  </button>
+                  <button class="sort-option" data-sort="name">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="4" y1="9" x2="20" y2="9" />
+                      <line x1="4" y1="15" x2="20" y2="15" />
+                      <line x1="10" y1="3" x2="8" y2="21" />
+                      <line x1="16" y1="3" x2="14" y2="21" /></svg
+                    >Name
+                  </button>
+                  <button class="sort-option" data-sort="episodes">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" />
+                      <line x1="7" y1="2" x2="7" y2="22" />
+                      <line x1="17" y1="2" x2="17" y2="22" />
+                      <line x1="2" y1="12" x2="22" y2="12" /></svg
+                    >Episodes
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="anime-list" id="animeList">
+            <!-- Initial skeleton — wiped out by the first renderAnimeList()
+                         call since it uses replaceChildren(). Stays visible during
+                         the brief window between popup paint and first cloud/local
+                         data render so the screen never sits empty. -->
+            <div class="skeleton-list" aria-hidden="true">
+              <div class="skeleton-card">
+                <div class="skeleton-cover"></div>
+                <div class="skeleton-text">
+                  <div class="skeleton-line skeleton-line--title"></div>
+                  <div class="skeleton-line skeleton-line--meta"></div>
+                </div>
+              </div>
+              <div class="skeleton-card">
+                <div class="skeleton-cover"></div>
+                <div class="skeleton-text">
+                  <div class="skeleton-line skeleton-line--title skeleton-line--medium"></div>
+                  <div class="skeleton-line skeleton-line--meta"></div>
+                </div>
+              </div>
+              <div class="skeleton-card">
+                <div class="skeleton-cover"></div>
+                <div class="skeleton-text">
+                  <div class="skeleton-line skeleton-line--title skeleton-line--short"></div>
+                  <div class="skeleton-line skeleton-line--meta"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="stats-view" id="statsView" hidden></div>
+          <div class="goals-view" id="goalsView" hidden></div>
+          <div class="settings-view" id="settingsView" hidden></div>
+          <div class="empty-state" id="emptyState">
+            <div class="empty-illustration" aria-hidden="true">
+              <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="8" y="14" width="48" height="36" rx="6" />
+                <path d="M8 22h48" />
+                <circle cx="14" cy="18" r="1.2" fill="currentColor" />
+                <circle cx="19" cy="18" r="1.2" fill="currentColor" />
+                <circle cx="24" cy="18" r="1.2" fill="currentColor" />
+                <path d="M28 36l8-5v10z" fill="currentColor" stroke="none" />
+              </svg>
+            </div>
+            <h3>Your library is empty</h3>
+            <p>Watch on <strong>an1me.to</strong> and we'll track progress here, or add anime you've already finished.</p>
+            <button class="empty-state-cta" id="emptyStateAddBtn" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              <span>Add your first anime</span>
+            </button>
+            <ul class="empty-state-tips" aria-label="Quick tips">
+              <li>Sign in with Google in <strong>Settings</strong> to sync across devices.</li>
+              <li>Open the player on an1me.to — episodes you complete are detected automatically.</li>
+            </ul>
+          </div>
+          <div class="list-loading" id="listLoading">
+            <span class="list-loading-spinner" aria-hidden="true"></span>
+            <p class="list-loading-text">Loading your library…</p>
+          </div>
+          <div class="search-empty" id="searchEmptyState">
+            <div class="search-empty-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="7" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </div>
+            <p class="search-empty-text">No anime match <strong id="searchEmptyQuery"></strong></p>
+          </div>
+        </main>
+
+        <footer class="footer">
+          <span id="versionText">Anime Tracker</span>
+          <span class="sync-status" id="syncStatus"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" /></svg
+            ><span id="syncText">Checking cloud…</span></span
+          >
+        </footer>
+      </div>
+    </div>
+
+    <div class="donate-dropdown" id="donateDropdown">
+      <div class="donate-dropdown-content">
+        <div class="donate-header">☕ Support the Developer</div>
+        <div class="donate-header-copy">
+          <span class="donate-badge">Support</span><span class="donate-header-title">Support Anime Tracker</span><span class="donate-header-note">Help keep updates coming.</span>
+        </div>
+        <button class="donate-option paypal" id="donatePaypal" type="button">
+          <span class="donate-option-icon" aria-hidden="true"
+            ><svg viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944 3.72a.773.773 0 0 1 .763-.642h6.483c2.165 0 3.744.473 4.693 1.405.934.916 1.273 2.263.992 4.013-.018.111-.04.234-.066.363a8.813 8.813 0 0 1-.135.669 6.573 6.573 0 0 1-.512 1.46 4.767 4.767 0 0 1-.905 1.229 4.163 4.163 0 0 1-1.324.863 6.554 6.554 0 0 1-1.882.423c-.535.055-1.139.082-1.8.082H9.57a.95.95 0 0 0-.937.783l-.012.076-.702 4.448-.018.092a.95.95 0 0 1-.938.783H7.076z" />
+              <path
+                d="M19.357 6.91c-.035.221-.076.448-.124.684a6.17 6.17 0 0 1-.627 1.74 4.726 4.726 0 0 1-1.137 1.405 4.78 4.78 0 0 1-1.645.867 7.757 7.757 0 0 1-2.198.314h-1.63a.773.773 0 0 0-.763.642l-.88 5.581a.641.641 0 0 1-.633.546h-2.66l-.062.392a.641.641 0 0 0 .633.74h2.897a.773.773 0 0 0 .763-.642l.031-.163.613-3.877.039-.212a.773.773 0 0 1 .763-.642h.48c3.108 0 5.541-1.263 6.252-4.914.297-1.525.143-2.798-.645-3.694a3.097 3.097 0 0 0-.867-.767z" /></svg></span
+          ><span class="donate-option-copy"><span class="donate-option-title">PayPal</span><span class="donate-option-note">Quick one-time support</span></span
+          ><span class="donate-option-tag">Open</span>
+        </button>
+        <button class="donate-option revolut" id="donateRevolut" type="button">
+          <span class="donate-option-icon" aria-hidden="true"
+            ><svg viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M20.422 18.667c-.237.123-.513.084-.708-.1l-4.12-4.1a.427.427 0 0 0-.3-.126H9.87v3.872a.45.45 0 0 1-.45.454H6.95a.45.45 0 0 1-.45-.454V5.787a.45.45 0 0 1 .45-.454h6.598c3.48 0 5.45 1.736 5.45 4.8 0 2.14-.984 3.59-2.78 4.257l4.45 3.66c.37.303.185.485-.246.617zM13.248 8.12H9.87v3.934h3.378c1.598 0 2.467-.736 2.467-1.967 0-1.232-.87-1.967-2.467-1.967z" /></svg></span
+          ><span class="donate-option-copy"><span class="donate-option-title">Revolut</span><span class="donate-option-note">Fast support from your phone</span></span
+          ><span class="donate-option-tag">Open</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="dialog-overlay" id="addAnimeDialog" role="dialog" aria-modal="true" aria-labelledby="addAnimeDialogTitle" aria-describedby="addAnimeDialogSubtitle" aria-hidden="true">
+      <div class="dialog add-anime-dialog">
+        <div class="dialog-header add-anime-header">
+          <div class="add-anime-header-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="7" width="20" height="13" rx="2" ry="2"></rect>
+              <polyline points="17 2 12 7 7 2"></polyline>
+            </svg>
+          </div>
+          <div class="add-anime-header-text">
+            <h3 id="addAnimeDialogTitle">Add Watched Anime</h3>
+            <p id="addAnimeDialogSubtitle" class="add-anime-subtitle">Track what you've watched from an1me.to</p>
+          </div>
+          <button class="dialog-close" id="closeAddAnime" type="button" aria-label="Close dialog">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div class="dialog-body add-anime-body">
+          <!-- ─── Auto-detect from the open watch tab (filled by add-anime-dialog.js) ─── -->
+          <div class="watch-detect" id="watchDetectBanner" style="display: none">
+            <img class="watch-detect-cover" id="watchDetectCover" alt="" />
+            <div class="watch-detect-content">
+              <div class="watch-detect-top">
+                <span class="watch-detect-eyebrow">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
+                  Watching now
+                </span>
+                <a class="watch-detect-link" id="watchDetectLink" href="#" target="_blank" rel="noopener" title="Open this episode on an1me.to">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                </a>
+              </div>
+              <div class="watch-detect-title">
+                <span id="watchDetectTitle"></span>
+                <span class="watch-detect-ep" id="watchDetectEp"></span>
+              </div>
+              <div class="watch-detect-existing" id="watchDetectExisting" style="display: none"></div>
+              <div class="watch-detect-actions">
+                <button class="ep-chip watch-detect-chip" id="watchDetectOnly" type="button"></button>
+                <button class="ep-chip watch-detect-chip watch-detect-chip-primary" id="watchDetectAll" type="button"></button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ─── Slug section ─────────────────────────────────────── -->
+          <div class="form-group">
+            <label for="animeSlug">Anime URL or Slug</label>
+            <div class="slug-card" data-has-meta="false">
+              <img class="slug-card-cover" id="slugMetaCover" alt="" />
+              <div class="slug-card-body">
+                <div class="slug-input-wrap" data-status="idle">
+                  <span class="input-leading-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                    </svg>
+                  </span>
+                  <input type="text" id="animeSlug" placeholder="e.g., one-piece or https://an1me.to/anime/one-piece" autocomplete="off" spellcheck="false" aria-describedby="slugDetectedHint" />
+                  <span class="slug-input-status" aria-hidden="true">
+                    <svg class="status-icon status-loading" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                      <circle cx="12" cy="12" r="10" stroke-opacity="0.25" />
+                      <path d="M12 2a10 10 0 0 1 10 10" />
+                    </svg>
+                    <svg class="status-icon status-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    <svg class="status-icon status-fail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </span>
+                </div>
+                <div class="slug-card-meta" id="slugMeta">
+                  <div class="slug-meta-title" id="slugMetaTitle"></div>
+                  <div class="slug-meta-stats" id="slugMetaStats"></div>
+                </div>
+                <span class="form-hint slug-detected-hint" id="slugDetectedHint" style="display: none"></span>
+              </div>
+            </div>
+            <span class="input-helper">Enter an anime slug or full URL from an1me.to</span>
+          </div>
+
+          <!-- ─── Episodes section ──────────────────────────────────── -->
+          <div class="form-group">
+            <label for="episodesWatched">Episodes Watched</label>
+            <div class="episodes-input-wrap">
+              <span class="input-leading-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="8" y1="6" x2="21" y2="6" />
+                  <line x1="8" y1="12" x2="21" y2="12" />
+                  <line x1="8" y1="18" x2="21" y2="18" />
+                  <line x1="3" y1="6" x2="3.01" y2="6" />
+                  <line x1="3" y1="12" x2="3.01" y2="12" />
+                  <line x1="3" y1="18" x2="3.01" y2="18" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                id="episodesWatched"
+                class="episodes-input"
+                placeholder="e.g. 1-56, 72-90, 113-122"
+                autocomplete="off"
+                spellcheck="false"
+                aria-describedby="episodesHint episodesCounter" />
+            </div>
+            <span class="input-helper">Enter episode numbers or ranges you've watched</span>
+            <div class="episodes-examples" id="episodesHint" aria-hidden="true">
+              <span class="examples-label">Examples:</span>
+              <span class="example-chip">5</span>
+              <span class="example-chip">1-56</span>
+              <span class="example-chip">1-56, 72-90, 113</span>
+            </div>
+            <!-- Merged filler info + quick chips (populated by main.js) -->
+            <div class="filler-action-bar" id="fillerActionBar" style="display: none"></div>
+            <div class="episodes-counter" id="episodesCounter" style="display: none">
+              <div class="episodes-counter-row">
+                <span class="counter-text" id="episodesCounterText"></span>
+                <span class="counter-percent" id="episodesCounterPercent"></span>
+              </div>
+              <div class="episodes-counter-bar" aria-hidden="true">
+                <div class="episodes-counter-fill" id="episodesCounterFill" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="include-fillers-block" id="includeFillersBlock" style="display: none">
+              <label class="include-fillers-label" id="includeFillerLabel">
+                <input type="checkbox" id="includeFillers" />
+                <span id="includeFillerText">Include fillers</span>
+              </label>
+              <div class="fillers-ranges-preview" id="fillersRangesPreview"></div>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-actions add-anime-actions">
+          <div class="add-anime-actions-buttons">
+            <button class="btn btn-ghost" id="cancelAddAnime" type="button">Cancel</button>
+            <button class="btn btn-primary btn-with-icon" id="confirmAddAnime" type="button">
+              <span class="btn-icon-circle" aria-hidden="true">
+                <svg class="btn-icon btn-icon-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                <svg class="btn-icon btn-icon-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" stroke-opacity="0.25" />
+                  <path d="M12 2a10 10 0 0 1 10 10" />
+                </svg>
+                <svg class="btn-icon btn-icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </span>
+              <span class="btn-label">Add Anime</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dialog-overlay" id="editTitleDialog" role="dialog" aria-modal="true" aria-labelledby="editTitleDialogTitle" aria-hidden="true">
+      <div class="dialog add-anime-dialog">
+        <div class="dialog-header">
+          <h3 id="editTitleDialogTitle">Edit Title</h3>
+          <button class="dialog-close" id="closeEditTitle" type="button" aria-label="Close dialog">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div class="dialog-body">
+          <div class="form-group"><label for="editTitleInput">Anime Title</label><input type="text" id="editTitleInput" placeholder="Enter anime title" /></div>
+        </div>
+        <div class="dialog-actions"><button class="btn btn-secondary" id="cancelEditTitle">Cancel</button><button class="btn btn-primary" id="confirmEditTitle">Save</button></div>
+      </div>
+    </div>
+
+    <div class="dialog-overlay" id="confirmDialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmDialogTitle" aria-describedby="confirmDialogDesc" aria-hidden="true">
+      <div class="dialog">
+        <div class="dialog-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+        </div>
+        <h3 id="confirmDialogTitle">Clear Data</h3>
+        <p id="confirmDialogDesc">Are you sure you want to delete all tracking data? This action cannot be undone.</p>
+        <div class="dialog-actions"><button class="btn btn-secondary" id="cancelClear">Cancel</button><button class="btn btn-danger" id="confirmClear">Delete</button></div>
+      </div>
+    </div>
+
+    <!-- Shared (common/) -->
+    <script src="src/common/logger.js"></script>
+    <script src="src/common/cloud.js"></script>
+    <script src="src/popup/services/firebase-lib.js"></script>
+    <script src="src/common/data/multipart-mappings.js"></script>
+    <script src="src/common/data/media-type.js"></script>
+    <script src="src/common/data/entry-state.js"></script>
+    <script src="src/popup/lib/config.js"></script>
+    <script src="src/popup/lib/storage.js"></script>
+    <script src="src/popup/services/library-mutation-service.js"></script>
+    <script src="src/popup/services/library-load-controller.js"></script>
+    <script src="src/popup/services/sync-status-controller.js"></script>
+    <script src="src/popup/lib/cover-cache.js"></script>
+    <script src="src/popup/lib/ui-helpers.js"></script>
+    <script src="src/common/data/merge-utils.js"></script>
+    <script src="src/common/data/dedupe-utils.js"></script>
+    <script src="src/common/data/cache-policy.js"></script>
+    <script src="src/common/data/slug-migration.js"></script>
+    <script src="src/popup/services/filler-service.js"></script>
+    <script src="src/popup/lib/filler-fetch-ui.js"></script>
+    <script src="src/popup/lib/progress-manager.js"></script>
+    <script src="src/popup/lib/anime-status.js"></script>
+    <script src="src/popup/lib/maintenance.js"></script>
+    <script src="src/popup/lib/episode-parse.js"></script>
+    <script src="src/popup/views/stats-engine.js"></script>
+    <script src="src/popup/views/stats-view.js"></script>
+    <script src="src/popup/views/achievements-engine.js"></script>
+    <script src="src/popup/services/progress-insights-service.js"></script>
+    <script src="src/popup/views/goals-view.js"></script>
+    <script src="src/popup/views/settings-view.js"></script>
+    <script src="src/common/data/anilist-core.js"></script>
+    <script src="src/common/data/anilist-import-utils.js"></script>
+    <script src="src/popup/services/anilist-api.js"></script>
+    <script src="src/popup/services/anime-resolver.js"></script>
+    <script src="src/popup/cards/share-card.js"></script>
+    <script src="src/popup/cards/anime-card.js"></script>
+    <script src="src/popup/app/toasts.js"></script>
+    <script src="src/popup/app/set-password-modal.js"></script>
+    <script src="src/popup/app/auth-ui.js"></script>
+    <script src="src/popup/app/add-anime-dialog.js"></script>
+    <script src="src/popup/app/anime-actions.js"></script>
+    <script src="src/popup/app/render-list.js"></script>
+    <script src="src/popup/app/metadata-repair.js"></script>
+    <script src="src/popup/app/stats-views.js"></script>
+    <script src="src/popup/main.js"></script>
+    <script src="src/common/boot-check.js"></script>
+  </body>
+</html>

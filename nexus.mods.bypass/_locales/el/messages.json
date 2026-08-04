@@ -1,0 +1,1220 @@
+{
+  "appName": {
+    "message": "NexusMods Bypass"
+  },
+  "appDesc": {
+    "message": "Απλοποιεί τις λήψεις από το Nexus Mods, διαχειρίζεται ουρές λήψης collections και κρατά τοπικό ιστορικό."
+  },
+  "sectionQuickControls": {
+    "message": "Γρήγορες ρυθμίσεις"
+  },
+  "toggleAutoStart": {
+    "message": "Αυτόματη έναρξη λήψεων"
+  },
+  "setAutoCloseTabLabel": {
+    "message": "Κλείσιμο καρτελών Vortex"
+  },
+  "toggleSkipReq": {
+    "message": "Παράλειψη οθονών requirements"
+  },
+  "toggleHideUpsells": {
+    "message": "Απόκρυψη διαφημίσεων και premium banner"
+  },
+  "toggleHideDownloadBar": {
+    "message": "Απόκρυψη κουμπιού λήψεων"
+  },
+  "setHandleArchivedFilesLabel": {
+    "message": "Κουμπιά αρχειοθετημένων αρχείων"
+  },
+  "setDebugLogsLabel": {
+    "message": "Αναλυτικά logs επέκτασης"
+  },
+  "btnPageSettings": {
+    "message": "Ρυθμίσεις σελίδας"
+  },
+  "btnGoNexus": {
+    "message": "NexusMods"
+  },
+  "btnReportBug": {
+    "message": "Αναφορά σφάλματος — αντιγράφει το report"
+  },
+  "popupFooter": {
+    "message": "Βοηθός λήψεων για Nexus Mods & Vortex"
+  },
+  "ratingPrompt": {
+    "message": "Σου αρέσει; ⭐ Δώσε star στο GitHub"
+  },
+  "ratingDismiss": {
+    "message": "Απόκρυψη"
+  },
+  "welcomeTitle": {
+    "message": "Το NexusMods Bypass είναι έτοιμο!"
+  },
+  "welcomeSubtitle": {
+    "message": "Κατέβασε αρχεία και ολόκληρα collections από το Nexus Mods με λιγότερα κλικ — σε ουρά, με ρυθμό και συνέχιση."
+  },
+  "quickStartTitle": {
+    "message": "Γρήγορη εκκίνηση"
+  },
+  "step1Title": {
+    "message": "Άνοιξε οποιαδήποτε σελίδα αρχείου στο Nexus Mods"
+  },
+  "step1Text": {
+    "message": "Πάτησε ένα κουμπί λήψης — η επέκταση ετοιμάζει τον σύνδεσμο και ξεκινά τη λήψη."
+  },
+  "step2Title": {
+    "message": "Δοκίμασε ένα collection"
+  },
+  "step2Text": {
+    "message": "Άνοιξε ένα collection και χρησιμοποίησε το Collection Downloader για να κατεβάσεις όλα τα mods με ένα κλικ."
+  },
+  "step3Title": {
+    "message": "Ρύθμισέ το όπως θες"
+  },
+  "step3Text": {
+    "message": "Πάτησε το εικονίδιο της επέκτασης για γρήγορες ρυθμίσεις, ή το ⚙ σε οποιαδήποτε σελίδα Nexus για όλες τις ρυθμίσεις."
+  },
+  "privacyCardTitle": {
+    "message": "🔒 Ιδιωτικότητα εξ ορισμού"
+  },
+  "privacyCardText": {
+    "message": "Χωρίς analytics, χωρίς λογαριασμούς, χωρίς εξωτερικούς servers. Όλα μένουν στον browser σου."
+  },
+  "bugCardTitle": {
+    "message": "🐛 Κάτι χάλασε;"
+  },
+  "bugCardText": {
+    "message": "Κάθε κουμπί «Αναφορά σφάλματος» αντιγράφει πλήρες διαγνωστικό report και ανοίγει προσυμπληρωμένο GitHub issue."
+  },
+  "starCardTitle": {
+    "message": "⭐ Σου αρέσει;"
+  },
+  "starCardText": {
+    "message": "Ένα star στο GitHub βοηθά περισσότερους modders να βρουν την επέκταση."
+  },
+  "openNexusBtn": {
+    "message": "Άνοιγμα Nexus Mods"
+  },
+  "starBtn": {
+    "message": "Star στο GitHub"
+  },
+  "disclaimer": {
+    "message": "Καμία σχέση με το Nexus Mods. Χρειάζεσαι δικό σου λογαριασμό Nexus Mods· το premium περιεχόμενο παραμένει premium."
+  },
+  "errMissingFileMsg": {
+    "message": "Αυτός ο σύνδεσμος λήψης δεν περιέχει αναγνωριστικό αρχείου."
+  },
+  "errMissingFileFix": {
+    "message": "Ανοίξτε τη σελίδα του αρχείου και δοκιμάστε ξανά."
+  },
+  "errTimeoutMsg": {
+    "message": "Το Nexus Mods άργησε πολύ να απαντήσει."
+  },
+  "errTimeoutFix": {
+    "message": "Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά."
+  },
+  "errOfflineMsg": {
+    "message": "Φαίνεται ότι είστε εκτός σύνδεσης."
+  },
+  "errOfflineFix": {
+    "message": "Συνδεθείτε ξανά στο διαδίκτυο και δοκιμάστε ξανά."
+  },
+  "errNetworkErrorMsg": {
+    "message": "Το αίτημα προς το Nexus Mods δεν ολοκληρώθηκε."
+  },
+  "errNetworkErrorFix": {
+    "message": "Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά."
+  },
+  "errRequiresLoginMsg": {
+    "message": "Δεν έχετε συνδεθεί στο Nexus Mods."
+  },
+  "errRequiresLoginFix": {
+    "message": "Συνδεθείτε, επιστρέψτε σε αυτή τη σελίδα και δοκιμάστε ξανά τη λήψη."
+  },
+  "errCloudflareMsg": {
+    "message": "Το Nexus Mods απαιτεί επαλήθευση προγράμματος περιήγησης πριν συνεχίσετε."
+  },
+  "errCloudflareFix": {
+    "message": "Ολοκληρώστε την επαλήθευση στη σελίδα του αρχείου και δοκιμάστε ξανά."
+  },
+  "errRateLimitedMsg": {
+    "message": "Το Nexus Mods περιορίζει προσωρινά τον αριθμό αιτημάτων."
+  },
+  "errRateLimitedFix": {
+    "message": "Περιμένετε μερικά λεπτά πριν δοκιμάσετε ξανά."
+  },
+  "errAccountSuspendedMsg": {
+    "message": "Το Nexus Mods ανέστειλε προσωρινά περαιτέρω αιτήματα λήψης."
+  },
+  "errAccountSuspendedFix": {
+    "message": "Περιμένετε πριν δοκιμάσετε ξανά για να μην παραταθεί η αναστολή."
+  },
+  "errAccessDeniedMsg": {
+    "message": "Το Nexus Mods απέρριψε την πρόσβαση σε αυτή τη λήψη."
+  },
+  "errAccessDeniedFix": {
+    "message": "Ελέγξτε τα δικαιώματα του λογαριασμού σας και τη σελίδα του αρχείου και δοκιμάστε ξανά."
+  },
+  "errFileNotFoundMsg": {
+    "message": "Το ζητούμενο αρχείο δεν βρέθηκε στο Nexus Mods."
+  },
+  "errFileNotFoundFix": {
+    "message": "Το αρχείο ίσως αφαιρέθηκε ή ο σύνδεσμος είναι παλιός."
+  },
+  "errModerationHoldMsg": {
+    "message": "Αυτό το αρχείο βρίσκεται υπό έλεγχο συντονισμού."
+  },
+  "errModerationHoldFix": {
+    "message": "Περιμένετε να εγκρίνει το Nexus Mods το αρχείο πριν το κατεβάσετε."
+  },
+  "errServerErrorMsg": {
+    "message": "Το Nexus Mods αντιμετωπίζει πρόβλημα στον διακομιστή."
+  },
+  "errServerErrorFix": {
+    "message": "Περιμένετε λίγο και δοκιμάστε ξανά."
+  },
+  "errInvalidResponseMsg": {
+    "message": "Το Nexus Mods επέστρεψε μη αναμενόμενη απάντηση."
+  },
+  "errInvalidResponseFix": {
+    "message": "Ανανεώστε τη σελίδα του αρχείου και δοκιμάστε ξανά."
+  },
+  "errNoDownloadUrlMsg": {
+    "message": "Το Nexus Mods δεν επέστρεψε αξιοποιήσιμο σύνδεσμο λήψης."
+  },
+  "errNoDownloadUrlFix": {
+    "message": "Ανοίξτε τη σελίδα του αρχείου, βεβαιωθείτε ότι έχετε συνδεθεί και δοκιμάστε ξανά."
+  },
+  "errNoNmmLinkMsg": {
+    "message": "Το Nexus Mods δεν επέστρεψε έγκυρο σύνδεσμο Vortex."
+  },
+  "errNoNmmLinkFix": {
+    "message": "Ελέγξτε τη σελίδα του αρχείου και δοκιμάστε ξανά, ή αλλάξτε σε λήψη μέσω προγράμματος περιήγησης."
+  },
+  "errAbortedMsg": {
+    "message": "Το αίτημα ακυρώθηκε."
+  },
+  "errUnsafeDownloadUrlMsg": {
+    "message": "Ο σύνδεσμος λήψης που επέστρεψε το Nexus Mods δεν είναι αναγνωρισμένος προορισμός."
+  },
+  "errUnsafeDownloadUrlFix": {
+    "message": "Ανοίξτε τη σελίδα του αρχείου και κατεβάστε χειροκίνητα. Αν συνεχίζεται, αναφέρετε το πρόβλημα."
+  },
+  "errContextInvalidMsg": {
+    "message": "Η επέκταση ενημερώθηκε ή φορτώθηκε ξανά ενώ η σελίδα ήταν ανοιχτή."
+  },
+  "errContextInvalidFix": {
+    "message": "Ανανεώστε αυτή τη σελίδα του Nexus Mods και δοκιμάστε ξανά."
+  },
+  "errRequestFailedMsg": {
+    "message": "Το αίτημα λήψης απέτυχε."
+  },
+  "errRequestFailedFix": {
+    "message": "Δοκιμάστε ξανά τη λήψη. Αν συνεχίζεται, αναφέρετε το πρόβλημα."
+  },
+  "dlgDownloadIssue": {
+    "message": "Πρόβλημα λήψης"
+  },
+  "dlgSignInRequired": {
+    "message": "Απαιτείται σύνδεση"
+  },
+  "dlgErrorId": {
+    "message": "Κωδικός σφάλματος"
+  },
+  "dlgReportBug": {
+    "message": "Αναφορά σφάλματος"
+  },
+  "btnSignIn": {
+    "message": "Σύνδεση στο Nexus Mods"
+  },
+  "btnRetry": {
+    "message": "Επανάληψη"
+  },
+  "btnDone": {
+    "message": "Έγινε"
+  },
+  "ariaCloseErrorDialog": {
+    "message": "Κλείσιμο παραθύρου σφάλματος"
+  },
+  "deckTitle": {
+    "message": "Λήψη Collection"
+  },
+  "deckReadyQueue": {
+    "message": "Ουρά έτοιμη"
+  },
+  "deckSubtitle": {
+    "message": "Βάλτε ολόκληρα collections σε ουρά, εισαγάγετε ολοκληρωμένες λήψεις και ρυθμίστε τον ρυθμό από ένα σημείο."
+  },
+  "deckDownloadMethod": {
+    "message": "Μέθοδος λήψης"
+  },
+  "deckMethodVortex": {
+    "message": "Αποστολή στο Vortex"
+  },
+  "deckMethodVortexHint": {
+    "message": "Ιδανικό για μεταφορά με ένα κλικ στην ουρά του Vortex."
+  },
+  "deckMethodBrowser": {
+    "message": "Λήψη μέσω περιηγητή"
+  },
+  "deckMethodBrowserHint": {
+    "message": "Χρησιμοποιήστε τις εγγενείς λήψεις του περιηγητή όταν το Vortex δεν χειρίζεται τους συνδέσμους."
+  },
+  "deckActions": {
+    "message": "Ενέργειες"
+  },
+  "deckImportMods": {
+    "message": "Εισαγωγή ληφθέντων mods"
+  },
+  "tipImportInfo": {
+    "message": "Πληροφορίες για την εισαγωγή"
+  },
+  "deckDownloadAll": {
+    "message": "Λήψη όλων των mods"
+  },
+  "deckDownloadMandatory": {
+    "message": "Λήψη υποχρεωτικών"
+  },
+  "deckDownloadMandatoryHint": {
+    "message": "Μόνο βασικά αρχεία"
+  },
+  "deckDownloadOptional": {
+    "message": "Λήψη προαιρετικών"
+  },
+  "deckDownloadOptionalHint": {
+    "message": "Προαιρετικά έξτρα"
+  },
+  "deckSelectMods": {
+    "message": "Επιλογή mods για λήψη"
+  },
+  "deckSelectModsHint": {
+    "message": "Χειροκίνητη επιλογή"
+  },
+  "deckUpdateCollection": {
+    "message": "Ενημέρωση collection"
+  },
+  "deckUpdateCollectionHint": {
+    "message": "Σύγκριση εκδόσεων"
+  },
+  "deckProgress": {
+    "message": "Πρόοδος λήψης"
+  },
+  "deckAdaptivePacing": {
+    "message": "Προσαρμοστικός ρυθμός"
+  },
+  "deckLogs": {
+    "message": "Καταγραφές"
+  },
+  "deckLogsCaption": {
+    "message": "Ζωντανή ροή δραστηριότητας"
+  },
+  "statusDownloading": {
+    "message": "Γίνεται λήψη..."
+  },
+  "statusPaused": {
+    "message": "Σε παύση"
+  },
+  "statusFinished": {
+    "message": "Ολοκληρώθηκε"
+  },
+  "statusStopped": {
+    "message": "Διακόπηκε"
+  },
+  "outcomePartial": {
+    "message": "Ολοκληρώθηκε με σφάλματα"
+  },
+  "outcomeBlocked": {
+    "message": "Απαιτείται ενέργεια"
+  },
+  "outcomeFailed": {
+    "message": "Απέτυχε"
+  },
+  "logDownloadStarted": {
+    "message": "Η λήψη ξεκίνησε."
+  },
+  "logDownloadFinished": {
+    "message": "Η λήψη ολοκληρώθηκε."
+  },
+  "logDownloadPartial": {
+    "message": "Η λήψη ολοκληρώθηκε με σφάλματα. Σε νέα προσπάθεια θα παραλειφθούν τα επιτυχημένα αρχεία."
+  },
+  "logDownloadStopped": {
+    "message": "Η λήψη διακόπηκε."
+  },
+  "logDownloadNeedsLogin": {
+    "message": "Η λήψη είναι σε παύση μέχρι να συνδεθείτε."
+  },
+  "logDownloadBlocked": {
+    "message": "Η λήψη είναι σε παύση. Ακολουθήστε τις οδηγίες του σφάλματος πριν δοκιμάσετε ξανά."
+  },
+  "logDownloadError": {
+    "message": "Η λήψη τερματίστηκε με σφάλμα."
+  },
+  "annPaused": {
+    "message": "Η λήψη τέθηκε σε παύση."
+  },
+  "annResumed": {
+    "message": "Η λήψη συνεχίστηκε."
+  },
+  "ariaProgress": {
+    "message": "Πρόοδος λήψης collection"
+  },
+  "ariaPause": {
+    "message": "Παύση λήψης"
+  },
+  "ariaResume": {
+    "message": "Συνέχιση λήψης"
+  },
+  "ariaStop": {
+    "message": "Διακοπή λήψης"
+  },
+  "tipPauseResume": {
+    "message": "Παύση/Συνέχιση"
+  },
+  "tipStop": {
+    "message": "Διακοπή"
+  },
+  "btnStatePleaseWait": {
+    "message": "Παρακαλώ περιμένετε..."
+  },
+  "btnStateDownloading": {
+    "message": "Γίνεται λήψη!"
+  },
+  "btnStateError": {
+    "message": "Σφάλμα"
+  },
+  "btnStateOpeningPage": {
+    "message": "Άνοιγμα σελίδας αρχείου..."
+  },
+  "btnFileArchive": {
+    "message": "Αρχείο αρχείων"
+  },
+  "btnModManagerDownload": {
+    "message": "Λήψη μέσω mod manager"
+  },
+  "btnManualDownload": {
+    "message": "Χειροκίνητη λήψη"
+  },
+  "annOutcome": {
+    "message": "$1. $2.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "deckModCount_one": {
+    "message": "$1 mod",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "deckModCount_other": {
+    "message": "$1 mods",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annStarted_one": {
+    "message": "Η λήψη ξεκίνησε: $1 mod.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annStarted_other": {
+    "message": "Η λήψη ξεκίνησε: $1 mods.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annReconnected_one": {
+    "message": "Επανασύνδεση σε λήψη που εκτελείται: $1 mod.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annReconnected_other": {
+    "message": "Επανασύνδεση σε λήψη που εκτελείται: $1 mods.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "progressOfTotal_one": {
+    "message": "$1 από $2 mod",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "progressOfTotal_other": {
+    "message": "$1 από $2 mods",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "btnCancel": {
+    "message": "Ακύρωση"
+  },
+  "btnClose": {
+    "message": "Κλείσιμο"
+  },
+  "btnOk": {
+    "message": "OK"
+  },
+  "btnGotIt": {
+    "message": "Το κατάλαβα"
+  },
+  "btnRestore": {
+    "message": "Επαναφορά"
+  },
+  "ariaClose": {
+    "message": "Κλείσιμο"
+  },
+  "dlgConfirmTitle": {
+    "message": "Επιβεβαίωση ενέργειας"
+  },
+  "setTitle": {
+    "message": "Ρυθμίσεις βοηθού λήψεων"
+  },
+  "setSubtitle": {
+    "message": "Οι αλλαγές αποθηκεύονται αμέσως. Η επαναφορά θα φορτώσει ξανά τη σελίδα."
+  },
+  "setSectionFlow": {
+    "message": "Ροή λήψης"
+  },
+  "setSectionPacing": {
+    "message": "Αρχεία και ρυθμός"
+  },
+  "setSectionAdvanced": {
+    "message": "Για προχωρημένους"
+  },
+  "setRestoreDefaults": {
+    "message": "Επαναφορά προεπιλογών και ανανέωση"
+  },
+  "setNeedHelp": {
+    "message": "Χρειάζεστε βοήθεια με μια λήψη;"
+  },
+  "setReportOnGithub": {
+    "message": "Αναφορά σφάλματος στο GitHub"
+  },
+  "setRestoreTitle": {
+    "message": "Επαναφορά προεπιλογών"
+  },
+  "setRestoreConfirm": {
+    "message": "Επαναφορά προεπιλεγμένων ρυθμίσεων και ανανέωση της σελίδας Nexus;"
+  },
+  "unitSeconds": {
+    "message": "Δευτερόλεπτα"
+  },
+  "setAutoStartDownloadLabel": {
+    "message": "Αυτόματη έναρξη λήψεων"
+  },
+  "setAutoStartDownloadDesc": {
+    "message": "Όταν ανοίγετε σελίδα λήψης του Nexus, ξεκινά η μεταφορά στο Vortex ή η λήψη μέσω περιηγητή χωρίς άλλο κλικ."
+  },
+  "setAutoCloseTabDesc": {
+    "message": "Αφού σταλεί σύνδεσμος στο Vortex, κλείνει την προσωρινή καρτέλα Nexus μετά την παρακάτω καθυστέρηση."
+  },
+  "setSkipRequirementsLabel": {
+    "message": "Παράλειψη οθονών απαιτήσεων"
+  },
+  "setSkipRequirementsDesc": {
+    "message": "Προσπερνά τα αναδυόμενα απαιτήσεων του Nexus και πηγαίνει απευθείας στη λήψη."
+  },
+  "setShowAlertsOnErrorLabel": {
+    "message": "Εμφάνιση αναδυόμενων σφαλμάτων"
+  },
+  "setShowAlertsOnErrorDesc": {
+    "message": "Εμφάνιση σαφούς μηνύματος όταν το Nexus δεν επιστρέφει αξιοποιήσιμο σύνδεσμο."
+  },
+  "setHidePremiumUpsellsLabel": {
+    "message": "Απόκρυψη διαφημίσεων και πάνελ Premium"
+  },
+  "setHidePremiumUpsellsDesc": {
+    "message": "Απόκρυψη διαφημιστικών θέσεων, κενών container, banner Premium και πάνελ αναβάθμισης."
+  },
+  "setHandleArchivedFilesDesc": {
+    "message": "Προσθέτει κουμπιά λήψης Vortex και περιηγητή σε αρχειοθετημένα αρχεία όταν το Nexus τα κρύβει."
+  },
+  "setDebugLogsDesc": {
+    "message": "Εκτυπώνει αναλυτική δραστηριότητα του NexusMods Bypass στην κονσόλα. Τα σφάλματα εμφανίζονται πάντα και οι αναφορές δεν επηρεάζονται."
+  },
+  "setHideDownloadBarLabel": {
+    "message": "Απόκρυψη του κουμπιού λήψεων του περιηγητή"
+  },
+  "setHideDownloadBarDesc": {
+    "message": "Αφαιρεί το κουμπί λήψεων και το αναδυόμενο παράθυρο προόδου από τη γραμμή εργαλείων. Ισχύει για κάθε λήψη σε αυτό το προφίλ του περιηγητή, όχι μόνο για τις λήψεις από το Nexus. Οι λήψεις σας παραμένουν πάντα διαθέσιμες με Ctrl+J."
+  },
+  "setDownloadFolderLabel": {
+    "message": "Φάκελος λήψεων περιηγητή"
+  },
+  "setDownloadFolderDesc": {
+    "message": "Υποφάκελος μέσα στον κατάλογο Λήψεων του περιηγητή, για τη λειτουργία Browser Download. Άφησέ το κενό για να αποθηκεύονται απευθείας στις Λήψεις — ορισμένοι mod managers παρακολουθούν μόνο αυτόν τον φάκελο και δεν κοιτούν μέσα σε υποφακέλους. Οι λήψεις μέσω Vortex δεν επηρεάζονται."
+  },
+  "setRequestTimeoutLabel": {
+    "message": "Χρονικό όριο αιτήματος λήψης"
+  },
+  "setRequestTimeoutDesc": {
+    "message": "Πόσο περιμένει η επέκταση να επιστρέψει το Nexus σύνδεσμο λήψης πριν τα παρατήσει."
+  },
+  "setCloseTabDelayLabel": {
+    "message": "Καθυστέρηση κλεισίματος καρτέλας"
+  },
+  "setCloseTabDelayDesc": {
+    "message": "Ισχύει μόνο για αυτόματες λήψεις Vortex που κλείνουν την καρτέλα τους. Αυξήστε το αν το Vortex χάνει συνδέσμους."
+  },
+  "setDownloadSpeedLabel": {
+    "message": "Η ταχύτητα λήψης σας στο Nexus"
+  },
+  "setDownloadSpeedDesc": {
+    "message": "Μόνο σε λειτουργία Vortex. Ο περιηγητής δεν βλέπει τη μεταφορά μέσα στο Vortex, οπότε αυτό εκτιμά τη διάρκεια και κατανέμει τις παραδόσεις. Βάλτε την ταχύτητα που πραγματικά βλέπετε — πολύ χαμηλή τιμή σημαίνει περιττή αναμονή."
+  },
+  "setPauseBetweenModsLabel": {
+    "message": "Παύση μεταξύ mods"
+  },
+  "setPauseBetweenModsDesc": {
+    "message": "Μόνο σε λειτουργία Vortex. Προστίθεται στην παραπάνω εκτίμηση. Βάλτε 0 για να απενεργοποιήσετε εντελώς την αναμονή — μαζί και την εκτίμηση μεγέθους — και να δίνονται όλα τα αρχεία διαδοχικά στο Vortex."
+  },
+  "dlgHistoryTitle": {
+    "message": "Βρέθηκαν ληφθέντα mods"
+  },
+  "dlgHistoryHelp": {
+    "message": "Επιλέξτε πώς θα συμπεριφερθεί αυτή η εκτέλεση πριν ξεκινήσει. Αν λείπουν αρχεία, επιλέξτε επαναλήψη όλων."
+  },
+  "dlgHistorySkip": {
+    "message": "Παράλειψη ληφθέντων"
+  },
+  "dlgHistorySkipHint": {
+    "message": "Συνέχεια μόνο με τα υπόλοιπα mods."
+  },
+  "dlgHistoryRedownload": {
+    "message": "Επανάληψη λήψης όλων"
+  },
+  "dlgHistoryRedownloadHint": {
+    "message": "Καθαρισμός αποθηκευμένου ιστορικού και επανεκκίνηση όλης της λίστας."
+  },
+  "dlgImportTitle": {
+    "message": "Εισαγωγή ληφθέντων mods"
+  },
+  "dlgImportLead": {
+    "message": "Αποφύγετε την εκ νέου λήψη αρχείων που ήδη έχετε."
+  },
+  "dlgImportHelp": {
+    "message": "Επιλέξτε όλα τα αρχεία από τον φάκελο mods και θα αντιστοιχιστούν με το ιστορικό αυτού του collection."
+  },
+  "dlgImportPathLabel": {
+    "message": "Προεπιλεγμένη διαδρομή Vortex"
+  },
+  "dlgSelectTitle": {
+    "message": "Επιλογή mods"
+  },
+  "selSelectAll": {
+    "message": "Επιλογή όλων"
+  },
+  "selDeselectAll": {
+    "message": "Αποεπιλογή όλων"
+  },
+  "selInvert": {
+    "message": "Αντιστροφή επιλογής"
+  },
+  "selExport": {
+    "message": "Εξαγωγή επιλογής"
+  },
+  "selImport": {
+    "message": "Εισαγωγή επιλογής"
+  },
+  "selSearchPlaceholder": {
+    "message": "Αναζήτηση mods..."
+  },
+  "selDownloadSelected": {
+    "message": "Λήψη επιλεγμένων"
+  },
+  "sortModAsc": {
+    "message": "Όνομα mod Α-Ω"
+  },
+  "sortModDesc": {
+    "message": "Όνομα mod Ω-Α"
+  },
+  "sortFileAsc": {
+    "message": "Όνομα αρχείου Α-Ω"
+  },
+  "sortFileDesc": {
+    "message": "Όνομα αρχείου Ω-Α"
+  },
+  "sortSizeAsc": {
+    "message": "Μέγεθος αύξουσα"
+  },
+  "sortSizeDesc": {
+    "message": "Μέγεθος φθίνουσα"
+  },
+  "colModName": {
+    "message": "Όνομα mod"
+  },
+  "colFileName": {
+    "message": "Όνομα αρχείου"
+  },
+  "colSize": {
+    "message": "Μέγεθος"
+  },
+  "colType": {
+    "message": "Τύπος"
+  },
+  "tagOptional": {
+    "message": "Προαιρετικό"
+  },
+  "tagMandatory": {
+    "message": "Υποχρεωτικό"
+  },
+  "dlgUpdateTitle": {
+    "message": "Ενημέρωση collection"
+  },
+  "dlgUpdateCurrentRev": {
+    "message": "Η τρέχουσα έκδοσή σας"
+  },
+  "dlgUpdateToRev": {
+    "message": "Ενημέρωση σε έκδοση"
+  },
+  "dlgUpdateSelectRev": {
+    "message": "Επιλέξτε έκδοση"
+  },
+  "dlgUpdateDownload": {
+    "message": "Λήψη ενημερώσεων"
+  },
+  "dlgUpdateFetchFailed": {
+    "message": "Αποτυχία λήψης εκδόσεων. Δοκιμάστε ξανά αργότερα."
+  },
+  "dlgUpdateCompareFailed": {
+    "message": "Αποτυχία σύγκρισης εκδόσεων. Δοκιμάστε ξανά αργότερα."
+  },
+  "dlgUpdateNone": {
+    "message": "Καμία"
+  },
+  "dlgUpdateColUpdated": {
+    "message": "Ενημερωμένα"
+  },
+  "dlgUpdateColAdded": {
+    "message": "Προστέθηκαν"
+  },
+  "dlgUpdateColRemoved": {
+    "message": "Αφαιρέθηκαν"
+  },
+  "logFailedSummary_one": {
+    "message": "Απέτυχε η λήψη $1 mod:",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "logFailedSummary_other": {
+    "message": "Απέτυχε η λήψη $1 mods:",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dlgCantOpenSettings": {
+    "message": "Δεν ήταν δυνατό το άνοιγμα ρυθμίσεων"
+  },
+  "dlgCollectionIssue": {
+    "message": "Πρόβλημα λήψης collection"
+  },
+  "dlgCantLoadRevisions": {
+    "message": "Δεν ήταν δυνατή η φόρτωση εκδόσεων"
+  },
+  "dlgCantCompareRevisions": {
+    "message": "Δεν ήταν δυνατή η σύγκριση εκδόσεων"
+  },
+  "alertContextInvalid": {
+    "message": "Το NexusMods Bypass ενημερώθηκε ή φορτώθηκε ξανά.\nΑνανεώστε τη σελίδα για να ανοίξετε τις ρυθμίσεις."
+  },
+  "alertPickOneToExport": {
+    "message": "Επιλέξτε τουλάχιστον ένα mod για εξαγωγή."
+  },
+  "alertPickOneMod": {
+    "message": "Επιλέξτε τουλάχιστον ένα mod."
+  },
+  "alertSelectionUnreadable": {
+    "message": "Δεν ήταν δυνατή η ανάγνωση του αρχείου επιλογής."
+  },
+  "alertSelectionInvalid": {
+    "message": "Το αρχείο δεν είναι έγκυρη επιλογή του NexusMods Bypass."
+  },
+  "popupReloadFirst": {
+    "message": "Ανανεώστε τη σελίδα Nexus Mods πριν ανοίξετε τις ρυθμίσεις σελίδας."
+  },
+  "popupReportFull": {
+    "message": "Το GitHub ανοίγει με την πλήρη αναφορά — απλώς περιγράψτε τι συνέβη."
+  },
+  "popupReportShortened": {
+    "message": "Η αναφορά συντομεύτηκε — το πλήρες αντίγραφο είναι στο πρόχειρο."
+  },
+  "popupReportNoCopy": {
+    "message": "Το GitHub ανοίγει συμπληρωμένο — η πλήρης αναφορά δεν αντιγράφηκε."
+  },
+  "popupLoadFailed": {
+    "message": "Το popup δεν ολοκλήρωσε τη φόρτωση. Φορτώστε ξανά την επέκταση και δοκιμάστε."
+  },
+  "alertSelectionTooLarge": {
+    "message": "Το αρχείο επιλογής είναι πολύ μεγάλο (όριο $1 KB).",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logPauseComplete": {
+    "message": "Η παύση ολοκληρώθηκε ($1 για $2).",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "logPausing": {
+    "message": "Παύση $1 πριν την επόμενη λήψη ($2 @ $3 MB/s $4)... απομένουν $5",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      },
+      "c": {
+        "content": "$3"
+      },
+      "d": {
+        "content": "$4"
+      },
+      "e": {
+        "content": "$5"
+      }
+    }
+  },
+  "logAlreadyRunning": {
+    "message": "Μια λήψη εκτελείται ήδη. Περιμένετε ή σταματήστε την πρώτα."
+  },
+  "logNothingToDownload": {
+    "message": "Δεν υπάρχουν mods για λήψη σε αυτή την επιλογή."
+  },
+  "logCanceledBeforeStart": {
+    "message": "Η λήψη ακυρώθηκε πριν ξεκινήσει."
+  },
+  "logCollectionPaused": {
+    "message": "Το collection τέθηκε σε παύση. Τα ολοκληρωμένα αρχεία παραμένουν στο ιστορικό, οπότε μπορείτε να ξαναδοκιμάσετε με ασφάλεια."
+  },
+  "logQueueRateLimited": {
+    "message": "Συμπληρώθηκε το όριο του Nexus Mods. Η ουρά θα συνεχίσει αυτόματα."
+  },
+  "logReconnectedAdopted": {
+    "message": "Επανασύνδεση στη λήψη που ήδη εκτελείται στο παρασκήνιο."
+  },
+  "logProgressRestored": {
+    "message": "Η πρόοδος αποκαταστάθηκε για τη λήψη που εκτελείται σε αυτή την καρτέλα."
+  },
+  "logReconnectedBackground": {
+    "message": "Επανασύνδεση σε λήψη collection που εκτελείται ακόμη στο παρασκήνιο."
+  },
+  "logRetryIgnored": {
+    "message": "Η επανάληψη αγνοήθηκε: αυτή η εκτέλεση σταμάτησε."
+  },
+  "logVortexNotice": {
+    "message": "Το Vortex πρέπει να εκτελείται. Τα αρχεία καταγράφονται μόλις σταλούν — ο περιηγητής δεν βλέπει αν το Vortex τα παρέλαβε."
+  },
+  "logSignInFirst": {
+    "message": "Συνδεθείτε στο Nexus Mods πριν ξεκινήσετε αυτό το collection."
+  },
+  "logOpenLogin": {
+    "message": "Άνοιγμα σύνδεσης"
+  },
+  "logSendingToVortex": {
+    "message": "Αποστολή στο Vortex:"
+  },
+  "logAlreadyDownloaded": {
+    "message": "Ήδη ληφθέν"
+  },
+  "logRateLimitCleared": {
+    "message": "Το όριο ήρθη. Οι λήψεις συνεχίζονται."
+  },
+  "logPausedRateLimitDone": {
+    "message": "Σε παύση. Το όριο ήρθη — πατήστε play για συνέχεια."
+  },
+  "logClaimBackground": {
+    "message": "Μια λήψη στο παρασκήνιο για αυτό το collection εκτελείται ακόμη. Ανοίξτε την καρτέλα της και σταματήστε την, ή κλείστε την."
+  },
+  "logClaimOtherTab": {
+    "message": "Αυτό το collection κατεβαίνει ήδη σε άλλη καρτέλα. Σταματήστε το εκεί ή κλείστε την καρτέλα."
+  },
+  "alertAllDownloaded": {
+    "message": "Όλα τα mods έχουν ήδη ληφθεί."
+  },
+  "dlgCantLoadCollection": {
+    "message": "Δεν ήταν δυνατή η φόρτωση του collection"
+  },
+  "dlgStartupIssue": {
+    "message": "Πρόβλημα εκκίνησης επέκτασης"
+  },
+  "unitSecondsShort": {
+    "message": "δ"
+  },
+  "logDownloading": {
+    "message": "Γίνεται λήψη: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logCompleted": {
+    "message": "Ολοκληρώθηκε: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRetryingInterrupted": {
+    "message": "Επανάληψη διακοπείσας λήψης: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logFailedItem": {
+    "message": "Απέτυχε: $1 ($2)",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "logBackgroundError": {
+    "message": "Σφάλμα collection στο παρασκήνιο: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRunStopped": {
+    "message": "Η λήψη collection σταμάτησε: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRetryFailed": {
+    "message": "Η επανάληψη απέτυχε: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logBackingOff": {
+    "message": "Το Nexus Mods περιορίζει αιτήματα. Αναμονή $1.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRateLimitWaiting": {
+    "message": "Το Nexus Mods περιορίζει αιτήματα. Αναμονή $1...",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logPausedRateLimit": {
+    "message": "Σε παύση. Το όριο του Nexus λήγει σε $1.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantOpenPage": {
+    "message": "Δεν ήταν δυνατό το άνοιγμα της σελίδας: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantLoadSettings": {
+    "message": "Δεν ήταν δυνατή η φόρτωση ρυθμίσεων: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantSaveSettings": {
+    "message": "Οι ρυθμίσεις δεν αποθηκεύτηκαν: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantOpenPageSettings": {
+    "message": "Δεν ήταν δυνατό το άνοιγμα ρυθμίσεων σελίδας: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertImportedMods": {
+    "message": "Εισήχθησαν $1 από $2 mods του collection στο ιστορικό.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertImportedIds": {
+    "message": "Εισήχθησαν $1 από $2 αναγνωριστικά αρχείων.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertUnmatchedFiles_one": {
+    "message": "$1 επιλεγμένο αρχείο δεν ταιριάζει με αυτό το collection.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertUnmatchedFiles_other": {
+    "message": "$1 επιλεγμένα αρχεία δεν ταιριάζουν με αυτό το collection.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertSelectedNotDownloaded_one": {
+    "message": "Επιλέχθηκε $1 mod που δεν έχει ληφθεί.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertSelectedNotDownloaded_other": {
+    "message": "Επιλέχθηκαν $1 mods που δεν έχουν ληφθεί.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "setSectionLanguage": {
+    "message": "Γλώσσα"
+  },
+  "setForceEnglishLabel": {
+    "message": "Πάντα στα αγγλικά"
+  },
+  "setForceEnglishDesc": {
+    "message": "Εμφανίζει την επέκταση στα αγγλικά ακόμη κι αν ο περιηγητής σας είναι σε άλλη γλώσσα. Χρήσιμο όταν ακολουθείτε οδηγούς γραμμένους στα αγγλικά. Το όνομα της επέκτασης στη λίστα του περιηγητή εξακολουθεί να ακολουθεί τη γλώσσα του περιηγητή."
+  },
+  "supportEntryTitle": {
+    "message": "Στήριξε το έργο"
+  },
+  "supportEntrySubtitle": {
+    "message": "Ανεξάρτητο, ιδιωτικό και χωρίς διαφημίσεις"
+  },
+  "supportBackAria": {
+    "message": "Πίσω στα γρήγορα χειριστήρια"
+  },
+  "supportBack": {
+    "message": "Πίσω"
+  },
+  "supportBadge": {
+    "message": "Με στήριξη της κοινότητας"
+  },
+  "supportKicker": {
+    "message": "Φτιαγμένο για την κοινότητα"
+  },
+  "supportTitle": {
+    "message": "Κράτα το NexusMods Bypass ανεξάρτητο"
+  },
+  "supportDescription": {
+    "message": "Αν η επέκταση σου γλίτωσε χρόνο, μπορείς να βοηθήσεις στη χρηματοδότηση της συντήρησης, της συμβατότητας με περιηγητές και των μελλοντικών βελτιώσεων."
+  },
+  "supportValuesAria": {
+    "message": "Δεσμεύσεις του έργου"
+  },
+  "supportValuePrivate": {
+    "message": "Ιδιωτικό"
+  },
+  "supportValueAdFree": {
+    "message": "Χωρίς διαφημίσεις"
+  },
+  "supportValueFree": {
+    "message": "Πάντα δωρεάν"
+  },
+  "supportPrimary": {
+    "message": "Στήριξε στο Ko-fi"
+  },
+  "supportPrimaryHint": {
+    "message": "Μία φορά ή μηνιαία — εσύ αποφασίζεις"
+  },
+  "supportPrimaryPending": {
+    "message": "Η σελίδα Ko-fi έρχεται σύντομα"
+  },
+  "supportPrimaryPendingHint": {
+    "message": "Η ασφαλής στήριξη ετοιμάζεται"
+  },
+  "supportTrust": {
+    "message": "Ασφαλής πληρωμή στο Ko-fi. Ανοίγει σε νέα καρτέλα."
+  },
+  "supportFreeTitle": {
+    "message": "Μπορείς να βοηθήσεις και δωρεάν"
+  },
+  "supportGithub": {
+    "message": "Δώσε αστέρι στο GitHub"
+  },
+  "supportCopy": {
+    "message": "Αντιγραφή συνδέσμου έργου"
+  },
+  "supportCopied": {
+    "message": "Ο σύνδεσμος του έργου αντιγράφηκε στο πρόχειρο."
+  },
+  "supportCopyFailed": {
+    "message": "Δεν ήταν δυνατή η αντιγραφή του συνδέσμου του έργου."
+  },
+  "supportPromise": {
+    "message": "Η στήριξη είναι εντελώς προαιρετική. Δεν ξεκλειδώνει ούτε περιορίζει ποτέ λειτουργίες."
+  },
+  "dlgReportOpeningFull": {
+    "message": "Το GitHub ανοίγει με την πλήρη αναφορά…",
+    "description": "Report button state when the whole report fits in the GitHub form."
+  },
+  "dlgReportOpeningCopied": {
+    "message": "Η αναφορά αντιγράφηκε — το GitHub ανοίγει συμπληρωμένο…",
+    "description": "Report button state when the report was copied and the form is prefilled."
+  },
+  "dlgReportOpeningPrefilled": {
+    "message": "Το GitHub ανοίγει συμπληρωμένο…",
+    "description": "Report button state when only the shortened report could be sent."
+  },
+  "dlgHistoryMarked": {
+    "message": "$1 από $2 mods είναι σημειωμένα ως ληφθέντα.",
+    "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "selSelectedCount_one": {
+    "message": "$1 mod επιλεγμένο",
+    "description": "Plural form \"one\". $1 selected count.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "selSelectedCount_other": {
+    "message": "$1 mods επιλεγμένα",
+    "description": "Plural form \"other\". $1 selected count.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertSelectionForeign": {
+    "message": "Αυτό το αρχείο εξήχθη από άλλη συλλογή ($1/$2).",
+    "description": "Import note. $1 game domain, $2 collection slug the file came from.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertSelectionRest": {
+    "message": "Τα υπόλοιπα δεν υπάρχουν σε αυτήν την έκδοση της συλλογής.",
+    "description": "Import note when some ids matched nothing in this revision."
+  },
+  "dlgUpdateRevisionLabel": {
+    "message": "Έκδοση $1 — $2 MB — $3",
+    "description": "Revision picker option. $1 revision number, $2 size in MB, $3 date.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      },
+      "c": {
+        "content": "$3"
+      }
+    }
+  },
+  "dlgDownloadPaused": {
+    "message": "Η λήψη σε παύση",
+    "description": "Error dialog title when a blocking error halted the collection run."
+  },
+  "speedSourceCustom": {
+    "message": "η ρύθμισή σου",
+    "description": "Names the speed used in the pause countdown: the user set it."
+  },
+  "speedSourceDefault": {
+    "message": "προεπιλογή",
+    "description": "Names the speed used in the pause countdown: the stock value."
+  }
+}

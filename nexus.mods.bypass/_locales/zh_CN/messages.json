@@ -1,0 +1,1152 @@
+{
+  "appName": {
+    "message": "NexusMods Bypass"
+  },
+  "appDesc": {
+    "message": "简化 Nexus Mods 下载，管理合集下载队列，并保存本地历史记录。"
+  },
+  "sectionQuickControls": {
+    "message": "快捷控制"
+  },
+  "toggleAutoStart": {
+    "message": "自动开始下载"
+  },
+  "setAutoCloseTabLabel": {
+    "message": "关闭 Vortex 标签页"
+  },
+  "toggleSkipReq": {
+    "message": "跳过前置要求页面"
+  },
+  "toggleHideUpsells": {
+    "message": "隐藏广告和高级版推广"
+  },
+  "toggleHideDownloadBar": {
+    "message": "隐藏下载按钮"
+  },
+  "setHandleArchivedFilesLabel": {
+    "message": "已归档文件按钮"
+  },
+  "setDebugLogsLabel": {
+    "message": "详细扩展日志"
+  },
+  "btnPageSettings": {
+    "message": "页面设置"
+  },
+  "btnGoNexus": {
+    "message": "NexusMods"
+  },
+  "btnReportBug": {
+    "message": "报告问题 — 自动复制诊断报告"
+  },
+  "popupFooter": {
+    "message": "Nexus Mods 与 Vortex 下载助手"
+  },
+  "ratingPrompt": {
+    "message": "喜欢吗？⭐ 在 GitHub 上点个星"
+  },
+  "ratingDismiss": {
+    "message": "关闭"
+  },
+  "welcomeTitle": {
+    "message": "NexusMods Bypass 已就绪！"
+  },
+  "welcomeSubtitle": {
+    "message": "用更少的点击下载 Nexus Mods 文件和整个合集 — 队列化、有节奏、可继续。"
+  },
+  "quickStartTitle": {
+    "message": "快速开始"
+  },
+  "step1Title": {
+    "message": "打开任意 Nexus Mods 文件页面"
+  },
+  "step1Text": {
+    "message": "点击下载按钮 — 扩展会准备下载链接并开始下载。"
+  },
+  "step2Title": {
+    "message": "试试合集功能"
+  },
+  "step2Text": {
+    "message": "打开任意合集页面，使用合集下载器一键获取所有模组。"
+  },
+  "step3Title": {
+    "message": "按需调整"
+  },
+  "step3Text": {
+    "message": "点击扩展图标进行快捷设置，或在任意 Nexus 页面点击 ⚙ 打开完整设置。"
+  },
+  "privacyCardTitle": {
+    "message": "🔒 隐私优先"
+  },
+  "privacyCardText": {
+    "message": "无分析、无账户、无外部服务器。所有数据都留在您的浏览器中。"
+  },
+  "bugCardTitle": {
+    "message": "🐛 出问题了？"
+  },
+  "bugCardText": {
+    "message": "每个\"报告问题\"按钮都会复制完整诊断报告并打开预填好的 GitHub issue。"
+  },
+  "starCardTitle": {
+    "message": "⭐ 喜欢吗？"
+  },
+  "starCardText": {
+    "message": "在 GitHub 上点星可以帮助更多玩家发现这个扩展。"
+  },
+  "openNexusBtn": {
+    "message": "打开 Nexus Mods"
+  },
+  "starBtn": {
+    "message": "在 GitHub 点星"
+  },
+  "disclaimer": {
+    "message": "与 Nexus Mods 无关联。您需要自己的 Nexus Mods 账户；高级版专属内容仍需高级版。"
+  },
+  "errMissingFileMsg": {
+    "message": "此下载链接不包含文件标识符。"
+  },
+  "errMissingFileFix": {
+    "message": "打开文件页面后重试。"
+  },
+  "errTimeoutMsg": {
+    "message": "Nexus Mods 响应超时。"
+  },
+  "errTimeoutFix": {
+    "message": "请检查网络连接后重试。"
+  },
+  "errOfflineMsg": {
+    "message": "您似乎处于离线状态。"
+  },
+  "errOfflineFix": {
+    "message": "重新连接网络后重试。"
+  },
+  "errNetworkErrorMsg": {
+    "message": "无法完成对 Nexus Mods 的请求。"
+  },
+  "errNetworkErrorFix": {
+    "message": "请检查网络连接后重试。"
+  },
+  "errRequiresLoginMsg": {
+    "message": "您尚未登录 Nexus Mods。"
+  },
+  "errRequiresLoginFix": {
+    "message": "登录后返回此页面，然后重新下载。"
+  },
+  "errCloudflareMsg": {
+    "message": "Nexus Mods 需要先完成浏览器验证。"
+  },
+  "errCloudflareFix": {
+    "message": "在文件页面完成验证后重试。"
+  },
+  "errRateLimitedMsg": {
+    "message": "Nexus Mods 正在临时限制请求频率。"
+  },
+  "errRateLimitedFix": {
+    "message": "请等待几分钟后重试。"
+  },
+  "errAccountSuspendedMsg": {
+    "message": "Nexus Mods 已暂时暂停后续下载请求。"
+  },
+  "errAccountSuspendedFix": {
+    "message": "请稍候再试，以免延长暂停时间。"
+  },
+  "errAccessDeniedMsg": {
+    "message": "Nexus Mods 拒绝了此次下载的访问。"
+  },
+  "errAccessDeniedFix": {
+    "message": "请检查账户权限和文件页面后重试。"
+  },
+  "errFileNotFoundMsg": {
+    "message": "在 Nexus Mods 上未找到请求的文件。"
+  },
+  "errFileNotFoundFix": {
+    "message": "该文件可能已被删除，或链接已过期。"
+  },
+  "errModerationHoldMsg": {
+    "message": "此文件正在接受审核。"
+  },
+  "errModerationHoldFix": {
+    "message": "请等待 Nexus Mods 审核通过后再下载。"
+  },
+  "errServerErrorMsg": {
+    "message": "Nexus Mods 服务器端出现问题。"
+  },
+  "errServerErrorFix": {
+    "message": "请稍候后重试。"
+  },
+  "errInvalidResponseMsg": {
+    "message": "Nexus Mods 返回了意外的响应。"
+  },
+  "errInvalidResponseFix": {
+    "message": "刷新文件页面后重试。"
+  },
+  "errNoDownloadUrlMsg": {
+    "message": "Nexus Mods 未返回可用的下载链接。"
+  },
+  "errNoDownloadUrlFix": {
+    "message": "打开文件页面，确认已登录后重试。"
+  },
+  "errNoNmmLinkMsg": {
+    "message": "Nexus Mods 未返回有效的 Vortex 链接。"
+  },
+  "errNoNmmLinkFix": {
+    "message": "请检查文件页面后重试，或改用浏览器下载。"
+  },
+  "errAbortedMsg": {
+    "message": "请求已取消。"
+  },
+  "errUnsafeDownloadUrlMsg": {
+    "message": "Nexus Mods 返回的链接不是可识别的下载目标。"
+  },
+  "errUnsafeDownloadUrlFix": {
+    "message": "请打开文件页面手动下载。若持续出现，请反馈该问题。"
+  },
+  "errContextInvalidMsg": {
+    "message": "此页面打开期间扩展被更新或重新加载。"
+  },
+  "errContextInvalidFix": {
+    "message": "请刷新此 Nexus Mods 页面后重试。"
+  },
+  "errRequestFailedMsg": {
+    "message": "下载请求失败。"
+  },
+  "errRequestFailedFix": {
+    "message": "请重试下载。若持续出现，请反馈该问题。"
+  },
+  "dlgDownloadIssue": {
+    "message": "下载问题"
+  },
+  "dlgSignInRequired": {
+    "message": "需要登录"
+  },
+  "dlgErrorId": {
+    "message": "错误 ID"
+  },
+  "dlgReportBug": {
+    "message": "报告问题"
+  },
+  "btnSignIn": {
+    "message": "登录 Nexus Mods"
+  },
+  "btnRetry": {
+    "message": "重试"
+  },
+  "btnDone": {
+    "message": "完成"
+  },
+  "ariaCloseErrorDialog": {
+    "message": "关闭错误对话框"
+  },
+  "deckTitle": {
+    "message": "合集下载器"
+  },
+  "deckReadyQueue": {
+    "message": "队列就绪"
+  },
+  "deckSubtitle": {
+    "message": "在一个面板中排队下载整个合集、导入已完成的下载并调整下载节奏。"
+  },
+  "deckDownloadMethod": {
+    "message": "下载方式"
+  },
+  "deckMethodVortex": {
+    "message": "发送到 Vortex"
+  },
+  "deckMethodVortexHint": {
+    "message": "最适合一键交给 Vortex 队列处理。"
+  },
+  "deckMethodBrowser": {
+    "message": "浏览器下载"
+  },
+  "deckMethodBrowserHint": {
+    "message": "当 Vortex 未处理链接时，使用浏览器原生下载。"
+  },
+  "deckActions": {
+    "message": "操作"
+  },
+  "deckImportMods": {
+    "message": "导入已下载的模组"
+  },
+  "tipImportInfo": {
+    "message": "关于导入的信息"
+  },
+  "deckDownloadAll": {
+    "message": "下载全部模组"
+  },
+  "deckDownloadMandatory": {
+    "message": "下载必需项"
+  },
+  "deckDownloadMandatoryHint": {
+    "message": "仅核心文件"
+  },
+  "deckDownloadOptional": {
+    "message": "下载可选项"
+  },
+  "deckDownloadOptionalHint": {
+    "message": "可选附加内容"
+  },
+  "deckSelectMods": {
+    "message": "选择要下载的模组"
+  },
+  "deckSelectModsHint": {
+    "message": "手动选择列表"
+  },
+  "deckUpdateCollection": {
+    "message": "更新合集"
+  },
+  "deckUpdateCollectionHint": {
+    "message": "比较版本"
+  },
+  "deckProgress": {
+    "message": "下载进度"
+  },
+  "deckAdaptivePacing": {
+    "message": "自适应节奏"
+  },
+  "deckLogs": {
+    "message": "日志"
+  },
+  "deckLogsCaption": {
+    "message": "实时活动记录"
+  },
+  "statusDownloading": {
+    "message": "正在下载…"
+  },
+  "statusPaused": {
+    "message": "已暂停"
+  },
+  "statusFinished": {
+    "message": "已完成"
+  },
+  "statusStopped": {
+    "message": "已停止"
+  },
+  "outcomePartial": {
+    "message": "完成，但有错误"
+  },
+  "outcomeBlocked": {
+    "message": "需要处理"
+  },
+  "outcomeFailed": {
+    "message": "失败"
+  },
+  "logDownloadStarted": {
+    "message": "下载已开始。"
+  },
+  "logDownloadFinished": {
+    "message": "下载已完成。"
+  },
+  "logDownloadPartial": {
+    "message": "下载完成，但存在错误。重试时将跳过已成功的文件。"
+  },
+  "logDownloadStopped": {
+    "message": "下载已停止。"
+  },
+  "logDownloadNeedsLogin": {
+    "message": "下载已暂停，请先登录。"
+  },
+  "logDownloadBlocked": {
+    "message": "下载已暂停。请按错误提示处理后再重试。"
+  },
+  "logDownloadError": {
+    "message": "下载因错误而结束。"
+  },
+  "annPaused": {
+    "message": "下载已暂停。"
+  },
+  "annResumed": {
+    "message": "下载已恢复。"
+  },
+  "ariaProgress": {
+    "message": "合集下载进度"
+  },
+  "ariaPause": {
+    "message": "暂停下载"
+  },
+  "ariaResume": {
+    "message": "继续下载"
+  },
+  "ariaStop": {
+    "message": "停止下载"
+  },
+  "tipPauseResume": {
+    "message": "暂停/继续"
+  },
+  "tipStop": {
+    "message": "停止"
+  },
+  "btnStatePleaseWait": {
+    "message": "请稍候…"
+  },
+  "btnStateDownloading": {
+    "message": "正在下载！"
+  },
+  "btnStateError": {
+    "message": "错误"
+  },
+  "btnStateOpeningPage": {
+    "message": "正在打开文件页面…"
+  },
+  "btnFileArchive": {
+    "message": "文件归档"
+  },
+  "btnModManagerDownload": {
+    "message": "模组管理器下载"
+  },
+  "btnManualDownload": {
+    "message": "手动下载"
+  },
+  "annOutcome": {
+    "message": "$1。$2。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "deckModCount_other": {
+    "message": "$1 个模组",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annStarted_other": {
+    "message": "下载已开始：$1 个模组。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annReconnected_other": {
+    "message": "已重新连接到进行中的下载：$1 个模组。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "progressOfTotal_other": {
+    "message": "$1 / $2 个模组",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "btnCancel": {
+    "message": "取消"
+  },
+  "btnClose": {
+    "message": "关闭"
+  },
+  "btnOk": {
+    "message": "确定"
+  },
+  "btnGotIt": {
+    "message": "知道了"
+  },
+  "btnRestore": {
+    "message": "恢复"
+  },
+  "ariaClose": {
+    "message": "关闭"
+  },
+  "dlgConfirmTitle": {
+    "message": "确认操作"
+  },
+  "setTitle": {
+    "message": "下载助手设置"
+  },
+  "setSubtitle": {
+    "message": "更改会立即保存。恢复默认设置将重新加载此页面。"
+  },
+  "setSectionFlow": {
+    "message": "下载流程"
+  },
+  "setSectionPacing": {
+    "message": "文件与节奏"
+  },
+  "setSectionAdvanced": {
+    "message": "高级"
+  },
+  "setRestoreDefaults": {
+    "message": "恢复默认并刷新"
+  },
+  "setNeedHelp": {
+    "message": "下载遇到问题？"
+  },
+  "setReportOnGithub": {
+    "message": "在 GitHub 上报告问题"
+  },
+  "setRestoreTitle": {
+    "message": "恢复默认设置"
+  },
+  "setRestoreConfirm": {
+    "message": "恢复默认设置并刷新此 Nexus 页面？"
+  },
+  "unitSeconds": {
+    "message": "秒"
+  },
+  "setAutoStartDownloadLabel": {
+    "message": "自动开始下载"
+  },
+  "setAutoStartDownloadDesc": {
+    "message": "打开 Nexus 文件下载页时，无需再次点击即可开始 Vortex 交接或浏览器下载。"
+  },
+  "setAutoCloseTabDesc": {
+    "message": "发送 Vortex 链接后，按下方延迟关闭临时的 Nexus 标签页。"
+  },
+  "setSkipRequirementsLabel": {
+    "message": "跳过依赖项界面"
+  },
+  "setSkipRequirementsDesc": {
+    "message": "跳过 Nexus 的依赖项弹窗，直接进入下载步骤。"
+  },
+  "setShowAlertsOnErrorLabel": {
+    "message": "显示错误弹窗"
+  },
+  "setShowAlertsOnErrorDesc": {
+    "message": "当 Nexus 未返回可用下载链接时显示明确提示。"
+  },
+  "setHidePremiumUpsellsLabel": {
+    "message": "隐藏广告和 Premium 面板"
+  },
+  "setHidePremiumUpsellsDesc": {
+    "message": "浏览时隐藏 Nexus 广告位、空广告容器、Premium 横幅和升级面板。"
+  },
+  "setHandleArchivedFilesDesc": {
+    "message": "当 Nexus 隐藏归档文件时，为其添加 Vortex 与浏览器下载按钮。"
+  },
+  "setDebugLogsDesc": {
+    "message": "在控制台输出 NexusMods Bypass 的详细活动记录。错误始终显示，且不影响错误报告。"
+  },
+  "setHideDownloadBarLabel": {
+    "message": "隐藏浏览器下载按钮"
+  },
+  "setHideDownloadBarDesc": {
+    "message": "从浏览器工具栏中移除下载按钮及其进度弹窗。这会影响此浏览器配置文件中的所有下载，而不仅仅是 Nexus 的下载。你随时可以通过 Ctrl+J 查看下载内容。"
+  },
+  "setDownloadFolderLabel": {
+    "message": "浏览器下载文件夹"
+  },
+  "setDownloadFolderDesc": {
+    "message": "浏览器下载目录中的子文件夹，用于 Browser Download 模式。留空可直接保存到「下载」文件夹——某些 Mod 管理器只监视该文件夹，不会查看子文件夹。通过 Vortex 的下载由 Vortex 处理，不受影响。"
+  },
+  "setRequestTimeoutLabel": {
+    "message": "下载请求超时"
+  },
+  "setRequestTimeoutDesc": {
+    "message": "扩展等待 Nexus 返回下载链接的时长，超时即放弃。"
+  },
+  "setCloseTabDelayLabel": {
+    "message": "关闭标签页延迟"
+  },
+  "setCloseTabDelayDesc": {
+    "message": "仅适用于自动开始并关闭标签页的 Vortex 下载。若 Vortex 漏掉链接，请调大此值。"
+  },
+  "setDownloadSpeedLabel": {
+    "message": "你的 Nexus 下载速度"
+  },
+  "setDownloadSpeedDesc": {
+    "message": "仅适用于 Vortex 模式。浏览器无法观测 Vortex 内部的传输，因此用此值估算每个文件的耗时并安排交接间隔。请填写你实际看到的速度——设得过低会让队列等待远超必要的时间。"
+  },
+  "setPauseBetweenModsLabel": {
+    "message": "模组之间的暂停"
+  },
+  "setPauseBetweenModsDesc": {
+    "message": "仅适用于 Vortex 模式。会加到上面的估算之上。设为 0 可完全关闭等待（包括基于大小的估算），把每个文件连续交给 Vortex 自行排队。"
+  },
+  "dlgHistoryTitle": {
+    "message": "发现已下载的模组"
+  },
+  "dlgHistoryHelp": {
+    "message": "在开始前选择此次合集运行的行为。如有文件缺失，请选择重新下载全部。"
+  },
+  "dlgHistorySkip": {
+    "message": "跳过已下载"
+  },
+  "dlgHistorySkipHint": {
+    "message": "仅继续下载剩余模组。"
+  },
+  "dlgHistoryRedownload": {
+    "message": "重新下载全部"
+  },
+  "dlgHistoryRedownloadHint": {
+    "message": "清除已保存的历史记录并重新开始整个列表。"
+  },
+  "dlgImportTitle": {
+    "message": "导入已下载的模组"
+  },
+  "dlgImportLead": {
+    "message": "避免重复下载你已经拥有的文件。"
+  },
+  "dlgImportHelp": {
+    "message": "从你的模组文件夹中选择所有文件，工具将与此合集的历史记录进行匹配。"
+  },
+  "dlgImportPathLabel": {
+    "message": "Vortex 默认路径"
+  },
+  "dlgSelectTitle": {
+    "message": "选择模组"
+  },
+  "selSelectAll": {
+    "message": "全选"
+  },
+  "selDeselectAll": {
+    "message": "取消全选"
+  },
+  "selInvert": {
+    "message": "反选"
+  },
+  "selExport": {
+    "message": "导出所选"
+  },
+  "selImport": {
+    "message": "导入所选"
+  },
+  "selSearchPlaceholder": {
+    "message": "搜索模组…"
+  },
+  "selDownloadSelected": {
+    "message": "下载所选"
+  },
+  "sortModAsc": {
+    "message": "模组名 A-Z"
+  },
+  "sortModDesc": {
+    "message": "模组名 Z-A"
+  },
+  "sortFileAsc": {
+    "message": "文件名 A-Z"
+  },
+  "sortFileDesc": {
+    "message": "文件名 Z-A"
+  },
+  "sortSizeAsc": {
+    "message": "大小升序"
+  },
+  "sortSizeDesc": {
+    "message": "大小降序"
+  },
+  "colModName": {
+    "message": "模组名"
+  },
+  "colFileName": {
+    "message": "文件名"
+  },
+  "colSize": {
+    "message": "大小"
+  },
+  "colType": {
+    "message": "类型"
+  },
+  "tagOptional": {
+    "message": "可选"
+  },
+  "tagMandatory": {
+    "message": "必需"
+  },
+  "dlgUpdateTitle": {
+    "message": "更新合集"
+  },
+  "dlgUpdateCurrentRev": {
+    "message": "你当前的版本"
+  },
+  "dlgUpdateToRev": {
+    "message": "更新到版本"
+  },
+  "dlgUpdateSelectRev": {
+    "message": "选择一个版本"
+  },
+  "dlgUpdateDownload": {
+    "message": "下载更新"
+  },
+  "dlgUpdateFetchFailed": {
+    "message": "获取版本失败。请稍后重试。"
+  },
+  "dlgUpdateCompareFailed": {
+    "message": "比较版本失败。请稍后重试。"
+  },
+  "dlgUpdateNone": {
+    "message": "无"
+  },
+  "dlgUpdateColUpdated": {
+    "message": "已更新"
+  },
+  "dlgUpdateColAdded": {
+    "message": "新增"
+  },
+  "dlgUpdateColRemoved": {
+    "message": "已移除"
+  },
+  "logFailedSummary_other": {
+    "message": "有 $1 个模组下载失败：",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dlgCantOpenSettings": {
+    "message": "无法打开设置"
+  },
+  "dlgCollectionIssue": {
+    "message": "合集下载问题"
+  },
+  "dlgCantLoadRevisions": {
+    "message": "无法加载版本"
+  },
+  "dlgCantCompareRevisions": {
+    "message": "无法比较版本"
+  },
+  "alertContextInvalid": {
+    "message": "NexusMods Bypass 已更新或重新加载。\n请刷新此页面以打开设置。"
+  },
+  "alertPickOneToExport": {
+    "message": "请至少选择一个模组以导出。"
+  },
+  "alertPickOneMod": {
+    "message": "请至少选择一个模组。"
+  },
+  "alertSelectionUnreadable": {
+    "message": "无法读取所选文件。"
+  },
+  "alertSelectionInvalid": {
+    "message": "该文件不是有效的 NexusMods Bypass 选择文件。"
+  },
+  "popupReloadFirst": {
+    "message": "打开页面设置前，请先刷新 Nexus Mods 页面。"
+  },
+  "popupReportFull": {
+    "message": "GitHub 已打开并附带完整报告——只需描述发生了什么。"
+  },
+  "popupReportShortened": {
+    "message": "报告已缩短——完整副本已复制到剪贴板。"
+  },
+  "popupReportNoCopy": {
+    "message": "GitHub 已打开并预填——但完整报告复制失败。"
+  },
+  "popupLoadFailed": {
+    "message": "弹窗未能完成加载。请重新加载扩展后重试。"
+  },
+  "alertSelectionTooLarge": {
+    "message": "所选文件过大（上限 $1 KB）。",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logPauseComplete": {
+    "message": "暂停结束（$2 用时 $1）。",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "logPausing": {
+    "message": "下一个下载前暂停 $1（$2 @ $3 MB/s $4）……剩余 $5",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      },
+      "c": {
+        "content": "$3"
+      },
+      "d": {
+        "content": "$4"
+      },
+      "e": {
+        "content": "$5"
+      }
+    }
+  },
+  "logAlreadyRunning": {
+    "message": "已有下载正在进行。请等待或先停止。"
+  },
+  "logNothingToDownload": {
+    "message": "此选择没有可下载的模组。"
+  },
+  "logCanceledBeforeStart": {
+    "message": "下载在开始前已取消。"
+  },
+  "logCollectionPaused": {
+    "message": "合集已暂停。已完成的文件保留在历史记录中，解决问题后可安全重试。"
+  },
+  "logQueueRateLimited": {
+    "message": "已达到 Nexus Mods 频率限制。后台队列将自动恢复。"
+  },
+  "logReconnectedAdopted": {
+    "message": "已重新连接到后台正在进行的下载。"
+  },
+  "logProgressRestored": {
+    "message": "已恢复此标签页中仍在进行的下载进度。"
+  },
+  "logReconnectedBackground": {
+    "message": "已重新连接到后台仍在进行的合集下载。"
+  },
+  "logRetryIgnored": {
+    "message": "已忽略重试：此次合集运行已停止。"
+  },
+  "logVortexNotice": {
+    "message": "Vortex 必须正在运行。文件在发送时即被记录——浏览器无法得知 Vortex 是否真正收到。"
+  },
+  "logSignInFirst": {
+    "message": "开始此合集前请先登录 Nexus Mods。"
+  },
+  "logOpenLogin": {
+    "message": "打开登录页"
+  },
+  "logSendingToVortex": {
+    "message": "正在发送到 Vortex："
+  },
+  "logAlreadyDownloaded": {
+    "message": "已下载"
+  },
+  "logRateLimitCleared": {
+    "message": "频率限制已解除。继续下载。"
+  },
+  "logPausedRateLimitDone": {
+    "message": "已暂停。频率限制已解除——按播放继续。"
+  },
+  "logClaimBackground": {
+    "message": "此合集仍有后台下载在进行。请打开其标签页停止，或关闭该标签页。"
+  },
+  "logClaimOtherTab": {
+    "message": "此合集已在另一个标签页下载。请在那里停止，或关闭该标签页。"
+  },
+  "alertAllDownloaded": {
+    "message": "所有模组均已下载。"
+  },
+  "dlgCantLoadCollection": {
+    "message": "无法加载合集"
+  },
+  "dlgStartupIssue": {
+    "message": "扩展启动问题"
+  },
+  "unitSecondsShort": {
+    "message": "秒"
+  },
+  "logDownloading": {
+    "message": "正在下载：$1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logCompleted": {
+    "message": "已完成：$1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRetryingInterrupted": {
+    "message": "正在重试中断的下载：$1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logFailedItem": {
+    "message": "失败：$1（$2）",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "logBackgroundError": {
+    "message": "后台合集错误：$1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRunStopped": {
+    "message": "合集下载已停止：$1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRetryFailed": {
+    "message": "重试失败：$1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logBackingOff": {
+    "message": "Nexus Mods 正在限制请求。等待 $1。",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRateLimitWaiting": {
+    "message": "Nexus Mods 正在限制请求。等待 $1……",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logPausedRateLimit": {
+    "message": "已暂停。Nexus 频率限制将在 $1 后解除。",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantOpenPage": {
+    "message": "无法打开此页面：$1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantLoadSettings": {
+    "message": "无法加载已保存的设置：$1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantSaveSettings": {
+    "message": "设置未保存：$1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantOpenPageSettings": {
+    "message": "无法打开页面设置：$1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertImportedMods": {
+    "message": "已将 $2 个合集模组中的 $1 个导入历史记录。",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertImportedIds": {
+    "message": "已导入 $2 个文件 ID 中的 $1 个。",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertUnmatchedFiles_other": {
+    "message": "有 $1 个所选文件与此合集不匹配。",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertSelectedNotDownloaded_other": {
+    "message": "已选择 $1 个尚未下载的模组。",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "setSectionLanguage": {
+    "message": "语言"
+  },
+  "setForceEnglishLabel": {
+    "message": "始终使用英语"
+  },
+  "setForceEnglishDesc": {
+    "message": "即使浏览器设置为其他语言，也以英语显示此扩展。在参照英文教程时很有用。浏览器扩展列表中的名称仍会跟随浏览器语言。"
+  },
+  "supportEntryTitle": {
+    "message": "支持这个项目"
+  },
+  "supportEntrySubtitle": {
+    "message": "独立、私密、无广告"
+  },
+  "supportBackAria": {
+    "message": "返回快速设置"
+  },
+  "supportBack": {
+    "message": "返回"
+  },
+  "supportBadge": {
+    "message": "由社区支持"
+  },
+  "supportKicker": {
+    "message": "为社区打造"
+  },
+  "supportTitle": {
+    "message": "让 NexusMods Bypass 保持独立"
+  },
+  "supportDescription": {
+    "message": "如果这个扩展为你节省了时间，你可以帮助资助维护、浏览器兼容性和未来的改进。"
+  },
+  "supportValuesAria": {
+    "message": "项目承诺"
+  },
+  "supportValuePrivate": {
+    "message": "私密"
+  },
+  "supportValueAdFree": {
+    "message": "无广告"
+  },
+  "supportValueFree": {
+    "message": "永久免费"
+  },
+  "supportPrimary": {
+    "message": "在 Ko-fi 上支持"
+  },
+  "supportPrimaryHint": {
+    "message": "一次性或按月——由你决定"
+  },
+  "supportPrimaryPending": {
+    "message": "Ko-fi 页面即将上线"
+  },
+  "supportPrimaryPendingHint": {
+    "message": "安全支持方式正在接入中"
+  },
+  "supportTrust": {
+    "message": "在 Ko-fi 上安全结账。将在新标签页中打开。"
+  },
+  "supportFreeTitle": {
+    "message": "你也可以免费提供帮助"
+  },
+  "supportGithub": {
+    "message": "在 GitHub 上加星"
+  },
+  "supportCopy": {
+    "message": "复制项目链接"
+  },
+  "supportCopied": {
+    "message": "项目链接已复制到剪贴板。"
+  },
+  "supportCopyFailed": {
+    "message": "无法复制项目链接。"
+  },
+  "supportPromise": {
+    "message": "支持完全是自愿的。它从不解锁或限制任何功能。"
+  },
+  "dlgReportOpeningFull": {
+    "message": "正在打开 GitHub，已附带完整报告…",
+    "description": "Report button state when the whole report fits in the GitHub form."
+  },
+  "dlgReportOpeningCopied": {
+    "message": "报告已复制 — 正在打开已填写的 GitHub…",
+    "description": "Report button state when the report was copied and the form is prefilled."
+  },
+  "dlgReportOpeningPrefilled": {
+    "message": "正在打开已填写的 GitHub…",
+    "description": "Report button state when only the shortened report could be sent."
+  },
+  "dlgHistoryMarked": {
+    "message": "$2 个模组中有 $1 个已标记为已下载。",
+    "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "selSelectedCount_other": {
+    "message": "已选择 $1 个模组",
+    "description": "Plural form \"other\". $1 selected count.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertSelectionForeign": {
+    "message": "此文件导出自另一个合集（$1/$2）。",
+    "description": "Import note. $1 game domain, $2 collection slug the file came from.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertSelectionRest": {
+    "message": "其余的不在此合集修订版中。",
+    "description": "Import note when some ids matched nothing in this revision."
+  },
+  "dlgUpdateRevisionLabel": {
+    "message": "修订版 $1 — $2 MB — $3",
+    "description": "Revision picker option. $1 revision number, $2 size in MB, $3 date.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      },
+      "c": {
+        "content": "$3"
+      }
+    }
+  },
+  "dlgDownloadPaused": {
+    "message": "下载已暂停",
+    "description": "Error dialog title when a blocking error halted the collection run."
+  },
+  "speedSourceCustom": {
+    "message": "你的设置",
+    "description": "Names the speed used in the pause countdown: the user set it."
+  },
+  "speedSourceDefault": {
+    "message": "默认值",
+    "description": "Names the speed used in the pause countdown: the stock value."
+  }
+}

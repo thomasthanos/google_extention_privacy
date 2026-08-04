@@ -1,0 +1,1152 @@
+{
+  "appName": {
+    "message": "NexusMods Bypass"
+  },
+  "appDesc": {
+    "message": "Nexus Mods のダウンロードを簡単にし、コレクションのダウンロードキューを管理し、完了したファイルの履歴をローカルに保存します。"
+  },
+  "sectionQuickControls": {
+    "message": "クイック設定"
+  },
+  "toggleAutoStart": {
+    "message": "ダウンロードを自動的に開始"
+  },
+  "setAutoCloseTabLabel": {
+    "message": "Vortex のタブを閉じる"
+  },
+  "toggleSkipReq": {
+    "message": "必須MOD画面をスキップ"
+  },
+  "toggleHideUpsells": {
+    "message": "広告と Premium パネルを非表示"
+  },
+  "toggleHideDownloadBar": {
+    "message": "ダウンロードボタンを非表示"
+  },
+  "setHandleArchivedFilesLabel": {
+    "message": "アーカイブ済みファイルのボタン"
+  },
+  "setDebugLogsLabel": {
+    "message": "詳細な拡張機能ログ"
+  },
+  "btnPageSettings": {
+    "message": "ページ設定"
+  },
+  "btnGoNexus": {
+    "message": "NexusMods"
+  },
+  "btnReportBug": {
+    "message": "バグを報告 — エラーレポートをコピー"
+  },
+  "popupFooter": {
+    "message": "Nexus Mods と Vortex のためのダウンロード支援ツール"
+  },
+  "ratingPrompt": {
+    "message": "気に入りましたか？ ⭐ GitHub でスターを"
+  },
+  "ratingDismiss": {
+    "message": "閉じる"
+  },
+  "welcomeTitle": {
+    "message": "NexusMods Bypass の準備ができました"
+  },
+  "welcomeSubtitle": {
+    "message": "Nexus Mods のファイルやコレクション全体を、より少ないクリックで — キュー管理・ペース調整・再開に対応。"
+  },
+  "quickStartTitle": {
+    "message": "クイックスタート"
+  },
+  "step1Title": {
+    "message": "Nexus Mods のファイルページを開く"
+  },
+  "step1Text": {
+    "message": "ダウンロードボタンをクリックすると、拡張機能がリンクを準備してダウンロードを開始します。"
+  },
+  "step2Title": {
+    "message": "コレクションを試す"
+  },
+  "step2Text": {
+    "message": "コレクションページを開き、Collection Downloader パネルからワンクリックで全 MOD を取得できます。"
+  },
+  "step3Title": {
+    "message": "好みに合わせて調整"
+  },
+  "step3Text": {
+    "message": "拡張機能アイコンでクイック設定、Nexus のページ上の ⚙ ボタンで詳細設定を開けます。"
+  },
+  "privacyCardTitle": {
+    "message": "🔒 設計段階からプライベート"
+  },
+  "privacyCardText": {
+    "message": "解析なし、アカウントなし、外部サーバーなし。すべてブラウザー内で完結します。"
+  },
+  "bugCardTitle": {
+    "message": "🐛 不具合がありましたか？"
+  },
+  "bugCardText": {
+    "message": "「バグを報告」ボタンは診断レポート全体をコピーし、内容が入力済みの GitHub Issue を開きます。"
+  },
+  "starCardTitle": {
+    "message": "⭐ 気に入りましたか？"
+  },
+  "starCardText": {
+    "message": "GitHub でのスターは、より多くの MOD 制作者に届く助けになります。"
+  },
+  "openNexusBtn": {
+    "message": "Nexus Mods を開く"
+  },
+  "starBtn": {
+    "message": "GitHub でスター"
+  },
+  "disclaimer": {
+    "message": "Nexus Mods とは無関係です。ご自身の Nexus Mods アカウントが必要で、Premium 限定コンテンツは Premium 限定のままです。"
+  },
+  "errMissingFileMsg": {
+    "message": "このダウンロードリンクにはファイル識別子が含まれていません。"
+  },
+  "errMissingFileFix": {
+    "message": "ファイルページを開いて再試行してください。"
+  },
+  "errTimeoutMsg": {
+    "message": "Nexus Mods の応答に時間がかかりすぎました。"
+  },
+  "errTimeoutFix": {
+    "message": "接続を確認してから再試行してください。"
+  },
+  "errOfflineMsg": {
+    "message": "オフラインのようです。"
+  },
+  "errOfflineFix": {
+    "message": "インターネットに再接続してから再試行してください。"
+  },
+  "errNetworkErrorMsg": {
+    "message": "Nexus Mods へのリクエストを完了できませんでした。"
+  },
+  "errNetworkErrorFix": {
+    "message": "接続を確認して再試行してください。"
+  },
+  "errRequiresLoginMsg": {
+    "message": "Nexus Mods にログインしていません。"
+  },
+  "errRequiresLoginFix": {
+    "message": "ログインし、このページに戻ってからダウンロードを再試行してください。"
+  },
+  "errCloudflareMsg": {
+    "message": "続行する前に Nexus Mods のブラウザー認証が必要です。"
+  },
+  "errCloudflareFix": {
+    "message": "ファイルページで認証を完了してから再試行してください。"
+  },
+  "errRateLimitedMsg": {
+    "message": "Nexus Mods が一時的にリクエストを制限しています。"
+  },
+  "errRateLimitedFix": {
+    "message": "数分待ってから再試行してください。"
+  },
+  "errAccountSuspendedMsg": {
+    "message": "Nexus Mods が以降のダウンロード要求を一時的に停止しました。"
+  },
+  "errAccountSuspendedFix": {
+    "message": "停止期間が延びないよう、時間を置いてから再試行してください。"
+  },
+  "errAccessDeniedMsg": {
+    "message": "Nexus Mods がこのダウンロードへのアクセスを拒否しました。"
+  },
+  "errAccessDeniedFix": {
+    "message": "アカウントの権限とファイルページを確認してから再試行してください。"
+  },
+  "errFileNotFoundMsg": {
+    "message": "要求されたファイルは Nexus Mods で見つかりませんでした。"
+  },
+  "errFileNotFoundFix": {
+    "message": "ファイルが削除されたか、リンクが古い可能性があります。"
+  },
+  "errModerationHoldMsg": {
+    "message": "このファイルは審査中です。"
+  },
+  "errModerationHoldFix": {
+    "message": "Nexus Mods がファイルを承認するまでお待ちください。"
+  },
+  "errServerErrorMsg": {
+    "message": "Nexus Mods 側でサーバーの問題が発生しています。"
+  },
+  "errServerErrorFix": {
+    "message": "少し待ってから再試行してください。"
+  },
+  "errInvalidResponseMsg": {
+    "message": "Nexus Mods が予期しない応答を返しました。"
+  },
+  "errInvalidResponseFix": {
+    "message": "ファイルページを再読み込みして再試行してください。"
+  },
+  "errNoDownloadUrlMsg": {
+    "message": "Nexus Mods から利用可能なダウンロードリンクが返されませんでした。"
+  },
+  "errNoDownloadUrlFix": {
+    "message": "ファイルページを開き、ログイン状態を確認してから再試行してください。"
+  },
+  "errNoNmmLinkMsg": {
+    "message": "Nexus Mods から有効な Vortex リンクが返されませんでした。"
+  },
+  "errNoNmmLinkFix": {
+    "message": "ファイルページを確認して再試行するか、ブラウザーダウンロードに切り替えてください。"
+  },
+  "errAbortedMsg": {
+    "message": "リクエストはキャンセルされました。"
+  },
+  "errUnsafeDownloadUrlMsg": {
+    "message": "Nexus Mods が返したリンクは、認識されたダウンロード先ではありません。"
+  },
+  "errUnsafeDownloadUrlFix": {
+    "message": "ファイルページを開いて手動でダウンロードしてください。繰り返す場合は問題を報告してください。"
+  },
+  "errContextInvalidMsg": {
+    "message": "このページを開いている間に拡張機能が更新または再読み込みされました。"
+  },
+  "errContextInvalidFix": {
+    "message": "この Nexus Mods ページを再読み込みしてから再試行してください。"
+  },
+  "errRequestFailedMsg": {
+    "message": "ダウンロード要求に失敗しました。"
+  },
+  "errRequestFailedFix": {
+    "message": "ダウンロードを再試行してください。繰り返す場合は問題を報告してください。"
+  },
+  "dlgDownloadIssue": {
+    "message": "ダウンロードの問題"
+  },
+  "dlgSignInRequired": {
+    "message": "ログインが必要です"
+  },
+  "dlgErrorId": {
+    "message": "エラー ID"
+  },
+  "dlgReportBug": {
+    "message": "バグを報告"
+  },
+  "btnSignIn": {
+    "message": "Nexus Mods にログイン"
+  },
+  "btnRetry": {
+    "message": "再試行"
+  },
+  "btnDone": {
+    "message": "完了"
+  },
+  "ariaCloseErrorDialog": {
+    "message": "エラーダイアログを閉じる"
+  },
+  "deckTitle": {
+    "message": "Collection Downloader"
+  },
+  "deckReadyQueue": {
+    "message": "キュー準備完了"
+  },
+  "deckSubtitle": {
+    "message": "コレクション全体のキュー登録、完了済みダウンロードの取り込み、ペース調整を 1 か所で行えます。"
+  },
+  "deckDownloadMethod": {
+    "message": "ダウンロード方法"
+  },
+  "deckMethodVortex": {
+    "message": "Vortex に送信"
+  },
+  "deckMethodVortexHint": {
+    "message": "Vortex のキューへワンクリックで渡すのに最適です。"
+  },
+  "deckMethodBrowser": {
+    "message": "ブラウザーでダウンロード"
+  },
+  "deckMethodBrowserHint": {
+    "message": "Vortex がリンクを処理しない場合はブラウザー標準のダウンロードを使用します。"
+  },
+  "deckActions": {
+    "message": "操作"
+  },
+  "deckImportMods": {
+    "message": "ダウンロード済み MOD を取り込む"
+  },
+  "tipImportInfo": {
+    "message": "取り込みについての情報"
+  },
+  "deckDownloadAll": {
+    "message": "すべての MOD をダウンロード"
+  },
+  "deckDownloadMandatory": {
+    "message": "必須をダウンロード"
+  },
+  "deckDownloadMandatoryHint": {
+    "message": "コアファイルのみ"
+  },
+  "deckDownloadOptional": {
+    "message": "任意をダウンロード"
+  },
+  "deckDownloadOptionalHint": {
+    "message": "任意の追加要素"
+  },
+  "deckSelectMods": {
+    "message": "ダウンロードする MOD を選択"
+  },
+  "deckSelectModsHint": {
+    "message": "手動で選択"
+  },
+  "deckUpdateCollection": {
+    "message": "コレクションを更新"
+  },
+  "deckUpdateCollectionHint": {
+    "message": "リビジョンを比較"
+  },
+  "deckProgress": {
+    "message": "ダウンロードの進行状況"
+  },
+  "deckAdaptivePacing": {
+    "message": "自動ペース調整"
+  },
+  "deckLogs": {
+    "message": "ログ"
+  },
+  "deckLogsCaption": {
+    "message": "リアルタイムの動作記録"
+  },
+  "statusDownloading": {
+    "message": "ダウンロード中..."
+  },
+  "statusPaused": {
+    "message": "一時停止中"
+  },
+  "statusFinished": {
+    "message": "完了"
+  },
+  "statusStopped": {
+    "message": "停止"
+  },
+  "outcomePartial": {
+    "message": "エラーありで完了"
+  },
+  "outcomeBlocked": {
+    "message": "対応が必要です"
+  },
+  "outcomeFailed": {
+    "message": "失敗"
+  },
+  "logDownloadStarted": {
+    "message": "ダウンロードを開始しました。"
+  },
+  "logDownloadFinished": {
+    "message": "ダウンロードが完了しました。"
+  },
+  "logDownloadPartial": {
+    "message": "エラーありで完了しました。再試行すると成功済みのファイルはスキップされます。"
+  },
+  "logDownloadStopped": {
+    "message": "ダウンロードを停止しました。"
+  },
+  "logDownloadNeedsLogin": {
+    "message": "ログインするまでダウンロードを一時停止しました。"
+  },
+  "logDownloadBlocked": {
+    "message": "ダウンロードを一時停止しました。再試行の前にエラーの指示に従ってください。"
+  },
+  "logDownloadError": {
+    "message": "ダウンロードはエラーで終了しました。"
+  },
+  "annPaused": {
+    "message": "ダウンロードを一時停止しました。"
+  },
+  "annResumed": {
+    "message": "ダウンロードを再開しました。"
+  },
+  "ariaProgress": {
+    "message": "コレクションのダウンロード進行状況"
+  },
+  "ariaPause": {
+    "message": "ダウンロードを一時停止"
+  },
+  "ariaResume": {
+    "message": "ダウンロードを再開"
+  },
+  "ariaStop": {
+    "message": "ダウンロードを停止"
+  },
+  "tipPauseResume": {
+    "message": "一時停止／再開"
+  },
+  "tipStop": {
+    "message": "停止"
+  },
+  "btnStatePleaseWait": {
+    "message": "お待ちください..."
+  },
+  "btnStateDownloading": {
+    "message": "ダウンロード中！"
+  },
+  "btnStateError": {
+    "message": "エラー"
+  },
+  "btnStateOpeningPage": {
+    "message": "ファイルページを開いています..."
+  },
+  "btnFileArchive": {
+    "message": "ファイルアーカイブ"
+  },
+  "btnModManagerDownload": {
+    "message": "MOD マネージャーでダウンロード"
+  },
+  "btnManualDownload": {
+    "message": "手動ダウンロード"
+  },
+  "annOutcome": {
+    "message": "$1。$2。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "btnCancel": {
+    "message": "キャンセル"
+  },
+  "btnClose": {
+    "message": "閉じる"
+  },
+  "btnOk": {
+    "message": "OK"
+  },
+  "btnGotIt": {
+    "message": "了解"
+  },
+  "btnRestore": {
+    "message": "復元"
+  },
+  "ariaClose": {
+    "message": "閉じる"
+  },
+  "dlgConfirmTitle": {
+    "message": "操作の確認"
+  },
+  "setTitle": {
+    "message": "ダウンロード支援の設定"
+  },
+  "setSubtitle": {
+    "message": "変更は即座に保存されます。既定値に戻すとこのページが再読み込みされます。"
+  },
+  "setSectionFlow": {
+    "message": "ダウンロードの流れ"
+  },
+  "setSectionPacing": {
+    "message": "ファイルとペース"
+  },
+  "setSectionAdvanced": {
+    "message": "詳細設定"
+  },
+  "setRestoreDefaults": {
+    "message": "既定値に戻して再読み込み"
+  },
+  "setNeedHelp": {
+    "message": "ダウンロードでお困りですか？"
+  },
+  "setReportOnGithub": {
+    "message": "GitHub でバグを報告"
+  },
+  "setRestoreTitle": {
+    "message": "既定値に戻す"
+  },
+  "setRestoreConfirm": {
+    "message": "設定を既定値に戻し、この Nexus ページを再読み込みしますか？"
+  },
+  "unitSeconds": {
+    "message": "秒"
+  },
+  "setAutoStartDownloadLabel": {
+    "message": "ダウンロードを自動的に開始"
+  },
+  "setAutoStartDownloadDesc": {
+    "message": "Nexus のファイルダウンロードページを開いたとき、追加のクリックなしで Vortex への受け渡しまたはブラウザーダウンロードを開始します。"
+  },
+  "setAutoCloseTabDesc": {
+    "message": "Vortex にリンクを送信した後、下記の遅延時間が過ぎたら一時的な Nexus タブを閉じます。"
+  },
+  "setSkipRequirementsLabel": {
+    "message": "必須MOD画面をスキップ"
+  },
+  "setSkipRequirementsDesc": {
+    "message": "Nexus の必須MODポップアップを通過し、直接ダウンロード手順へ進みます。"
+  },
+  "setShowAlertsOnErrorLabel": {
+    "message": "エラーのポップアップを表示"
+  },
+  "setShowAlertsOnErrorDesc": {
+    "message": "Nexus が利用可能なダウンロードリンクを返さないとき、分かりやすいメッセージを表示します。"
+  },
+  "setHidePremiumUpsellsLabel": {
+    "message": "広告と Premium パネルを非表示"
+  },
+  "setHidePremiumUpsellsDesc": {
+    "message": "閲覧中に Nexus の広告枠、空の広告コンテナ、Premium バナー、アップグレード案内を非表示にします。"
+  },
+  "setHandleArchivedFilesDesc": {
+    "message": "Nexus が非表示にしているアーカイブ済みファイルに、Vortex とブラウザーのダウンロードボタンを追加します。"
+  },
+  "setDebugLogsDesc": {
+    "message": "NexusMods Bypass の詳細な動作をコンソールに出力します。エラーは常に表示され、この設定はバグレポートに影響しません。"
+  },
+  "setHideDownloadBarLabel": {
+    "message": "ブラウザーのダウンロードボタンを非表示にする"
+  },
+  "setHideDownloadBarDesc": {
+    "message": "ツールバーからダウンロードボタンと進行状況のポップアップを取り除きます。Nexus のダウンロードだけでなく、このブラウザープロファイルのすべてのダウンロードに適用されます。ダウンロードしたファイルは Ctrl+J でいつでも確認できます。"
+  },
+  "setDownloadFolderLabel": {
+    "message": "ブラウザーのダウンロードフォルダー"
+  },
+  "setDownloadFolderDesc": {
+    "message": "ブラウザーのダウンロードフォルダー内のサブフォルダー（Browser Download モード用）。空欄にすると「ダウンロード」に直接保存されます。一部の Mod マネージャーはこのフォルダーしか監視せず、サブフォルダーの中を見ません。Vortex 経由のダウンロードは Vortex が処理するため影響ありません。"
+  },
+  "setRequestTimeoutLabel": {
+    "message": "ダウンロード要求のタイムアウト"
+  },
+  "setRequestTimeoutDesc": {
+    "message": "Nexus がダウンロードリンクを返すのを拡張機能が待つ時間です。"
+  },
+  "setCloseTabDelayLabel": {
+    "message": "タブを閉じるまでの遅延"
+  },
+  "setCloseTabDelayDesc": {
+    "message": "自動開始され、タブを閉じる Vortex のダウンロードにのみ適用されます。Vortex がリンクを取りこぼす場合は長くしてください。"
+  },
+  "setDownloadSpeedLabel": {
+    "message": "Nexus のダウンロード速度"
+  },
+  "setDownloadSpeedDesc": {
+    "message": "Vortex モードのみ。ブラウザーは Vortex 内部の転送を観測できないため、この値で各ファイルの所要時間を見積もり、受け渡しの間隔を調整します。実際に出ている速度を設定してください。低すぎると、キューが必要以上に長く待機します。"
+  },
+  "setPauseBetweenModsLabel": {
+    "message": "MOD 間の待機時間"
+  },
+  "setPauseBetweenModsDesc": {
+    "message": "Vortex モードのみ。上記の見積もりに加算されます。0 にすると、サイズに基づく見積もりを含めて待機を完全に無効化し、各ファイルを連続で Vortex に渡して Vortex 自身にキュー管理させます。"
+  },
+  "dlgHistoryTitle": {
+    "message": "ダウンロード済みの MOD が見つかりました"
+  },
+  "dlgHistoryHelp": {
+    "message": "開始前に、この実行の動作を選択してください。ファイルが不足している場合は「すべて再ダウンロード」を選んでください。"
+  },
+  "dlgHistorySkip": {
+    "message": "ダウンロード済みをスキップ"
+  },
+  "dlgHistorySkipHint": {
+    "message": "残りの MOD のみ続行します。"
+  },
+  "dlgHistoryRedownload": {
+    "message": "すべて再ダウンロード"
+  },
+  "dlgHistoryRedownloadHint": {
+    "message": "保存された履歴を消去し、全リストを最初からやり直します。"
+  },
+  "dlgImportTitle": {
+    "message": "ダウンロード済み MOD を取り込む"
+  },
+  "dlgImportLead": {
+    "message": "すでに持っているファイルの再ダウンロードを省けます。"
+  },
+  "dlgImportHelp": {
+    "message": "MOD フォルダー内のすべてのファイルを選択すると、このコレクションの履歴と照合されます。"
+  },
+  "dlgImportPathLabel": {
+    "message": "Vortex の既定パス"
+  },
+  "dlgSelectTitle": {
+    "message": "MOD を選択"
+  },
+  "selSelectAll": {
+    "message": "すべて選択"
+  },
+  "selDeselectAll": {
+    "message": "選択をすべて解除"
+  },
+  "selInvert": {
+    "message": "選択を反転"
+  },
+  "selExport": {
+    "message": "選択をエクスポート"
+  },
+  "selImport": {
+    "message": "選択をインポート"
+  },
+  "selSearchPlaceholder": {
+    "message": "MOD を検索..."
+  },
+  "selDownloadSelected": {
+    "message": "選択項目をダウンロード"
+  },
+  "sortModAsc": {
+    "message": "MOD 名 A-Z"
+  },
+  "sortModDesc": {
+    "message": "MOD 名 Z-A"
+  },
+  "sortFileAsc": {
+    "message": "ファイル名 A-Z"
+  },
+  "sortFileDesc": {
+    "message": "ファイル名 Z-A"
+  },
+  "sortSizeAsc": {
+    "message": "サイズ昇順"
+  },
+  "sortSizeDesc": {
+    "message": "サイズ降順"
+  },
+  "colModName": {
+    "message": "MOD 名"
+  },
+  "colFileName": {
+    "message": "ファイル名"
+  },
+  "colSize": {
+    "message": "サイズ"
+  },
+  "colType": {
+    "message": "種類"
+  },
+  "tagOptional": {
+    "message": "任意"
+  },
+  "tagMandatory": {
+    "message": "必須"
+  },
+  "dlgUpdateTitle": {
+    "message": "コレクションを更新"
+  },
+  "dlgUpdateCurrentRev": {
+    "message": "現在のリビジョン"
+  },
+  "dlgUpdateToRev": {
+    "message": "更新先のリビジョン"
+  },
+  "dlgUpdateSelectRev": {
+    "message": "リビジョンを選択"
+  },
+  "dlgUpdateDownload": {
+    "message": "更新をダウンロード"
+  },
+  "dlgUpdateFetchFailed": {
+    "message": "リビジョンを取得できませんでした。後でもう一度お試しください。"
+  },
+  "dlgUpdateCompareFailed": {
+    "message": "リビジョンを比較できませんでした。後でもう一度お試しください。"
+  },
+  "dlgUpdateNone": {
+    "message": "なし"
+  },
+  "dlgUpdateColUpdated": {
+    "message": "更新"
+  },
+  "dlgUpdateColAdded": {
+    "message": "追加"
+  },
+  "dlgUpdateColRemoved": {
+    "message": "削除"
+  },
+  "dlgCantOpenSettings": {
+    "message": "設定を開けませんでした"
+  },
+  "dlgCollectionIssue": {
+    "message": "コレクションのダウンロードの問題"
+  },
+  "dlgCantLoadRevisions": {
+    "message": "リビジョンを読み込めませんでした"
+  },
+  "dlgCantCompareRevisions": {
+    "message": "リビジョンを比較できませんでした"
+  },
+  "alertContextInvalid": {
+    "message": "NexusMods Bypass が更新または再読み込みされました。\n設定を開くには、このページを再読み込みしてください。"
+  },
+  "alertPickOneToExport": {
+    "message": "エクスポートする MOD を 1 つ以上選択してください。"
+  },
+  "alertPickOneMod": {
+    "message": "MOD を 1 つ以上選択してください。"
+  },
+  "alertSelectionUnreadable": {
+    "message": "選択ファイルを読み込めませんでした。"
+  },
+  "alertSelectionInvalid": {
+    "message": "このファイルは有効な NexusMods Bypass の選択ファイルではありません。"
+  },
+  "popupReloadFirst": {
+    "message": "ページ設定を開く前に Nexus Mods のページを再読み込みしてください。"
+  },
+  "popupReportFull": {
+    "message": "GitHub が完全なレポート付きで開きます — 何が起きたかを書くだけです。"
+  },
+  "popupReportShortened": {
+    "message": "収まるようレポートを短縮しました — 完全な内容はクリップボードにあります。"
+  },
+  "popupReportNoCopy": {
+    "message": "GitHub は入力済みで開きます — 完全なレポートはコピーできませんでした。"
+  },
+  "popupLoadFailed": {
+    "message": "ポップアップの読み込みを完了できませんでした。拡張機能を再読み込みして再試行してください。"
+  },
+  "alertSelectionTooLarge": {
+    "message": "選択ファイルが大きすぎます（上限 $1 KB）。",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logPauseComplete": {
+    "message": "待機が完了しました（$2 に対して $1）。",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "logPausing": {
+    "message": "次のダウンロードまで $1 待機中（$2 @ $3 MB/s $4）... 残り $5",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      },
+      "c": {
+        "content": "$3"
+      },
+      "d": {
+        "content": "$4"
+      },
+      "e": {
+        "content": "$5"
+      }
+    }
+  },
+  "logAlreadyRunning": {
+    "message": "すでにダウンロードが実行中です。完了を待つか、先に停止してください。"
+  },
+  "logNothingToDownload": {
+    "message": "この選択にダウンロードする MOD はありません。"
+  },
+  "logCanceledBeforeStart": {
+    "message": "開始前にダウンロードをキャンセルしました。"
+  },
+  "logCollectionPaused": {
+    "message": "コレクションを一時停止しました。完了済みファイルは履歴に残るため、問題を解決してから安全に再試行できます。"
+  },
+  "logQueueRateLimited": {
+    "message": "Nexus Mods のレート制限に達しました。バックグラウンドのキューは自動的に再開します。"
+  },
+  "logReconnectedAdopted": {
+    "message": "バックグラウンドで実行中のダウンロードに再接続しました。"
+  },
+  "logProgressRestored": {
+    "message": "このタブで実行中のダウンロードの進行状況を復元しました。"
+  },
+  "logReconnectedBackground": {
+    "message": "バックグラウンドで実行中のコレクションのダウンロードに再接続しました。"
+  },
+  "logRetryIgnored": {
+    "message": "再試行は無視されました。この実行は停止済みです。"
+  },
+  "logVortexNotice": {
+    "message": "Vortex を起動しておく必要があります。ファイルは送信した時点で記録されます — Vortex が実際に受け取ったかどうかをブラウザーは確認できません。"
+  },
+  "logSignInFirst": {
+    "message": "このコレクションを開始する前に Nexus Mods にログインしてください。"
+  },
+  "logOpenLogin": {
+    "message": "ログインを開く"
+  },
+  "logSendingToVortex": {
+    "message": "Vortex に送信中:"
+  },
+  "logAlreadyDownloaded": {
+    "message": "ダウンロード済み"
+  },
+  "logRateLimitCleared": {
+    "message": "レート制限が解除されました。ダウンロードを再開します。"
+  },
+  "logPausedRateLimitDone": {
+    "message": "一時停止中。レート制限は解除されました — 再生を押して続行してください。"
+  },
+  "logClaimBackground": {
+    "message": "このコレクションのバックグラウンドダウンロードがまだ実行中です。そのタブを開いて停止するか、タブを閉じてください。"
+  },
+  "logClaimOtherTab": {
+    "message": "このコレクションは別のタブですでにダウンロード中です。そちらで停止するか、そのタブを閉じてください。"
+  },
+  "alertAllDownloaded": {
+    "message": "すべての MOD はダウンロード済みです。"
+  },
+  "dlgCantLoadCollection": {
+    "message": "コレクションを読み込めませんでした"
+  },
+  "dlgStartupIssue": {
+    "message": "拡張機能の起動に関する問題"
+  },
+  "unitSecondsShort": {
+    "message": "秒"
+  },
+  "logDownloading": {
+    "message": "ダウンロード中: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logCompleted": {
+    "message": "完了: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRetryingInterrupted": {
+    "message": "中断したダウンロードを再試行中: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logFailedItem": {
+    "message": "失敗: $1（$2）",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "logBackgroundError": {
+    "message": "バックグラウンドのコレクションエラー: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRunStopped": {
+    "message": "コレクションのダウンロードを停止しました: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRetryFailed": {
+    "message": "再試行に失敗しました: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logBackingOff": {
+    "message": "Nexus Mods がリクエストを制限しています。$1 待機します。",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logRateLimitWaiting": {
+    "message": "Nexus Mods がリクエストを制限しています。$1 待機中...",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "logPausedRateLimit": {
+    "message": "一時停止中。Nexus のレート制限は $1 後に解除されます。",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantOpenPage": {
+    "message": "このページを開けませんでした: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantLoadSettings": {
+    "message": "保存された設定を読み込めませんでした: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantSaveSettings": {
+    "message": "設定は保存されませんでした: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupCantOpenPageSettings": {
+    "message": "ページ設定を開けませんでした: $1",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertImportedMods": {
+    "message": "コレクションの MOD $2 件のうち $1 件を履歴に取り込みました。",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertImportedIds": {
+    "message": "ファイル ID $2 件のうち $1 件を取り込みました。",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertSelectedNotDownloaded_other": {
+    "message": "未ダウンロードの MOD を $1 件選択しました。",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertUnmatchedFiles_other": {
+    "message": "選択した $1 件のファイルはこのコレクションと一致しませんでした。",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      }
+    }
+  },
+  "annReconnected_other": {
+    "message": "実行中のダウンロードに再接続しました: $1 件の MOD。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "annStarted_other": {
+    "message": "ダウンロードを開始しました: $1 件の MOD。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "deckModCount_other": {
+    "message": "$1 件の MOD",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "logFailedSummary_other": {
+    "message": "$1 件の MOD のダウンロードに失敗しました:",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "progressOfTotal_other": {
+    "message": "$2 件中 $1 件の MOD",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "setSectionLanguage": {
+    "message": "言語"
+  },
+  "setForceEnglishLabel": {
+    "message": "常に英語を使用"
+  },
+  "setForceEnglishDesc": {
+    "message": "ブラウザーが他の言語に設定されていても、この拡張機能を英語で表示します。英語で書かれたガイドを参照するときに便利です。ブラウザーの拡張機能一覧に表示される名前は、引き続きブラウザーの言語に従います。"
+  },
+  "supportEntryTitle": {
+    "message": "プロジェクトを支援"
+  },
+  "supportEntrySubtitle": {
+    "message": "独立・プライベート・広告なし"
+  },
+  "supportBackAria": {
+    "message": "クイック設定に戻る"
+  },
+  "supportBack": {
+    "message": "戻る"
+  },
+  "supportBadge": {
+    "message": "コミュニティに支えられています"
+  },
+  "supportKicker": {
+    "message": "コミュニティのために"
+  },
+  "supportTitle": {
+    "message": "NexusMods Bypass の独立性を守る"
+  },
+  "supportDescription": {
+    "message": "この拡張機能で時間を節約できたなら、メンテナンスやブラウザー対応、今後の改善の資金を支援できます。"
+  },
+  "supportValuesAria": {
+    "message": "プロジェクトの約束"
+  },
+  "supportValuePrivate": {
+    "message": "プライベート"
+  },
+  "supportValueAdFree": {
+    "message": "広告なし"
+  },
+  "supportValueFree": {
+    "message": "いつでも無料"
+  },
+  "supportPrimary": {
+    "message": "Ko-fi で支援する"
+  },
+  "supportPrimaryHint": {
+    "message": "一回でも毎月でも、あなた次第です"
+  },
+  "supportPrimaryPending": {
+    "message": "Ko-fi ページは近日公開"
+  },
+  "supportPrimaryPendingHint": {
+    "message": "安全な支援方法を準備しています"
+  },
+  "supportTrust": {
+    "message": "Ko-fi の安全な決済ページ。新しいタブで開きます。"
+  },
+  "supportFreeTitle": {
+    "message": "無料でも力になれます"
+  },
+  "supportGithub": {
+    "message": "GitHub でスターを付ける"
+  },
+  "supportCopy": {
+    "message": "プロジェクトのリンクをコピー"
+  },
+  "supportCopied": {
+    "message": "プロジェクトのリンクをクリップボードにコピーしました。"
+  },
+  "supportCopyFailed": {
+    "message": "プロジェクトのリンクをコピーできませんでした。"
+  },
+  "supportPromise": {
+    "message": "支援は完全に任意です。機能が解放されたり制限されたりすることは一切ありません。"
+  },
+  "dlgReportOpeningFull": {
+    "message": "完全なレポートを添えて GitHub を開いています…",
+    "description": "Report button state when the whole report fits in the GitHub form."
+  },
+  "dlgReportOpeningCopied": {
+    "message": "レポートをコピーしました — 入力済みの GitHub を開いています…",
+    "description": "Report button state when the report was copied and the form is prefilled."
+  },
+  "dlgReportOpeningPrefilled": {
+    "message": "入力済みの GitHub を開いています…",
+    "description": "Report button state when only the shortened report could be sent."
+  },
+  "dlgHistoryMarked": {
+    "message": "$2 個中 $1 個の Mod がダウンロード済みとして記録されています。",
+    "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "selSelectedCount_other": {
+    "message": "$1 個の Mod を選択中",
+    "description": "Plural form \"other\". $1 selected count.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "alertSelectionForeign": {
+    "message": "このファイルは別のコレクション（$1/$2）から書き出されています。",
+    "description": "Import note. $1 game domain, $2 collection slug the file came from.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      }
+    }
+  },
+  "alertSelectionRest": {
+    "message": "残りはこのコレクションのリビジョンに含まれていません。",
+    "description": "Import note when some ids matched nothing in this revision."
+  },
+  "dlgUpdateRevisionLabel": {
+    "message": "リビジョン $1 — $2 MB — $3",
+    "description": "Revision picker option. $1 revision number, $2 size in MB, $3 date.",
+    "placeholders": {
+      "a": {
+        "content": "$1"
+      },
+      "b": {
+        "content": "$2"
+      },
+      "c": {
+        "content": "$3"
+      }
+    }
+  },
+  "dlgDownloadPaused": {
+    "message": "ダウンロードを一時停止しました",
+    "description": "Error dialog title when a blocking error halted the collection run."
+  },
+  "speedSourceCustom": {
+    "message": "あなたの設定",
+    "description": "Names the speed used in the pause countdown: the user set it."
+  },
+  "speedSourceDefault": {
+    "message": "既定値",
+    "description": "Names the speed used in the pause countdown: the stock value."
+  }
+}
