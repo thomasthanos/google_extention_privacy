@@ -20,9 +20,6 @@
   "toggleHideUpsells": {
     "message": "Masquer les publicités et encarts premium"
   },
-  "toggleHideDownloadBar": {
-    "message": "Masquer le bouton de téléchargement"
-  },
   "setHandleArchivedFilesLabel": {
     "message": "Boutons des fichiers archivés"
   },
@@ -562,12 +559,6 @@
   },
   "setDebugLogsDesc": {
     "message": "Affiche dans la console l'activité détaillée de NexusMods Bypass. Les erreurs sont toujours affichées et les rapports ne sont pas affectés."
-  },
-  "setHideDownloadBarLabel": {
-    "message": "Masquer le bouton de téléchargement du navigateur"
-  },
-  "setHideDownloadBarDesc": {
-    "message": "Retire le bouton de téléchargement et sa fenêtre de progression de la barre d'outils. Cela s'applique à tous les téléchargements de ce profil de navigateur, pas seulement à ceux de Nexus. Vos téléchargements restent accessibles via Ctrl+J."
   },
   "setDownloadFolderLabel": {
     "message": "Dossier de téléchargement du navigateur"

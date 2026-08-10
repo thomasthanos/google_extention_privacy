@@ -20,9 +20,6 @@
   "toggleHideUpsells": {
     "message": "Απόκρυψη διαφημίσεων και premium banner"
   },
-  "toggleHideDownloadBar": {
-    "message": "Απόκρυψη κουμπιού λήψεων"
-  },
   "setHandleArchivedFilesLabel": {
     "message": "Κουμπιά αρχειοθετημένων αρχείων"
   },
@@ -562,12 +559,6 @@
   },
   "setDebugLogsDesc": {
     "message": "Εκτυπώνει αναλυτική δραστηριότητα του NexusMods Bypass στην κονσόλα. Τα σφάλματα εμφανίζονται πάντα και οι αναφορές δεν επηρεάζονται."
-  },
-  "setHideDownloadBarLabel": {
-    "message": "Απόκρυψη του κουμπιού λήψεων του περιηγητή"
-  },
-  "setHideDownloadBarDesc": {
-    "message": "Αφαιρεί το κουμπί λήψεων και το αναδυόμενο παράθυρο προόδου από τη γραμμή εργαλείων. Ισχύει για κάθε λήψη σε αυτό το προφίλ του περιηγητή, όχι μόνο για τις λήψεις από το Nexus. Οι λήψεις σας παραμένουν πάντα διαθέσιμες με Ctrl+J."
   },
   "setDownloadFolderLabel": {
     "message": "Φάκελος λήψεων περιηγητή"

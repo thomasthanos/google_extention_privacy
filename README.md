@@ -35,7 +35,7 @@ what they do before installing them. Nothing is minified, nothing is obfuscated.
 | Extension | What it does | Version |
 |---|---|:--:|
 | [![An1me.to Tracker](.github/assets/link-tracker.svg)](An1me_tracker/) | Tracks your anime progress automatically, resumes where you left off, syncs your library to the cloud, marks fillers, connects to AniList, and shows stats, goals and achievements. | [![7.2.4](.github/assets/chip-v-tracker.svg)](An1me_tracker/manifest.json) |
-| [![NexusMods Bypass](.github/assets/link-nexus.svg)](nexus.mods.bypass/) | Removes the friction from Nexus Mods downloads, queues whole collections, and keeps a local history of finished files. 13 languages. | [![2.4.2](.github/assets/chip-v-nexus.svg)](nexus.mods.bypass/manifest.json) |
+| [![NexusMods Bypass](.github/assets/link-nexus.svg)](nexus.mods.bypass/) | Removes the friction from Nexus Mods downloads, queues whole collections, and keeps a local history of finished files. 13 languages. | [manifest.json](nexus.mods.bypass/manifest.json) |
 | [![Auto Liker for Tinder & Boo](.github/assets/link-liker.svg)](auto-liker-extension/) | A neon on-page button that likes for you, with a live counter, progress ring and smart pause. 3 languages. | [![4.8](.github/assets/chip-v-liker.svg)](auto-liker-extension/manifest.json) |
 | [![An1me.to Speed Control](.github/assets/link-speed.svg)](An1me_speed_control/) | Hold <img src=".github/assets/kbd-f7.svg" alt="F7" align="middle"> to boost playback speed, press <img src=".github/assets/kbd-f8.svg" alt="F8" align="middle"> to toggle it. Remembers your default speed and volume. | [![3.5](.github/assets/chip-v-speed.svg)](An1me_speed_control/manifest.json) |
 

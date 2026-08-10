@@ -20,9 +20,6 @@
   "toggleHideUpsells": {
     "message": "広告と Premium パネルを非表示"
   },
-  "toggleHideDownloadBar": {
-    "message": "ダウンロードボタンを非表示"
-  },
   "setHandleArchivedFilesLabel": {
     "message": "アーカイブ済みファイルのボタン"
   },
@@ -492,12 +489,6 @@
   },
   "setDebugLogsDesc": {
     "message": "NexusMods Bypass の詳細な動作をコンソールに出力します。エラーは常に表示され、この設定はバグレポートに影響しません。"
-  },
-  "setHideDownloadBarLabel": {
-    "message": "ブラウザーのダウンロードボタンを非表示にする"
-  },
-  "setHideDownloadBarDesc": {
-    "message": "ツールバーからダウンロードボタンと進行状況のポップアップを取り除きます。Nexus のダウンロードだけでなく、このブラウザープロファイルのすべてのダウンロードに適用されます。ダウンロードしたファイルは Ctrl+J でいつでも確認できます。"
   },
   "setDownloadFolderLabel": {
     "message": "ブラウザーのダウンロードフォルダー"

@@ -1,5 +1,6 @@
 # Build artifacts
 *.zip
+dist/
 
 # Wrangler
 .wrangler
@@ -10,3 +11,4 @@ node_modules/
 .dev.vars*
 nexus.mods.bypass/.claude/settings.local.json
 .claude/settings.local.json
+/nexus.mods.bypass/promo

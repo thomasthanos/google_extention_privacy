@@ -20,10 +20,6 @@
   "toggleHideUpsells": {
     "message": "Hide ads and premium panels"
   },
-  "toggleHideDownloadBar": {
-    "message": "Hide the browser download button",
-    "description": "Popup toggle label."
-  },
   "setHandleArchivedFilesLabel": {
     "message": "Archived file buttons"
   },
@@ -698,14 +694,6 @@
   },
   "setDebugLogsDesc": {
     "message": "Print detailed NexusMods Bypass activity in the console. Errors are always shown, and bug reports are unaffected by this setting.",
-    "description": "Setting description."
-  },
-  "setHideDownloadBarLabel": {
-    "message": "Hide the browser download button",
-    "description": "Setting label."
-  },
-  "setHideDownloadBarDesc": {
-    "message": "Removes the download button and its progress popup from your browser toolbar. This applies to every download in this browser profile, not only Nexus ones. Your downloads are always still available with Ctrl+J.",
     "description": "Setting description."
   },
   "setDownloadFolderLabel": {

@@ -20,9 +20,6 @@
   "toggleHideUpsells": {
     "message": "Reklamları ve Premium panellerini gizle"
   },
-  "toggleHideDownloadBar": {
-    "message": "İndirme düğmesini gizle"
-  },
   "setHandleArchivedFilesLabel": {
     "message": "Arşivlenmiş dosya düğmeleri"
   },
@@ -492,12 +489,6 @@
   },
   "setDebugLogsDesc": {
     "message": "NexusMods Bypass etkinliğini konsola ayrıntılı yazar. Hatalar her zaman gösterilir ve bu ayar hata raporlarını etkilemez."
-  },
-  "setHideDownloadBarLabel": {
-    "message": "Tarayıcının indirme düğmesini gizle"
-  },
-  "setHideDownloadBarDesc": {
-    "message": "İndirme düğmesini ve ilerleme penceresini tarayıcı araç çubuğundan kaldırır. Yalnızca Nexus indirmelerini değil, bu tarayıcı profilindeki tüm indirmeleri etkiler. İndirdiğiniz dosyalara her zaman Ctrl+J ile ulaşabilirsiniz."
   },
   "setDownloadFolderLabel": {
     "message": "Tarayıcı indirme klasörü"

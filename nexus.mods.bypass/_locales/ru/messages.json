@@ -20,9 +20,6 @@
   "toggleHideUpsells": {
     "message": "Скрывать рекламу и премиум-баннеры"
   },
-  "toggleHideDownloadBar": {
-    "message": "Скрывать кнопку загрузок"
-  },
   "setHandleArchivedFilesLabel": {
     "message": "Кнопки для архивных файлов"
   },
@@ -632,12 +629,6 @@
   },
   "setDebugLogsDesc": {
     "message": "Выводит подробную активность NexusMods Bypass в консоль. Ошибки показываются всегда, на отчёты это не влияет."
-  },
-  "setHideDownloadBarLabel": {
-    "message": "Скрывать кнопку загрузок браузера"
-  },
-  "setHideDownloadBarDesc": {
-    "message": "Убирает кнопку загрузок и всплывающее окно прогресса с панели инструментов браузера. Действует на все загрузки этого профиля, а не только на загрузки с Nexus. Загрузки всегда остаются доступны по Ctrl+J."
   },
   "setDownloadFolderLabel": {
     "message": "Папка загрузок браузера"

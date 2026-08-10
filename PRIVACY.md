@@ -113,8 +113,10 @@ see the content and you choose whether to submit it.** Nothing is transmitted au
 
 ### Downloads permission
 
-`downloads` starts files and places them in the subfolder you configured. `downloads.ui` exists only
-for the optional "hide the download button" setting. Neither reads your existing download history.
+`downloads` starts files and places them in the subfolder you configured. `downloads.ui` is on its
+way out: the "hide the download button" setting was removed in 2.4.3, and the permission is kept for
+a single release purely to restore the button for profiles that still have it hidden. It is dropped
+in 2.5.0. Neither permission reads your existing download history.
 
 ### Your controls
 

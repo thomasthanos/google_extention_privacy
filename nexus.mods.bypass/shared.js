@@ -29,14 +29,6 @@
     HandleArchivedFiles: true,
     HidePremiumUpsells: true,
     DebugLogs: false,
-    /* Suppresses the browser's own download UI. chrome.downloads.setUiOptions is
-       PROFILE-WIDE, so this removes the download button and progress popup for every
-       site, not just Nexus. Defaulted OFF after a report where the browser's download
-       button silently disappeared for all downloads: nobody opts into a browser-wide
-       change they did not ask for, and the symptom is impossible to trace back here.
-       background.js clears the stored `true` that existing profiles carry. Keep in
-       sync with the copy of DEFAULTS inside background.js. */
-    HideDownloadBar: false,
     // Subfolder under the browser's Downloads directory, used only in Browser mode.
     DownloadFolder: 'NexusMods',
     CloseTabDelay: 3000,

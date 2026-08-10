@@ -17,9 +17,6 @@ const NXTK = (() => {
     HandleArchivedFiles: true,
     HidePremiumUpsells: true,
     DebugLogs: false,
-    // Profile-wide (see shared.js DEFAULTS). Off by default; the migration below
-    // clears the stored `true` that every existing profile carries.
-    HideDownloadBar: false,
     DownloadFolder: 'NexusMods',
     CloseTabDelay: 3000,
     RequestTimeout: 30000,
@@ -171,21 +168,15 @@ const NXTK = (() => {
 
 /* Settings that no longer exist. onInstalled strips these from stored settings so
    an upgraded install stops carrying (and reporting) dead keys.
-   QuietSiteErrors went with the removed page-console override. HidePremiumUpsells
-   is NOT listed: that feature is still shipped, so stripping it would silently
-   reset the user's choice. */
-const LEGACY_SETTINGS_KEYS = ['PlayErrorSound', 'ErrorSoundUrl', 'QuietSiteErrors'];
+   QuietSiteErrors went with the removed page-console override. HideDownloadBar went
+   with the removed browser-download-UI toggle in 2.4.3. HidePremiumUpsells is NOT
+   listed: that feature is still shipped, so stripping it would silently reset the
+   user's choice. */
+const LEGACY_SETTINGS_KEYS = ['PlayErrorSound', 'ErrorSoundUrl', 'QuietSiteErrors', 'HideDownloadBar'];
 
 /* Value migration, not a dead key: never add NDC_downloadSpeed to LEGACY_SETTINGS_KEYS
    above, which deletes rather than updates. */
 const LEGACY_SPEED_DEFAULT = 1.5;
-
-/* HideDownloadBar shipped defaulted ON, and a fresh install writes the whole defaults
-   object — so every existing profile holds an explicit `true` and lowering the default
-   alone would reach nobody. Cleared once on update. Tracked by its own key rather than
-   by version, so someone who deliberately switches it back on keeps it through every
-   later update; version comparison would undo their choice each time. */
-const DOWNLOAD_UI_RESET_KEY = 'nxtk_download_ui_default_reset';
 
 function getRuntimeError() {
   try {
@@ -387,47 +378,26 @@ function hasDownloadsApi() {
   }
 }
 
-/* Suppress Edge's automatic Downloads flyout/progress UI. setUiOptions is
-   PROFILE-WIDE while the extension is enabled — it hides the bar for downloads from
-   every site, not just Nexus — so it is behind the HideDownloadBar setting rather
-   than applied unconditionally. Downloads stay reachable via Ctrl+J and
-   edge://downloads. `downloads.ui` is a required manifest permission. */
-function applyBrowserDownloadUi(enabled) {
+/* TRANSITIONAL — delete along with the `downloads.ui` permission in 2.5.0.
+   The HideDownloadBar setting is gone, but setUiOptions is PROFILE-WIDE and does not
+   survive a browser restart: the old code re-applied it on every worker start, so a
+   profile that had it on still has the download button hidden for the rest of the
+   current session. Simply dropping the code would leave those users with no button
+   and no toggle to get it back until they restart. One unconditional re-enable on
+   worker start fixes it immediately, for everyone, exactly once per session. */
+function restoreBrowserDownloadUi() {
   try {
     if (typeof chrome.downloads?.setUiOptions !== 'function') return;
-    const pending = chrome.downloads.setUiOptions({ enabled });
+    const pending = chrome.downloads.setUiOptions({ enabled: true });
     pending?.catch?.((cause) => {
-      recordBackgroundError('set download UI', cause);
+      recordBackgroundError('restore download UI', cause);
     });
   } catch (cause) {
-    recordBackgroundError('set download UI', cause);
+    recordBackgroundError('restore download UI', cause);
   }
 }
 
-async function syncBrowserDownloadUi() {
-  const stored = await storageGetLocal(NXTK.SETTINGS_KEY, null);
-  /* Only an explicit `true` suppresses the browser's download UI. This used to read
-     `!== false`, so an absent or unreadable settings object hid the download button
-     across the whole profile — the one outcome nobody would have asked for. */
-  const hide = stored?.HideDownloadBar === true;
-  applyBrowserDownloadUi(!hide);
-}
-
-/* Re-applied on every worker start (MV3 workers are killed freely) and whenever the
-   stored settings change — which covers the popup and the in-page settings modal
-   alike, without either of them needing to know this exists. */
-function scheduleBrowserDownloadUiSync() {
-  syncBrowserDownloadUi().catch((cause) => recordBackgroundError('sync download UI', cause));
-}
-
-scheduleBrowserDownloadUiSync();
-
-if (chrome.storage?.onChanged) {
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'local' || !changes?.[NXTK.SETTINGS_KEY]) return;
-    scheduleBrowserDownloadUiSync();
-  });
-}
+restoreBrowserDownloadUi();
 
 /* Chrome rejects absolute paths, drive letters, `..` segments and a leading slash,
    and silently mangles control characters. Sanitise the segments ourselves so a
@@ -518,11 +488,13 @@ function withFallbackExtension(name, fallbackExtension) {
   return /^\.[a-z0-9]{1,8}$/.test(extension) ? cleanName + extension : cleanName;
 }
 
-/* Storage key retired in 2.3.2. It backed an ownership map used to deliver
-   NXT_DOWNLOAD_TERMINAL to the tab that started a single-file download — a message
-   no content script ever listened for, so it cost two storage writes per download
-   and delivered nothing. onInstalled drops the leftover key. */
-const RETIRED_STORAGE_KEYS = ['nxtk_managed_downloads'];
+/* Storage keys retired by subsystems that no longer exist; onInstalled drops the
+   leftovers. `nxtk_managed_downloads` (2.3.2) backed an ownership map used to deliver
+   NXT_DOWNLOAD_TERMINAL to the tab that started a single-file download — a message no
+   content script ever listened for, so it cost two storage writes per download and
+   delivered nothing. `nxtk_download_ui_default_reset` (2.4.3) guarded the one-shot that
+   lowered the HideDownloadBar default; the whole setting is gone now. */
+const RETIRED_STORAGE_KEYS = ['nxtk_managed_downloads', 'nxtk_download_ui_default_reset'];
 
 const DOWNLOAD_HANDLERS = {
   async DOWNLOAD_START(payload) {
@@ -1824,7 +1796,7 @@ chrome.runtime.onInstalled.addListener((details) => {
     chrome.storage.local.remove(RETIRED_STORAGE_KEYS, () => void getRuntimeError());
   } catch (_) { }
 
-  chrome.storage.local.get([NXTK.SETTINGS_KEY, DOWNLOAD_UI_RESET_KEY], (result) => {
+  chrome.storage.local.get(NXTK.SETTINGS_KEY, (result) => {
     const readError = getRuntimeError();
     if (readError) {
       recordBackgroundError('onInstalled read', readError);
@@ -1832,7 +1804,6 @@ chrome.runtime.onInstalled.addListener((details) => {
     }
 
     const stored = result?.[NXTK.SETTINGS_KEY];
-    const downloadUiReset = result?.[DOWNLOAD_UI_RESET_KEY] === true;
     let next;
     if (stored) {
       const hasLegacyKeys = LEGACY_SETTINGS_KEYS.some((key) => key in stored);
@@ -1842,26 +1813,15 @@ chrome.runtime.onInstalled.addListener((details) => {
          win. Rewritten ONLY when it still holds the exact superseded default, so a value
          the user picked themselves — 1.5 included — is never touched. */
       const hasStaleSpeed = Number(stored.NDC_downloadSpeed) === LEGACY_SPEED_DEFAULT;
-      const hasStaleDownloadUi = !downloadUiReset && stored.HideDownloadBar === true;
-      if (!hasLegacyKeys && !hasStaleSpeed && !hasStaleDownloadUi) {
-        // Still record that the one-shot has been considered, or it would re-run and
-        // undo a deliberate re-enable on the next update.
-        if (!downloadUiReset) {
-          try {
-            chrome.storage.local.set({ [DOWNLOAD_UI_RESET_KEY]: true }, () => void getRuntimeError());
-          } catch (_) { }
-        }
-        return;
-      }
+      if (!hasLegacyKeys && !hasStaleSpeed) return;
       next = { ...stored };
       LEGACY_SETTINGS_KEYS.forEach((key) => delete next[key]);
       if (hasStaleSpeed) next.NDC_downloadSpeed = NXTK.DEFAULTS.NDC_downloadSpeed;
-      if (hasStaleDownloadUi) next.HideDownloadBar = false;
     } else {
       next = { ...NXTK.DEFAULTS };
     }
 
-    chrome.storage.local.set({ [NXTK.SETTINGS_KEY]: next, [DOWNLOAD_UI_RESET_KEY]: true }, () => {
+    chrome.storage.local.set({ [NXTK.SETTINGS_KEY]: next }, () => {
       const writeError = getRuntimeError();
       if (writeError) recordBackgroundError('onInstalled write', writeError);
     });

@@ -20,9 +20,6 @@
   "toggleHideUpsells": {
     "message": "Ukryj reklamy i panele Premium"
   },
-  "toggleHideDownloadBar": {
-    "message": "Ukryj przycisk pobierania"
-  },
   "setHandleArchivedFilesLabel": {
     "message": "Przyciski plików archiwalnych"
   },
@@ -492,12 +489,6 @@
   },
   "setDebugLogsDesc": {
     "message": "Wypisuje w konsoli szczegółową aktywność NexusMods Bypass. Błędy są zawsze pokazywane, a to ustawienie nie wpływa na raporty błędów."
-  },
-  "setHideDownloadBarLabel": {
-    "message": "Ukryj przycisk pobierania w przeglądarce"
-  },
-  "setHideDownloadBarDesc": {
-    "message": "Usuwa przycisk pobierania i okienko postępu z paska narzędzi przeglądarki. Dotyczy wszystkich pobrań w tym profilu przeglądarki, nie tylko tych z Nexusa. Pobrane pliki nadal znajdziesz pod Ctrl+J."
   },
   "setDownloadFolderLabel": {
     "message": "Folder pobierania przeglądarki"

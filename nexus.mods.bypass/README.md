@@ -2,7 +2,6 @@
 
 <img src="../.github/assets/banner-nexus.svg" alt="NexusMods Bypass">
 
-[![Version 2.4.2](../.github/assets/badge-v-nexus.svg)](manifest.json)
 [![Manifest V3](../.github/assets/badge-manifest.svg)](manifest.json)
 [![13 languages](../.github/assets/badge-lang-13.svg)](_locales)
 [![Data stays local](../.github/assets/badge-local.svg)](../PRIVACY.md#-nexusmods-bypass)
@@ -59,7 +58,6 @@ can pick up where it stopped instead of starting over.
 
 - **Hide ads and Premium panels** — advertising slots, empty ad containers and upgrade banners are
   collapsed while you browse.
-- **Hide the browser download button** and its progress popup, optionally.
 - **Guided onboarding page** the first time you install.
 - **Built-in bug reporter** that attaches recent extension errors to a pre-filled GitHub issue.
 - **Support panel** — entirely optional, never gates a feature.
@@ -94,7 +92,7 @@ Reachable from the popup → **Page settings**. Changes save instantly.
 |---|---|
 | **Download Flow** | Start downloads automatically · Close Vortex tabs (+ delay) · Skip requirement screens · Show error popups |
 | **Files & Pacing** | Archived file buttons · Browser download folder · Download request timeout · Your Nexus download speed · Pause between mods |
-| **Advanced** | Hide ads and Premium panels · Hide the browser download button · Verbose extension logs |
+| **Advanced** | Hide ads and Premium panels · Verbose extension logs |
 | **Language** | Always use English |
 
 **Restore Defaults** resets everything and refreshes the Nexus page.
@@ -107,7 +105,7 @@ Reachable from the popup → **Page settings**. Changes save instantly.
 |---|---|
 | `storage` | Your settings and the local download history. |
 | `downloads` | Browser download mode — starting files and putting them in your chosen subfolder. |
-| `downloads.ui` | The optional "hide the download button and progress popup" setting. |
+| `downloads.ui` | Being removed. The "hide the download button" setting is gone as of 2.4.3; the permission is held for one release only, to put the button back for profiles that still have it hidden. Dropped in 2.5.0. |
 | `alarms` | Pacing the background queue between mods. |
 | `https://www.nexusmods.com/*` | The only site this extension touches. |
 

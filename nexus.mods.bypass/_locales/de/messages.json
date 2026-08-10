@@ -20,9 +20,6 @@
   "toggleHideUpsells": {
     "message": "Werbung und Premium-Banner ausblenden"
   },
-  "toggleHideDownloadBar": {
-    "message": "Download-Schaltfläche ausblenden"
-  },
   "setHandleArchivedFilesLabel": {
     "message": "Buttons für archivierte Dateien"
   },
@@ -562,12 +559,6 @@
   },
   "setDebugLogsDesc": {
     "message": "Gibt detaillierte NexusMods-Bypass-Aktivität in der Konsole aus. Fehler werden immer angezeigt; Fehlerberichte sind davon nicht betroffen."
-  },
-  "setHideDownloadBarLabel": {
-    "message": "Download-Schaltfläche des Browsers ausblenden"
-  },
-  "setHideDownloadBarDesc": {
-    "message": "Entfernt die Download-Schaltfläche und das Fortschritts-Pop-up aus der Browser-Symbolleiste. Das betrifft alle Downloads in diesem Browserprofil, nicht nur die von Nexus. Deine Downloads sind weiterhin über Strg+J erreichbar."
   },
   "setDownloadFolderLabel": {
     "message": "Browser-Download-Ordner"

@@ -20,9 +20,6 @@
   "toggleHideUpsells": {
     "message": "Nascondi pubblicità e pannelli Premium"
   },
-  "toggleHideDownloadBar": {
-    "message": "Nascondi il pulsante dei download"
-  },
   "setHandleArchivedFilesLabel": {
     "message": "Pulsanti per i file archiviati"
   },
@@ -492,12 +489,6 @@
   },
   "setDebugLogsDesc": {
     "message": "Stampa nella console l'attività dettagliata di NexusMods Bypass. Gli errori sono sempre mostrati e i report di bug non sono influenzati da questa impostazione."
-  },
-  "setHideDownloadBarLabel": {
-    "message": "Nascondi il pulsante dei download del browser"
-  },
-  "setHideDownloadBarDesc": {
-    "message": "Rimuove il pulsante dei download e il popup di avanzamento dalla barra degli strumenti. Vale per tutti i download di questo profilo del browser, non solo per quelli di Nexus. I tuoi download restano sempre raggiungibili con Ctrl+J."
   },
   "setDownloadFolderLabel": {
     "message": "Cartella di download del browser"

@@ -20,9 +20,6 @@
   "toggleHideUpsells": {
     "message": "광고 및 Premium 패널 숨기기"
   },
-  "toggleHideDownloadBar": {
-    "message": "다운로드 버튼 숨기기"
-  },
   "setHandleArchivedFilesLabel": {
     "message": "보관된 파일 버튼"
   },
@@ -492,12 +489,6 @@
   },
   "setDebugLogsDesc": {
     "message": "NexusMods Bypass의 상세 동작을 콘솔에 출력합니다. 오류는 항상 표시되며 이 설정은 버그 보고서에 영향을 주지 않습니다."
-  },
-  "setHideDownloadBarLabel": {
-    "message": "브라우저 다운로드 버튼 숨기기"
-  },
-  "setHideDownloadBarDesc": {
-    "message": "도구 모음에서 다운로드 버튼과 진행률 팝업을 제거합니다. Nexus뿐 아니라 이 브라우저 프로필의 모든 다운로드에 적용됩니다. 다운로드한 파일은 Ctrl+J로 언제든 확인할 수 있습니다."
   },
   "setDownloadFolderLabel": {
     "message": "브라우저 다운로드 폴더"

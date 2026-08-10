@@ -20,9 +20,6 @@
   "toggleHideUpsells": {
     "message": "隐藏广告和高级版推广"
   },
-  "toggleHideDownloadBar": {
-    "message": "隐藏下载按钮"
-  },
   "setHandleArchivedFilesLabel": {
     "message": "已归档文件按钮"
   },
@@ -527,12 +524,6 @@
   },
   "setDebugLogsDesc": {
     "message": "在控制台输出 NexusMods Bypass 的详细活动记录。错误始终显示，且不影响错误报告。"
-  },
-  "setHideDownloadBarLabel": {
-    "message": "隐藏浏览器下载按钮"
-  },
-  "setHideDownloadBarDesc": {
-    "message": "从浏览器工具栏中移除下载按钮及其进度弹窗。这会影响此浏览器配置文件中的所有下载，而不仅仅是 Nexus 的下载。你随时可以通过 Ctrl+J 查看下载内容。"
   },
   "setDownloadFolderLabel": {
     "message": "浏览器下载文件夹"
