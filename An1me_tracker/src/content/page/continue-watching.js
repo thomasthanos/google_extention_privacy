@@ -1007,7 +1007,9 @@
   function pickAnimeInfoBySlug(storageResult) {
     const out = {};
     for (const [key, value] of Object.entries(storageResult || {})) {
-      if (!key.startsWith("animeinfo_") || !globalThis.AnimeTrackerCachePolicy?.isInfoAuthoritative?.(value)) continue;
+      // Usable, not authoritative: a scrape that timed out keeps its prior data but is flagged
+      // retryable, and dropping those here blanks out the next-episode link until the retry lands.
+      if (!key.startsWith("animeinfo_") || !globalThis.AnimeTrackerCachePolicy?.isInfoUsableSnapshot?.(value)) continue;
       out[key.slice("animeinfo_".length)] = value;
     }
     return out;

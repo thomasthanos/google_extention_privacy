@@ -1249,10 +1249,10 @@
         });
         if (!plan.changed) return;
 
-        PopupLogger.info(
+        PopupLogger.log(
           "Dedupe",
-          `Merged ${plan.mergedPairs.length} duplicate entr${plan.mergedPairs.length === 1 ? "y" : "ies"}:`,
-          plan.mergedPairs.map((p) => `${p.loser} → ${p.winner}`).join(", "),
+          `Merged ${plan.mergedPairs.length} duplicate entr${plan.mergedPairs.length === 1 ? "y" : "ies"}: ` +
+            plan.mergedPairs.map((p) => `${p.loser} → ${p.winner}`).join(", "),
         );
 
         const payload = {
@@ -1276,11 +1276,18 @@
     }
   }
 
-  async function finalizeAfterMaintenance() {
-    const { FillerService, LibraryMutations } = AT;
+  // Airing badges, episode totals and filler marks all read these caches. Rendering before they
+  // are in memory produces a card that looks like nothing was ever fetched for it.
+  async function loadMetadataCaches() {
+    const { FillerService } = AT;
     await FillerService.loadCachedEpisodeTypes(animeData);
     await FillerService.loadStayedFillers();
     await AT.AnilistService.loadCachedData(animeData);
+  }
+
+  async function finalizeAfterMaintenance() {
+    const { LibraryMutations } = AT;
+    await loadMetadataCaches();
 
     animeData = await LibraryMutations.enqueue("finalize-maintenance", async ({ commit, snapshot }) => {
       const latestAnimeData = snapshot.animeData || {};
@@ -1415,12 +1422,38 @@
     }
   }
 
+  // Tracked apart from currentCompactStatus, which renderAnimeList temporarily reassigns when the
+  // chosen status has no entries in the active category. Only an actual chip click updates this.
+  let preferredCompactStatus = "airing";
+
+  // Single writer for userPreferences: every call sends the whole object, so a partial write
+  // here would silently drop whichever preference it left out.
+  function persistLibraryPreferences({ rememberCompactStatus = false } = {}) {
+    if (rememberCompactStatus) preferredCompactStatus = normalizeCompactStatus(currentCompactStatus);
+    try {
+      const saved = chrome.storage.local.set({
+        userPreferences: {
+          sort: currentSort,
+          category: currentCategory,
+          compactStatus: preferredCompactStatus,
+          // Only the section toggle writes this one, so the live value is always the user's choice.
+          compactStatusOpen: currentCompactStatusOpen === true,
+        },
+      });
+      if (saved && typeof saved.catch === "function") saved.catch((e) => window.__atSwallow("savePref", e));
+    } catch {}
+  }
+  AT.saveLibraryPreferences = (options) => persistLibraryPreferences(options);
+
   async function loadLibraryPreferences() {
     const prefs = await chrome.storage.local.get(["userPreferences"]);
     if (!prefs.userPreferences) return;
 
     currentSort = prefs.userPreferences.sort || "date";
     currentCategory = normalizeCategory(prefs.userPreferences.category || "all");
+    preferredCompactStatus = normalizeCompactStatus(prefs.userPreferences.compactStatus);
+    currentCompactStatus = preferredCompactStatus;
+    currentCompactStatusOpen = prefs.userPreferences.compactStatusOpen === true;
     document.querySelectorAll(".sort-option").forEach((option) => {
       option.classList.toggle("active", option.dataset.sort === currentSort);
     });
@@ -1467,8 +1500,13 @@
 
     publishLibrarySnapshot(pipeline);
     if (!AT.PopupState.libraryLoaded) {
+      // Warm the info/filler caches first: this is the popup's first paint, and it used to land
+      // before finalizeAfterMaintenance loaded them, so every card showed as un-fetched until the
+      // second render seconds later.
+      await loadMetadataCaches();
       AT.PopupState.libraryLoaded = true;
       renderAnimeList(getActiveFilter());
+      await updateStats();
     }
 
     if (pipeline.changed) {
@@ -1575,7 +1613,9 @@
         videoProgress = {};
         AT.PopupState.libraryLoaded = true;
         renderAnimeList(getActiveFilter());
-        await updateStats();
+        // The empty animeData above is a failure placeholder, not the library — caching its zeros
+        // would make every later popup open start by painting 0s from cachedStats.
+        await updateStats({ persist: false });
       }
       throw error;
     }
@@ -2184,7 +2224,7 @@
         if (elements.searchInput) renderAnimeList(elements.searchInput.value);
         if (elements.sortDropdown) elements.sortDropdown.classList.remove("visible");
         if (elements.sortBtn) elements.sortBtn.classList.remove("active");
-        await chrome.storage.local.set({ userPreferences: { sort: currentSort, category: currentCategory } });
+        persistLibraryPreferences();
       });
     });
 
@@ -2259,12 +2299,7 @@
             renderCategorySwitch(elements.searchInput?.value || "");
           }
 
-          try {
-            const savePref = chrome.storage.local.set({
-              userPreferences: { sort: currentSort, category: currentCategory },
-            });
-            if (savePref && typeof savePref.catch === "function") savePref.catch((e) => window.__atSwallow("savePref", e));
-          } catch {}
+          persistLibraryPreferences();
         });
       });
     }

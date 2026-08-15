@@ -617,6 +617,10 @@ const ProgressTracker = {
           if (idx === -1) return false;
 
           const existing = anime.episodes[idx] || {};
+          // AniList import placeholders stay untouched: promoting them here (on loadedmetadata,
+          // before anything is watched) would bank the full runtime with no watchedAt.
+          // EpisodeWriter promotes them properly once the episode is actually tracked.
+          if (existing.durationSource === "anilist") return false;
           const currentDuration = Number(existing.duration) || 0;
           if (!this.isPlaceholderDuration(currentDuration) || currentDuration === validDuration) return false;
 
@@ -635,7 +639,7 @@ const ProgressTracker = {
         if (!updatedMain && anime.episodes.length === 1) {
           const onlyEpisode = anime.episodes[0] || {};
           const onlyDuration = Number(onlyEpisode.duration) || 0;
-          if (this.isPlaceholderDuration(onlyDuration) && onlyDuration !== validDuration) {
+          if (onlyEpisode.durationSource !== "anilist" && this.isPlaceholderDuration(onlyDuration) && onlyDuration !== validDuration) {
             anime.episodes[0] = {
               ...onlyEpisode,
               duration: validDuration,

@@ -10,6 +10,7 @@
 
   const INFO_TTL = 24 * HOUR;
   const INFO_AIRING_RECHECK = 6 * HOUR;
+  const INFO_SETTLED_TTL = 30 * DAY;
   const EPISODE_TYPES_TTL = 24 * HOUR;
   const FILLER_FINISHED_TTL = 7 * DAY;
   const NOT_FOUND_TTL = 3 * DAY;
@@ -23,6 +24,16 @@
     return Number.isFinite(t) ? t : NaN;
   }
 
+  // Finished airing AND every declared episode already on the site: nothing left to discover,
+  // so re-scraping it daily is pure noise. A FINISHED page that is still missing episodes keeps
+  // the normal TTL — the scraper itself downgrades those to RELEASING when it can tell.
+  function isSettledInfo(info) {
+    if (info?.status !== "FINISHED") return false;
+    const total = Number(info.totalEpisodes) || 0;
+    const latest = Number(info.latestEpisode) || 0;
+    return total > 0 && latest >= total;
+  }
+
   function infoRefreshAt(info) {
     const at = toMs(info?.retryable ? info?.retryAt || info?.cachedAt : info?.cachedAt);
     if (!Number.isFinite(at)) return 0;
@@ -33,6 +44,7 @@
       if (Number.isFinite(nextMs) && nextMs > at) return Math.min(nextMs, at + INFO_TTL);
       return at + INFO_AIRING_RECHECK;
     }
+    if (isSettledInfo(info)) return at + INFO_SETTLED_TTL;
     return at + INFO_TTL;
   }
 
@@ -120,6 +132,8 @@
   const exports = {
     INFO_TTL,
     INFO_AIRING_RECHECK,
+    INFO_SETTLED_TTL,
+    isSettledInfo,
     EPISODE_TYPES_TTL,
     FILLER_FINISHED_TTL,
     NOT_FOUND_TTL,

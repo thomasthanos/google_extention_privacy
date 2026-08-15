@@ -883,6 +883,9 @@ window.AnimeTracker.AnimeCardRenderer = AnimeCardRenderer;
         resolvedLabels[i] = distinct && distinct.toLowerCase() !== title.toLowerCase() ? distinct : `${label} (${count})`;
       });
 
+      // Hoisted above the row map so each row can tell whether its badge would just repeat the header's.
+      const groupStatusView = this.getGroupStatusView(filteredSeasons);
+
       const seasonData = expandedSeasons.map(({ slug, anime, partConfig, isMovie: isMergedMovie }, index) => {
         const { CONFIG } = window.AnimeTracker;
         const episodeCount = anime.episodes?.length || 0;
@@ -1188,7 +1191,11 @@ window.AnimeTracker.AnimeCardRenderer = AnimeCardRenderer;
         statusClass = memberStatusView.itemClass;
         statusIcon = memberStatusView.icon ? UIHelpers.createIcon(memberStatusView.icon) : "";
         const memberStatusIcon = memberStatusView.icon ? UIHelpers.createIcon(memberStatusView.icon) : "";
-        const memberStatusBadgeHtml = `<span class="meta-badge grp-state-badge ${memberStatusView.badgeClass}">${memberStatusIcon}${memberStatusView.text}</span>`;
+        // Same status as the group header → the row badge adds nothing, so drop it.
+        const memberStatusBadgeHtml =
+          memberStatusView.text === groupStatusView.text
+            ? ""
+            : `<span class="meta-badge grp-state-badge ${memberStatusView.badgeClass}">${memberStatusIcon}${memberStatusView.text}</span>`;
 
         const hasExpandableContent = !isMovie;
         const expandIconHtml = hasExpandableContent
@@ -1297,7 +1304,6 @@ window.AnimeTracker.AnimeCardRenderer = AnimeCardRenderer;
           ? `${itemCount} seasons`
           : `${itemCount} parts`;
 
-      const groupStatusView = this.getGroupStatusView(filteredSeasons);
       const groupProgressBadge =
         isChronologyGroup && inMoviesCategory
           ? `<span class="meta-badge" style="color:#f4a261;background:rgba(244,162,97,0.12);border:1px solid rgba(244,162,97,0.35);">${itemLabel}</span>`
@@ -1354,11 +1360,14 @@ window.AnimeTracker.AnimeCardRenderer = AnimeCardRenderer;
         .trim();
     },
 
-    renderMovieItem(slug, label, formattedTime, statusView) {
+    renderMovieItem(slug, label, formattedTime, statusView, hideStatusBadge = false) {
       const { UIHelpers } = window.AnimeTracker;
       const statusIcon = statusView.icon ? UIHelpers.createIcon(statusView.icon) : "";
       const metricText = formattedTime || "—";
-      const rightHtml = `<span class="meta-badge grp-state-badge ${statusView.badgeClass}">${statusIcon}${statusView.text}</span>
+      const statusBadgeHtml = hideStatusBadge
+        ? ""
+        : `<span class="meta-badge grp-state-badge ${statusView.badgeClass}">${statusIcon}${statusView.text}</span>`;
+      const rightHtml = `${statusBadgeHtml}
                                 <span class="movie-duration grp-metric" title="${UIHelpers.escapeHtml(metricText)}">${metricText}</span>
                                 <div class="movie-item-actions grp-row-actions">
                                     <button class="movie-edit-btn" data-slug="${UIHelpers.escapeHtml(slug)}" title="Edit title">${UIHelpers.createIcon("edit")}</button>
@@ -1396,13 +1405,14 @@ window.AnimeTracker.AnimeCardRenderer = AnimeCardRenderer;
         }
       });
 
+      const groupStatusView = this.getGroupStatusView(movies);
       const movieItemsHTML = movies
         .map(({ slug, anime }) => {
           const movieLabel = SeasonGrouping.getMovieLabel(slug, anime.title);
           const watchTime = this.getRealMovieWatchTime(anime);
           const formattedTime = UIHelpers.formatDuration(watchTime);
           const statusView = this.getEntryStatusView(slug, anime);
-          return this.renderMovieItem(slug, movieLabel, formattedTime, statusView);
+          return this.renderMovieItem(slug, movieLabel, formattedTime, statusView, statusView.text === groupStatusView.text);
         })
         .join("");
 
@@ -1436,7 +1446,6 @@ window.AnimeTracker.AnimeCardRenderer = AnimeCardRenderer;
       const coverHtmlGroup = UIHelpers.renderCoverFigure(baseTitle, coverImageGroup);
 
       const totalMovies = movies.length;
-      const groupStatusView = this.getGroupStatusView(movies);
       const movieTypeBadge = `<span class="meta-badge" style="color:#f4a261;background:rgba(244,162,97,0.12);border:1px solid rgba(244,162,97,0.35);">${totalMovies} Movies</span>`;
       const movieStatusIcon = groupStatusView.icon ? UIHelpers.createIcon(groupStatusView.icon) : "";
       const movieStatusBadge = `<span class="meta-badge ${groupStatusView.badgeClass}">${movieStatusIcon}${groupStatusView.text}</span>`;
@@ -1484,7 +1493,8 @@ window.AnimeTracker.AnimeCardRenderer = AnimeCardRenderer;
         coverHtml,
         title: UIHelpers.escapeHtml(title),
         metaRowHtml,
-        itemsHtml: this.renderMovieItem(slug, title, formattedTime, statusView),
+        // Single movie: the header badge above is built from this same statusView, always a repeat.
+        itemsHtml: this.renderMovieItem(slug, title, formattedTime, statusView, true),
       });
     },
   });

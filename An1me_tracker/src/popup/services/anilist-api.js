@@ -684,6 +684,24 @@
           existing.totalEpisodesSource = "anilist";
           touched = true;
         }
+        // Backfill placeholders for entries imported before episodes were materialised.
+        // Guarded on "no on-site episode was ever watched", so real history is never touched.
+        const importCount = status === "COMPLETED" && importedTotal > 0 ? importedTotal : progress;
+        const existingEpisodes = Array.isArray(existing.episodes) ? existing.episodes : [];
+        if (importCount > 0 && !existingEpisodes.some((ep) => ep && ep.durationSource !== "anilist")) {
+          const known = new Set(existingEpisodes.map((ep) => Number(ep?.number) || 0));
+          let backfilled = false;
+          for (let n = 1; n <= importCount; n++) {
+            if (known.has(n)) continue;
+            existingEpisodes.push({ number: n, duration: 0, durationSource: "anilist" });
+            backfilled = true;
+          }
+          if (backfilled) {
+            existingEpisodes.sort((a, b) => (Number(a?.number) || 0) - (Number(b?.number) || 0));
+            existing.episodes = existingEpisodes;
+            animeDataTouched = true;
+          }
+        }
         if (touched) {
           existing.alternateTitlesUpdatedAt = importedAt;
           animeDataTouched = true;
@@ -719,7 +737,10 @@
 
       const total = Number(media.episodes) || 0;
       const count = status === "COMPLETED" && total > 0 ? total : progress;
+      // Placeholder episodes: no watchedAt/duration, so they show as watched in the card
+      // but stay out of watch time, stats and the AniList push (localProgress skips them).
       const episodes = [];
+      for (let n = 1; n <= count; n++) episodes.push({ number: n, duration: 0, durationSource: "anilist" });
 
       const entryObj = {
         title,

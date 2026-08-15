@@ -514,6 +514,7 @@
         if (cards) {
           cards.classList.toggle("open");
           AT.PopupState.currentCompactStatusOpen = cards.classList.contains("open");
+          AT.saveLibraryPreferences?.();
         }
         refreshCompactChevrons();
         return;
@@ -540,6 +541,7 @@
             }
           });
           refreshCompactChevrons();
+          AT.saveLibraryPreferences?.({ rememberCompactStatus: true });
         }
         return;
       }

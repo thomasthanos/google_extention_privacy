@@ -15,7 +15,10 @@
   const AUTO_4K_SERVER_KEY = "auto4kServerEnabled";
   const PASSWORD_SET_MARKER_KEY = "passwordSetMarker";
 
-  async function updateStats() {
+  // persist:false paints the numbers without writing cachedStats — for callers whose animeData
+  // is a placeholder rather than the real library (e.g. a failed load), since that cache is what
+  // primes the stats bar on the next popup open.
+  async function updateStats({ persist = true } = {}) {
     const { UIHelpers, SeasonGrouping, Storage } = AT;
     const animeEntries = Object.entries(AT.PopupState.animeData);
     const groups = SeasonGrouping.groupByBase(animeEntries);
@@ -44,6 +47,8 @@
     const totalTimeStr = UIHelpers.formatDurationShort(totalWatchTime);
     setTopStatValue(elements.totalEpisodes, totalWatchedEpisodes);
     setTopStatValue(elements.totalTime, totalTimeStr);
+
+    if (!persist) return;
 
     try {
       const manifest = chrome.runtime.getManifest();
