@@ -143,11 +143,19 @@
         subtitle: state.auto4kServer ? "Prefer 4k server when available" : "4k auto-pick is off",
         enabled: state.auto4kServer,
       }),
+      renderToggleItem({
+        id: "settingsAdGuard",
+        subtitleId: "settingsAdGuardSubtitle",
+        iconKey: "skipMark",
+        title: "Ad Guard",
+        subtitle: state.adGuard ? "Block pop-up ads on an1me.to" : "Pop-up ads are allowed",
+        enabled: state.adGuard,
+      }),
     ].join("");
 
     return `
             <section class="settings-card settings-card--preferences">
-                ${sectionHead("gear", "PREFERENCES", "5 settings")}
+                ${sectionHead("gear", "PREFERENCES", "6 settings")}
                 <div class="settings-toggle-list">${items}</div>
             </section>
         `;
@@ -277,6 +285,7 @@
       autoSkipFiller: settings.autoSkipFiller === true,
       skiptimeHelper: settings.skiptimeHelper === true,
       auto4kServer: settings.auto4kServer !== false,
+      adGuard: settings.adGuard !== false,
     };
 
     const alreadyRendered = container.querySelector(".settings-view-inner");
@@ -376,6 +385,11 @@
       "settingsAuto4kServer",
       state.auto4kServer,
       state.auto4kServer ? "Prefer 4k server when available" : "4k auto-pick is off",
+    );
+    updateToggle(
+      "settingsAdGuard",
+      state.adGuard,
+      state.adGuard ? "Block pop-up ads on an1me.to" : "Pop-up ads are allowed",
     );
   }
 

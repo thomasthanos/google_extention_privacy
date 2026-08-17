@@ -543,6 +543,7 @@
 
   const SKIPTIME_HELPER_KEY = "skiptimeHelperEnabled";
   const AUTO_4K_SERVER_KEY = "auto4kServerEnabled";
+  const AD_GUARD_KEY = "adGuardEnabled";
 
   const PASSWORD_SET_MARKER_KEY = "passwordSetMarker";
 
@@ -600,6 +601,17 @@
       copy: {
         on: "Auto-switch to 4k server when available",
         off: "4k auto-pick is off",
+      },
+    },
+    adGuard: {
+      btnId: "settingsAdGuard",
+      subtitleId: "settingsAdGuardSubtitle",
+      storageKey: AD_GUARD_KEY,
+      defaultsTo: true,
+      interpret: (raw) => raw !== false,
+      copy: {
+        on: "Block pop-up ads on an1me.to",
+        off: "Pop-up ads are allowed",
       },
     },
   };
@@ -669,6 +681,7 @@
   const renderAutoSkipFillerSetting = (enabled) => renderToggle("autoSkipFiller", enabled);
   const renderSkiptimeHelperSetting = (enabled) => renderToggle("skiptime", enabled);
   const renderAuto4kServerSetting = (enabled) => renderToggle("auto4kServer", enabled);
+  const renderAdGuardSetting = (enabled) => renderToggle("adGuard", enabled);
   const loadCopyGuardSetting = () => loadToggleSetting("copyGuard");
   async function loadSmartNotifSetting() {
     try {
@@ -693,6 +706,7 @@
   const loadAutoSkipFillerSetting = () => loadToggleSetting("autoSkipFiller");
   const loadSkiptimeHelperSetting = () => loadToggleSetting("skiptime");
   const loadAuto4kServerSetting = () => loadToggleSetting("auto4kServer");
+  const loadAdGuardSetting = () => loadToggleSetting("adGuard");
   AT.refreshSmartNotificationStatus = loadSmartNotifSetting;
 
   function setSettingsDataToolsExpanded(expanded) {
@@ -1893,6 +1907,13 @@
         });
         return;
       }
+      if (e.target.closest("#settingsAdGuard")) {
+        e.stopPropagation();
+        await handleToggle({ btnId: "settingsAdGuard", storageKey: AD_GUARD_KEY }, renderAdGuardSetting, {
+          read: (btn) => btn.dataset.enabled !== "false",
+        });
+        return;
+      }
 
       const dataToolsToggle = e.target.closest("#settingsDataToolsToggle");
       if (dataToolsToggle) {
@@ -2406,6 +2427,9 @@
       if (changes[AUTO_4K_SERVER_KEY]) {
         renderAuto4kServerSetting(changes[AUTO_4K_SERVER_KEY].newValue !== false);
       }
+      if (changes[AD_GUARD_KEY]) {
+        renderAdGuardSetting(changes[AD_GUARD_KEY].newValue !== false);
+      }
       if (changes.videoProgress) {
         videoProgress = changes.videoProgress.newValue || {};
         if (!isOwn) isExternalUpdate = true;
@@ -2645,6 +2669,7 @@
       loadAutoSkipFillerSetting(),
       loadSkiptimeHelperSetting(),
       loadAuto4kServerSetting(),
+      loadAdGuardSetting(),
     ]);
 
     try {

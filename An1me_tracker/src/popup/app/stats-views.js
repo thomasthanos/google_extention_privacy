@@ -13,6 +13,7 @@
   const AUTO_SKIP_FILLER_STORAGE_KEY = "autoSkipFillers";
   const SKIPTIME_HELPER_KEY = "skiptimeHelperEnabled";
   const AUTO_4K_SERVER_KEY = "auto4kServerEnabled";
+  const AD_GUARD_KEY = "adGuardEnabled";
   const PASSWORD_SET_MARKER_KEY = "passwordSetMarker";
 
   // persist:false paints the numbers without writing cachedStats — for callers whose animeData
@@ -176,6 +177,7 @@
         AUTO_SKIP_FILLER_STORAGE_KEY,
         SKIPTIME_HELPER_KEY,
         AUTO_4K_SERVER_KEY,
+        AD_GUARD_KEY,
         PASSWORD_SET_MARKER_KEY,
       ]);
       storedSettings = {
@@ -184,6 +186,7 @@
         autoSkipFiller: stored[AUTO_SKIP_FILLER_STORAGE_KEY] === true,
         skiptimeHelper: stored[SKIPTIME_HELPER_KEY] === true,
         auto4kServer: stored[AUTO_4K_SERVER_KEY] !== false,
+        adGuard: stored[AD_GUARD_KEY] !== false,
       };
       const marker = stored[PASSWORD_SET_MARKER_KEY];
 

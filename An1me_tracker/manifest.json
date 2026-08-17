@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "An1me.to Tracker",
-  "version": "7.2.6",
+  "version": "7.2.7",
   "description": "Auto-track an1me.to progress, resume episodes, sync your library, manage fillers, AniList, stats, goals and alerts.",
   "author": "ThomasThanos",
   "permissions": ["storage", "unlimitedStorage", "identity", "alarms", "notifications", "sidePanel"],
@@ -58,6 +58,19 @@
       "js": ["src/content/page/copy-guard.js"],
       "run_at": "document_start",
       "all_frames": false
+    },
+    {
+      "matches": ["https://an1me.to/*", "https://*.an1me.to/*"],
+      "js": ["src/content/page/ad-guard.js"],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true
+    },
+    {
+      "matches": ["https://an1me.to/*", "https://*.an1me.to/*"],
+      "js": ["src/content/page/ad-guard-bridge.js"],
+      "run_at": "document_start",
+      "all_frames": true
     },
     {
       "matches": ["https://an1me.to/watch/*", "https://*.an1me.to/watch/*"],
