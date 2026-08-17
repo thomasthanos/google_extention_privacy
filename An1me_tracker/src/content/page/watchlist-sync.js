@@ -279,14 +279,17 @@ const WatchlistSync = {
     const Logger = this._logger();
     const force = options.force === true;
 
+    // Explicit false, not a bare return: callers (and the WATCHLIST_SYNC_EXECUTE bridge, which
+    // reports `ok !== false`) would otherwise read undefined as success and claim a push that
+    // never left the browser.
     if (!animeId || !type) {
       Logger.debug("Watchlist: missing animeId or type, skipping");
-      return;
+      return false;
     }
 
     if (!this._isLoggedIn()) {
       Logger.debug("Watchlist: not logged in on an1me.to, skipping sync");
-      return;
+      return false;
     }
 
     const entry = animeSlug ? await this._loadAnimeEntry(animeSlug) : null;

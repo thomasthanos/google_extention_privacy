@@ -7,6 +7,9 @@
 
   const RUN_GAP_MS = 7 * 24 * 3600 * 1000;
   const PER_SLUG_COOLDOWN_MS = 24 * 3600 * 1000;
+  // A movie/series mismatch is deterministic: re-probing can only reach the same verdict, so these
+  // are parked far longer than an ordinary retry.
+  const INCOMPATIBLE_COOLDOWN_MS = 30 * 24 * 3600 * 1000;
   const PROBE_TIMEOUT_MS = 8000;
   const PROBE_GAP_MS = 700;
   const SEARCH_PROBE_GAP_MS = 1500;
@@ -283,8 +286,12 @@
     for (const slug of slugs) {
       const cache = caches[`animeinfo_${slug}`];
       if (!cache || !cache.notFound) continue;
-      const triedAt = (state.perSlug[slug] && state.perSlug[slug].triedAt) || 0;
-      if (!force && Date.now() - triedAt < PER_SLUG_COOLDOWN_MS) continue;
+      const prior = state.perSlug[slug];
+      const triedAt = (prior && prior.triedAt) || 0;
+      // force lifts the run gate only. It used to lift this cooldown too, which meant every
+      // sign-in re-probed the same unresolvable slugs and replayed their 404s and warnings.
+      if (prior && prior.incompatible && Date.now() - triedAt < INCOMPATIBLE_COOLDOWN_MS) continue;
+      if (Date.now() - triedAt < PER_SLUG_COOLDOWN_MS) continue;
 
       if (shouldSkipSlugForMigration(slug)) continue;
       suspects.push(slug);
@@ -342,6 +349,7 @@
           renames.push({ from: slug, to: resolved });
           logInfo(`Found target for "${slug}" → "${resolved}"`);
         } else {
+          state.perSlug[slug] = { ...state.perSlug[slug], incompatible: true };
           logWarn(`Skipping incompatible rename for "${slug}" → "${resolved}" (movie/series type mismatch)`);
         }
       }
