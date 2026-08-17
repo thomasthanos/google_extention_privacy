@@ -1310,7 +1310,17 @@ window.AnimeTracker.AnimeCardRenderer = AnimeCardRenderer;
           : `<span class="meta-badge meta-badge-progress">${itemLabel}</span>`;
       const groupStatusIcon = groupStatusView.icon ? UIHelpers.createIcon(groupStatusView.icon) : "";
       const groupStatusBadge = `<span class="meta-badge ${groupStatusView.badgeClass}">${groupStatusIcon}${groupStatusView.text}</span>`;
-      const metaRowHtmlGroup = `<div class="grp-meta-row">${groupProgressBadge}${groupStatusBadge}</div><span class="meta-time">${lastWatchedText}</span>`;
+      // Same rule as the standalone card's airing badge (see createCard): the group's lone status
+      // badge can only say one thing, so an airing season sitting behind a "Watching" group badge
+      // would otherwise show no airing marker at all — unlike the ungrouped card next to it.
+      const groupAiringBadge =
+        groupStatusView.status !== "airing" &&
+        groupStatusView.status !== "dropped" &&
+        groupStatusView.status !== "on_hold" &&
+        filteredSeasons.some(({ slug: memberSlug }) => AnilistService?.getStatus?.(memberSlug) === "RELEASING")
+          ? `<span class="meta-badge meta-badge-airing" title="Currently airing">Airing</span>`
+          : "";
+      const metaRowHtmlGroup = `<div class="grp-meta-row">${groupProgressBadge}${groupStatusBadge}${groupAiringBadge}</div><span class="meta-time">${lastWatchedText}</span>`;
 
       return this.renderGroupShell({
         variant: "season",

@@ -1515,6 +1515,33 @@ const AnilistService = {
     return changed;
   },
 
+  _isSeasonLikeSlug(slug) {
+    return /-(?:season-?\d+|(?:\d+)(?:st|nd|rd|th)-season|s\d+|(?:part|cour)-?\d+|(?:ii|iii|iv|v|vi))(?=$|-)/i.test(String(slug || ""));
+  },
+
+  // Read-only warm used for the popup's first paint. loadCachedData() also purges bad keys and
+  // commits animeData backfills through the mutation queue, and those read the *persisted*
+  // snapshot — running them before the maintenance pipeline is written would revert it.
+  async primeCachedData(animeData) {
+    const { Storage } = window.AnimeTracker;
+
+    try {
+      const keys = Object.keys(animeData).map((slug) => `animeinfo_${slug}`);
+      if (keys.length === 0) return;
+
+      const result = await Storage.get(keys);
+      for (const [key, value] of Object.entries(result)) {
+        if (!key.startsWith("animeinfo_") || !value) continue;
+        const slug = key.replace("animeinfo_", "");
+        // Mirrors loadCachedData's skip so a first paint never shows data it is about to purge.
+        if (!value.notFound && this._isSeasonLikeSlug(slug) && !value.resolvedSlug) continue;
+        this.cache[slug] = value;
+      }
+    } catch (error) {
+      PopupLogger.error("AnimeInfo", "Failed to prime cache:", error);
+    }
+  },
+
   async loadCachedData(animeData) {
     const { Storage } = window.AnimeTracker;
 
@@ -1527,8 +1554,7 @@ const AnilistService = {
       const keysToPurge = [];
       const authoritativeBackfills = [];
 
-      const isSeasonLikeSlug = (slug) =>
-        /-(?:season-?\d+|(?:\d+)(?:st|nd|rd|th)-season|s\d+|(?:part|cour)-?\d+|(?:ii|iii|iv|v|vi))(?=$|-)/i.test(String(slug || ""));
+      const isSeasonLikeSlug = (slug) => this._isSeasonLikeSlug(slug);
 
       let needsSave = false;
       for (const [key, value] of Object.entries(result)) {

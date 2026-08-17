@@ -1277,17 +1277,20 @@
   }
 
   // Airing badges, episode totals and filler marks all read these caches. Rendering before they
-  // are in memory produces a card that looks like nothing was ever fetched for it.
-  async function loadMetadataCaches() {
+  // are in memory produces a card that looks like nothing was ever fetched for it. Both filler
+  // loaders are pure reads; the AniList one has a read-only variant for this early call.
+  async function warmMetadataCachesForFirstPaint() {
     const { FillerService } = AT;
     await FillerService.loadCachedEpisodeTypes(animeData);
     await FillerService.loadStayedFillers();
-    await AT.AnilistService.loadCachedData(animeData);
+    await AT.AnilistService.primeCachedData(animeData);
   }
 
   async function finalizeAfterMaintenance() {
-    const { LibraryMutations } = AT;
-    await loadMetadataCaches();
+    const { FillerService, LibraryMutations } = AT;
+    await FillerService.loadCachedEpisodeTypes(animeData);
+    await FillerService.loadStayedFillers();
+    await AT.AnilistService.loadCachedData(animeData);
 
     animeData = await LibraryMutations.enqueue("finalize-maintenance", async ({ commit, snapshot }) => {
       const latestAnimeData = snapshot.animeData || {};
@@ -1502,8 +1505,8 @@
     if (!AT.PopupState.libraryLoaded) {
       // Warm the info/filler caches first: this is the popup's first paint, and it used to land
       // before finalizeAfterMaintenance loaded them, so every card showed as un-fetched until the
-      // second render seconds later.
-      await loadMetadataCaches();
+      // second render seconds later. Read-only — the pipeline below is not persisted yet.
+      await warmMetadataCachesForFirstPaint();
       AT.PopupState.libraryLoaded = true;
       renderAnimeList(getActiveFilter());
       await updateStats();
