@@ -4,7 +4,14 @@
   "version": "7.2.7",
   "description": "Auto-track an1me.to progress, resume episodes, sync your library, manage fillers, AniList, stats, goals and alerts.",
   "author": "ThomasThanos",
-  "permissions": ["storage", "unlimitedStorage", "identity", "alarms", "notifications", "sidePanel"],
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "identity",
+    "alarms",
+    "notifications",
+    "sidePanel"
+  ],
   "host_permissions": [
     "https://an1me.to/*",
     "https://*.an1me.to/*",
@@ -42,8 +49,14 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://an1me.to/*", "https://*.an1me.to/*"],
-      "exclude_matches": ["https://an1me.to/watch/*", "https://*.an1me.to/watch/*"],
+      "matches": [
+        "https://an1me.to/*",
+        "https://*.an1me.to/*"
+      ],
+      "exclude_matches": [
+        "https://an1me.to/watch/*",
+        "https://*.an1me.to/watch/*"
+      ],
       "js": [
         "src/common/data/cache-policy.js",
         "src/common/data/media-type.js",
@@ -54,26 +67,55 @@
       "all_frames": false
     },
     {
-      "matches": ["https://an1me.to/*", "https://*.an1me.to/*"],
-      "js": ["src/content/page/copy-guard.js"],
+      "matches": [
+        "https://an1me.to/*",
+        "https://*.an1me.to/*"
+      ],
+      "js": [
+        "src/content/page/copy-guard.js"
+      ],
       "run_at": "document_start",
       "all_frames": false
     },
     {
-      "matches": ["https://an1me.to/*", "https://*.an1me.to/*"],
-      "js": ["src/content/page/ad-guard.js"],
+      "matches": [
+        "https://an1me.to/*",
+        "https://*.an1me.to/*"
+      ],
+      "js": [
+        "src/content/page/ad-guard.js"
+      ],
       "run_at": "document_start",
       "world": "MAIN",
       "all_frames": true
     },
     {
-      "matches": ["https://an1me.to/*", "https://*.an1me.to/*"],
-      "js": ["src/content/page/ad-guard-bridge.js"],
+      "matches": [
+        "https://an1me.to/*",
+        "https://*.an1me.to/*"
+      ],
+      "js": [
+        "src/content/page/ad-guard-bridge.js"
+      ],
       "run_at": "document_start",
       "all_frames": true
     },
     {
-      "matches": ["https://an1me.to/watch/*", "https://*.an1me.to/watch/*"],
+      "matches": [
+        "https://an1me.to/*",
+        "https://*.an1me.to/*"
+      ],
+      "js": [
+        "src/content/page/site-fetch-bridge.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://an1me.to/watch/*",
+        "https://*.an1me.to/watch/*"
+      ],
       "js": [
         "src/common/data/multipart-mappings.js",
         "src/common/data/cache-policy.js",
@@ -99,8 +141,13 @@
       "all_frames": false
     },
     {
-      "matches": ["https://an1me.to/", "https://*.an1me.to/"],
-      "js": ["src/content/page/continue-watching.js"],
+      "matches": [
+        "https://an1me.to/",
+        "https://*.an1me.to/"
+      ],
+      "js": [
+        "src/content/page/continue-watching.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     }
@@ -110,8 +157,15 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["src/icons/icon128.png", "src/fonts/PROXON.ttf", "src/fonts/comic_sans.ttf"],
-      "matches": ["https://an1me.to/*", "https://*.an1me.to/*"]
+      "resources": [
+        "src/icons/icon128.png",
+        "src/fonts/PROXON.ttf",
+        "src/fonts/comic_sans.ttf"
+      ],
+      "matches": [
+        "https://an1me.to/*",
+        "https://*.an1me.to/*"
+      ]
     }
   ]
 }

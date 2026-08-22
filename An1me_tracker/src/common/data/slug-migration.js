@@ -68,12 +68,45 @@
     } catch {}
   }
 
+  // an1me.to answers extension-origin requests with a Cloudflare challenge (HTTP 403). A fetch
+  // performed inside an open an1me tab is same-origin and rides that tab's clearance, so probes go
+  // through site-fetch-bridge.js when a tab exists and fall back to a direct fetch when none does.
+  async function fetchAn1meViaTab(url) {
+    if (typeof chrome === "undefined" || !chrome.tabs?.query) return null;
+    let tabs;
+    try {
+      tabs = await chrome.tabs.query({ url: ["https://an1me.to/*", "https://*.an1me.to/*"] });
+    } catch {
+      return null;
+    }
+    const tab = (tabs || []).find((t) => t && t.id != null && t.discarded !== true && t.status !== "unloaded");
+    if (!tab) return null;
+
+    const reply = await new Promise((resolve) => {
+      try {
+        chrome.tabs.sendMessage(tab.id, { type: "AN1ME_FETCH", url, timeoutMs: PROBE_TIMEOUT_MS }, (r) => {
+          void chrome.runtime.lastError;
+          resolve(r || null);
+        });
+      } catch {
+        resolve(null);
+      }
+    });
+    // No answer at all means the bridge is absent, not that the page is missing — let the caller
+    // fall back rather than record a false negative for the slug.
+    if (!reply || typeof reply.text !== "string") return null;
+    return { ok: reply.ok === true, status: Number(reply.status) || 0, text: reply.text };
+  }
   async function probeSlug(slug) {
     if (!slug) return false;
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT_MS);
     try {
-      const res = await fetch(`https://an1me.to/anime/${encodeURIComponent(slug)}/`, {
+      const url = `https://an1me.to/anime/${encodeURIComponent(slug)}/`;
+      const viaTab = await fetchAn1meViaTab(url);
+      if (viaTab) return viaTab.ok;
+
+      const res = await fetch(url, {
         method: "GET",
         signal: ctrl.signal,
         redirect: "follow",
@@ -96,15 +129,18 @@
     const timer = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT_MS);
     try {
       const url = `https://an1me.to/?s=${encodeURIComponent(q)}&post_type=anime`;
-      const res = await fetch(url, {
-        method: "GET",
-        signal: ctrl.signal,
-        redirect: "follow",
-        cache: "no-store",
-        credentials: "omit",
-      });
-      if (!res.ok) return null;
-      const html = await res.text();
+      const viaTab = await fetchAn1meViaTab(url);
+      const html = viaTab ? (viaTab.ok ? viaTab.text : null) : await (async () => {
+        const res = await fetch(url, {
+          method: "GET",
+          signal: ctrl.signal,
+          redirect: "follow",
+          cache: "no-store",
+          credentials: "omit",
+        });
+        return res.ok ? await res.text() : null;
+      })();
+      if (html === null) return null;
 
       // Collect ALL /anime/ links and pick the one whose slug best matches the searched
       // title — the first link on the page can be a nav element or an unrelated result,

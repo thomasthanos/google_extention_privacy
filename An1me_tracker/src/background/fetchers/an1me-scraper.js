@@ -148,6 +148,50 @@ function extractAnimeTitlesFromHtml(html) {
   return out;
 }
 
+// Cloudflare serves the extension's own origin a managed challenge (403) for every an1me page,
+// because a background fetch cannot control Origin/Sec-Fetch-Site. A request made inside an open
+// an1me tab is same-origin and rides that tab's clearance, so it is tried first; the direct fetch
+// stays as the fallback for when no tab is open.
+async function fetchAn1meViaTab(url, timeoutMs) {
+  let tabs;
+  try {
+    tabs = await chrome.tabs.query({ url: ["https://an1me.to/*", "https://*.an1me.to/*"] });
+  } catch {
+    return null;
+  }
+  const tab = (tabs || []).find((t) => t && t.id != null && t.discarded !== true && t.status !== "unloaded");
+  if (!tab) return null;
+
+  const response = await new Promise((resolve) => {
+    try {
+      chrome.tabs.sendMessage(tab.id, { type: "AN1ME_FETCH", url, timeoutMs }, (r) => {
+        void chrome.runtime.lastError;
+        resolve(r || null);
+      });
+    } catch {
+      resolve(null);
+    }
+  });
+
+  // A bridge that never answered (old content script, torn-down tab) is not a failed page load —
+  // return null so the caller falls back instead of caching a bogus error for the slug.
+  if (!response || typeof response.text !== "string") return null;
+  return { ok: response.ok === true, status: Number(response.status) || 0, text: response.text, finalUrl: response.finalUrl || url };
+}
+
+async function fetchAn1mePage(url, timeoutMs) {
+  const viaTab = await fetchAn1meViaTab(url, timeoutMs);
+  if (viaTab) return viaTab;
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    return { ok: res.ok, status: res.status, text: res.ok ? await res.text() : "", finalUrl: res.url };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 async function fetchAnimePageInfo(slug) {
   const candidates = buildAnimeInfoSlugCandidates(slug);
   if (candidates.length === 0) {
@@ -156,21 +200,12 @@ async function fetchAnimePageInfo(slug) {
 
   let resolvedSlug = candidates[0];
   let url = `https://an1me.to/anime/${resolvedSlug}/`;
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), SCRAPER_TIMEOUT_MS);
-  let response;
-  try {
-    response = await fetch(url, { signal: ctrl.signal });
-  } finally {
-    clearTimeout(timer);
-  }
+  let response = await fetchAn1mePage(url, SCRAPER_TIMEOUT_MS);
 
   if (!response.ok && response.status === 404 && candidates.length > 1) {
     for (const candidateSlug of candidates.slice(1)) {
-      const ctrl2 = new AbortController();
-      const timer2 = setTimeout(() => ctrl2.abort(), SCRAPER_TIMEOUT_MS);
       try {
-        const candidateResponse = await fetch(`https://an1me.to/anime/${candidateSlug}/`, { signal: ctrl2.signal });
+        const candidateResponse = await fetchAn1mePage(`https://an1me.to/anime/${candidateSlug}/`, SCRAPER_TIMEOUT_MS);
         if (candidateResponse.ok) {
           response = candidateResponse;
           resolvedSlug = candidateSlug;
@@ -178,14 +213,12 @@ async function fetchAnimePageInfo(slug) {
         }
       } catch {
         continue;
-      } finally {
-        clearTimeout(timer2);
       }
     }
   }
 
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const html = await response.text();
+  const html = response.text;
 
   let totalEpisodes = null;
   const episodeDetail = extractScrapedDetail(html, "Επεισόδια|Episodes?", 300);

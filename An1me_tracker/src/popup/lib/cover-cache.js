@@ -20,16 +20,64 @@
     }
   }
 
+  // an1me covers hit the same Cloudflare challenge as the page scrapes (403 + CORP: same-origin,
+  // which is what surfaces as ERR_BLOCKED_BY_RESPONSE.NotSameOrigin). Fetching them inside an open
+  // an1me tab is same-origin and works; everything else (AniList, MAL, TMDB) is fetched directly.
+  function isAn1meUrl(url) {
+    try {
+      const host = new URL(url, location.href).hostname.toLowerCase();
+      return host === "an1me.to" || host.endsWith(".an1me.to");
+    } catch {
+      return false;
+    }
+  }
+
+  async function fetchViaAn1meTab(url) {
+    let tabs;
+    try {
+      tabs = await chrome.tabs.query({ url: ["https://an1me.to/*", "https://*.an1me.to/*"] });
+    } catch {
+      return null;
+    }
+    const tab = (tabs || []).find((t) => t && t.id != null && t.discarded !== true && t.status !== "unloaded");
+    if (!tab) return null;
+
+    const reply = await new Promise((resolve) => {
+      try {
+        chrome.tabs.sendMessage(tab.id, { type: "AN1ME_FETCH", url, as: "dataUrl", timeoutMs: 15000 }, (r) => {
+          void chrome.runtime.lastError;
+          resolve(r || null);
+        });
+      } catch {
+        resolve(null);
+      }
+    });
+    if (!reply || !reply.ok || typeof reply.dataUrl !== "string" || !reply.dataUrl.startsWith("data:image/")) return null;
+
+    try {
+      return await (await fetch(reply.dataUrl)).blob();
+    } catch {
+      return null;
+    }
+  }
   function backgroundStore(cache, url) {
     if (fetching.has(url)) return;
     fetching.add(url);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
-    fetch(url, { credentials: "omit", cache: "force-cache", signal: controller.signal })
-      .then((resp) => {
-        if (resp && resp.ok) {
-          return cache.put(url, resp.clone()).catch(() => {});
-        }
+    const request = isAn1meUrl(url)
+      ? fetchViaAn1meTab(url).then((blob) => (blob ? new Response(blob) : fetch(url, { credentials: "omit", cache: "force-cache", signal: controller.signal })))
+      : fetch(url, { credentials: "omit", cache: "force-cache", signal: controller.signal });
+    request
+      .then(async (resp) => {
+        if (!resp || !resp.ok) return;
+        await cache.put(url, resp.clone()).catch(() => {});
+        // Publish it for this session too, otherwise resolve() keeps handing out the raw an1me
+        // URL and the <img> stays broken until the next popup open warms from the cache.
+        try {
+          const blob = await resp.blob();
+          if (blob && blob.size > 0 && !mem.has(url)) mem.set(url, URL.createObjectURL(blob));
+        } catch {}
       })
       .catch(() => {})
       .finally(() => {
