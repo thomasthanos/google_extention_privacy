@@ -68,10 +68,6 @@
     } catch {}
   }
 
-  // Sentinel returned when the site is actively blocking all requests (e.g. Cloudflare 403).
-  // In that case no slug will resolve and the whole run should be aborted.
-  const SITE_BLOCKED = Symbol("SITE_BLOCKED");
-
   async function probeSlug(slug) {
     if (!slug) return false;
     const ctrl = new AbortController();
@@ -81,11 +77,10 @@
         method: "GET",
         signal: ctrl.signal,
         redirect: "follow",
-        cache: "default",
-        credentials: "include",
+        cache: "no-store",
+        credentials: "omit",
       });
 
-      if (res.status === 403) return SITE_BLOCKED;
       return res.ok;
     } catch {
       return false;
@@ -105,10 +100,9 @@
         method: "GET",
         signal: ctrl.signal,
         redirect: "follow",
-        cache: "default",
-        credentials: "include",
+        cache: "no-store",
+        credentials: "omit",
       });
-      if (res.status === 403) return SITE_BLOCKED;
       if (!res.ok) return null;
       const html = await res.text();
 
@@ -328,34 +322,20 @@
 
       const candidates = buildCandidatesForEntry(slug, entry);
       let resolved = null;
-      let siteBlocked = false;
 
       for (const cand of candidates) {
-        const probeResult = await probeSlug(cand);
-        if (probeResult === SITE_BLOCKED) { siteBlocked = true; break; }
-        if (probeResult) { resolved = cand; break; }
+        if (await probeSlug(cand)) {
+          resolved = cand;
+          break;
+        }
         await sleep(PROBE_GAP_MS);
-      }
-
-      if (siteBlocked) {
-        logWarn("Site is returning 403 for all requests — aborting slug migration run.");
-        break;
       }
 
       if (!resolved) {
         const searchTitle = entry.englishTitle || entry.title || entry.romajiTitle || slug.replace(/-/g, " ");
         const found = await searchAn1meForTitle(searchTitle);
-        if (found === SITE_BLOCKED) {
-          logWarn("Site is returning 403 for search — aborting slug migration run.");
-          break;
-        }
-        if (found && found !== slug) {
-          const confirmResult = await probeSlug(found);
-          if (confirmResult === SITE_BLOCKED) {
-            logWarn("Site is returning 403 for confirmation probe — aborting slug migration run.");
-            break;
-          }
-          if (confirmResult) resolved = found;
+        if (found && found !== slug && (await probeSlug(found))) {
+          resolved = found;
         }
         await sleep(SEARCH_PROBE_GAP_MS);
       }
