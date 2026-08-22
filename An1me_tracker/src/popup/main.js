@@ -599,8 +599,8 @@
       defaultsTo: true,
       interpret: (raw) => raw !== false,
       copy: {
-        on: "Auto-switch to 4k server when available",
-        off: "4k auto-pick is off",
+        on: "Auto-switch to 4K/Remaster server when available",
+        off: "Premium server auto-pick is off",
       },
     },
     adGuard: {

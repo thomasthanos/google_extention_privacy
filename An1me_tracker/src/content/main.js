@@ -1111,7 +1111,8 @@
     const spans = Array.from(container.querySelectorAll("[data-embed-id]"));
     for (const s of spans) {
       if (s === except) continue;
-      if (/4k/i.test(s.textContent || "")) continue;
+      const text = s.textContent || "";
+      if (/4k/i.test(text) || /remaster/i.test(text)) continue;
       if (!isValidEmbedPayload(s)) continue;
       return s;
     }
@@ -1231,32 +1232,36 @@
 
   function maybeAutoSelect4kServer() {
     runServerSelectionWatcher("__atAuto4kClickedFor", (container, activeSpan, markDone, Logger) => {
-      const spans = container.querySelectorAll(AT.CONFIG.SELECTORS.EMBED);
-      let fourK = null;
-      for (const s of spans) {
-        if (/4k/i.test(s.textContent || "")) {
-          fourK = s;
-          break;
-        }
-      }
-      if (!fourK) return false;
+      const spans = Array.from(container.querySelectorAll(AT.CONFIG.SELECTORS.EMBED));
+      
+      let fourK = spans.find(s => /4k/i.test(s.textContent || ""));
+      let remaster = spans.find(s => /remaster/i.test(s.textContent || ""));
+      
+      if (!fourK && !remaster) return false;
 
-      if (!isValidEmbedPayload(fourK)) {
+      let target = null;
+      if (fourK && isValidEmbedPayload(fourK)) {
+        target = fourK;
+      } else if (remaster && isValidEmbedPayload(remaster)) {
+        target = remaster;
+      }
+
+      if (!target) {
         markDone();
-        Logger.debug("Auto-4k: 4k chip present but payload invalid — skipping");
+        Logger.debug("Auto-4k: special server chip present but payload invalid — skipping");
         return true;
       }
 
-      if (fourK === activeSpan) {
+      if (target === activeSpan) {
         markDone();
-        Logger.debug("Auto-4k: 4k server is already active");
+        Logger.debug("Auto-4k: special server is already active");
         return true;
       }
 
       try {
-        fourK.click();
+        target.click();
         markDone();
-        Logger.info(`Auto-4k: clicked "${(fourK.textContent || "").trim()}"`);
+        Logger.info(`Auto-4k: clicked "${(target.textContent || "").trim()}"`);
       } catch (err) {
         Logger.warn("Auto-4k click failed:", err);
       }

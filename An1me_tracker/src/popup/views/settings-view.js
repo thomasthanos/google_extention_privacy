@@ -139,8 +139,8 @@
         id: "settingsAuto4kServer",
         subtitleId: "settingsAuto4kServerSubtitle",
         iconKey: "fourK",
-        title: "Auto-Pick 4k Server",
-        subtitle: state.auto4kServer ? "Prefer 4k server when available" : "4k auto-pick is off",
+        title: "Auto-Pick Premium",
+        subtitle: state.auto4kServer ? "Prefer 4K/Remaster servers" : "Premium server auto-pick is off",
         enabled: state.auto4kServer,
       }),
       renderToggleItem({
@@ -384,7 +384,7 @@
     updateToggle(
       "settingsAuto4kServer",
       state.auto4kServer,
-      state.auto4kServer ? "Prefer 4k server when available" : "4k auto-pick is off",
+      state.auto4kServer ? "Prefer 4K/Remaster servers" : "Premium server auto-pick is off",
     );
     updateToggle(
       "settingsAdGuard",
