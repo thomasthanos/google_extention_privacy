@@ -516,7 +516,7 @@ const FillerFetchUI = {
 
     this._setProgress(pct, label);
 
-    if (state.status === "completed") {
+    if (state.status === "completed" && state.followUpPending !== true) {
       this._scheduleAutoClose();
     }
   },

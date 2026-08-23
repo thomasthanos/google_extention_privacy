@@ -144,6 +144,14 @@
         enabled: state.auto4kServer,
       }),
       renderToggleItem({
+        id: "settingsAutoResume",
+        subtitleId: "settingsAutoResumeSubtitle",
+        iconKey: "skipFwd",
+        title: "Auto-Resume",
+        subtitle: state.autoResume ? "Resume playback without asking" : "Ask before resuming where you left off",
+        enabled: state.autoResume,
+      }),
+      renderToggleItem({
         id: "settingsAdGuard",
         subtitleId: "settingsAdGuardSubtitle",
         iconKey: "skipMark",
@@ -155,7 +163,7 @@
 
     return `
             <section class="settings-card settings-card--preferences">
-                ${sectionHead("gear", "PREFERENCES", "6 settings")}
+                ${sectionHead("gear", "PREFERENCES", "7 settings")}
                 <div class="settings-toggle-list">${items}</div>
             </section>
         `;
@@ -286,6 +294,7 @@
       skiptimeHelper: settings.skiptimeHelper === true,
       auto4kServer: settings.auto4kServer !== false,
       adGuard: settings.adGuard !== false,
+      autoResume: settings.autoResume === true,
     };
 
     const alreadyRendered = container.querySelector(".settings-view-inner");
@@ -385,6 +394,11 @@
       "settingsAuto4kServer",
       state.auto4kServer,
       state.auto4kServer ? "Prefer 4K/Remaster servers" : "Premium server auto-pick is off",
+    );
+    updateToggle(
+      "settingsAutoResume",
+      state.autoResume,
+      state.autoResume ? "Resume playback without asking" : "Ask before resuming where you left off",
     );
     updateToggle(
       "settingsAdGuard",

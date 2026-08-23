@@ -148,49 +148,12 @@ function extractAnimeTitlesFromHtml(html) {
   return out;
 }
 
-// Cloudflare serves the extension's own origin a managed challenge (403) for every an1me page,
-// because a background fetch cannot control Origin/Sec-Fetch-Site. A request made inside an open
-// an1me tab is same-origin and rides that tab's clearance, so it is tried first; the direct fetch
-// stays as the fallback for when no tab is open.
-async function fetchAn1meViaTab(url, timeoutMs) {
-  let tabs;
-  try {
-    tabs = await chrome.tabs.query({ url: ["https://an1me.to/*", "https://*.an1me.to/*"] });
-  } catch {
-    return null;
-  }
-  const tab = (tabs || []).find((t) => t && t.id != null && t.discarded !== true && t.status !== "unloaded");
-  if (!tab) return null;
-
-  const response = await new Promise((resolve) => {
-    try {
-      chrome.tabs.sendMessage(tab.id, { type: "AN1ME_FETCH", url, timeoutMs }, (r) => {
-        void chrome.runtime.lastError;
-        resolve(r || null);
-      });
-    } catch {
-      resolve(null);
-    }
-  });
-
-  // A bridge that never answered (old content script, torn-down tab) is not a failed page load —
-  // return null so the caller falls back instead of caching a bogus error for the slug.
-  if (!response || typeof response.text !== "string") return null;
-  return { ok: response.ok === true, status: Number(response.status) || 0, text: response.text, finalUrl: response.finalUrl || url };
-}
+const AN1ME_UNREACHABLE = "an1me_unreachable";
 
 async function fetchAn1mePage(url, timeoutMs) {
-  const viaTab = await fetchAn1meViaTab(url, timeoutMs);
-  if (viaTab) return viaTab;
-
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { signal: ctrl.signal });
-    return { ok: res.ok, status: res.status, text: res.ok ? await res.text() : "", finalUrl: res.url };
-  } finally {
-    clearTimeout(timer);
-  }
+  const res = await an1meFetch(url, { timeoutMs });
+  if (res.unreachable) throw new Error(AN1ME_UNREACHABLE);
+  return res;
 }
 async function fetchAnimePageInfo(slug) {
   const candidates = buildAnimeInfoSlugCandidates(slug);
@@ -217,7 +180,10 @@ async function fetchAnimePageInfo(slug) {
     }
   }
 
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  if (!response.ok) {
+    if (response.status === 403 || response.status === 503) throw new Error(AN1ME_UNREACHABLE);
+    throw new Error(`HTTP ${response.status}`);
+  }
   const html = response.text;
 
   let totalEpisodes = null;

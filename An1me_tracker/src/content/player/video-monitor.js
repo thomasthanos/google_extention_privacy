@@ -182,8 +182,7 @@ const VideoMonitor = {
         this.silentResumeFor = null;
         const armedTime = this.silentResumeTime || 0;
         this.silentResumeTime = 0;
-        const saved = await ProgressTracker.getSavedProgress(animeInfo.uniqueId);
-        const resumeAt = Math.max(armedTime, saved?.currentTime || 0);
+        const resumeAt = armedTime;
         if (resumeAt > CONFIG.MIN_PROGRESS_TO_SAVE) {
           let attempt = 0;
           const MAX = 30;
@@ -215,6 +214,34 @@ const VideoMonitor = {
         const promptKey = animeInfo.uniqueId;
 
         let resumePromptShown = false;
+        let autoResumeEnabled = false;
+        try {
+          const pref = await chrome.storage.local.get(["autoResumeEnabled"]);
+          autoResumeEnabled = pref.autoResumeEnabled === true;
+        } catch {}
+        const autoResume = (savedProgress) => {
+          if (resumePromptShown) return;
+          resumePromptShown = true;
+          window.__atResumeShownFor.add(promptKey);
+          let tries = 0;
+          const seek = () => {
+            if (!this.videoElement || this.videoElement !== video) return;
+            if (video.readyState >= 2 && video.duration > 0) {
+              const target = Math.min(savedProgress.currentTime, Math.max(0, video.duration - 1));
+              try {
+                video.currentTime = target;
+                video.play().catch(() => {});
+                Logger.success(`Auto-resumed @ ${Math.round(target)}s`);
+              } catch (err) {
+                Logger.warn("Auto-resume seek failed:", err);
+              }
+            } else if (tries++ < 20) {
+              setTimeout(seek, 500);
+            }
+          };
+          setTimeout(seek, 500);
+        };
+
         const showPromptOnce = (savedProgress) => {
           if (resumePromptShown) return;
           if (window.__atResumeShownFor.has(promptKey)) {
@@ -226,6 +253,11 @@ const VideoMonitor = {
           const here = video.currentTime || 0;
           if (here > 0 && Math.abs(here - savedProgress.currentTime) < 5) return;
           if (here > savedProgress.currentTime) return;
+
+          if (autoResumeEnabled) {
+            autoResume(savedProgress);
+            return;
+          }
 
           resumePromptShown = true;
           window.__atResumeShownFor.add(promptKey);

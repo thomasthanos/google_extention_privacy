@@ -29,7 +29,7 @@
 
     const origin = state?.origin || (state?.options?.auto === true ? "background" : "manual");
     if (origin === "manual") return "modal";
-    if (origin === "sign-in" && getMetadataRepairProgress(state).total >= METADATA_REPAIR_MODAL_FETCH_THRESHOLD) return "modal";
+    if (origin === "sign-in") return getMetadataRepairProgress(state).total > 0 ? "modal" : "status";
     return "status";
   }
 
@@ -131,6 +131,7 @@
 
     const previousState = AT.PopupState.lastMetadataRepairState || null;
     const previousStatus = previousState?.status || null;
+    if (state?.status === "throttled") return previousState;
     AT.PopupState.lastMetadataRepairState = state || null;
     const { FillerFetchUI } = AT;
 
@@ -183,11 +184,21 @@
       }
       lastMetadataRepairResumeNudgeAt = 0;
       const nextStep = progress.total > 0 ? Math.min(progress.total, progress.processed + 1) : 0;
-      setMetadataRepairStatus(progress.total > 0 ? `Fetching ${nextStep}/${progress.total}...` : "Fetching data...");
+      if (uiMode === "status") {
+        setMetadataRepairStatus(
+          progress.remaining > 0 ? `Fetching ${progress.remaining} anime...` : "Fetching data...",
+        );
+      } else {
+        setMetadataRepairStatus(progress.total > 0 ? `Fetching ${nextStep}/${progress.total}...` : "Fetching data...");
+      }
       return state;
     }
 
     if (state.status === "completed") {
+      if (state.followUpPending === true) {
+        setMetadataRepairStatus("Fetching data...");
+        return state;
+      }
       const label = state.failed > 0 ? `Import Complete (${state.failed} failed)` : "Import Complete";
       setMetadataRepairStatus(label, true);
       if (previousStatus !== "completed" || previousState?.runId !== state.runId) {

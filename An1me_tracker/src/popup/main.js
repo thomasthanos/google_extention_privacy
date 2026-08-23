@@ -544,6 +544,7 @@
   const SKIPTIME_HELPER_KEY = "skiptimeHelperEnabled";
   const AUTO_4K_SERVER_KEY = "auto4kServerEnabled";
   const AD_GUARD_KEY = "adGuardEnabled";
+  const AUTO_RESUME_KEY = "autoResumeEnabled";
 
   const PASSWORD_SET_MARKER_KEY = "passwordSetMarker";
 
@@ -601,6 +602,17 @@
       copy: {
         on: "Auto-switch to 4K/Remaster server when available",
         off: "Premium server auto-pick is off",
+      },
+    },
+    autoResume: {
+      btnId: "settingsAutoResume",
+      subtitleId: "settingsAutoResumeSubtitle",
+      storageKey: AUTO_RESUME_KEY,
+      defaultsTo: false,
+      interpret: (raw) => raw === true,
+      copy: {
+        on: "Resume playback without asking",
+        off: "Ask before resuming where you left off",
       },
     },
     adGuard: {
@@ -682,6 +694,7 @@
   const renderSkiptimeHelperSetting = (enabled) => renderToggle("skiptime", enabled);
   const renderAuto4kServerSetting = (enabled) => renderToggle("auto4kServer", enabled);
   const renderAdGuardSetting = (enabled) => renderToggle("adGuard", enabled);
+  const renderAutoResumeSetting = (enabled) => renderToggle("autoResume", enabled);
   const loadCopyGuardSetting = () => loadToggleSetting("copyGuard");
   async function loadSmartNotifSetting() {
     try {
@@ -707,6 +720,7 @@
   const loadSkiptimeHelperSetting = () => loadToggleSetting("skiptime");
   const loadAuto4kServerSetting = () => loadToggleSetting("auto4kServer");
   const loadAdGuardSetting = () => loadToggleSetting("adGuard");
+  const loadAutoResumeSetting = () => loadToggleSetting("autoResume");
   AT.refreshSmartNotificationStatus = loadSmartNotifSetting;
 
   function setSettingsDataToolsExpanded(expanded) {
@@ -1907,6 +1921,13 @@
         });
         return;
       }
+      if (e.target.closest("#settingsAutoResume")) {
+        e.stopPropagation();
+        await handleToggle({ btnId: "settingsAutoResume", storageKey: AUTO_RESUME_KEY }, renderAutoResumeSetting, {
+          read: (btn) => btn.dataset.enabled === "true",
+        });
+        return;
+      }
       if (e.target.closest("#settingsAdGuard")) {
         e.stopPropagation();
         await handleToggle({ btnId: "settingsAdGuard", storageKey: AD_GUARD_KEY }, renderAdGuardSetting, {
@@ -2427,6 +2448,9 @@
       if (changes[AUTO_4K_SERVER_KEY]) {
         renderAuto4kServerSetting(changes[AUTO_4K_SERVER_KEY].newValue !== false);
       }
+      if (changes[AUTO_RESUME_KEY]) {
+        renderAutoResumeSetting(changes[AUTO_RESUME_KEY].newValue === true);
+      }
       if (changes[AD_GUARD_KEY]) {
         renderAdGuardSetting(changes[AD_GUARD_KEY].newValue !== false);
       }
@@ -2670,6 +2694,7 @@
       loadSkiptimeHelperSetting(),
       loadAuto4kServerSetting(),
       loadAdGuardSetting(),
+      loadAutoResumeSetting(),
     ]);
 
     try {

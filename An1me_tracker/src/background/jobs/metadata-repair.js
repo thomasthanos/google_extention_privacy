@@ -5,6 +5,8 @@ const PENDING_METADATA_REPAIR_KEY = "pendingBackgroundMetadataRepair";
 const PENDING_REPAIR_SLUGS_KEY = "pendingRepairSlugs";
 const META_LAST_RUN_KEY = "metadataRepairLastRunAt";
 const META_REPAIR_GATE_MS = 6 * 60 * 60 * 1000;
+const ENSURE_FRESH_GATE_MS = 60 * 60 * 1000;
+const ENSURE_FRESH_LAST_RUN_KEY = "ensureLibraryFreshLastRunAt";
 const METADATA_REPAIR_ALARM = "metadataRepairTick";
 const METADATA_REPAIR_STALE_MS = 3 * 60 * 1000;
 const METADATA_REPAIR_INTER_ITEM_DELAY_MS = 250;
@@ -42,7 +44,7 @@ function getMetadataRepairRemainingFetches(state) {
 
 function resolveMetadataRepairUiMode(origin, fetchCount) {
   if (origin === "manual") return "modal";
-  if (origin === "sign-in" && Number(fetchCount) >= METADATA_REPAIR_MODAL_FETCH_THRESHOLD) return "modal";
+  if (origin === "sign-in") return Number(fetchCount) > 0 ? "modal" : "status";
   return "status";
 }
 
@@ -301,6 +303,8 @@ async function repairAnimeInfoCacheUncoalesced(slug, forceRefresh = true) {
       await bgStorageSet({ [key]: notFoundEntry });
       return { status: "unavailable", entry: notFoundEntry };
     }
+    if (message.includes("an1me_unreachable")) throw error;
+
     // Transient failure (timeout/5xx): cache a short retryable backoff so a giant page (e.g. One Piece) isn't re-scraped every sweep. Keep prior data if any.
     const backoffEntry =
       cached && typeof cached === "object"
@@ -477,9 +481,19 @@ function repairEpisodeTypesCache(slug, title, forceRefresh = true, mediaType = n
 }
 
 async function finalizeMetadataRepair(state, patch = {}) {
+  let followUpPending = state?.pendingSignInSweep === true;
+  if (!followUpPending) {
+    try {
+      const pending = await bgStorageGet([PENDING_METADATA_REPAIR_KEY, PENDING_REPAIR_SLUGS_KEY]);
+      const queued = pending[PENDING_REPAIR_SLUGS_KEY];
+      followUpPending = pending[PENDING_METADATA_REPAIR_KEY] === true && Array.isArray(queued) && queued.length > 0;
+    } catch {}
+  }
+
   const finalState = {
     ...state,
     ...patch,
+    followUpPending,
     currentSlug: null,
     currentTitle: null,
     updatedAt: new Date().toISOString(),
@@ -566,7 +580,8 @@ async function runMetadataRepairBatch(options = {}) {
         infoResult = resolved.infoResult || { status: "unavailable", entry: null };
         fillerResult = resolved.fillerResult || { status: "nofill", entry: null };
       } catch (error) {
-        const message = error?.message || String(error);
+        const raw = error?.message || String(error);
+        const message = raw.includes("an1me_unreachable") ? "an1me.to unreachable" : raw;
         infoResult = { status: "failed", error: message };
         fillerResult = { status: "failed", error: message };
       }
@@ -650,12 +665,13 @@ async function startLibraryRepair(options = {}) {
       !hasExplicitMetadataRepairFetchTotal(existing)
     ) {
       const origin = shouldPromoteToManual ? "manual" : shouldPromoteToSignIn ? "sign-in" : existingOrigin;
-      const uiMode =
+      const nextUiMode =
         shouldPromoteToManual || shouldPromoteToSignIn
-          ? resolveMetadataRepairUiMode(origin, getMetadataRepairRemainingFetches(existing))
+          ? resolveMetadataRepairUiMode(origin, getMetadataRepairFetchTotal(existing))
           : hasExplicitUiMode
             ? existing.uiMode
-            : resolveMetadataRepairUiMode(origin, getMetadataRepairRemainingFetches(existing));
+            : resolveMetadataRepairUiMode(origin, getMetadataRepairFetchTotal(existing));
+      const uiMode = existing.uiMode === "modal" ? "modal" : nextUiMode;
       existing = {
         ...existing,
         runId: existing.runId || createMetadataRepairRunId(),
@@ -675,7 +691,7 @@ async function startLibraryRepair(options = {}) {
     return existing;
   }
 
-  if (options.auto === true && !isTargeted && requestedOrigin !== "sign-in") {
+  if (options.auto === true && !isTargeted) {
     try {
       const gateRead = await bgStorageGet([META_LAST_RUN_KEY]);
       const lastRun = Number(gateRead[META_LAST_RUN_KEY]) || 0;
@@ -699,10 +715,12 @@ async function startLibraryRepair(options = {}) {
   const now = new Date().toISOString();
   const fetchTotal = plan.items.length;
 
+  const carriedModal = existing?.followUpPending === true && existing?.uiMode === "modal";
+
   let state = {
     runId: createMetadataRepairRunId(),
     origin: requestedOrigin,
-    uiMode: resolveMetadataRepairUiMode(requestedOrigin, fetchTotal),
+    uiMode: carriedModal ? "modal" : resolveMetadataRepairUiMode(requestedOrigin, fetchTotal),
     fetchTotal,
     status: "running",
     startedAt: now,
@@ -834,6 +852,10 @@ async function ensureLibraryFresh(prioritySlugs = []) {
     return true;
   }
 
+  const gate = await bgStorageGet([ENSURE_FRESH_LAST_RUN_KEY]);
+  const lastEnsure = Number(gate[ENSURE_FRESH_LAST_RUN_KEY]) || 0;
+  if (lastEnsure > 0 && Date.now() - lastEnsure < ENSURE_FRESH_GATE_MS) return false;
+
   const stored = await bgStorageGet(["animeData"]);
   const animeData = stored.animeData || {};
   const plan = await buildLibraryRepairPlan(animeData, {
@@ -842,6 +864,8 @@ async function ensureLibraryFresh(prioritySlugs = []) {
     prioritySlugs,
   });
   if (!plan.items.length) return false;
+
+  await bgStorageSet({ [ENSURE_FRESH_LAST_RUN_KEY]: Date.now() });
 
   const now = new Date().toISOString();
   const fetchTotal = plan.items.length;

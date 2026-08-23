@@ -8,6 +8,7 @@ importScripts(
   "src/common/data/entry-state.js",
   "src/background/fetchers/aniskip.js",
   "src/background/fetchers/filler-discovery.js",
+  "src/background/fetchers/an1me-gateway.js",
   "src/background/fetchers/an1me-scraper.js",
   "src/background/notification-coordinator.js",
   "src/background/sync/watchlist-sync.js",
@@ -1644,6 +1645,8 @@ async function fetchCloudData(user, token, reason = "read") {
   }
 }
 
+const CLOUD_POLL_SKIPPED = "cloud_poll_skipped";
+
 async function pollCloudData(reason = "consumer-connected", { force = false, requireAuth = false } = {}) {
   if (_cloudPollInFlight) {
     if (!force) return _cloudPollInFlight;
@@ -1656,14 +1659,14 @@ async function pollCloudData(reason = "consumer-connected", { force = false, req
   _cloudPollInFlight = (async () => {
     try {
       await hydrateBgPollState();
-      if (!force && Date.now() - _lastCloudPollAt < CLOUD_CONSUMER_POLL_MIN_GAP_MS) return null;
+      if (!force && Date.now() - _lastCloudPollAt < CLOUD_CONSUMER_POLL_MIN_GAP_MS) return CLOUD_POLL_SKIPPED;
 
       await hydrateBgCloudDocCache();
       const user = await getFirebaseUser();
       const token = await getFirebaseToken();
       if (!user || !token) {
         if (requireAuth) throw new Error(!user ? "not_authenticated" : "token_unavailable");
-        return null;
+        return CLOUD_POLL_SKIPPED;
       }
 
       const cacheFresh =
@@ -3401,8 +3404,12 @@ const messageHandlers = {
     if (message.waitForCompletion === true) {
       task
         .then(async (doc) => {
+          if (doc === CLOUD_POLL_SKIPPED) {
+            sendResponse({ success: true, skipped: true, cloudDocFound: null });
+            return;
+          }
           if (!doc) {
-            const syncResult = await syncToFirebase("cloud-poll:verify-empty-or-skipped");
+            const syncResult = await syncToFirebase("cloud-poll:verify-empty");
             if (!syncResult.success) {
               sendResponse(syncResult);
               return;
@@ -3426,6 +3433,10 @@ const messageHandlers = {
     if (message.waitForCompletion === true) {
       task
         .then(async (doc) => {
+          if (doc === CLOUD_POLL_SKIPPED) {
+            sendResponse({ success: true, skipped: true, cloudDocFound: null });
+            return;
+          }
           if (!doc) {
             const syncResult = await syncToFirebase("cloud-poll:verify-empty");
             if (!syncResult.success) {
@@ -3660,6 +3671,13 @@ const messageHandlers = {
     })
       .then((state) => sendResponse({ success: true, state }))
       .catch((error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  },
+
+  AN1ME_GATEWAY_FETCH(message, _sender, sendResponse) {
+    an1meFetch(String(message.url || ""), { as: message.as, timeoutMs: message.timeoutMs })
+      .then((result) => sendResponse(result))
+      .catch((error) => sendResponse({ ok: false, status: 0, unreachable: true, error: error?.message || String(error) }));
     return true;
   },
 

@@ -495,6 +495,7 @@
     try {
       const FS = (typeof window !== "undefined" && window.AnimeTracker?.FirebaseSync) || null;
       if (!FS || typeof FS.pushAnilistAuthToCloud !== "function") return;
+      if (!isConnected() && reason !== "disconnect") return;
       if (!_auth?.updatedAt) {
         const stamped = await persistAuthAtomic("anilist-auth:stamp", (current) => {
           if (current?.updatedAt) return null; // already stamped by another writer — reuse it

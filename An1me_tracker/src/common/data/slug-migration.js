@@ -68,23 +68,10 @@
     } catch {}
   }
 
-  // an1me.to answers extension-origin requests with a Cloudflare challenge (HTTP 403). A fetch
-  // performed inside an open an1me tab is same-origin and rides that tab's clearance, so probes go
-  // through site-fetch-bridge.js when a tab exists and fall back to a direct fetch when none does.
   async function fetchAn1meViaTab(url) {
-    if (typeof chrome === "undefined" || !chrome.tabs?.query) return null;
-    let tabs;
-    try {
-      tabs = await chrome.tabs.query({ url: ["https://an1me.to/*", "https://*.an1me.to/*"] });
-    } catch {
-      return null;
-    }
-    const tab = (tabs || []).find((t) => t && t.id != null && t.discarded !== true && t.status !== "unloaded");
-    if (!tab) return null;
-
     const reply = await new Promise((resolve) => {
       try {
-        chrome.tabs.sendMessage(tab.id, { type: "AN1ME_FETCH", url, timeoutMs: PROBE_TIMEOUT_MS }, (r) => {
+        chrome.runtime.sendMessage({ type: "AN1ME_GATEWAY_FETCH", url, timeoutMs: PROBE_TIMEOUT_MS }, (r) => {
           void chrome.runtime.lastError;
           resolve(r || null);
         });
@@ -92,9 +79,7 @@
         resolve(null);
       }
     });
-    // No answer at all means the bridge is absent, not that the page is missing — let the caller
-    // fall back rather than record a false negative for the slug.
-    if (!reply || typeof reply.text !== "string") return null;
+    if (!reply || reply.unreachable || typeof reply.text !== "string") return null;
     return { ok: reply.ok === true, status: Number(reply.status) || 0, text: reply.text };
   }
   async function probeSlug(slug) {
