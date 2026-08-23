@@ -1472,6 +1472,11 @@
         },
       });
       if (saved && typeof saved.catch === "function") saved.catch((e) => window.__atSwallow("savePref", e));
+
+      Promise.resolve(saved)
+        .then(() => chrome.storage.local.set({ playbackSettingsUpdatedAt: new Date().toISOString() }))
+        .then(() => AT.FirebaseSync?.queuePlaybackSettingsSave?.())
+        .catch((e) => window.__atSwallow("savePref:cloud", e));
     } catch {}
   }
   AT.saveLibraryPreferences = (options) => persistLibraryPreferences(options);

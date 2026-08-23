@@ -2564,7 +2564,11 @@ const BG_PLAYBACK_FIELD_MAP = {
   autoSkipFiller: "autoSkipFillers",
   skiptimeHelper: "skiptimeHelperEnabled",
   auto4kServer: "auto4kServerEnabled",
+  adGuard: "adGuardEnabled",
+  autoResume: "autoResumeEnabled",
 };
+const BG_PLAYBACK_DEFAULT_ON = new Set(["copyGuardEnabled", "auto4kServerEnabled", "adGuardEnabled"]);
+const BG_USER_PREFS_KEY = "userPreferences";
 const BG_PLAYBACK_UPDATED_AT_KEY = "playbackSettingsUpdatedAt";
 
 async function applyCloudPlaybackSettings(cloudPlayback) {
@@ -2573,7 +2577,7 @@ async function applyCloudPlaybackSettings(cloudPlayback) {
   if (!cloudUpdatedAt) return false;
 
   try {
-    const localKeys = Object.values(BG_PLAYBACK_FIELD_MAP).concat([BG_PLAYBACK_UPDATED_AT_KEY]);
+    const localKeys = Object.values(BG_PLAYBACK_FIELD_MAP).concat([BG_PLAYBACK_UPDATED_AT_KEY, BG_USER_PREFS_KEY]);
     const outcome = await runBgLibraryTransaction(localKeys, async (stored) => {
       const localUpdatedAt = stored[BG_PLAYBACK_UPDATED_AT_KEY] || null;
       if (localUpdatedAt && Date.parse(localUpdatedAt) >= Date.parse(cloudUpdatedAt)) {
@@ -2585,10 +2589,18 @@ async function applyCloudPlaybackSettings(cloudPlayback) {
       for (const [field, storageKey] of Object.entries(BG_PLAYBACK_FIELD_MAP)) {
         const next = !!cloudPlayback[field];
         const current = stored[storageKey];
-        const currentBool =
-          storageKey === "copyGuardEnabled" || storageKey === "auto4kServerEnabled" ? current !== false : current === true;
+        const currentBool = BG_PLAYBACK_DEFAULT_ON.has(storageKey) ? current !== false : current === true;
         if (currentBool !== next) {
           writes[storageKey] = next;
+          changed = true;
+        }
+      }
+
+      const cloudPrefs = cloudPlayback[BG_USER_PREFS_KEY];
+      if (cloudPrefs && typeof cloudPrefs === "object") {
+        const localPrefs = stored[BG_USER_PREFS_KEY];
+        if (JSON.stringify(localPrefs || null) !== JSON.stringify(cloudPrefs)) {
+          writes[BG_USER_PREFS_KEY] = cloudPrefs;
           changed = true;
         }
       }
@@ -2672,6 +2684,9 @@ async function queueStoredPlaybackSettings() {
     "autoSkipFillers",
     "skiptimeHelperEnabled",
     "auto4kServerEnabled",
+    "adGuardEnabled",
+    "autoResumeEnabled",
+    "userPreferences",
     BG_PLAYBACK_UPDATED_AT_KEY,
   ]);
   const updatedAt = stored[BG_PLAYBACK_UPDATED_AT_KEY] || new Date().toISOString();
@@ -2684,6 +2699,9 @@ async function queueStoredPlaybackSettings() {
     autoSkipFiller: stored.autoSkipFillers === true,
     skiptimeHelper: stored.skiptimeHelperEnabled === true,
     auto4kServer: stored.auto4kServerEnabled !== false,
+    adGuard: stored.adGuardEnabled !== false,
+    autoResume: stored.autoResumeEnabled === true,
+    userPreferences: stored.userPreferences || null,
     updatedAt,
   });
 }
