@@ -11,5 +11,4 @@ node_modules/
 .dev.vars*
 nexus.mods.bypass/.claude/settings.local.json
 .claude/settings.local.json
-/nexus.mods.bypass/internal/promo
-An1me_tracker/An1me_tracker
+/internal/promo

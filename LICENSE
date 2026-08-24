@@ -46,7 +46,7 @@ public domain and does not grant permission to reuse it.
 
 3. NAME, ICONS, AND STORE ASSETS
 
-   The name "NexusMods Bypass", the extension icons in nexus.mods.bypass/src/icons/, and
+   The name "NexusMods Bypass", the extension icons in src/icons/, and
    every file in nexus.mods.bypass/internal/store-assets/ are excluded from all permissions
    above. The same applies to the names and artwork of the other extensions in this
    repository.
@@ -91,4 +91,4 @@ public domain and does not grant permission to reuse it.
 8. PERMISSION REQUESTS
 
    Want to do something this licence does not allow? Ask:
-   https://github.com/thomasthanos/google_extention_privacy/issues
+   https://github.com/thomasthanos/nexusmods-bypass/issues

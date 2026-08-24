@@ -1,4 +1,0 @@
-backend/serviceAccountKey.json
-.env
-.env.*
-!.env.example

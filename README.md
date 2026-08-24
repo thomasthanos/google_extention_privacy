@@ -1,160 +1,210 @@
 <div align="center">
 
-<img src=".github/assets/banner.svg" alt="Browser Extensions by ThomasThanos">
+<img src=".github/assets/banner-nexus.svg" alt="NexusMods Bypass">
 
-[![Manifest V3](.github/assets/badge-manifest.svg)](https://developer.chrome.com/docs/extensions/mv3/intro/)
-[![Chrome ready](.github/assets/badge-chrome.svg)](#-installation)
-[![Edge ready](.github/assets/badge-edge.svg)](#-installation)
-[![4 extensions](.github/assets/badge-ext-count.svg)](#-the-extensions)
-[![Source-available licence](.github/assets/badge-licence.svg)](LICENSE)
+[![Manifest V3](.github/assets/badge-manifest.svg)](src/manifest.json)
+[![13 languages](.github/assets/badge-lang-13.svg)](src/_locales)
+[![Data stays local](.github/assets/badge-local.svg)](PRIVACY.md)
 <br>
-[![Showcase](.github/assets/btn-showcase.svg)](https://thomasthanos.github.io/google_extention_privacy/)
-[![Report a bug](.github/assets/btn-reportbug.svg)](https://github.com/thomasthanos/google_extention_privacy/issues/new/choose)
+[![Install](.github/assets/btn-install.svg)](#-install)
+[![Features](.github/assets/btn-features.svg)](#-features)
+[![Settings](.github/assets/btn-settings.svg)](#-settings)
+[![Permissions](.github/assets/btn-permissions.svg)](#-permissions-explained)
 [![Privacy](.github/assets/btn-privacy.svg)](PRIVACY.md)
-[![Contributing](.github/assets/btn-contributing.svg)](CONTRIBUTING.md)
-[![Licence](.github/assets/btn-licence.svg)](LICENSE)
+[![Troubleshooting](.github/assets/btn-troubleshooting.svg)](#-troubleshooting)
+
+<img src=".github/assets/spec-nexus.svg" alt="At a glance">
 
 </div>
 
 <img src=".github/assets/divider.svg" width="100%" alt="">
 
-## <img src=".github/assets/icon-info.svg" width="22" align="middle"> What is this repository?
+## <img src=".github/assets/icon-cloud.svg" width="22" align="middle"> What it does
 
-This is the **source of four browser extensions**, published openly so that anyone can read exactly
-what they do before installing them. Nothing is minified, nothing is obfuscated.
+Installing a large mod collection by hand means clicking through requirement screens, ad panels and
+download pages, one file at a time, for an hour. This extension turns that into: open the collection
+page, press start, walk away.
 
-> **Source-available, not open source.** You may read, audit and use official builds.
-> You may not redistribute, republish or sell them.
-
-[![Read the licence](.github/assets/btn-licence-read.svg)](LICENSE)
-
-<img src=".github/assets/divider.svg" width="100%" alt="">
-
-## <img src=".github/assets/icon-package.svg" width="22" align="middle"> The extensions
-
-| Extension | What it does | Version |
-|---|---|:--:|
-| [![An1me.to Tracker](.github/assets/link-tracker.svg)](An1me_tracker/) | Tracks your anime progress automatically, resumes where you left off, syncs your library to the cloud, marks fillers, connects to AniList, and shows stats, goals and achievements. | [![7.2.4](.github/assets/chip-v-tracker.svg)](An1me_tracker/manifest.json) |
-| [![NexusMods Bypass](.github/assets/link-nexus.svg)](nexus.mods.bypass/) | Removes the friction from Nexus Mods downloads, queues whole collections, and keeps a local history of finished files. 13 languages. | [manifest.json](nexus.mods.bypass/manifest.json) |
-| [![Auto Liker for Tinder & Boo](.github/assets/link-liker.svg)](auto-liker-extension/) | A neon on-page button that likes for you, with a live counter, progress ring and smart pause. 3 languages. | [![4.8](.github/assets/chip-v-liker.svg)](auto-liker-extension/manifest.json) |
-| [![An1me.to Speed Control](.github/assets/link-speed.svg)](An1me_speed_control/) | Hold <img src=".github/assets/kbd-f7.svg" alt="F7" align="middle"> to boost playback speed, press <img src=".github/assets/kbd-f8.svg" alt="F8" align="middle"> to toggle it. Remembers your default speed and volume. | [![3.5](.github/assets/chip-v-speed.svg)](An1me_speed_control/manifest.json) |
-
-Each folder has its own README with the full feature list, permissions and troubleshooting.
+It handles two download modes — **send to Vortex** or **download in the browser** — queues the whole
+list, paces itself so Nexus does not rate-limit you, and keeps a local history so an interrupted run
+can pick up where it stopped instead of starting over.
 
 <img src=".github/assets/divider.svg" width="100%" alt="">
 
-## <img src=".github/assets/icon-install.svg" width="22" align="middle"> Installation
+## <img src=".github/assets/icon-sparkle.svg" width="22" align="middle"> Features
 
-None of these are on the Chrome Web Store yet, so they are installed as **unpacked extensions**.
-It takes about 30 seconds.
+### The download flow
 
-<details open>
-<summary><b>Chrome / Brave / Opera</b></summary>
+- **Auto-start downloads** when you land on a file page — no extra click.
+- **Skip requirement screens** and go straight to the download step.
+- **Archived file buttons** — adds Vortex and browser download buttons back to archived entries that
+  Nexus hides.
+- **Auto-close Vortex tabs** after the handoff, with a delay you control.
+- **Clear error messages** when Nexus fails to return a usable link, instead of a silent dead end.
+
+### Collection downloader
+
+- Detects collection pages and builds a **Ready Queue** of everything in the revision.
+- Choose your method per run: **Send to Vortex** or **Browser download**.
+- **Paced queue** — a configurable pause between mods, plus a speed estimate for Vortex mode,
+  because the browser cannot see a transfer happening inside Vortex.
+- **Rate-limit aware** — if Nexus throttles you, the queue pauses and resumes on its own.
+- **Local download history** — already-downloaded mods are recognised, so you can pick
+  *Skip Downloaded* or *Re-download All* when you retry a collection.
+- **Update collection** — compare revisions to see what actually changed.
+- Runs in the background service worker, so it survives tab navigation.
+
+### Quality of life
+
+- **Hide ads and Premium panels** — advertising slots, empty ad containers and upgrade banners are
+  collapsed while you browse.
+- **Guided onboarding page** the first time you install.
+- **Built-in bug reporter** that attaches recent extension errors to a pre-filled GitHub issue.
+- **Support panel** — entirely optional, never gates a feature.
+
+### <img src=".github/assets/icon-globe.svg" width="20" align="middle"> Languages
+
+English, Greek, German, Spanish, French, Italian, Japanese, Korean, Polish, Portuguese (BR),
+Russian, Turkish, Simplified Chinese — 319 strings each. There is also an **Always use English**
+switch for when your browser language and your Nexus language disagree.
+
+<img src=".github/assets/divider.svg" width="100%" alt="">
+
+## <img src=".github/assets/icon-install.svg" width="22" align="middle"> Install
+
+**Chrome and Edge**
+
+1. Download the repository (`Code` → `Download ZIP`) and unzip it.
+2. Open <img src=".github/assets/cmd-chrome-extensions.svg" alt="chrome://extensions" align="middle"> (or <img src=".github/assets/cmd-edge-extensions.svg" alt="edge://extensions" align="middle">).
+3. Enable **Developer mode**.
+4. Click **Load unpacked** and select the **`src` folder** inside it — that is the
+   extension; `tools/`, `dist/` and `internal/` beside it are not part of the package.
+5. Open a Nexus Mods page — the welcome screen appears on first run.
+
+**Firefox 140 or newer**
+
+Firefox needs its own package rather than the `src` folder: `manifest.json` declares a
+Chrome service worker, and Gecko runs the same background file as an event page instead.
+`tools/build-zip.mjs` writes both packages from the one tree.
+
+1. Download and unzip the repository as above, then run `node tools/build-zip.mjs`.
+2. Open `about:debugging#/runtime/this-firefox`.
+3. Click **Load Temporary Add-on** and pick `dist/nexus.mods.bypass-<version>-firefox.zip`.
+4. Open a Nexus Mods page and let the add-on run on `nexusmods.com` when Firefox asks —
+   Manifest V3 leaves that grant to you, and nothing on the page changes until you give it.
+
+A temporary add-on is unloaded when Firefox closes. Installing it permanently needs a
+build signed by AMO.
+
+![Note](.github/assets/callout-note.svg)
+> **Vortex mode requires Vortex to be running.** The browser hands the link over and cannot verify
+> what happens after that, which is why files are recorded as sent rather than as completed.
+
+<img src=".github/assets/divider.svg" width="100%" alt="">
+
+## <img src=".github/assets/icon-settings.svg" width="22" align="middle"> Settings
+
+Reachable from the popup → **Page settings**. Changes save instantly.
+
+| Group | Settings |
+|---|---|
+| **Download Flow** | Start downloads automatically · Close Vortex tabs (+ delay) · Skip requirement screens · Show error popups |
+| **Files & Pacing** | Archived file buttons · Browser download folder · Download request timeout · Your Nexus download speed · Pause between mods |
+| **Advanced** | Hide ads and Premium panels · Verbose extension logs |
+| **Language** | Always use English |
+
+**Restore Defaults** resets everything and refreshes the Nexus page.
+
+<img src=".github/assets/divider.svg" width="100%" alt="">
+
+## <img src=".github/assets/icon-key.svg" width="22" align="middle"> Permissions explained
+
+| Permission | Why it is needed |
+|---|---|
+| `storage` | Your settings and the local download history. |
+| `downloads` | Browser download mode — starting files and putting them in your chosen subfolder. |
+| `downloads.ui` | Chrome and Edge only — Firefox has no such API, and the Firefox package does not ask for it. Being removed anyway: the "hide the download button" setting is gone as of 2.4.3 and the permission is held only to put the button back for profiles that still have it hidden. Dropped in 2.5.0. |
+| `alarms` | Pacing the background queue between mods. |
+| `https://www.nexusmods.com/*` | The only site this extension touches. |
+
+That is the complete list. No tabs permission, no all-URLs, no remote code.
+
+<img src=".github/assets/divider.svg" width="100%" alt="">
+
+## <img src=".github/assets/icon-shield.svg" width="22" align="middle"> Privacy, briefly
+
+**Everything stays on your computer.** Settings, history and error logs live in local extension
+storage. Nothing is sent anywhere except the requests to Nexus Mods that a download requires — the
+same ones your browser would make if you clicked the buttons yourself. No analytics, no ads, no
+account.
+
+[![Full privacy detail](.github/assets/btn-privacy-detail.svg)](PRIVACY.md)
+
+<img src=".github/assets/divider.svg" width="100%" alt="">
+
+## <img src=".github/assets/icon-code.svg" width="22" align="middle"> How the code is organised
+
+![NexusMods Bypass source layout](.github/assets/tree-nexus.svg)
+
+Contributors: run `node tools/check-locales.mjs` before opening a PR that touches strings.
+
+<img src=".github/assets/divider.svg" width="100%" alt="">
+
+## <img src=".github/assets/icon-help.svg" width="22" align="middle"> Troubleshooting
+
+<details>
+<summary><b>Downloads do not start automatically</b></summary>
 
 <br>
 
-1. **Download this repository** — click the green `Code` button → `Download ZIP`, then unzip it.
-2. Open <img src=".github/assets/cmd-chrome-extensions.svg" alt="chrome://extensions" align="middle"> in your browser.
-3. Turn on **Developer mode** (top-right toggle).
-4. Click **Load unpacked**.
-5. Select the **folder of the extension you want** — for example `An1me_tracker`, not the whole repo.
-6. Pin it to the toolbar with the puzzle-piece icon.
-
+Check **Start downloads automatically** in settings, and confirm you are signed in to Nexus Mods —
+the extension detects login state and will not fight an anonymous session.
 </details>
 
 <details>
-<summary><b>Microsoft Edge</b></summary>
+<summary><b>Vortex never receives the file</b></summary>
 
 <br>
 
-1. Download and unzip the repository as above.
-2. Open <img src=".github/assets/cmd-edge-extensions.svg" alt="edge://extensions" align="middle">.
-3. Turn on **Developer mode** (left sidebar).
-4. Click **Load unpacked** and select the extension's folder.
-
+Vortex must already be running when the handoff happens. If it is slow to start, raise the
+**Close-tab delay** so the tab is not closed before Vortex picks up the link.
 </details>
 
-![Important](.github/assets/callout-important.svg)
-> Pick the **sub-folder**, not the repository root. The root is a showcase page, not an extension.
-> If Chrome says *"Manifest file is missing or unreadable"*, you selected one level too high.
+<details>
+<summary><b>The collection queue paused itself</b></summary>
 
-**Updating:** download the repo again, replace the folder, then press the reload icon on the
-extension card in <img src=".github/assets/cmd-chrome-extensions.svg" alt="chrome://extensions" align="middle">.
+<br>
 
-<img src=".github/assets/divider.svg" width="100%" alt="">
+That is the rate-limit guard. Nexus throttled the account; the queue resumes automatically.
+Completed files stay in history, so nothing is re-downloaded when it does.
+</details>
 
-## <img src=".github/assets/icon-shield.svg" width="22" align="middle"> Privacy in one paragraph
+<details>
+<summary><b>A collection run keeps re-downloading files I already have</b></summary>
 
-Nothing is sold, nothing is profiled, and no analytics SDK exists anywhere in this repository.
-Three of the four extensions keep **100% of their data on your own machine**. Only **An1me.to
-Tracker** sends data off-device, and only if you sign in — your watch library goes to your own
-private Firebase document so it can sync between your browsers. Full details, per extension and per
-permission, are written up separately.
+<br>
 
-[![Read the privacy policy](.github/assets/btn-privacy-policy.svg)](PRIVACY.md)
+When the history dialog appears, choose **Skip Downloaded**. If history was cleared, the extension
+has no way to know which files exist on disk.
+</details>
 
-<img src=".github/assets/divider.svg" width="100%" alt="">
+<details>
+<summary><b>Reporting a bug</b></summary>
 
-## <img src=".github/assets/icon-folder.svg" width="22" align="middle"> Repository layout
+<br>
 
-![Repository layout](.github/assets/tree-root.svg)
-
-<img src=".github/assets/divider.svg" width="100%" alt="">
-
-## <img src=".github/assets/icon-bug.svg" width="22" align="middle"> Something broken?
-
-Open an issue — there is a guided bug-report form for NexusMods Bypass, and blank issues are
-enabled for everything else.
-
-[![Report a bug](.github/assets/btn-reportbug.svg)](https://github.com/thomasthanos/google_extention_privacy/issues/new/choose)
-
-A good report includes: which extension, its version, your browser and version, what you expected,
-and what happened instead. Console output (<img src=".github/assets/kbd-f12.svg" alt="F12" align="middle"> → Console) helps a lot.
-
-<img src=".github/assets/divider.svg" width="100%" alt="">
-
-## <img src=".github/assets/icon-contribute.svg" width="22" align="middle"> Contributing
-
-Pull requests are welcome, with one condition worth knowing up front: contributions are licensed to
-the project owner under the terms in the licence, § 4. Read the contributing guide before you
-start — it will save you a round trip.
-
-[![Read the contributing guide](.github/assets/btn-contributing-read.svg)](CONTRIBUTING.md)
+Use the popup's **Report a bug** button — it pre-fills the GitHub form with the recent error log.
+Turning on **Verbose extension logs** first gives a much more useful report.
+</details>
 
 <img src=".github/assets/divider.svg" width="100%" alt="">
 
 ## <img src=".github/assets/icon-license.svg" width="22" align="middle"> Licence
 
-Copyright © 2026 Thomas Thanos. All rights reserved.
+Source-available, all rights reserved. The name *NexusMods Bypass*, the icons in `src/icons/`, and
+everything in `internal/` are explicitly excluded from all permissions — a review fork may not
+carry the branding.
 
-| | You may | | You may not |
-|:--:|---|:--:|---|
-| <img src=".github/assets/pill-yes.svg" width="20" align="middle"> | Install and use official builds, free, forever | <img src=".github/assets/pill-no.svg" width="20" align="middle"> | Redistribute the code or builds |
-| <img src=".github/assets/pill-yes.svg" width="20" align="middle"> | Read, study and audit the source | <img src=".github/assets/pill-no.svg" width="20" align="middle"> | Publish it to any extension store or registry |
-| <img src=".github/assets/pill-yes.svg" width="20" align="middle"> | Fork on GitHub **for review or to prepare a PR** | <img src=".github/assets/pill-no.svg" width="20" align="middle"> | Sell it, or bundle it with anything that earns money |
-| <img src=".github/assets/pill-yes.svg" width="20" align="middle"> | Open issues and pull requests | <img src=".github/assets/pill-no.svg" width="20" align="middle"> | Publish modified or derived versions |
-| | | <img src=".github/assets/pill-no.svg" width="20" align="middle"> | Use the names, icons or store artwork |
+[![Read the licence](.github/assets/btn-licence-read.svg)](LICENSE)
 
-Need an exception? Ask:
-
-[![Open an issue](.github/assets/btn-openissue.svg)](https://github.com/thomasthanos/google_extention_privacy/issues)
-
-Third-party fonts, APIs and artwork keep their own licences, listed separately.
-
-[![Third-party notices](.github/assets/btn-notices.svg)](THIRD-PARTY-NOTICES.md)
-
-<img src=".github/assets/divider.svg" width="100%" alt="">
-
-## <img src=".github/assets/icon-warning.svg" width="22" align="middle"> Not affiliated
-
-These extensions are not affiliated with, endorsed by, or connected to Nexus Mods, an1me.to, Tinder,
-Boo, AniList, MyAnimeList or Google. All product names and trademarks belong to their owners.
-
-<div align="center">
-<br>
-
-<img src=".github/assets/icon-star.svg" width="28" align="middle">
-
-Made by <a href="https://github.com/thomasthanos"><img src=".github/assets/tag-thomasthanos.svg" alt="ThomasThanos" align="middle"></a> — star the repo if any of this saved you time.
-
-</div>
+**Not affiliated with, endorsed by, or connected to Nexus Mods.**

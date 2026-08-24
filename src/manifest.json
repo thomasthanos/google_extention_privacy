@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_appName__",
+  "version": "2.4.4",
+  "description": "__MSG_appDesc__",
+  "default_locale": "en",
+  "homepage_url": "https://github.com/thomasthanos/nexusmods-bypass",
+  "permissions": [
+    "storage",
+    "downloads",
+    "downloads.ui",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://www.nexusmods.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.nexusmods.com/*"],
+      "css": ["content/content-styles.css"],
+      "js": [
+        "shared.js",
+        "content/storage.js",
+        "content/errors.js",
+        "content/auth.js",
+        "content/nnw.js",
+        "content/ndc.js",
+        "content/ui.js",
+        "content/main.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
