@@ -138,11 +138,12 @@
       counter.style.display = "block";
       const ICON =
         '<svg class="counter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
-      counterText.innerHTML = `${ICON}${finalCount} episode${finalCount !== 1 ? "s" : ""} selected`;
+      counterText.innerHTML = ICON;
+      counterText.appendChild(document.createTextNode(finalCount + " episode" + (finalCount !== 1 ? "s" : "") + " selected"));
       if (knownTotal) {
         const pct = Math.min(100, Math.round((finalCount / knownTotal) * 100));
-        if (counterPct) counterPct.textContent = `${finalCount} / ${knownTotal} · ${pct}%`;
-        counterFill.style.width = `${pct}%`;
+        if (counterPct) counterPct.textContent = finalCount + " / " + knownTotal + " · " + pct + "%";
+        counterFill.style.width = pct + "%";
       } else {
         if (counterPct) counterPct.textContent = "";
         counterFill.style.width = "0%";
@@ -157,10 +158,10 @@
         block.dataset.checked = includeFillers ? "true" : "false";
         if (includeFillerText) {
           const n = fillers.length;
-          includeFillerText.textContent = includeFillers ? `Fillers included (${n})` : `Include ${n} filler${n !== 1 ? "s" : ""}`;
+          includeFillerText.textContent = includeFillers ? "Fillers included (" + n + ")" : "Include " + n + " filler" + (n !== 1 ? "s" : "");
         }
         if (rangesPreview) {
-          rangesPreview.textContent = `Fillers: ${buildRangeString(fillers)}`;
+          rangesPreview.textContent = "Fillers: " + buildRangeString(fillers);
         }
       } else {
         block.style.display = "none";
