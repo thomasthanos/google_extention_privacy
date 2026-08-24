@@ -1,16 +1,4 @@
-/* ============================================================
-   Nexus Mods Toolkit — Content Styles
-   iOS 26/27 "Liquid Glass" Design System
-   - Strong perimeter glass rim (specular highlight + dark hairline)
-   - Multi-layer liquid glass core (tint + refraction + noise + sheen)
-   - Background underneath is fully masked by high-opacity tint
-   ============================================================ */
-
-/* ============================================================
-   1. DESIGN TOKENS
-   ============================================================ */
 :root {
-  /* Base palette */
   --nxtk-bg-deep: #0a0b12;
   --nxtk-accent: #d98f40;
   --nxtk-accent-hover: #ecaa5a;
@@ -19,35 +7,29 @@
   --nxtk-accent-glow: 0 0 24px rgba(217, 143, 64, 0.35);
   --nxtk-accent-glow-strong: 0 0 40px rgba(217, 143, 64, 0.55);
 
-  /* Liquid glass tints (high opacity = bg is NOT visible) */
   --nxtk-glass-tint: rgba(18, 20, 32, 0.78);
   --nxtk-glass-tint-strong: rgba(14, 16, 26, 0.88);
   --nxtk-glass-tint-soft: rgba(28, 30, 44, 0.7);
   --nxtk-glass-tint-deep: rgba(10, 12, 22, 0.92);
 
-  /* Surfaces (for embedded elements) */
   --nxtk-surface: rgba(36, 38, 54, 0.72);
   --nxtk-surface-high: rgba(52, 54, 72, 0.78);
   --nxtk-surface-low: rgba(22, 24, 36, 0.78);
 
-  /* Borders */
   --nxtk-border: rgba(255, 255, 255, 0.1);
   --nxtk-border-strong: rgba(255, 255, 255, 0.18);
   --nxtk-accent-border: rgba(217, 143, 64, 0.45);
 
-  /* Liquid glass rim (perimeter glow) */
   --nxtk-rim-light: rgba(255, 255, 255, 0.55);
   --nxtk-rim-light-soft: rgba(255, 255, 255, 0.22);
   --nxtk-rim-dark: rgba(0, 0, 0, 0.55);
   --nxtk-rim-accent: rgba(217, 143, 64, 0.5);
 
-  /* Text */
   --nxtk-text: #eceaf2;
   --nxtk-text-dim: #8a8a9a;
   --nxtk-text-bright: #f8f8fc;
   --nxtk-text-muted: rgba(236, 234, 242, 0.62);
 
-  /* Status colors */
   --nxtk-danger: #ff5560;
   --nxtk-danger-soft: rgba(255, 85, 96, 0.18);
   --nxtk-success: #45d672;
@@ -55,7 +37,6 @@
   --nxtk-info: #5cbcff;
   --nxtk-info-soft: rgba(92, 188, 255, 0.18);
 
-  /* Radii — iOS 26 squircle-ish */
   --nxtk-radius-xl: 28px;
   --nxtk-radius: 22px;
   --nxtk-radius-md: 16px;
@@ -63,33 +44,23 @@
   --nxtk-radius-xs: 8px;
   --nxtk-radius-pill: 999px;
 
-  /* Motion */
   --nxtk-ease: cubic-bezier(0.32, 0.72, 0, 1);
   --nxtk-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --nxtk-transition: all 0.32s var(--nxtk-ease);
   --nxtk-transition-fast: all 0.18s var(--nxtk-ease);
 
-  /* Effects */
   --nxtk-glass-blur: 32px;
   --nxtk-glass-blur-strong: 48px;
   --nxtk-glass-saturate: 180%;
 
-  /* The signature LIQUID GLASS rim shadow (perimeter) */
   --nxtk-rim:
-    /* inner top white highlight (light source) */
     inset 0 1.5px 0 0 var(--nxtk-rim-light),
-    /* inner left white highlight */
     inset 1.5px 0 0 0 var(--nxtk-rim-light-soft),
-    /* inner bottom dark shadow */
     inset 0 -1.5px 0 0 var(--nxtk-rim-dark),
-    /* inner right dark shadow */
     inset -1.5px 0 0 0 rgba(0, 0, 0, 0.35),
-    /* inner subtle hairline */
     inset 0 0 0 1px rgba(255, 255, 255, 0.08),
-    /* outer ambient shadow */
     0 24px 60px -12px rgba(0, 0, 0, 0.65),
     0 8px 24px -8px rgba(0, 0, 0, 0.5),
-    /* outer accent halo */
     0 0 0 0.5px rgba(217, 143, 64, 0.22);
 
   --nxtk-rim-strong:
@@ -109,7 +80,6 @@
     inset 0 0 0 1px rgba(255, 255, 255, 0.06),
     0 8px 24px -8px rgba(0, 0, 0, 0.45);
 
-  /* Specular sweep (the "wet" highlight on top of glass) */
   --nxtk-specular: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.22) 0%,
@@ -120,13 +90,9 @@
     rgba(255, 255, 255, 0.14) 100%
   );
 
-  /* SVG noise grain for liquid surface texture */
   --nxtk-noise: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.35 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>");
 }
 
-/* ============================================================
-   2. ANIMATIONS
-   ============================================================ */
 @keyframes nxtk-slideUp {
   from { opacity: 0; transform: translateY(40px) scale(0.94); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -153,13 +119,6 @@
   100% { background-position:  250% 0; }
 }
 
-/* ============================================================
-   3. LIQUID GLASS PRIMITIVE
-   Use as: <div class="nxtk-glass">... content ...</div>
-   Or apply directly to any surface via the @mixin-style rules below.
-   ============================================================ */
-
-/* Internal pseudo-elements used by every glass surface */
 .nxtk-deck,
 .nxtk-modal,
 .nxtk-dropdown-menu,
@@ -175,7 +134,6 @@
   isolation: isolate;
 }
 
-/* Glass specular highlight overlay (added by ui.js as a child span) */
 .nxtk-glass-specular {
   position: absolute;
   inset: 0;
@@ -197,7 +155,6 @@
   mix-blend-mode: overlay;
 }
 
-/* Static sheen layer */
 .nxtk-glass-sheen {
   position: absolute;
   inset: 0;
@@ -217,9 +174,6 @@
 .nxtk-deck:hover  > .nxtk-glass-sheen,
 .nxtk-modal:hover > .nxtk-glass-sheen { opacity: 1; }
 
-/* ============================================================
-   4. SETTINGS FAB (floating launcher)
-   ============================================================ */
 #nxtk-extension-root {
   display: contents;
 }
@@ -261,9 +215,6 @@
 }
 .nxtk-settings-fab:active { transform: translateY(-1px) scale(1); }
 
-/* ============================================================
-   5. CONTROL DECK — main liquid glass panel
-   ============================================================ */
 .nxtk-deck {
   margin: 22px auto;
   max-width: 1180px;
@@ -272,9 +223,7 @@
   color: var(--nxtk-text);
   font: 14px/1.5 "SF Pro Text", "Inter", system-ui, -apple-system, sans-serif;
   background:
-    /* top accent glow */
     radial-gradient(circle at 88% -10%, rgba(217, 143, 64, 0.22), transparent 38%),
-    /* bottom cool tint */
     radial-gradient(circle at 12% 110%, rgba(74, 168, 216, 0.1),  transparent 42%),
     var(--nxtk-glass-tint-strong);
   backdrop-filter: blur(var(--nxtk-glass-blur-strong)) saturate(var(--nxtk-glass-saturate));
@@ -291,14 +240,9 @@
 }
 .nxtk-deck.nxtk-dropdown-active {
   overflow: visible;
-  /* Lift the whole deck above the site's following .next-container blocks
-     while a dropdown is open. The deck is a stacking context (backdrop-filter),
-     so the menu's own z-index can't escape it — the deck itself must rise.
-     Stays below the extension's modals/fab (999998+). */
   position: relative;
   z-index: 9999;
 }
-/* Inner refraction tint layer (uniform glass body, hides bg) */
 .nxtk-deck::before {
   content: "";
   position: absolute;
@@ -309,7 +253,6 @@
   pointer-events: none;
   z-index: 0;
 }
-/* Noise/grain overlay */
 .nxtk-deck::after {
   content: "";
   position: absolute;
@@ -324,7 +267,6 @@
 }
 .nxtk-deck > * { position: relative; z-index: 3; }
 
-/* Deck header */
 .nxtk-deck-header {
   display: flex;
   justify-content: space-between;
@@ -384,7 +326,6 @@
   color: var(--nxtk-text-muted);
   max-width: 640px;
 }
-/* Deck panels grid */
 .nxtk-deck-panels {
   position: relative;
   z-index: 5;
@@ -397,9 +338,6 @@
 }
 @media (max-width: 900px) { .nxtk-deck-panels { grid-template-columns: 1fr; } }
 
-/* ============================================================
-   6. PANELS (inner liquid glass cells)
-   ============================================================ */
 .nxtk-panel {
   padding: 18px 20px;
   border-radius: var(--nxtk-radius-md);
@@ -436,9 +374,6 @@
   margin-bottom: 12px;
 }
 
-/* ============================================================
-   7. BADGES
-   ============================================================ */
 .nxtk-badge {
   display: inline-flex; align-items: center;
   padding: 4px 10px;
@@ -459,9 +394,6 @@
   backdrop-filter: blur(8px);
 }
 
-/* ============================================================
-   8. RADIO GROUP (download method)
-   ============================================================ */
 .nxtk-radio-group { display: flex; flex-direction: column; gap: 10px; }
 .nxtk-radio-label {
   display: flex; align-items: center; gap: 14px;
@@ -503,9 +435,6 @@
 }
 .nxtk-radio-label.nxtk-selected svg { fill: var(--nxtk-accent-hover); }
 
-/* ============================================================
-   9. BUTTONS — Liquid Glass pills
-   ============================================================ */
 .nxtk-btn {
   position: relative;
   display: inline-flex; align-items: center; justify-content: center;
@@ -552,7 +481,6 @@
 .nxtk-btn:hover::after { animation: nxtk-shine-sweep 0.9s var(--nxtk-ease); }
 .nxtk-btn:active { transform: translateY(0); filter: brightness(.92); }
 
-/* Primary */
 .nxtk-btn-primary {
   color: #fff;
   border: 1px solid var(--nxtk-accent-border);
@@ -577,14 +505,12 @@
     var(--nxtk-accent-glow-strong);
 }
 
-/* Secondary (default liquid glass) — same as base .nxtk-btn */
 .nxtk-btn-secondary {
   background:
     linear-gradient(180deg, rgba(255,255,255,.1), rgba(255,255,255,.02)),
     var(--nxtk-glass-tint);
 }
 
-/* Ghost */
 .nxtk-btn-ghost {
   background: transparent;
   border-color: transparent;
@@ -598,7 +524,6 @@
   box-shadow: var(--nxtk-rim-subtle);
 }
 
-/* Icon button */
 .nxtk-btn-icon {
   padding: 0;
   width: 40px; min-width: 40px;
@@ -606,7 +531,6 @@
 }
 .nxtk-btn-wide  { flex: 1; padding-left: 22px; padding-right: 22px; }
 
-/* Collection split button group */
 .nxtk-btn-split {
   position: relative;
   display: flex;
@@ -652,9 +576,6 @@
 }
 .nxtk-btn-row-utility { margin-top: 0; margin-bottom: 12px; }
 
-/* ============================================================
-   10. DROPDOWN MENUS
-   ============================================================ */
 .nxtk-dropdown { position: relative; z-index: 20; }
 .nxtk-dropdown-menu {
   position: absolute;
@@ -743,9 +664,6 @@
   margin: 6px 4px;
 }
 
-/* ============================================================
-   11. PROGRESS AREA
-   ============================================================ */
 .nxtk-progress-area {
   display: none;
   margin-top: 22px;
@@ -805,10 +723,6 @@
 }
 .nxtk-progress-pct    { min-width: 50px; flex: none; }
 .nxtk-progress-count  { min-width: 60px; flex: none; text-align: right; }
-/* The status is the only elastic label, and the only one whose text is not a fixed
-   width: "Completed with errors" and "Sign in required" overflowed a narrow deck and
-   wrapped inside a 38px-tall bar, shoving the count out of the pill. Clamp it to the
-   space actually left between the two fixed labels. */
 .nxtk-progress-status {
   color: var(--nxtk-text);
   flex: 1 1 auto;
@@ -821,18 +735,12 @@
 
 .nxtk-progress-controls { display: flex; gap: 8px; }
 
-/* A moving shimmer means "bytes are moving". It ran unconditionally, so a paused,
-   stopped or finished queue still animated as though it were transferring. */
 .nxtk-progress-area:not([data-run-state="running"]) .nxtk-progress-fill {
   animation-play-state: paused;
 }
 
-/* The run is over. The bar stays on screen as the result readout — it used to be
-   hidden the instant a run ended, so the final "258/258 · Completed with errors" was
-   never actually seen — but the transport controls no longer apply to anything. */
 .nxtk-progress-area[data-run-state="done"] .nxtk-progress-controls { display: none; }
 
-/* Announced to assistive tech only; the visible labels are decorative duplicates. */
 .nxtk-sr-only {
   position: absolute;
   width: 1px; height: 1px;
@@ -854,9 +762,6 @@
 }
 .nxtk-setting-info-icon:hover { opacity: 1; color: var(--nxtk-accent-hover); }
 
-/* ============================================================
-   12. LOG CONSOLE
-   ============================================================ */
 .nxtk-log-wrap {
   position: relative;
   z-index: 2;
@@ -911,9 +816,6 @@
 .nxtk-log-error .nxtk-log-msg { color: var(--nxtk-danger); }
 .nxtk-log-info  .nxtk-log-msg { color: var(--nxtk-info); }
 
-/* ============================================================
-   13. MODAL SYSTEM
-   ============================================================ */
 .nxtk-modal-backdrop {
   position: fixed; inset: 0; z-index: 999999;
   display: flex; align-items: center; justify-content: center;
@@ -1053,9 +955,6 @@
   text-align: center;
 }
 
-/* ============================================================
-   14. SETTINGS SECTIONS / TOGGLES
-   ============================================================ */
 .nxtk-settings-section {
   margin-bottom: 22px;
   padding: 16px;
@@ -1077,10 +976,6 @@
   margin-bottom: 12px;
 }
 
-/* Collapsed "Advanced" disclosure. Developer and troubleshooting-only controls live
-   here so the panel opens on the handful of settings that actually matter, without
-   putting any of them out of reach. Deliberately mirrors the deck's log toggle
-   (.nxtk-log-toggle) so the two disclosures read as the same control. */
 .nxtk-settings-advanced { margin-bottom: 0; }
 .nxtk-settings-advanced-toggle {
   display: inline-flex; align-items: center; gap: 6px;
@@ -1105,8 +1000,6 @@
   border-color: var(--nxtk-border-strong);
 }
 .nxtk-settings-advanced-body { margin-top: 12px; }
-/* The first row in the panel drops its top border; the advanced body needs the same
-   treatment or it opens with a stray rule directly under the button. */
 .nxtk-settings-advanced-body .nxtk-setting-row:first-of-type { border-top: none; padding-top: 0; }
 
 .nxtk-setting-row {
@@ -1250,7 +1143,6 @@
   }
 }
 
-/* iOS-style toggle */
 .nxtk-toggle {
   position: relative;
   width: 50px; height: 30px;
@@ -1286,11 +1178,6 @@
 
 .nxtk-hidden { display: none !important; }
 
-/* Ad/upsell collapse. `display:none` alone is not enough: Nexus ad wrappers
-   carry Tailwind min-h-[250px], py-2 and gap-x-4, so a wrapper that is hidden
-   but still laid out (or a parent still reserving its box) leaves an empty
-   ~250px band on collection pages. Every box-sizing contribution is zeroed so
-   the slot collapses completely. */
 .nxtk-upsell-hidden,
 .nxtk-ad-hidden {
   display: none !important;
@@ -1305,9 +1192,6 @@
   overflow: hidden !important;
 }
 
-/* ============================================================
-   15. HISTORY DECISION MODAL
-   ============================================================ */
 .nxtk-history-summary {
   display: flex; flex-direction: column; gap: 16px;
   margin-bottom: 18px;
@@ -1360,9 +1244,6 @@
   font-size: 12px; color: var(--nxtk-text-muted); line-height: 1.45;
 }
 
-/* ============================================================
-   16. IMPORT INFO MODAL
-   ============================================================ */
 .nxtk-import-modal { width: min(580px, 100%); }
 .nxtk-import-guide { display: flex; flex-direction: column; gap: 18px; }
 .nxtk-import-hero { display: flex; gap: 14px; align-items: flex-start; }
@@ -1397,9 +1278,6 @@
   word-break: break-all;
 }
 
-/* ============================================================
-   17. ALERT MODAL
-   ============================================================ */
 .nxtk-alert-backdrop { z-index: 9999999; }
 .nxtk-alert-modal { width: min(440px, 100%); padding: 22px; }
 .nxtk-alert-header-inner { display: flex; align-items: center; gap: 10px; }
@@ -1441,9 +1319,6 @@
 }
 .nxtk-error-footer { flex-wrap: wrap; }
 
-/* ============================================================
-   18. SELECT MODS MODAL
-   ============================================================ */
 .nxtk-mods-toolbar {
   position: relative;
   z-index: 6;
@@ -1571,9 +1446,6 @@
   border: 1px solid rgba(92, 188, 255, 0.4);
 }
 
-/* ============================================================
-   19. UPDATE COLLECTION MODAL
-   ============================================================ */
 .nxtk-spinner {
   display: flex; align-items: center; justify-content: center;
   padding: 40px;
@@ -1718,12 +1590,6 @@
   color: var(--nxtk-text);
 }
 
-/* ============================================================
-   20. ACCESSIBILITY & MOTION
-   ============================================================ */
-/* Scoped to this extension's own surfaces. As an unscoped `*` rule it also stripped
-   every animation and transition from Nexus itself — a content-script stylesheet must
-   not change how the host page behaves. */
 @media (prefers-reduced-motion: reduce) {
   .nxtk-deck, .nxtk-deck *, .nxtk-deck *::before, .nxtk-deck *::after,
   .nxtk-modal-backdrop, .nxtk-modal-backdrop *, .nxtk-modal-backdrop *::before, .nxtk-modal-backdrop *::after,
@@ -1731,5 +1597,21 @@
   #nxtk-dropdown-portal, #nxtk-dropdown-portal *, #nxtk-dropdown-portal *::before, #nxtk-dropdown-portal *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .nxtk-log-container,
+  .nxtk-modal-scroll,
+  .nxtk-mod-list,
+  .nxtk-custom-select-menu {
+    scrollbar-width: thin;
+    scrollbar-color: var(--nxtk-accent-soft) transparent;
+  }
+}
+
+@supports not (field-sizing: content) {
+  .nxtk-setting-field input[type="number"] {
+    width: 9ch;
   }
 }

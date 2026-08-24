@@ -2,8 +2,8 @@
 
 <img src="../.github/assets/banner-nexus.svg" alt="NexusMods Bypass">
 
-[![Manifest V3](../.github/assets/badge-manifest.svg)](manifest.json)
-[![13 languages](../.github/assets/badge-lang-13.svg)](_locales)
+[![Manifest V3](../.github/assets/badge-manifest.svg)](src/manifest.json)
+[![13 languages](../.github/assets/badge-lang-13.svg)](src/_locales)
 [![Data stays local](../.github/assets/badge-local.svg)](../PRIVACY.md#-nexusmods-bypass)
 <br>
 [![Install](../.github/assets/btn-install.svg)](#-install)
@@ -72,11 +72,29 @@ switch for when your browser language and your Nexus language disagree.
 
 ## <img src="../.github/assets/icon-install.svg" width="22" align="middle"> Install
 
+**Chrome and Edge**
+
 1. Download the repository (`Code` → `Download ZIP`) and unzip it.
 2. Open <img src="../.github/assets/cmd-chrome-extensions.svg" alt="chrome://extensions" align="middle"> (or <img src="../.github/assets/cmd-edge-extensions.svg" alt="edge://extensions" align="middle">).
 3. Enable **Developer mode**.
-4. Click **Load unpacked** and select this **`nexus.mods.bypass` folder**.
+4. Click **Load unpacked** and select the **`src` folder** inside it — that is the
+   extension; `tools/`, `dist/` and `internal/` beside it are not part of the package.
 5. Open a Nexus Mods page — the welcome screen appears on first run.
+
+**Firefox 140 or newer**
+
+Firefox needs its own package rather than the `src` folder: `manifest.json` declares a
+Chrome service worker, and Gecko runs the same background file as an event page instead.
+`tools/build-zip.mjs` writes both packages from the one tree.
+
+1. Download and unzip the repository as above, then run `node tools/build-zip.mjs`.
+2. Open `about:debugging#/runtime/this-firefox`.
+3. Click **Load Temporary Add-on** and pick `dist/nexus.mods.bypass-<version>-firefox.zip`.
+4. Open a Nexus Mods page and let the add-on run on `nexusmods.com` when Firefox asks —
+   Manifest V3 leaves that grant to you, and nothing on the page changes until you give it.
+
+A temporary add-on is unloaded when Firefox closes. Installing it permanently needs a
+build signed by AMO.
 
 ![Note](../.github/assets/callout-note.svg)
 > **Vortex mode requires Vortex to be running.** The browser hands the link over and cannot verify
@@ -105,7 +123,7 @@ Reachable from the popup → **Page settings**. Changes save instantly.
 |---|---|
 | `storage` | Your settings and the local download history. |
 | `downloads` | Browser download mode — starting files and putting them in your chosen subfolder. |
-| `downloads.ui` | Being removed. The "hide the download button" setting is gone as of 2.4.3; the permission is held for one release only, to put the button back for profiles that still have it hidden. Dropped in 2.5.0. |
+| `downloads.ui` | Chrome and Edge only — Firefox has no such API, and the Firefox package does not ask for it. Being removed anyway: the "hide the download button" setting is gone as of 2.4.3 and the permission is held only to put the button back for profiles that still have it hidden. Dropped in 2.5.0. |
 | `alarms` | Pacing the background queue between mods. |
 | `https://www.nexusmods.com/*` | The only site this extension touches. |
 
@@ -183,8 +201,8 @@ Turning on **Verbose extension logs** first gives a much more useful report.
 
 ## <img src="../.github/assets/icon-license.svg" width="22" align="middle"> Licence
 
-Source-available, all rights reserved. The name *NexusMods Bypass*, the icons in `icons/`, and
-everything in `store-assets/` are explicitly excluded from all permissions — a review fork may not
+Source-available, all rights reserved. The name *NexusMods Bypass*, the icons in `src/icons/`, and
+everything in `internal/` are explicitly excluded from all permissions — a review fork may not
 carry the branding.
 
 [![Read the licence](../.github/assets/btn-licence-read.svg)](../LICENSE)

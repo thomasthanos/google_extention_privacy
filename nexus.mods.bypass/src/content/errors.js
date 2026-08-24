@@ -1,4 +1,3 @@
-/* errors.js — shared, safe error handling for NexusMods Bypass */
 window.NexusExt = window.NexusExt || {};
 
 (function () {
@@ -87,10 +86,6 @@ window.NexusExt = window.NexusExt || {};
       recovery: 'Check the file page and retry, or switch to Browser Download.',
       retryable: true
     },
-    /* User pressed Stop, or the route changed. Not a failure: it is never passed
-       to create(), so it is never written to the error log — but it needs a real
-       definition so normalize() stops relabelling it "The download request
-       failed." and so it is distinguishable from a genuine timeout. */
     aborted: {
       userMessage: 'The request was canceled.',
       recovery: '',
@@ -99,8 +94,6 @@ window.NexusExt = window.NexusExt || {};
     unsafe_download_url: {
       userMessage: 'The download link Nexus Mods returned was not a recognised download target.',
       recovery: 'Open the file page and download manually. If this keeps happening, report the issue.',
-      // Deliberately NOT retryable: the same URL would fail validation again, and
-      // an unknown code would otherwise fall back to the retryable request_failed.
       retryable: false
     },
     context_invalid: {
@@ -115,8 +108,6 @@ window.NexusExt = window.NexusExt || {};
     }
   };
 
-  /* Builds the error shape WITHOUT touching the log. Reading or re-shaping an
-     existing error must never produce a new log entry. */
   function buildError(code, overrides = {}) {
     const safeCode = DEFINITIONS[code] ? code : 'request_failed';
     const definition = DEFINITIONS[safeCode];
@@ -133,18 +124,12 @@ window.NexusExt = window.NexusExt || {};
     };
   }
 
-  /* The one entry point that records. Call it where a failure actually HAPPENS. */
   function create(code, overrides = {}) {
     const error = buildError(code, overrides);
     NXTK.recordError(error);
     return error;
   }
 
-  /* Re-shapes an arbitrary value into the standard error object without logging.
-     normalize() used to route through create(), so a single failure was recorded
-     again on every normalize / isBlocking / toLogMessage call — the 2-second
-     duplicate guard in recordError only suppresses *consecutive* repeats, so an
-     interleaved second error defeated it and the 50-entry log filled with copies. */
   function normalize(input, fallbackCode = 'request_failed') {
     if (input && typeof input === 'object' && input.code) {
       return buildError(input.code, input);
@@ -155,25 +140,16 @@ window.NexusExt = window.NexusExt || {};
     return buildError(fallbackCode);
   }
 
-  /* Delegates to the single shared implementation so the redaction rules cannot
-     drift between the error layer and the report builder. */
   function safeUrl(url) {
     return NXTK.sanitizeUrlForReport(url);
   }
 
-  /* Compact response fingerprint for diagnostics — records only the SHAPE of a
-     response (status, size, whether a Vortex link was present), never its body,
-     so usernames/avatars/nxm keys are never captured. */
   function describeResponse(finalUrl, status, text) {
     const length = text ? text.length : 0;
     const hasNxm = /nxm:\/\//i.test(text || '');
     return `resp HTTP ${status || 0}, ${length}B, ${hasNxm ? 'nxm-link present' : 'no nxm-link'}, final=${safeUrl(finalUrl)}`;
   }
 
-  /* AJAX fragments carry no site header, so in-body signed-in markers are absent even for
-     an authenticated user — and the Nexus UI ships stray "log in" strings regardless. The
-     live DOM therefore vetoes those weak heuristics. A real sign-in redirect or an HTTP
-     401 is handled elsewhere and still counts. */
   function isLiveDocumentSignedIn() {
     try {
       if (typeof document === 'undefined') return false;
@@ -191,11 +167,7 @@ window.NexusExt = window.NexusExt || {};
   function classifyContent(text, { status = null, context = '', extra = '' } = {}) {
     const content = String(text || '').slice(0, MAX_CLASSIFY_CHARS).toLowerCase();
     if (!content) return null;
-    // Attaches the specific matched signal (+ optional response fingerprint) to
-    // the error, so bug reports state exactly WHY a response was classified.
     const detail = (reason) => ({ status, context, technicalMessage: [reason, extra].filter(Boolean).join(' | ') });
-    // Signed-in markers override login heuristics: the Next.js Nexus UI ships
-    // "Log in" strings in its markup/payloads even for authenticated users.
     const signedIn = content.includes('/auth/sign_out')
       || content.includes('data-testid="profile-image"')
       || content.includes("data-testid='profile-image'")
@@ -210,17 +182,9 @@ window.NexusExt = window.NexusExt || {};
     const loginHeading = /<h1\b[^>]*>[\s\S]{0,200}?(?:log|sign)\s*in(?:\s+to)?[\s\S]{0,100}?nexus\s*mods/i.test(content);
     const loginSubmit = /<input\b[^>]*\btype=["']submit["'][^>]*\bvalue=["'](?:log|sign)\s*in["']/i.test(content)
       || /<input\b[^>]*\bvalue=["'](?:log|sign)\s*in["'][^>]*\btype=["']submit["']/i.test(content);
-    // Authoritative machine-readable auth failure (GraphQL/API) — trusted on its
-    // own. The loose "authentication required"/"not logged in" phrases are page
-    // text that can appear anywhere, so they count only as weak signals below.
     const apiUnauthenticated = /"code"\s*:\s*"unauthenticated"/i.test(content);
-    // Do NOT add 'replaced-login-link': it is a CSS class shipped in every mod-page
-    // fragment regardless of auth state, and matching it flagged every signed-in user's
-    // Vortex link fetch as requires_login.
     if (!signedIn) {
       if (apiUnauthenticated) return create('requires_login', detail('login signal: API "code":"unauthenticated"'));
-      // Weak HTML markers only block when the live page is NOT signed in — this
-      // is what stops the fragment false-positive on the Vortex download path.
       const weakReasons = [];
       if (loginButton) weakReasons.push('"Log in" button');
       if (loginLink) weakReasons.push('"Log in" link');
@@ -257,8 +221,6 @@ window.NexusExt = window.NexusExt || {};
     if (status === 401) return create('requires_login', detail('HTTP 401'));
     if (status === 404) return create('file_not_found', detail('HTTP 404'));
     if (status === 403) {
-      // Nexus answers 403 both for genuinely denied access and for files held in
-      // moderation review; the body is the only thing that distinguishes them.
       return String(text || '').toLowerCase().includes('moderation')
         ? create('moderation_hold', detail('HTTP 403 + "moderation" in body'))
         : create('access_denied', detail('HTTP 403'));
@@ -291,9 +253,6 @@ window.NexusExt = window.NexusExt || {};
     return Math.min(Math.max(Math.round(timeout), 1000), 120000);
   }
 
-  /* Readable for same-origin requests only: the cross-origin GraphQL endpoint hides the
-     header unless Nexus exposes it, which is why the caller falls back to bounded backoff.
-     Retry-After may be seconds or an HTTP-date; both are handled. */
   function readRateLimitHeaders(response) {
     try {
       const raw = response?.headers?.get?.('Retry-After');
@@ -317,9 +276,6 @@ window.NexusExt = window.NexusExt || {};
         controller.abort();
       }, normalizeTimeout(timeoutMs))
       : null;
-    /* Chains an external abort signal into the timeout controller. The listener MUST be
-       removed in the finally: `{ once: true }` only detaches on an actual abort, and one
-       collection run issues thousands of requests against the same long-lived signal. */
     let onExternalAbort = null;
     if (controller && signal) {
       if (signal.aborted) {
@@ -390,10 +346,6 @@ window.NexusExt = window.NexusExt || {};
         error: null
       };
     } catch (cause) {
-      /* Externally canceled (Stop button / route change) — not a real failure.
-         Built through normalize(), which does NOT record, so a cancelled run never
-         fills the error log. `timedOut` keeps a genuine timeout distinguishable:
-         it falls through to the timeout branch below and IS recorded. */
       if (!timedOut && signal?.aborted) {
         return {
           ok: false,
@@ -422,10 +374,6 @@ window.NexusExt = window.NexusExt || {};
     return !!normalize(error).blocking;
   }
 
-  /* DEFINITIONS stays English: the error object, the stored log, the copied report and
-     the GitHub issue title all read userMessage/recovery off it, and a maintainer cannot
-     triage a report in a language they do not read. Translation happens only at render
-     time, keyed off the stable code. Key shape: err<Code>Msg / err<Code>Fix. */
   function messageKeyFor(code, suffix) {
     const camel = String(code || 'request_failed')
       .split('_')
@@ -442,21 +390,17 @@ window.NexusExt = window.NexusExt || {};
     }
     return {
       message: translate(messageKeyFor(normalized.code, 'Msg'), null, normalized.userMessage),
-      // `aborted` ships an empty recovery; no key exists for it and none should.
       recovery: normalized.recovery
         ? translate(messageKeyFor(normalized.code, 'Fix'), null, normalized.recovery)
         : ''
     };
   }
 
-  // User-visible (deck log). Diagnostics must not call this.
   function toLogMessage(error) {
     const { message, recovery } = displayText(error);
     return `${message} ${recovery}`.trim();
   }
 
-  /* Opens the GitHub issue page — pass a prefilled issues/new URL (from
-     NXTK.buildReportIssueUrl) to land the user on a ready-to-submit form. */
   function openReportIssue(url = REPORT_ISSUE_URL) {
     const fallback = () => window.open(url, '_blank', 'noopener,noreferrer');
     try {

@@ -1,11 +1,7 @@
-/* Popup JS — Quick settings & actions */
 (function () {
   'use strict';
 
   const PROJECT_URL = NXTK.GITHUB_REPO_URL;
-  /* Keep the payment destination in one auditable place. Leave blank until the
-     creator's real Ko-fi page has been verified; the UI then degrades to an
-     honest "coming soon" state instead of opening a guessed or unsafe URL. */
   const SUPPORT_URL = 'https://ko-fi.com/thomasth';
   let supportViewOpen = false;
 
@@ -17,9 +13,6 @@
     }
   }
 
-  /* `record: false` keeps expected user guidance out of the error log — not bugs.
-     `diagnostic` is the ENGLISH text that gets logged: the visible message may be
-     localized, and storing that would put Greek or Chinese into a bug report. */
   function showStatus(message, type = 'error', { record = true, diagnostic = '' } = {}) {
     const status = document.getElementById('popupStatus');
     if (!status) return;
@@ -84,8 +77,6 @@
     });
   }
 
-  /* English is baked into the markup; translations only override when the
-     browser locale has a bundle in _locales. Shared with the onboarding page. */
   function applyI18n() {
     NXTK.applyI18nTo(document);
   }
@@ -107,8 +98,6 @@
     }
   }
 
-  /* The support experience is a second popup view, never an overlay injected into
-     Nexus Mods. `inert` prevents keyboard focus from leaking into the hidden view. */
   function setSupportView(open) {
     const main = document.getElementById('popupMainView');
     const support = document.getElementById('popupSupportView');
@@ -170,9 +159,6 @@
     }
   }
 
-  /* One-time, dismissible "star us" line once the user has 25 successful
-     downloads behind them. Clicking either the link or dismiss hides it
-     forever. */
   function maybeShowRatingPrompt() {
     try {
       chrome.storage.local.get([NXTK.TOTAL_DOWNLOADS_KEY, NXTK.RATING_PROMPT_KEY], (result) => {
@@ -193,13 +179,9 @@
         document.getElementById('ratingLink')?.addEventListener('click', markDone);
       });
     } catch (_) {
-      // Storage unavailable — skip the prompt.
     }
   }
 
-  /* ----------------------------------------------------------
-     Subtle press feedback on toggle rows + buttons
-     ---------------------------------------------------------- */
   function bindPressFeedback() {
     document.querySelectorAll('.popup-toggle-row, .nxtk-btn, .popup-support-entry, .support-free-button').forEach((el) => {
       el.addEventListener('pointerdown', () => {
@@ -213,7 +195,6 @@
   }
 
   async function init() {
-    // Settings first, or ForceEnglish paints the browser language then flips.
     const cfg = await getSettings();
     NXTK.setForceEnglish(cfg.ForceEnglish);
     applyI18n();
@@ -233,7 +214,6 @@
           cfg[key] = previousValue;
           input.checked = !!previousValue;
         }
-        // Re-sweep so the language switches without closing and reopening the popup.
         if (key === 'ForceEnglish') {
           NXTK.setForceEnglish(cfg[key]);
           applyI18n();
@@ -250,9 +230,13 @@
             return;
           }
           if (tabs[0] && tabs[0].url?.includes('nexusmods.com')) {
-            chrome.tabs.sendMessage(tabs[0].id, { type: 'TOGGLE_POPOUT' })
-              .then(() => window.close())
-              .catch(() => showStatus(NXTK.t('popupReloadFirst', null, 'Reload the Nexus Mods page before opening page settings.'), 'error', { record: false }));
+            chrome.tabs.sendMessage(tabs[0].id, { type: 'TOGGLE_POPOUT' }, () => {
+              if (getRuntimeError()) {
+                showStatus(NXTK.t('popupReloadFirst', null, 'Reload the Nexus Mods page before opening page settings.'), 'error', { record: false });
+                return;
+              }
+              window.close();
+            });
           } else {
             createTab('https://www.nexusmods.com');
           }
@@ -304,7 +288,6 @@
         const result = await NXTK.buildReportIssueUrl(null, { fullReport: report });
         issueUrl = result.url;
         complete = result.complete;
-        // Fallback only — see the note in ui.js copyReportAndOpenIssue.
         if (!complete) copied = await NXTK.copyText(report);
       } catch (_) {
         copied = false;
@@ -316,8 +299,6 @@
       } else {
         showStatus(NXTK.t('popupReportNoCopy', null, 'GitHub opens prefilled — the full report could not be copied.'), 'error', { record: false });
       }
-      // Small pause so the confirmation is visible; chrome.tabs.create does
-      // not need user activation, so the delay is safe here.
       setTimeout(() => createTab(issueUrl), 600);
     });
 
@@ -334,8 +315,6 @@
       technicalMessage: String(error?.message || error || ''),
       stack: String(error?.stack || '')
     });
-    // record: false — the explicit recordError above already captured it with
-    // the stack; recording again via showStatus would double-log.
     showStatus(NXTK.t('popupLoadFailed', null, 'The popup could not finish loading. Reload the extension and try again.'), 'error', { record: false });
   });
 })();

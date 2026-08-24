@@ -1,7 +1,3 @@
-/* NexusMods Bypass — Service Worker (MV3) */
-
-/* Self-contained on purpose: Edge fails before worker startup if shared.js is loaded
-   here as a second worker resource. Only the subset this worker needs is duplicated. */
 const NXTK = (() => {
   const SETTINGS_KEY = 'nxtk_settings';
   const ERROR_LOG_KEY = 'nxtk_error_log';
@@ -21,11 +17,7 @@ const NXTK = (() => {
     CloseTabDelay: 3000,
     RequestTimeout: 30000,
     NDC_pauseBetweenDownload: 5,
-    // Keep in sync with shared.js DEFAULTS and DEFAULT_DOWNLOAD_SPEED in content/ndc.js.
     NDC_downloadSpeed: 3.2,
-    /* Returns the extension to English regardless of the browser language.
-       chrome.i18n cannot be overridden, so t() simply returns its baked English
-       fallback instead. Keep in sync with the other DEFAULTS copy. */
     ForceEnglish: false,
     NDC_downloadMethod: 0
   };
@@ -166,16 +158,8 @@ const NXTK = (() => {
   };
 })();
 
-/* Settings that no longer exist. onInstalled strips these from stored settings so
-   an upgraded install stops carrying (and reporting) dead keys.
-   QuietSiteErrors went with the removed page-console override. HideDownloadBar went
-   with the removed browser-download-UI toggle in 2.4.3. HidePremiumUpsells is NOT
-   listed: that feature is still shipped, so stripping it would silently reset the
-   user's choice. */
 const LEGACY_SETTINGS_KEYS = ['PlayErrorSound', 'ErrorSoundUrl', 'QuietSiteErrors', 'HideDownloadBar'];
 
-/* Value migration, not a dead key: never add NDC_downloadSpeed to LEGACY_SETTINGS_KEYS
-   above, which deletes rather than updates. */
 const LEGACY_SPEED_DEFAULT = 1.5;
 
 function getRuntimeError() {
@@ -196,14 +180,10 @@ function recordBackgroundError(context, cause) {
   })).catch(() => undefined);
 }
 
-/* Per-key serialisation, so two tabs cannot clobber each other's history. Chained with
-   `.then(task, task)` so a rejected predecessor cannot wedge the queue. */
 const STORAGE_HISTORY_KEY = 'nxtk_ndc_history';
 const HISTORY_TYPES = new Set(['all', 'mandatory', 'optional']);
 const ID_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
 const MAX_HISTORY_IDS = 10000;
-// Keys that would walk the prototype chain if used as object indexes. gameId and
-// collectionId come from a content script, so they are attacker-reachable here.
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 const writeQueues = new Map();
@@ -263,14 +243,11 @@ function isSafeId(value) {
   return typeof value === 'string' && ID_PATTERN.test(value) && !FORBIDDEN_KEYS.has(value);
 }
 
-/* fileId keeps its stored type exactly. Normalising number -> string would break
-   dedupe against history written by earlier versions and cause mass re-downloads. */
 function isValidFileId(value) {
   if (typeof value === 'number') return Number.isInteger(value) && value > 0 && value < 1e12;
   return typeof value === 'string' && /^\d{1,12}$/.test(value);
 }
 
-// Null-prototype containers so a crafted key cannot reach Object.prototype.
 function historyBranch(history, gameId, collectionId) {
   const root = Object.assign(Object.create(null), history || {});
   const game = Object.assign(Object.create(null), root[gameId] || {});
@@ -340,8 +317,6 @@ const STORAGE_HANDLERS = {
     });
   },
 
-  /* Needed by the "import downloaded mods" flow, which replaces all three lists at
-     once; three separate ADD round-trips would not be atomic together. */
   async NDC_HISTORY_SET_COLLECTION(payload) {
     const lists = payload?.lists;
     if (!lists || typeof lists !== 'object') throw new Error('invalid-lists');
@@ -366,8 +341,6 @@ const STORAGE_HANDLERS = {
   }
 };
 
-/* Single-file browser downloads only; collections are owned by the queue below.
-   Vortex never reaches here — its transfer happens inside Vortex, invisible to Chrome. */
 const MAX_DOWNLOAD_NAME_CHARS = 150;
 
 function hasDownloadsApi() {
@@ -378,13 +351,6 @@ function hasDownloadsApi() {
   }
 }
 
-/* TRANSITIONAL — delete along with the `downloads.ui` permission in 2.5.0.
-   The HideDownloadBar setting is gone, but setUiOptions is PROFILE-WIDE and does not
-   survive a browser restart: the old code re-applied it on every worker start, so a
-   profile that had it on still has the download button hidden for the rest of the
-   current session. Simply dropping the code would leave those users with no button
-   and no toggle to get it back until they restart. One unconditional re-enable on
-   worker start fixes it immediately, for everyone, exactly once per session. */
 function restoreBrowserDownloadUi() {
   try {
     if (typeof chrome.downloads?.setUiOptions !== 'function') return;
@@ -399,9 +365,6 @@ function restoreBrowserDownloadUi() {
 
 restoreBrowserDownloadUi();
 
-/* Chrome rejects absolute paths, drive letters, `..` segments and a leading slash,
-   and silently mangles control characters. Sanitise the segments ourselves so a
-   rejected filename never costs the user a download. */
 function sanitizePathSegment(value, { allowDots = true } = {}) {
   let segment = String(value ?? '')
     .replace(/[\\/]+/g, ' ')
@@ -410,22 +373,15 @@ function sanitizePathSegment(value, { allowDots = true } = {}) {
     .replace(/\s+/g, ' ')
     .trim();
   if (!allowDots) segment = segment.replace(/\./g, '');
-  /* Flattening separators turns "../../x" into ".. .. x", leaving literal ".."
-     tokens that Chrome can reject outright — costing the user the download even
-     though nothing can escape the folder any more. Drop tokens that are only dots,
-     which leaves real names like "mod.v1.2.3.7z" untouched. */
   segment = segment
     .split(' ')
     .filter((token) => token && !/^\.+$/.test(token))
     .join(' ');
-  // A leading dot would hide the file.
   segment = segment.replace(/^\.+/, '').trim();
-  // Windows refuses these outright, with or without an extension.
   if (/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i.test(segment)) segment = `_${segment}`;
   return segment;
 }
 
-/* Keeps the extension intact when truncating, so a long mod name stays openable. */
 function capFileName(name) {
   if (name.length <= MAX_DOWNLOAD_NAME_CHARS) return name;
   const dot = name.lastIndexOf('.');
@@ -434,28 +390,16 @@ function capFileName(name) {
   return name.slice(0, MAX_DOWNLOAD_NAME_CHARS - ext.length) + ext;
 }
 
-/* An empty folder means the browser's Downloads directory itself, with no subfolder.
-   It used to fall back to 'NexusMods', so clearing the setting did nothing and there
-   was no way to reach the root at all — which breaks mod managers that watch only
-   Downloads and never look inside subfolders. */
 function buildDownloadPath(folder, rawName) {
   const name = capFileName(sanitizePathSegment(rawName)) || 'nexus-download';
   const dir = sanitizePathSegment(folder, { allowDots: false });
   return dir ? `${dir}/${name}` : name;
 }
 
-/* 'overwrite' is correct inside our own subfolder: a mod archive is content-addressed
-   by its Nexus file id, so re-downloading yields the same bytes, and uniquify is what
-   turned every retry into `mod (1).7z` that Vortex could not tell apart.
-   The Downloads root is NOT ours. A file there with the same name may be anything the
-   user owns, so overwriting would be silent data loss — uniquify there instead. */
 function conflictActionFor(filename) {
   return String(filename).includes('/') ? 'overwrite' : 'uniquify';
 }
 
-/* A version suffix such as "4.1.5f" is not a file extension. Keep a bounded set
-   of real downloadable formats so human Nexus names receive the archive suffix
-   from the signed CDN URL instead of being saved extensionless. */
 const DOWNLOAD_EXTENSIONS = new Set([
   'zip', '7z', 'rar', 'tar', 'gz', 'tgz', 'bz2', 'tbz2', 'xz', 'txz', 'lzma', '001',
   'exe', 'msi', 'jar', 'fomod', 'omod',
@@ -488,26 +432,15 @@ function withFallbackExtension(name, fallbackExtension) {
   return /^\.[a-z0-9]{1,8}$/.test(extension) ? cleanName + extension : cleanName;
 }
 
-/* Storage keys retired by subsystems that no longer exist; onInstalled drops the
-   leftovers. `nxtk_managed_downloads` (2.3.2) backed an ownership map used to deliver
-   NXT_DOWNLOAD_TERMINAL to the tab that started a single-file download — a message no
-   content script ever listened for, so it cost two storage writes per download and
-   delivered nothing. `nxtk_download_ui_default_reset` (2.4.3) guarded the one-shot that
-   lowered the HideDownloadBar default; the whole setting is gone now. */
 const RETIRED_STORAGE_KEYS = ['nxtk_managed_downloads', 'nxtk_download_ui_default_reset'];
 
 const DOWNLOAD_HANDLERS = {
   async DOWNLOAD_START(payload) {
     if (!hasDownloadsApi()) throw new Error('no-permission');
     const url = String(payload?.url || '');
-    /* Same allowlist the content side applies, enforced again here: the worker must
-       never start a download to a host the page-side validator would have refused. */
     const verdict = NXTK.validateDownloadTarget(url, { method: 1 });
     if (!verdict.ok) throw new Error(`unsafe-target:${verdict.detail}`);
 
-    /* Edge does not consistently apply onDeterminingFilename suggestions for MV3
-       service-worker downloads. Always provide the relative folder/name in the
-       initial call so the target path is deterministic and the folder is created. */
     const requestedName = withFallbackExtension(
       payload?.filename || 'nexus-download',
       extractDownloadExtension(verdict.url) || payload?.fallbackExtension || '.zip'
@@ -517,13 +450,7 @@ const DOWNLOAD_HANDLERS = {
       const options = {
         url: verdict.url,
         filename,
-        // See conflictActionFor: overwrite in our own subfolder, uniquify in the root.
         conflictAction: conflictActionFor(filename),
-        /* Explicit opt-out of the Save As dialog. Omitting this does NOT mean "no
-           prompt" — it means "follow the browser's own Ask-me-where-to-save
-           preference", so a user with that turned on was asked for a location on
-           every single file. That also silently defeats conflictAction and the
-           DownloadFolder setting, since the chooser decides the path instead. */
         saveAs: false
       };
       chrome.downloads.download(options, (id) => {
@@ -536,20 +463,11 @@ const DOWNLOAD_HANDLERS = {
   }
 };
 
-/* Edge freezes hidden pages, and a frozen content script cannot receive download events
-   or resolve the next signed URL. Browser-mode collections therefore run as a persisted
-   state machine here; alarms cover rate-limit waits. */
 const NDC_JOBS_KEY = 'nxtk_background_ndc_jobs';
 const NDC_RATE_LIMIT_KEY = 'nxtk_ndc_rate_limit';
 const NDC_ALARM_PREFIX = 'nxtk-ndc-job:';
 const MAX_NDC_JOB_ITEMS = 5000;
-/* Retention for a job that has REACHED a terminal state. Live jobs are exempt
-   (see cleanNdcJobs): a collection paused overnight used to be swept away
-   mid-run, after which Resume and Stop both answered `job-not-found` and the
-   page's progress deck waited forever for a NXT_NDC_DONE that could never come. */
 const MAX_NDC_JOB_AGE_MS = 24 * 60 * 60 * 1000;
-// Backstop so a job abandoned in `running` (tab gone, never stopped) cannot live
-// in storage forever.
 const MAX_NDC_ACTIVE_JOB_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const ndcProcessingJobs = new Set();
 const ndcDownloadJobs = new Map();
@@ -558,8 +476,6 @@ function makeNdcJobId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
-/* Hand-picked selections all carry `type === null`, so comparing type alone made two
-   different selections look like the same work. Compared for untyped runs only. */
 function ndcScopeKey(type, items) {
   const ids = items.map((item) => String(item.fileId)).sort();
   const text = `${type ?? 'null'}|${ids.join(',')}`;
@@ -575,11 +491,6 @@ function sanitizeNdcJobItem(raw) {
   const gameId = String(raw?.gameId ?? '').trim();
   const name = String(raw?.name || '').trim().slice(0, 300);
   const pageUrl = String(raw?.pageUrl || '').trim();
-  /* Nexus reports every file's size in the same GraphQL response the list comes from.
-     Carrying it lets a finished transfer be checked against what it was SUPPOSED to
-     weigh — the queue otherwise trusts `state: complete`, which is just as true for a
-     truncated or empty file as for a whole archive. Optional: jobs written before this
-     field existed simply skip the size half of the check. */
   const rawSize = Number(raw?.sizeKb);
   const sizeKb = Number.isFinite(rawSize) && rawSize > 0 && rawSize < 1e9 ? Math.round(rawSize) : 0;
   if (!isValidFileId(fileId) || !/^\d{1,12}$/.test(gameId) || !name || !pageUrl) return null;
@@ -596,28 +507,19 @@ function sanitizeNdcJobItem(raw) {
   return { fileId, gameId, name, pageUrl, sizeKb };
 }
 
-/* `state: complete` only means Chrome stopped writing without an error — a truncated or
-   empty body lands here as a success, enters history, and is skipped forever after.
-   Checked against the size Nexus published for the file. */
 const SHORT_TRANSFER_RATIO = 0.5;
-/* Nexus publishes sizes in KB, so a real 339-byte mod reports as 1 KB and would fail a
-   naive ratio test. Below this threshold rounding dominates — skip the check. */
 const MIN_EXPECTED_BYTES_FOR_RATIO = 64 * 1024;
 
 async function verifyTransferSize(downloadId, item) {
   const record = await searchDownload(downloadId);
-  // No record to inspect — do not invent a failure.
   if (!record) return { suspicious: false, actualBytes: null, expectedBytes: 0 };
 
   const actualBytes = Number(record.bytesReceived) || 0;
   const expectedBytes = Number(item?.sizeKb) > 0 ? Math.round(Number(item.sizeKb) * 1024) : 0;
 
-  // An empty file is wrong whatever the expected size was — including unknown.
   if (actualBytes === 0) {
     return { suspicious: true, code: 'empty-file', actualBytes, expectedBytes };
   }
-  // Truncation of a substantial archive. Small files are exempt on purpose: see
-  // MIN_EXPECTED_BYTES_FOR_RATIO — a legitimate few-hundred-byte mod must never fail.
   if (expectedBytes >= MIN_EXPECTED_BYTES_FOR_RATIO
     && actualBytes < expectedBytes * SHORT_TRANSFER_RATIO) {
     return { suspicious: true, code: 'short-file', actualBytes, expectedBytes };
@@ -625,8 +527,6 @@ async function verifyTransferSize(downloadId, item) {
   return { suspicious: false, actualBytes, expectedBytes };
 }
 
-/* The item manifest is immutable and large; the cursor is tiny and rewritten on every
-   step. Keeping them in one record meant each transition re-serialised the whole list. */
 const NDC_ITEMS_KEY_PREFIX = 'nxtk_ndc_items:';
 const ndcItemsCache = new Map();
 
@@ -672,8 +572,6 @@ function cleanNdcJobs(stored) {
     if (!ndcJobItemCount(job)) continue;
     const touchedAt = Number(job.updatedAt || job.createdAt);
     if (!Number.isFinite(touchedAt)) continue;
-    // A running/paused job is live state, not history: evicting it silently
-    // destroys the only record the Stop/Resume/status paths can address.
     const maxAge = ndcJobIsActive(job) ? MAX_NDC_ACTIVE_JOB_AGE_MS : MAX_NDC_JOB_AGE_MS;
     if (now - touchedAt > maxAge) continue;
     jobs[jobId] = job;
@@ -690,8 +588,6 @@ async function readNdcJob(jobId) {
   return jobs[jobId] || null;
 }
 
-/* Stop/Pause/Resume bump this. It is the only way a writer can tell that the status it
-   is holding has since been overruled by the user. */
 function bumpNdcControl(job) {
   job.controlVersion = Number(job.controlVersion || 0) + 1;
   return job;
@@ -702,11 +598,6 @@ async function saveNdcJob(job) {
   await enqueueStorageTask(NDC_JOBS_KEY, async () => {
     const jobs = await readNdcJobs();
     const stored = jobs[job.id];
-    /* Resolving one signed URL costs two network round-trips. A Stop landing during
-       them used to be silently undone: this function was handed the pre-Stop copy and
-       wrote `running` straight back over it, so the queue kept pulling files and could
-       only be halted by disabling the extension. A copy older than the last control
-       command no longer owns the status field. */
     if (stored && Number(stored.controlVersion || 0) > Number(job.controlVersion || 0)) {
       job.status = stored.status;
       job.controlVersion = stored.controlVersion;
@@ -721,9 +612,6 @@ function ndcJobIsActive(job) {
   return !!job && (job.status === 'running' || job.status === 'paused');
 }
 
-/* At most ONE live job per collection. Without this, a page that lost track of its
-   jobId (route change, re-mounted deck, reloaded tab) started a second job over the
-   same file list and every mod downloaded twice. */
 async function findActiveNdcJobForCollection(gameId, collectionId) {
   const jobs = await readNdcJobs();
   return Object.values(jobs).find(
@@ -741,8 +629,6 @@ async function findNdcJobByDownloadId(downloadId) {
   return Object.values(jobs).find((job) => job?.activeDownloadId === downloadId) || null;
 }
 
-/* Stop can be issued by collection from any tab, so the commanding tab is often not
-   job.tabId — yet it is the one waiting for NXT_NDC_DONE to release its deck. */
 function notifyNdcJob(job, type, extra = {}, alsoTabIds = []) {
   const targets = new Set();
   if (Number.isInteger(job?.tabId) && job.tabId >= 0) targets.add(job.tabId);
@@ -754,10 +640,6 @@ function notifyNdcJob(job, type, extra = {}, alsoTabIds = []) {
   const message = {
     type,
     jobId: job.id,
-    /* Carried on every event so a page that does not (yet) know the jobId can still
-       recognise its own stream and latch on. This is what keeps the log and the
-       progress bar alive when the START reply is slow, lost, or belongs to a deck
-       that has since been replaced. */
     gameId: job.gameId,
     collectionId: job.collectionId,
     status: job.status,
@@ -847,10 +729,6 @@ async function fetchNdcResponse(url, options, timeoutMs) {
   }
 }
 
-/* Floored at 30s because these waits are armed with chrome.alarms, and Chrome will not
-   honour a shorter delay for a packed extension — a 5s Retry-After produced an alarm
-   that simply did not fire when asked, leaving the job parked until something else
-   nudged it. */
 const MIN_NDC_ALARM_DELAY_MS = 30000;
 
 function retryAfterMilliseconds(raw, strike = 1) {
@@ -861,11 +739,6 @@ function retryAfterMilliseconds(raw, strike = 1) {
   return Math.min(30000 * Math.pow(2, Math.max(0, strike - 1)), 10 * 60 * 1000);
 }
 
-/* The rate-limit cooldown is SHARED with the content scripts (content/storage.js
-   writes the same key when a Vortex-mode run sees a 429). The worker used to ignore
-   it entirely, so a background collection kept hammering an endpoint a Vortex tab had
-   already been told to back off from — and vice versa, since it never published its
-   own 429s either. Both directions are wired up here. */
 async function readSharedRateLimitUntil() {
   const stored = await storageGetLocal(NDC_RATE_LIMIT_KEY, null);
   const until = Number(stored?.until);
@@ -881,9 +754,6 @@ async function publishSharedRateLimit(until) {
   });
 }
 
-/* A download can go terminal before processNdcJob persists its id (small files, or a
-   URL the CDN rejects instantly). Such events are parked here and replayed by the
-   starter once the id is durable — dropping them pinned the job to a dead download. */
 const pendingTerminalDownloads = new Map();
 const MAX_PENDING_TERMINALS = 200;
 
@@ -960,12 +830,7 @@ async function startNdcDownload(job, item, url) {
     chrome.downloads.download({
       url,
       filename,
-      // See conflictActionFor: overwrite in our own subfolder, uniquify in the root.
       conflictAction: conflictActionFor(filename),
-      /* Non-negotiable here: this queue runs unattended and a collection is hundreds
-         of files. Without it the browser's Ask-me-where-to-save preference put a
-         modal chooser in front of every one of them, which also blocks the queue —
-         the next file cannot start until the current download is resolved. */
       saveAs: false
     }, (id) => {
       const error = getRuntimeError();
@@ -1000,8 +865,6 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/* Advances the job by ONE step. Returns a terminal event that arrived too early to be
-   attributed (see pendingTerminalDownloads) so processNdcJob's loop can replay it. */
 async function advanceNdcJob(jobId) {
   for (;;) {
     let job = await readNdcJob(jobId);
@@ -1012,8 +875,6 @@ async function advanceNdcJob(jobId) {
       return null;
     }
 
-    /* Honour a cooldown any tab (or a previous run) published, before spending a
-       request on an endpoint that is already refusing. */
     const sharedUntil = await readSharedRateLimitUntil();
     if (sharedUntil > Date.now()) {
       job.waitingUntil = sharedUntil;
@@ -1031,13 +892,8 @@ async function advanceNdcJob(jobId) {
     const item = items[startIndex];
     const resolved = await resolveNdcBrowserUrl(item, job.requestTimeout);
 
-    /* Re-read before acting on the result. Those two network round-trips are the
-       window in which Stop and Pause actually get pressed, and everything below
-       mutates and saves `job` — so continuing with the pre-request copy is what made
-       a stopped queue carry on downloading. */
     job = await readNdcJob(jobId);
     if (!job || job.status !== 'running' || job.activeDownloadId !== null) return null;
-    // Something else advanced the queue meanwhile; `resolved` belongs to a stale item.
     if (job.index !== startIndex) continue;
 
     if (!resolved.ok) {
@@ -1045,7 +901,6 @@ async function advanceNdcJob(jobId) {
         job.rateLimitStrikes = Math.min((job.rateLimitStrikes || 0) + 1, 6);
         job.waitingUntil = Date.now() + retryAfterMilliseconds(resolved.retryAfter, job.rateLimitStrikes);
         await saveNdcJob(job);
-        // Publish so Vortex-mode tabs on this collection back off too.
         await publishSharedRateLimit(job.waitingUntil);
         scheduleNdcJobAlarm(job.id, job.waitingUntil);
         notifyNdcJob(job, 'NXT_NDC_WAITING', {
@@ -1068,8 +923,6 @@ async function advanceNdcJob(jobId) {
       job.resolveAttempts = attempts;
       if (attempts < 2) {
         await saveNdcJob(job);
-        // Backing off before the retry: an immediate re-request just re-hits
-        // whatever transient condition produced the first failure.
         await sleep(NDC_RESOLVE_RETRY_DELAY_MS);
         continue;
       }
@@ -1090,9 +943,6 @@ async function advanceNdcJob(jobId) {
     job.resolveAttempts = 0;
     const started = await startNdcDownload(job, item, resolved.url);
 
-    /* The same race one level deeper. chrome.downloads.download awaits too, and a
-       Stop arriving inside it found activeDownloadId still null — nothing to cancel —
-       so the transfer it never knew about ran to completion. Cancel it here. */
     const afterStart = await readNdcJob(jobId);
     if (!afterStart || afterStart.status !== 'running') {
       ndcDownloadJobs.delete(started.downloadId);
@@ -1107,9 +957,6 @@ async function advanceNdcJob(jobId) {
       itemState: 'started'
     });
 
-    /* The id is durable now, so a terminal event parked while it was not can finally
-       be attributed. Handing it back rather than handling it here keeps the replay
-       outside the processing lock. */
     const early = pendingTerminalDownloads.get(started.downloadId);
     if (early) {
       pendingTerminalDownloads.delete(started.downloadId);
@@ -1119,16 +966,6 @@ async function advanceNdcJob(jobId) {
   }
 }
 
-/* Flat loop, not mutual recursion. handleNdcDownloadTerminal used to end by awaiting
-   processNdcJob again, so every early-terminal item added a retained async frame pair
-   that only unwound once the whole queue had drained. It now reports which job still
-   needs advancing and this loop does it. */
-/* Closes a job out when something in the queue threw. NOTHING in here may throw:
-   the overwhelmingly likely cause is a failed storage write, and this used to re-save
-   before notifying — so the save threw a second time and the tab was never told. The
-   job then sat in `running` forever, the page's watchdog polled it forever, and the
-   deck refused every later Download. Persisting is best-effort; releasing the page is
-   not, because the page is the only thing that cannot recover on its own. */
 async function failNdcJob(jobId, cause, context = 'background collection queue') {
   let job = null;
   try {
@@ -1136,8 +973,6 @@ async function failNdcJob(jobId, cause, context = 'background collection queue')
   } catch (_) { }
   if (job && (job.status === 'running' || job.status === 'paused')) {
     job.status = 'error';
-    /* NXTK-qualified deliberately: the helper lives inside the NXTK IIFE, so a bare
-       call here threw a ReferenceError *inside this very recovery path*. */
     try {
       job.lastError = NXTK.sanitizeDiagnosticText(cause?.message || cause, 300);
     } catch (_) {
@@ -1170,8 +1005,6 @@ async function processNdcJob(jobId) {
       }
       if (!replay) break;
       const nextId = await handleNdcDownloadTerminal(replay.downloadId, replay.state, replay.error);
-      // The replay always belongs to `currentId`. Looping on anything else would advance
-      // a job this call does not hold the processing lock for.
       currentId = nextId === currentId ? currentId : null;
     }
   } finally {
@@ -1179,25 +1012,13 @@ async function processNdcJob(jobId) {
   }
 }
 
-/* downloads.onChanged can deliver more than one terminal delta for the same id. Two
-   of them racing both read the job before either saved it, so both advanced the index
-   — skipping one file and re-running another. The stored activeDownloadId check below
-   catches this after a worker restart; this set catches it within one worker life. */
 const handledTerminalDownloads = new Set();
 
-/* Every terminal transition below persists, and a failed write threw straight through
-   this function into callers that only log — downloads.onChanged, reconcileNdcJobs and
-   the replay inside processNdcJob alike. The job stayed `running` and the page waited
-   for a NXT_NDC_DONE that could never arrive. The whole body is now wrapped so any
-   throw closes the job out through the one failure-safe path. */
 async function handleNdcDownloadTerminal(downloadId, state, error) {
   if (handledTerminalDownloads.has(downloadId)) return null;
 
   const job = await findNdcJobByDownloadId(downloadId);
   if (!job || job.activeDownloadId !== downloadId) {
-    /* A hit in ndcDownloadJobs (set synchronously at download start) means this IS ours and
-       the starter has not persisted the id yet — park it for replay. Marking the id
-       handled before this point permanently swallowed such events. */
     if (ndcDownloadJobs.has(downloadId)) rememberEarlyTerminal(downloadId, state, error);
     return null;
   }
@@ -1228,19 +1049,12 @@ async function applyNdcDownloadTerminal(job, downloadId, state, error) {
     return null;
   }
 
-  /* Defensive: every read below dereferences `item`. If the index has already run past
-     the list, an undefined here throws inside a listener whose only handler is a log —
-     leaving the job "running" forever and the page's deck frozen with no DONE event.
-     Close the job out instead of dying silently. */
   const item = (await readNdcJobItems(job))[job.index];
   if (!item) {
     await finishNdcJob(job);
     return null;
   }
 
-  /* A "complete" that did not deliver the bytes Nexus promised is routed through the
-     SAME retry-then-fail path as an interrupted transfer. Counting it as a success is
-     what let a truncated archive enter history and be skipped on every later run. */
   let effectiveState = state;
   let effectiveError = error;
   if (state === 'complete') {
@@ -1292,8 +1106,6 @@ async function applyNdcDownloadTerminal(job, downloadId, state, error) {
   return job.status === 'running' ? job.id : null;
 }
 
-/* Single implementation of "stop this job dead", shared by the Stop command, the
-   stop-all escape hatch and the owning-tab-closed listener. */
 async function haltNdcJob(job, { notifyTabIds = [] } = {}) {
   job.status = 'stopped';
   const activeDownloadId = job.activeDownloadId;
@@ -1310,9 +1122,6 @@ async function haltNdcJob(job, { notifyTabIds = [] } = {}) {
   return job;
 }
 
-/* Surviving a HIDDEN or FROZEN tab is the point of this queue; a CLOSED tab is not —
-   nothing is watching and the run cannot be stopped from anywhere. onRemoved fires only
-   for real removals, never for a freeze or a reload (which keeps the same tab id). */
 async function stopNdcJobsForTab(tabId) {
   if (!Number.isInteger(tabId) || tabId < 0) return;
   const jobs = await readNdcJobs();
@@ -1328,8 +1137,6 @@ if (chrome.tabs?.onRemoved) {
   });
 }
 
-/* Lease register for the cross-tab run claim. The TTL is generous relative to the
-   15s page heartbeat so a throttled background tab is not treated as dead. */
 const NDC_CLAIM_KEY = 'nxtk_ndc_run_claims';
 const NDC_CLAIM_TTL_MS = 45000;
 
@@ -1338,8 +1145,6 @@ function cleanNdcClaims(stored) {
   const now = Date.now();
   if (!stored || typeof stored !== 'object') return claims;
   for (const [key, claim] of Object.entries(stored)) {
-    // The key is `${gameId}/${collectionId}`; the slash makes __proto__ unreachable,
-    // and the null-prototype container covers the rest.
     if (typeof key !== 'string' || !key.includes('/') || FORBIDDEN_KEYS.has(key)) continue;
     const tabId = Number(claim?.tabId);
     const at = Number(claim?.at);
@@ -1350,8 +1155,6 @@ function cleanNdcClaims(stored) {
   return claims;
 }
 
-/* Accepts a jobId OR the collection identity: a page that lost its jobId (remounted
-   deck, reloaded tab) must still be able to stop the job it is watching. */
 async function resolveNdcJob(payload) {
   const jobId = String(payload?.jobId || '');
   if (jobId) {
@@ -1380,10 +1183,6 @@ const NDC_QUEUE_HANDLERS = {
 
     const scopeKey = ndcScopeKey(type, items);
     const existing = await findActiveNdcJobForCollection(gameId, collectionId);
-    /* Adopt only when this is genuinely the same work. For a TYPED run the type IS the
-       scope: a reconnect legitimately sends a shorter list, since completed files are now
-       filtered out by history. Untyped runs write no history, so their list is stable and
-       the scope key is the only thing distinguishing selection A from selection B. */
     const isReconnect = !!existing
       && !payload?.restart
       && existing.type === type
@@ -1404,8 +1203,6 @@ const NDC_QUEUE_HANDLERS = {
       };
     }
 
-    /* Superseded: retire it before the replacement starts, so the two never download
-       in parallel — that overlap is what produced every file twice. */
     if (existing) {
       existing.status = 'stopped';
       const supersededDownloadId = existing.activeDownloadId;
@@ -1429,7 +1226,6 @@ const NDC_QUEUE_HANDLERS = {
       collectionId,
       type,
       scopeKey,
-      // Empty is a valid choice: it means the Downloads root, with no subfolder.
       folder: sanitizePathSegment(payload?.folder, { allowDots: false }),
       requestTimeout: Math.min(Math.max(Number(payload?.requestTimeout) || 30000, 5000), 120000),
       itemCount: items.length,
@@ -1446,9 +1242,6 @@ const NDC_QUEUE_HANDLERS = {
     return { jobId: job.id, total: items.length };
   },
 
-  /* Authoritative snapshot for the page's watchdog. Every other event is a
-     fire-and-forget tabs.sendMessage that a frozen tab never receives, so without this
-     pull path one lost NXT_NDC_DONE stranded the deck forever. */
   async NDC_QUEUE_STATUS(payload) {
     const job = await resolveNdcJob(payload);
     if (!job) return null;
@@ -1464,9 +1257,6 @@ const NDC_QUEUE_HANDLERS = {
     };
   },
 
-  /* Rebinds a live job to the asking tab; sent by every collection page as it mounts.
-     Without it a reopened tab shows an idle deck while the run continues invisibly, with
-     no Stop button anywhere. Only running/paused jobs are adoptable. */
   async NDC_QUEUE_ATTACH(payload, sender) {
     const tabId = Number(sender?.tab?.id);
     if (!Number.isInteger(tabId) || tabId < 0) throw new Error('missing-tab');
@@ -1480,10 +1270,6 @@ const NDC_QUEUE_HANDLERS = {
     job.tabId = tabId;
     await saveNdcJob(job);
 
-    /* A job can be `running` yet idle — the worker may have been torn down between a
-       download finishing and the next one starting. Reconciliation covers that on
-       worker startup, but a tab reopened later in the SAME worker life would find it
-       parked. Nudge it here too; processNdcJob is a no-op when it is genuinely busy. */
     if (job.status === 'running' && job.activeDownloadId === null) {
       processNdcJob(job.id).catch((cause) => recordBackgroundError('attach nudge', cause));
     }
@@ -1502,8 +1288,6 @@ const NDC_QUEUE_HANDLERS = {
   async NDC_QUEUE_STOP(payload, sender) {
     const job = await resolveNdcJob(payload);
     if (!job) throw new Error('job-not-found');
-    // Also to the commanding tab: Stop is addressable by collection, so it is often
-    // not job.tabId, and that tab is the one waiting to release its deck.
     await haltNdcJob(job, { notifyTabIds: [Number(sender?.tab?.id)] });
     return { stopped: true };
   },
@@ -1527,9 +1311,6 @@ const NDC_QUEUE_HANDLERS = {
     return { resumed: true };
   },
 
-  /* One-job-per-collection only covered browser mode; two Vortex tabs on one collection
-     each handed every mod to Vortex twice. Lease-based, not a hard lock: an unrenewed
-     lease expires, so a leaked claim can never make a collection undownloadable. */
   async NDC_RUN_CLAIM(payload, sender) {
     const tabId = Number(sender?.tab?.id);
     if (!Number.isInteger(tabId) || tabId < 0) throw new Error('missing-tab');
@@ -1537,11 +1318,6 @@ const NDC_QUEUE_HANDLERS = {
     const collectionId = String(payload?.collectionId || '');
     if (!isSafeId(gameId) || !isSafeId(collectionId)) throw new Error('invalid-collection-identifier');
 
-    /* A lease expires when its holder stops heartbeating — which a FROZEN tab does
-       while its browser-mode job keeps downloading perfectly happily in this worker.
-       The lease alone would then hand the collection to a second tab, and a Vortex run
-       there would duplicate every file the background queue was still fetching.
-       The job registry does not expire on freeze, so it is consulted as well. */
     const liveJob = await findActiveNdcJobForCollection(gameId, collectionId);
     if (liveJob && liveJob.tabId !== tabId) {
       return { granted: false, heldBy: liveJob.tabId, reason: 'background-job' };
@@ -1551,7 +1327,6 @@ const NDC_QUEUE_HANDLERS = {
       const claims = cleanNdcClaims(await storageGetLocal(NDC_CLAIM_KEY, null));
       const key = `${gameId}/${collectionId}`;
       const held = claims[key];
-      // Same tab re-claiming (a reload keeps its tab id) is a renewal, not a conflict.
       if (held && held.tabId !== tabId) return { granted: false, heldBy: held.tabId, reason: 'lease' };
       claims[key] = { tabId, at: Date.now() };
       await storageSetLocal(NDC_CLAIM_KEY, claims);
@@ -1568,7 +1343,6 @@ const NDC_QUEUE_HANDLERS = {
     return enqueueStorageTask(NDC_CLAIM_KEY, async () => {
       const claims = cleanNdcClaims(await storageGetLocal(NDC_CLAIM_KEY, null));
       const key = `${gameId}/${collectionId}`;
-      // Only the holder may release, so a losing tab cannot free someone else's lease.
       if (!claims[key] || claims[key].tabId !== tabId) return { released: false };
       delete claims[key];
       await storageSetLocal(NDC_CLAIM_KEY, claims);
@@ -1586,8 +1360,6 @@ if (chrome.alarms?.onAlarm) {
   });
 }
 
-/* Unlike page timers, this event wakes an MV3 worker when Chrome changes download
-   state — which is what advances the persisted collection state. */
 if (chrome.downloads?.onChanged) {
   chrome.downloads.onChanged.addListener((delta) => {
     const downloadId = Number(delta?.id);
@@ -1600,9 +1372,6 @@ if (chrome.downloads?.onChanged) {
   });
 }
 
-/* Every wake-up path is an event (onChanged, alarm, page message) and all three can be
-   missed, leaving a job in `running` with nothing to nudge it. Runs on every worker
-   start and reconciles each live job against the actual download state. */
 function searchDownload(downloadId) {
   return new Promise((resolve) => {
     try {
@@ -1625,8 +1394,6 @@ async function reconcileNdcJobs() {
 
     if (Number.isInteger(job.activeDownloadId)) {
       const record = await searchDownload(job.activeDownloadId);
-      // Gone from Chrome's history entirely — treat as a failed transfer so the
-      // queue's normal retry/skip bookkeeping runs instead of waiting forever.
       if (!record) {
         const nextJobId = await handleNdcDownloadTerminal(job.activeDownloadId, 'interrupted', 'download-record-missing');
         if (nextJobId) await processNdcJob(nextJobId);
@@ -1636,11 +1403,9 @@ async function reconcileNdcJobs() {
         const nextJobId = await handleNdcDownloadTerminal(job.activeDownloadId, record.state, record.error || null);
         if (nextJobId) await processNdcJob(nextJobId);
       }
-      // Still in_progress: onChanged will deliver its terminal delta normally.
       continue;
     }
 
-    // Waiting out a rate limit whose alarm may not have survived. Re-arm it.
     const waitingUntil = Number(job.waitingUntil) || 0;
     if (waitingUntil > Date.now()) {
       scheduleNdcJobAlarm(job.id, waitingUntil);
@@ -1651,9 +1416,6 @@ async function reconcileNdcJobs() {
   }
 }
 
-/* Jobs written before the manifest was split out still carry their items inline. Move
-   them to their own key once, then strip the field. readNdcJobItems reads either shape,
-   so a message arriving mid-migration is served correctly either way. */
 async function migrateNdcJobItems() {
   const stored = await storageGetLocal(NDC_JOBS_KEY, null);
   if (!stored || typeof stored !== 'object') return;
@@ -1680,9 +1442,6 @@ async function migrateNdcJobItems() {
   });
 }
 
-/* Age-based eviction in cleanNdcJobs drops a cursor without touching its manifest, so
-   the manifest would linger. Browser-startup only: reading every key is too heavy to
-   repeat on each worker instantiation, and every ordinary exit path already deletes. */
 async function pruneOrphanedNdcItems() {
   const jobs = await readNdcJobs();
   const all = await new Promise((resolve) => {
@@ -1716,10 +1475,6 @@ if (chrome.runtime?.onStartup) {
   });
 }
 
-// Listen for messages from popup or content scripts.
-/* There is no externally_connectable block, so only this extension's own pages and its
-   content scripts can reach here — but nothing asserted that until now. The content
-   scripts only ever run on Nexus, so anything claiming a different origin is not ours. */
 const TRUSTED_SENDER_URL = /^https:\/\/(?:[\w-]+\.)*nexusmods\.com\//i;
 
 function isTrustedSender(sender) {
@@ -1733,8 +1488,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!isTrustedSender(sender)) return false;
 
   if (msg?.type === 'OPEN_REPORT_ISSUE') {
-    // Only ever open our own repo's new-issue page; anything else falls back
-    // to the template chooser (defends the message API against abuse).
     const url = typeof msg.url === 'string' && msg.url.startsWith(NXTK.ISSUE_NEW_URL)
       ? msg.url
       : NXTK.REPORT_ISSUE_URL;
@@ -1755,8 +1508,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       sendResponse({ ok: false, error: 'No tab is available to close.' });
       return false;
     }
-    chrome.tabs.remove(sender.tab.id)
-      .catch(() => undefined);
+    chrome.tabs.remove(sender.tab.id, () => void getRuntimeError());
     sendResponse({ ok: true });
     return false;
   }
@@ -1765,8 +1517,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     || DOWNLOAD_HANDLERS[msg?.type]
     || NDC_QUEUE_HANDLERS[msg?.type];
   if (storageHandler) {
-    /* `return true` keeps the response port open across the await, which also
-       keeps the service worker alive until the write lands. */
     storageHandler(msg.payload, sender)
       .then((value) => sendResponse({ ok: true, value, error: null }))
       .catch((cause) => {
@@ -1780,9 +1530,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return false;
 });
 
-// On install/update: seed defaults for new installs, and strip legacy keys
-// from existing settings (one-time migration replacing scattered runtime
-// deletes in popup.js/storage.js). Fresh installs also get the welcome page.
 chrome.runtime.onInstalled.addListener((details) => {
   if (details?.reason === 'install') {
     chrome.tabs.create({ url: chrome.runtime.getURL('onboarding/welcome.html') }, () => {
@@ -1791,7 +1538,6 @@ chrome.runtime.onInstalled.addListener((details) => {
     });
   }
 
-  // Drop storage written by subsystems that no longer exist.
   try {
     chrome.storage.local.remove(RETIRED_STORAGE_KEYS, () => void getRuntimeError());
   } catch (_) { }
@@ -1807,11 +1553,6 @@ chrome.runtime.onInstalled.addListener((details) => {
     let next;
     if (stored) {
       const hasLegacyKeys = LEGACY_SETTINGS_KEYS.some((key) => key in stored);
-      /* Raising DEFAULTS alone would reach nobody: a fresh install writes the whole
-         defaults object below, so every existing profile holds an explicit
-         NDC_downloadSpeed, and `{ ...DEFAULTS, ...stored }` always lets the stored copy
-         win. Rewritten ONLY when it still holds the exact superseded default, so a value
-         the user picked themselves — 1.5 included — is never touched. */
       const hasStaleSpeed = Number(stored.NDC_downloadSpeed) === LEGACY_SPEED_DEFAULT;
       if (!hasLegacyKeys && !hasStaleSpeed) return;
       next = { ...stored };

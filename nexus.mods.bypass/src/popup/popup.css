@@ -1,8 +1,3 @@
-/* ============================================================
-   Popup Styles
-   Solid extension surface, compact — fits without a scrollbar
-   ============================================================ */
-
 * {
   margin: 0;
   padding: 0;
@@ -18,9 +13,6 @@ html, body {
   overflow: hidden;
 }
 
-/* ============================================================
-   Popup — rectangular extension surface (no border-radius)
-   ============================================================ */
 .popup {
   position: relative;
   padding: 14px 16px 12px;
@@ -75,9 +67,6 @@ html, body {
   animation: popup-view-enter 0.4s cubic-bezier(0.32, 0.72, 0.24, 1) both;
 }
 
-/* ============================================================
-   Header
-   ============================================================ */
 .popup-header {
   display: flex;
   align-items: center;
@@ -134,9 +123,6 @@ html, body {
   font-weight: 500;
 }
 
-/* ============================================================
-   Sections
-   ============================================================ */
 .popup-section {
   margin-bottom: 12px;
 }
@@ -151,9 +137,6 @@ html, body {
   padding-left: 4px;
 }
 
-/* ============================================================
-   Toggle Rows — inner liquid glass cards
-   ============================================================ */
 .popup-toggle-row {
   display: flex;
   align-items: center;
@@ -206,9 +189,6 @@ html, body {
   line-height: 1.25;
 }
 
-/* ============================================================
-   Actions
-   ============================================================ */
 .popup-actions {
   margin-bottom: 10px;
 }
@@ -255,9 +235,6 @@ html, body {
   border-color: rgba(224, 64, 64, .28);
 }
 
-/* ============================================================
-   Rating prompt (one-time, dismissible)
-   ============================================================ */
 .popup-rating {
   display: flex;
   align-items: center;
@@ -270,8 +247,6 @@ html, body {
   border-radius: var(--nxtk-radius-xs);
   font-size: 11.5px;
 }
-/* `display: flex` above overrides the UA's `[hidden] { display: none }`
-   rule, so the hidden attribute must be re-asserted explicitly. */
 .popup-rating[hidden] { display: none; }
 .popup-rating a {
   color: var(--nxtk-accent-hover, #e8a45c);
@@ -291,9 +266,6 @@ html, body {
 }
 .popup-rating button:hover { color: var(--nxtk-text-bright); }
 
-/* ============================================================
-   Footer
-   ============================================================ */
 .popup-footer {
   text-align: center;
   font-size: 10px;
@@ -304,9 +276,6 @@ html, body {
   letter-spacing: 0.04em;
 }
 
-/* ============================================================
-   Support entry
-   ============================================================ */
 .popup-support-entry {
   width: 100%;
   min-height: 58px;
@@ -425,9 +394,6 @@ html, body {
   transform: translateX(2px);
 }
 
-/* ============================================================
-   Support view
-   ============================================================ */
 .popup-support-view {
   padding-bottom: 1px;
 }

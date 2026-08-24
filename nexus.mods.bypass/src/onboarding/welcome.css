@@ -1,5 +1,3 @@
-/* welcome.css — onboarding page, self-contained, matches the extension's
-   dark "liquid glass" look without depending on the content stylesheets. */
 :root {
   --bg: #0d0f18;
   --surface: rgba(28, 30, 44, 0.7);

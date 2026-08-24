@@ -1,4 +1,3 @@
-/* nnw.js — Nexus No-Wait ++ logic (ported from Tampermonkey script2) */
 window.NexusExt = window.NexusExt || {};
 
 (function () {
@@ -12,8 +11,6 @@ window.NexusExt = window.NexusExt || {};
   const Errors = NexusExt.Errors;
   const Auth = NexusExt.Auth;
 
-  /* Friendly console logger. Errors always show with a readable badge;
-     debug/info/warn only when the "Verbose extension logs" setting is on. */
   const LOG_BADGE = 'background:#d98f40;color:#191106;font-weight:700;padding:1px 6px;border-radius:3px';
   const LOG_STYLES = {
     debug: 'color:#8a8f98',
@@ -37,15 +34,12 @@ window.NexusExt = window.NexusExt || {};
     error: (...args) => emitLog('error', args)
   };
 
-  /* Fire-and-forget runtime message that survives an invalidated extension
-     context (extension reloaded/updated while this tab is still open). */
   function safeSendMessage(message) {
     try {
       if (!chrome.runtime?.id) return;
       const result = chrome.runtime.sendMessage(message);
       if (result && typeof result.catch === 'function') result.catch(() => undefined);
     } catch (_) {
-      // Extension context invalidated — nothing we can do from here.
     }
   }
 
@@ -234,15 +228,6 @@ window.NexusExt = window.NexusExt || {};
     return decoded && decoded !== raw ? extractDownloadUrlFrom(decoded) : null;
   }
 
-  /* `prefetched*` lets a caller that has ALREADY fetched `href` hand the response
-     over instead of making this function fetch it again. The collection downloader
-     fetched `<file page>&nmm=1`, failed to parse an nxm link, then called this with
-     the same href — which fetched the identical URL a second time with identical
-     credentials and headers. With the 2-attempt retry that was up to four identical
-     authenticated GETs per mod.
-
-     `signal` is threaded too: these fetches previously carried none, so the
-     duplicate request was the one thing the Stop button could not cancel. */
   async function getDownloadUrl({
     fileId,
     gameId,
@@ -269,10 +254,6 @@ window.NexusExt = window.NexusExt || {};
       signal
     });
 
-    /* Consumed at most ONCE, and only for the exact URL it was fetched from.
-       One-shot is what keeps retries correct: an inner retry re-fetches instead of
-       re-parsing a stale body. The URL guard matters because fetchText is also
-       called for other URLs (api-file, requirements sub-page). */
     let pendingPrefetch = (prefetchedText === null && !prefetchedError) ? null : {
       ok: !prefetchedError && prefetchedStatus >= 200 && prefetchedStatus < 400,
       status: prefetchedStatus || 0,
@@ -294,9 +275,6 @@ window.NexusExt = window.NexusExt || {};
       return response;
     };
 
-    /* NOTE: fetchGeneratedDownloadUrl is a POST to a different endpoint and calls
-       Errors.request directly, so it can never consume the prefetch. Keep it that
-       way if this is ever refactored. */
     const fetchText = async (url, { ajax = true, context = 'Loading Nexus download page' } = {}) => {
       const absoluteUrl = new URL(url, location.href).href;
       const reused = takePrefetch(absoluteUrl);
@@ -433,7 +411,6 @@ window.NexusExt = window.NexusExt || {};
       return { url: null, error: generated?.error || latestError || Errors.create('no_nmm_link') };
     }
 
-    // Manual download logic
     const fetchFilePageFallback = async () => {
       const pageResponse = await fetchText(filePageUrl, {
         ajax: false,
@@ -487,10 +464,6 @@ window.NexusExt = window.NexusExt || {};
 
     try {
       const parsed = new URL(decodedUrl, location.href);
-      /* depth cap: a server that keeps answering with another still-resolvable
-         URL must not recurse unbounded.
-         The host test is dotted-suffix: a bare endsWith('nexusmods.com') would also
-         match evilnexusmods.com and keep resolving against an attacker's host. */
       const host = parsed.hostname.toLowerCase().replace(/\.$/, '');
       const isNexusHost = host === 'nexusmods.com' || host.endsWith('.nexusmods.com');
       if (depth < 3 && isNexusHost && (parsed.searchParams.has('file_id') || parsed.pathname.includes('/api/files/'))) {
@@ -514,7 +487,6 @@ window.NexusExt = window.NexusExt || {};
   function setButtonState(button, state, message) {
     const textElement = button.querySelector('span.flex-label, span') || button;
     const stateConfig = {
-      // `message` is already localized by the caller (handleError uses displayText).
       waiting: { text: message || NXTK.t('btnStatePleaseWait', null, 'Please Wait...'), color: 'orange' },
       downloading: { text: NXTK.t('btnStateDownloading', null, 'Downloading!'), color: '#3dbb5e' },
       error: { text: message || NXTK.t('btnStateError', null, 'Error'), color: '#e04040' }
@@ -530,9 +502,6 @@ window.NexusExt = window.NexusExt || {};
       urlName = decodeURIComponent(new URL(url).pathname.split('/').pop() || '').trim();
     } catch (_) {}
 
-    /* Normal Nexus CDN paths already contain the real archive filename. Opaque UUID
-       paths do not, so use the page's mod title plus file id instead of saving a
-       nameless UUID. The worker performs the final Windows/path sanitization. */
     if (/\.(?:zip|7z|rar|tar|gz|tgz|bz2|tbz2|xz|txz|lzma|exe|msi|jar|fomod|omod|txt|pdf|json|xml|ini|cfg|esp|esm|esl|dll)$/i.test(urlName)) {
       return urlName;
     }
@@ -542,8 +511,6 @@ window.NexusExt = window.NexusExt || {};
       || 'nexus-mod'
     ).replace(/\s+/g, ' ').trim();
     const idSuffix = fileId ? `-${fileId}` : '';
-    /* Leave the fallback name extensionless. The worker can see the final signed
-       CDN URL and appends its real extension; opaque UUID URLs fall back to .zip. */
     return `${pageTitle || 'nexus-mod'}${idSuffix}`;
   }
 
@@ -552,7 +519,6 @@ window.NexusExt = window.NexusExt || {};
       const settings = await NexusExt.Storage.getSettings();
       const reply = await NexusExt.Storage.sendDownloadCommand('DOWNLOAD_START', {
         url,
-        // Empty means the Downloads root; the worker decides the final path.
         folder: settings.DownloadFolder ?? '',
         filename: inferBrowserDownloadName(url, fileId),
         fallbackExtension: '.zip'
@@ -576,8 +542,6 @@ window.NexusExt = window.NexusExt || {};
 
   function handleError(btn, error, { onRetry = null } = {}) {
     const normalized = Errors.normalize(error);
-    /* Two audiences, two languages: the button and the alert are read by the user, the
-       Logger line is a diagnostic and stays on the English catalogue text. */
     const shown = Errors.displayText ? Errors.displayText(normalized) : {
       message: normalized.userMessage,
       recovery: normalized.recovery
@@ -626,9 +590,6 @@ window.NexusExt = window.NexusExt || {};
       const shouldOpenFilePage = openFilePageOnNoUrl && !isNMM && href
         && error.code === 'no_download_url' && isDifferentPage(href);
       if (shouldOpenFilePage) {
-        // A Nexus *page*, not a download — validated with the lighter page check
-        // (which excludes the CDN). href originates from a page anchor, so an open
-        // redirect is worth closing even though Chrome blocks javascript: here.
         if (!NXTK.isSafeNexusPageUrl(new URL(href, location.href).href)) {
           handleError(button, Errors.create('unsafe_download_url', {
             context: 'Opening file page',
@@ -672,9 +633,6 @@ window.NexusExt = window.NexusExt || {};
       return false;
     }
 
-    /* Vortex requires an nxm:// navigation to invoke its protocol handler. Browser
-       mode always uses the required downloads permission; a worker failure is
-       surfaced instead of starting a second, unmanaged fallback path. */
     if (isNMM) {
       location.assign(finalUrl);
     } else if (!await startManagedFileDownload(finalUrl, fileId)) {
@@ -783,9 +741,6 @@ window.NexusExt = window.NexusExt || {};
     return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
   }
 
-  /* Nexus's shadow roots all hang off custom elements, so they can be addressed by tag.
-     Enumerating every element with `*` to test each one for a shadowRoot walked the
-     whole document on every debounced pass. */
   const SHADOW_HOST_SELECTOR = 'mod-file-download, download-modal';
 
   function getSearchRoots(root = document) {
@@ -809,10 +764,6 @@ window.NexusExt = window.NexusExt || {};
     return roots;
   }
 
-  /* `:not([data-nxtk-slow-bound])` lets the engine drop already-bound buttons
-     natively, so a rescan no longer re-reads textContent for every button it has
-     already handled. (A dataset marker rather than an expando precisely so it can
-     be expressed in the selector.) */
   function findSlowDownloadButtons(root) {
     const buttons = Array.from(root.querySelectorAll('button:not([data-nxtk-slow-bound])'));
     return buttons.filter((button) => {
@@ -862,15 +813,6 @@ window.NexusExt = window.NexusExt || {};
     }
   }
 
-  /* Slow-download intercept lifecycle. The full-document + shadow-DOM scan is
-     expensive, so it only ever runs debounced, only on file pages, and the
-     observer is disconnected the moment the route leaves a file page.
-     (Previously the observer fired the scan on EVERY body mutation, forever,
-     and was only installed if the FIRST page load happened to be a file page.) */
-  /* Rescanned on a poll rather than from its own body-subtree observer. That observer was
-     the third one watching document.body, and its only job was to notice buttons that
-     Nexus adds after load — a once-a-second check covers that without adding another
-     consumer to every React commit. The interval only exists while a file page is open. */
   const SLOW_DOWNLOAD_POLL_MS = 1000;
   let slowDownloadTimer = null;
 
@@ -908,8 +850,6 @@ window.NexusExt = window.NexusExt || {};
       } catch (_) {
         return;
       }
-      // linkHref comes from a page anchor on a site with user-authored mod pages,
-      // so confirm it still points at Nexus before replacing the location.
       if (!NXTK.isSafeNexusPageUrl(target)) {
         Logger.warn('Ignored requirements link with unexpected target.');
         return;
@@ -918,11 +858,6 @@ window.NexusExt = window.NexusExt || {};
     }, true);
   }
 
-  // Guard against double-fire: pushState + replaceState on the same file URL
-  // both trigger onNavigate, which would launch the same download twice.
-  // Keyed WITHOUT the hash, matching navKey() in main.js: a '#comments' anchor on
-  // a ?file_id= URL is not a new download target, and treating it as one would
-  // start the same file twice now that SPA navigations are actually detected.
   let lastAutoStartHref = '';
 
   async function autoStartDownload() {
@@ -946,10 +881,6 @@ window.NexusExt = window.NexusExt || {};
     });
   }
 
-  /* Hoisted once — rebuilt selector arrays per call were pure overhead. The
-     case-insensitive `[class*="…" i]` variants were dropped: Nexus emits these
-     class/id fragments lowercase, the exact-case selectors already match, and
-     `i`-flag substring scans are among the slowest selectors to evaluate. */
   const UPSELL_SELECTORS = [
       '#nonPremiumBanner', '#freeTrialBanner', '#ig-banner-container', '#rj-vortex',
       '[class*="ads-bottom"]', '[class*="ads-top"]', '[class*="to-premium"]',
@@ -966,11 +897,6 @@ window.NexusExt = window.NexusExt || {};
       '#head > div.rj-right-tray.rj-profile-tray.rj-open > ul > li.user-profile-menu-section-top > a'
   ];
 
-  /* One grouped selector instead of 17 separate querySelectorAll calls per scanned
-     node — a React burst of 200 insertions used to cost ~3400 queries per flush.
-     Validated once here rather than per pass: if any escaped Tailwind chain above is
-     ever rejected by a browser the whole group throws, so we fall back to the
-     per-selector loop, which skips only the offending entry (see collectMatches). */
   const UPSELL_SELECTOR = (() => {
     const joined = UPSELL_SELECTORS.join(', ');
     try {
@@ -981,19 +907,10 @@ window.NexusExt = window.NexusExt || {};
     }
   })();
 
-  /* Deliberately broad, because Nexus renames these classes freely — but a bare
-     substring match also hits any page that merely TALKS about Premium, and hiding it
-     applies `display:none !important`. Anything caught here therefore has to survive the
-     page-content test below before it is hidden; the curated selectors above do not,
-     since a banner legitimately contains its own heading and call-to-action. */
   const UPSELL_FUZZY_SELECTORS = [
     '[class*="premium"]', '[id*="premium"]', '[class*="upsell"]', '[id*="upsell"]'
   ];
   const UPSELL_FUZZY_SELECTOR = UPSELL_FUZZY_SELECTORS.join(', ');
-  /* Narrow on purpose. The failure this guards against is a whole PAGE about Premium
-     being collapsed, and the page's own <h1> is the signal for that. Widening it to
-     forms or tables would start exempting real banners, which is the opposite mistake
-     and the one users actually notice. */
   const UPSELL_PAGE_CONTENT_SELECTOR = 'h1, #mainContent';
 
   function looksLikePageContent(el) {
@@ -1006,12 +923,6 @@ window.NexusExt = window.NexusExt || {};
     }
   }
 
-  /* Ad slots are matched semantically instead of by Tailwind class chains.
-     Nexus reshuffles utility classes freely, but the slot identity
-     (data-testid, the Playwire pw-tag containers, the GPT iframe id) is stable.
-     `data-testid^="ad-"` also covers rail/skyscraper slots without guessing a
-     broad selector; note it cannot collide with "add-…" testids, since those
-     lack the hyphen after "ad". */
   const AD_SLOT_SELECTORS = [
     "[data-testid^=\"ad-\"]",
     "[id^=\"standard_iab_\"]",
@@ -1023,9 +934,6 @@ window.NexusExt = window.NexusExt || {};
   ];
   const AD_SLOT_SELECTOR = AD_SLOT_SELECTORS.join(", ");
 
-  /* Anything here marks a container as real page content, so it is never
-     collapsed even if an ad happens to sit inside it. A non-ad data-testid is
-     the strongest signal Nexus gives us that a node is product UI. */
   const AD_CONTENT_SELECTOR = [
     "a[href]",
     "button",
@@ -1043,10 +951,6 @@ window.NexusExt = window.NexusExt || {};
   const AD_WRAPPER_STOP_TAGS = new Set(["BODY", "HTML", "MAIN", "HEADER", "FOOTER", "NAV"]);
   const AD_WRAPPER_MAX_DEPTH = 4;
 
-  /* A container may be collapsed only when it exists purely to host ad slots:
-     it must contain at least one slot, no interactive/heading/media content and
-     no visible text. That is what keeps the collection title, revision selector
-     and "Add collection" button safe. */
   function isAdOnlyContainer(el) {
     if (!el || el.nodeType !== 1) return false;
     if (AD_WRAPPER_STOP_TAGS.has(el.tagName)) return false;
@@ -1057,9 +961,6 @@ window.NexusExt = window.NexusExt || {};
     return !!el.querySelector(AD_SLOT_SELECTOR);
   }
 
-  /* Walks up from a slot to the outermost ad-only ancestor. Hiding only the slot
-     leaves the wrapper's min-height/padding/gap behind — that empty ~250px band
-     on collection pages was exactly this. */
   function findAdSlotWrapper(slot) {
     let wrapper = slot;
     let node = slot.parentElement;
@@ -1071,16 +972,12 @@ window.NexusExt = window.NexusExt || {};
     return wrapper;
   }
 
-  /* Selector matching that also tests `root` itself, so the observer can pass a
-     freshly added node directly. Guarded because UPSELL_SELECTORS carries
-     escaped Tailwind chains that a future browser could reject. */
   function collectMatches(root, selector) {
     const matches = [];
     try {
       if (root.nodeType === 1 && root.matches(selector)) matches.push(root);
       root.querySelectorAll(selector).forEach((el) => matches.push(el));
     } catch (_) {
-      // Unsupported selector — skip it rather than abort the whole pass.
     }
     return matches;
   }
@@ -1138,20 +1035,13 @@ window.NexusExt = window.NexusExt || {};
     startPremiumObserver();
   }
 
-  /* Queued added-subtrees, so a burst of React insertions costs one debounced
-     pass over just those nodes instead of a full-document rescan per mutation. */
   let pendingUpsellRoots = [];
 
   function flushPendingUpsellRoots() {
     const connected = pendingUpsellRoots.filter((node) => node.isConnected);
     pendingUpsellRoots = [];
     if (!cfg.HidePremiumUpsells) return;
-    /* React commonly reports a parent and several of its descendants in the same
-       batch. Scanning a descendant is redundant once its ancestor is scanned, since
-       applyUpsellHiding walks the whole subtree either way. */
     const unique = [...new Set(connected)];
-    /* The containment filter is O(n^2), so past a modest batch one whole-document
-       pass is simply cheaper than deduplicating and then walking each subtree. */
     if (unique.length > 24) {
       applyUpsellHiding(document);
       return;
@@ -1167,15 +1057,11 @@ window.NexusExt = window.NexusExt || {};
   function startPremiumObserver() {
     if (premiumObserver || !document.body) return;
 
-    /* childList only: this module hides by toggling a class, which is an
-       attribute mutation, so its own writes can never re-trigger the observer.
-       Removals and attribute churn don't warrant a rescan either. */
     premiumObserver = new MutationObserver((mutations) => {
       let queued = false;
       for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
           if (node.nodeType !== 1) continue;
-          // Ignore the extension's own UI so the deck can never queue work.
           if (node.closest && node.closest("[id^=\"nxtk-\"], .nxtk-deck")) continue;
           pendingUpsellRoots.push(node);
           queued = true;
@@ -1188,12 +1074,6 @@ window.NexusExt = window.NexusExt || {};
     premiumObserver.observe(document.body, { childList: true, subtree: true });
   }
 
-  /* Class-only hiding. The collapse rules live in content-styles.css, so turning
-     the setting off restores the element exactly by dropping one class. Writing
-     inline display/visibility here (as this used to) meant the restore path had
-     to replay the original inline value, and a slot such as
-     `#standard_iab_head1` that already ships `style="display:none"` from Nexus
-     would be un-hidden by that replay. */
   function hideUpsellElement(el, className = "nxtk-upsell-hidden") {
     if (!el || !el.dataset || el.dataset.nxtkUpsellHidden === "1") return;
     el.dataset.nxtkUpsellHidden = "1";
@@ -1223,8 +1103,6 @@ window.NexusExt = window.NexusExt || {};
       });
     });
   }
-  /* Returns a cancel function so fast navigation can tear down the pending
-     observer instead of stacking body-subtree observers for up to 10s each. */
   function waitForElement(selector, cb, timeoutMs = 10000) {
     const el = document.querySelector(selector);
     if (el) {
@@ -1277,7 +1155,6 @@ window.NexusExt = window.NexusExt || {};
           btn.href = url + '&category=archived';
           btn.className = 'nxtk-archive-btn';
           btn.dataset.nxtkArchive = '1';
-          // textContent on a child span: the label is data, the markup stays in code.
           const label = document.createElement('span');
           label.textContent = NXTK.t('btnFileArchive', null, 'File archive');
           btn.appendChild(label);
@@ -1334,10 +1211,8 @@ window.NexusExt = window.NexusExt || {};
     ));
   }
 
-  // Public API
   async function init() {
     cfg = await NexusExt.Storage.getSettings();
-    // Before any extension UI exists, so the first render is already in the right language.
     NXTK.setForceEnglish(cfg.ForceEnglish);
     if (!listenersAttached) {
       attachClickInterceptor();
@@ -1367,7 +1242,6 @@ window.NexusExt = window.NexusExt || {};
         updateConfig(changes[NXTK.SETTINGS_KEY].newValue);
       });
     } catch (_) {
-      // Orphaned content script — keep whatever init() loaded.
     }
   }
 

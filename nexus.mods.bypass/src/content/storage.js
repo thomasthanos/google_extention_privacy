@@ -1,9 +1,3 @@
-/* storage.js — chrome.storage.local wrapper for content scripts
-   Hardened against "Extension context invalidated": when the extension is
-   reloaded/updated while a Nexus tab is still open, the orphaned content
-   script loses access to chrome.* APIs and any call throws synchronously.
-   Every access here is guarded so callers get safe fallbacks instead of an
-   unhandled promise rejection. */
 window.NexusExt = window.NexusExt || {};
 
 (function () {
@@ -14,12 +8,8 @@ window.NexusExt = window.NexusExt || {};
   const NDC_RATE_LIMIT_KEY = 'nxtk_ndc_rate_limit';
   const DEFAULTS = NXTK.DEFAULTS;
 
-  // Last known-good values so reads keep working after the context dies
-  // (e.g. a download loop in progress keeps the user's real settings).
   const cache = Object.create(null);
 
-  /* Returns false once the extension has been reloaded/updated/disabled.
-     Accessing chrome.runtime.id is the cheapest reliable probe. */
   function isContextValid() {
     try {
       return !!(chrome && chrome.runtime && chrome.runtime.id);
@@ -28,7 +18,6 @@ window.NexusExt = window.NexusExt || {};
     }
   }
 
-  /* Promise-based chrome.storage.local.get that never throws. */
   function storageGet(key, fallback) {
     return new Promise((resolve) => {
       if (!isContextValid()) {
@@ -37,7 +26,6 @@ window.NexusExt = window.NexusExt || {};
       }
       try {
         chrome.storage.local.get(key, (result) => {
-          // Reading lastError clears Chrome's "unchecked error" warning.
           if (chrome.runtime.lastError) {
             resolve(key in cache ? cache[key] : fallback);
             return;
@@ -52,8 +40,6 @@ window.NexusExt = window.NexusExt || {};
     });
   }
 
-  /* Promise-based chrome.storage.local.set that never throws.
-     Resolves true on success, false if the value could not be persisted. */
   function storageSet(key, value) {
     cache[key] = value;
     return new Promise((resolve) => {
@@ -106,12 +92,6 @@ window.NexusExt = window.NexusExt || {};
     return storageSet(NDC_HISTORY_KEY, history);
   }
 
-  /* ===== Atomic history mutations =====
-     Routed through the service worker, which serialises them per storage key so two
-     tabs cannot clobber each other's entries. Every mutation here is idempotent
-     (set union / absolute assignment), which is what makes the retry safe: an MV3
-     worker can be killed after the write lands but before the reply arrives, and
-     re-applying the same union changes nothing. */
   const MUTATION_RETRY_DELAYS = [150, 400, 1000];
 
   function sendMutation(type, payload) {
@@ -134,7 +114,6 @@ window.NexusExt = window.NexusExt || {};
     for (let attempt = 0; attempt <= MUTATION_RETRY_DELAYS.length; attempt += 1) {
       const reply = await sendMutation(type, payload);
       if (reply.ok) return reply;
-      // A rejected payload will be rejected identically next time — do not retry.
       if (reply.error && !/could not establish|receiving end|context-invalid|empty-reply/i.test(reply.error)) {
         return reply;
       }
@@ -145,15 +124,10 @@ window.NexusExt = window.NexusExt || {};
     return { ok: false, error: 'retries-exhausted' };
   }
 
-  /* Browser-mode downloads are driven by the service worker (chrome.downloads is not
-     reachable from a content script). Single-shot, no retry: a retried DOWNLOAD_START
-     could start the same file twice, and the caller already has a fallback. */
   async function sendDownloadCommand(type, payload) {
     return sendMutation(type, payload);
   }
 
-  /* Local read-modify-write, used only when the worker could not be reached. Racy
-     across tabs, but a rare race beats losing the entry outright. */
   async function localHistoryMutate(gameId, collectionId, mutate) {
     const history = await getHistory();
     history[gameId] = history[gameId] || {};
@@ -202,10 +176,6 @@ window.NexusExt = window.NexusExt || {};
     });
   }
 
-  /* Shared rate-limit cooldown. Written when Nexus actually answers 429, so a
-     second tab on the same collection backs off instead of continuing to hammer an
-     endpoint that is already refusing. Replaces the old launched-download counter,
-     which guessed at a limit from successful downloads. */
   async function getRateLimit() {
     return storageGet(NDC_RATE_LIMIT_KEY, { until: 0 });
   }
@@ -229,8 +199,6 @@ window.NexusExt = window.NexusExt || {};
     saveRateLimit
   };
 
-  /* Another tab (or the worker) may change storage under us. Without this the
-     in-memory cache would serve stale history for the rest of the page's life. */
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local') return;
@@ -241,6 +209,5 @@ window.NexusExt = window.NexusExt || {};
       }
     });
   } catch (_) {
-    // Orphaned content script — the cache simply stays as-is.
   }
 })();

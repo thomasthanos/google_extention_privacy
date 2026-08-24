@@ -1,4 +1,3 @@
-/* ndc.js — Nexus Download Collection logic (ported from Tampermonkey script1) */
 window.NexusExt = window.NexusExt || {};
 
 (function () {
@@ -27,9 +26,6 @@ window.NexusExt = window.NexusExt || {};
     return sizeInGB >= 1 ? `${sizeInGB.toFixed(2)} GB` : `${sizeInMB.toFixed(2)} MB`;
   };
 
-  /* Countdown label: plain seconds under a minute, m:ss at or above one minute
-     (and h:mm:ss past an hour). Used by BOTH the per-file pause and the
-     rate-limit cooldown so every wait in the log reads the same way. */
   const formatDuration = (totalSeconds) => {
     const seconds = Math.max(0, Math.round(Number(totalSeconds) || 0));
     if (seconds < 60) return `${seconds}s`;
@@ -43,29 +39,18 @@ window.NexusExt = window.NexusExt || {};
   };
 
   const escapeHtml = NXTK.escapeHtml;
-  /* T = plain, TS = with substitutions. Markup and links are always built in code.
-     Values passed to TS are pre-escaped by the caller, so nothing is escaped twice. */
   const T = (key, fallback) => NXTK.t(key, null, fallback);
   const TS = (key, subs, fallback) => NXTK.t(key, subs.map(String), fallback);
 
-  /* Must equal DEFAULTS.NDC_downloadSpeed. resolveDownloadSpeed() compares against it to
-     decide whether the stored value is the stock one or the user's own, so a mismatch
-     would label every untouched install as customised. */
   const DEFAULT_DOWNLOAD_SPEED = 3.2;
-  // Ceiling on the size/speed formula: without it a very large file asks for a wait so
-  // long that the queue reads as frozen.
   const MAX_PAUSE_SECONDS = 10 * 60;
 
-  /* Backoff bounds used when Nexus returns 429 without a Retry-After header.
-     Doubles per consecutive 429, capped so a run never stalls indefinitely. */
   const RATE_LIMIT_BASE_SECONDS = 30;
   const RATE_LIMIT_MAX_SECONDS = 10 * 60;
   const RATE_LIMIT_MAX_STRIKES = 6;
 
   const MAX_QUEUE_POLL_FAILURES = 5;
 
-  /* One collator instead of a lookup per comparison, and `numeric` so "Patch 10" sorts
-     after "Patch 2" rather than before it. */
   const nameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
   class NDC {
@@ -84,47 +69,27 @@ window.NexusExt = window.NexusExt || {};
       this.lastError = null;
       this.disposed = false;
       this.initialized = false;
-      /* Two scopes: lifecycleController covers page-owned work (fetchMods, revisions) and
-         is aborted only by dispose(); downloadController covers the active run, so Stop
-         cancels it without making the instance unusable. */
       this.lifecycleController = typeof AbortController === 'function' ? new AbortController() : null;
       this.downloadController = null;
       this.backgroundJobId = null;
-      /* Set while a browser-mode run is waiting on the worker. Stop and dispose() use
-         it to end that wait when no NXT_NDC_DONE can arrive. */
       this.settleBrowserQueue = null;
-      // Renews this tab's cross-tab run lease while a run is active.
       this.claimTimer = null;
-      // storage.onChanged subscription that keeps the pacing tunables live.
       this.onSettingsChanged = null;
-      /* Guards against a second concurrent run (double-click on "Download all",
-         or starting a selection while a run is live). Deliberately NOT derived
-         from runStatus: that is initialised to STATUS_DOWNLOADING before anything
-         starts, so testing it would reject the very first download. */
       this.running = false;
 
-      /* The loop's stop/pause condition. It used to live on the deck's state object,
-         so isStopped() answered "not stopped" whenever no deck was mounted and every
-         pause check reached through the DOM. The deck now mirrors this field instead
-         of owning it. */
       this.runStatus = STATUS_DOWNLOADING;
 
-      // UI references (set by ui.js)
       this.ui = null;
     }
 
-    // Requests that belong to the page/route rather than to a download run.
     get lifecycleSignal() {
       return this.lifecycleController?.signal || null;
     }
 
-    // Requests that belong to the active download run.
     get downloadSignal() {
       return this.downloadController?.signal || null;
     }
 
-    /* Cancels the active download run only. The instance stays usable, so pressing
-       Stop and then Download again works without a route change. */
     stopDownload() {
       this.running = false;
       this.runStatus = STATUS_STOPPED;
@@ -135,8 +100,6 @@ window.NexusExt = window.NexusExt || {};
       this.downloadController = null;
     }
 
-    /* Addressed by collection as well as by jobId: a page that lost track of a live job
-       could otherwise never stop it. */
     queueTarget() {
       return {
         jobId: this.backgroundJobId || null,
@@ -145,22 +108,13 @@ window.NexusExt = window.NexusExt || {};
       };
     }
 
-    /* `ownedOnly` separates an explicit Stop from an incidental teardown. Stop may address
-       the job by collection; a route change must not, or it would kill a job another tab
-       is driving. */
     stopBackgroundQueue({ ownedOnly = false } = {}) {
       if (ownedOnly && !this.backgroundJobId) {
-        /* Nothing to stop in the worker, but a browser-mode wait may still be pending here.
-           Settling it removes the queue listener — otherwise each route change leaks one,
-           still driving a detached deck. */
         this.settleBrowserQueue?.('stopped');
         return;
       }
       Promise.resolve(NexusExt.Storage.sendDownloadCommand('NDC_QUEUE_STOP', this.queueTarget()))
         .then((reply) => {
-          /* `job-not-found`: the worker has no record, so NXT_NDC_DONE can never
-             arrive. Without settling here the deck stayed frozen mid-progress and
-             `running` stayed latched, so every later Download was refused. */
           if (!reply?.ok) this.settleBrowserQueue?.('stopped');
         })
         .catch(() => this.settleBrowserQueue?.('stopped'));
@@ -173,9 +127,6 @@ window.NexusExt = window.NexusExt || {};
       ).catch?.(() => undefined);
     }
 
-    /* Called by main.js when the route changes away from this collection.
-       Tears the instance down for good: both request scopes, the download loop, and
-       the UI surfaces that close over it. */
     dispose() {
       this.disposed = true;
       this.running = false;
@@ -188,8 +139,6 @@ window.NexusExt = window.NexusExt || {};
       }
       this.releaseRunClaim();
       this.stopBackgroundQueue({ ownedOnly: true });
-      // Belt and braces: stopBackgroundQueue settles on both of its paths, but the
-      // listener must not survive this instance under any circumstance.
       this.settleBrowserQueue?.('stopped');
       for (const controller of [this.downloadController, this.lifecycleController]) {
         try {
@@ -199,17 +148,11 @@ window.NexusExt = window.NexusExt || {};
       this.downloadController = null;
     }
 
-    /* Held for the whole run so a second tab cannot start a parallel one. Vortex has no
-       worker-side job to collide on, so without this two tabs each handed every mod to
-       Vortex. Lease-based: the heartbeat keeps it alive, and it expires if this tab dies. */
     async acquireRunClaim() {
       const reply = await NexusExt.Storage.sendDownloadCommand('NDC_RUN_CLAIM', {
         gameId: this.gameId,
         collectionId: this.collectionId
       });
-      // Worker unreachable: fail OPEN. A claim is a duplicate guard, not a
-      // correctness gate, and refusing to download because a message dropped would
-      // be a worse failure than the duplication it prevents.
       if (!reply?.ok) return { granted: true };
       if (!reply.value?.granted) return { granted: false, reason: reply.value?.reason || 'lease' };
 
@@ -236,18 +179,10 @@ window.NexusExt = window.NexusExt || {};
       return this.disposed || this.runStatus === STATUS_STOPPED;
     }
 
-    /* Auto-detection is deliberately NOT used: navigator.connection.downlink is capped at
-       10 Mbps so it can never report a fast link, and Resource Timing on our own ~8 KB
-       fetches cannot predict sustained throughput. Browser-queue byte rates say nothing
-       about Vortex's own speed either. */
     resolveDownloadSpeed() {
       const manual = Number(this.downloadSpeed);
       const isCustom = Number.isFinite(manual) && manual > 0
         && Math.abs(manual - DEFAULT_DOWNLOAD_SPEED) > 0.001;
-      /* The old label nagged "set your real speed" on EVERY countdown tick, pointing at
-         a setting that was not exposed on any surface — so it was both noise and a dead
-         end. The control now exists in the settings panel, where the explanation
-         belongs; this just states which value is in play. */
       return isCustom
         ? { speed: manual, source: T('speedSourceCustom', 'your setting') }
         : { speed: DEFAULT_DOWNLOAD_SPEED, source: T('speedSourceDefault', 'default') };
@@ -260,7 +195,6 @@ window.NexusExt = window.NexusExt || {};
       this.downloadMethod = settings.NDC_downloadMethod;
       this.requestTimeout = settings.RequestTimeout || Errors.DEFAULT_TIMEOUT_MS;
       this.showAlertsOnError = settings.ShowAlertsOnError !== false;
-      // Empty means the Downloads root; the worker decides the final path.
       this.downloadFolder = settings.DownloadFolder ?? '';
 
       this.watchSettings();
@@ -278,9 +212,6 @@ window.NexusExt = window.NexusExt || {};
       return true;
     }
 
-    /* Read once in init() and never again before this, so changing pacing mid-run did
-       nothing until a reload. Subscribing to storage covers every writer — popup,
-       in-page modal, other tabs — at once. */
     watchSettings() {
       if (this.onSettingsChanged) return;
       this.onSettingsChanged = (changes, area) => {
@@ -290,7 +221,6 @@ window.NexusExt = window.NexusExt || {};
       try {
         chrome.storage.onChanged.addListener(this.onSettingsChanged);
       } catch (_) {
-        // Orphaned content script — keep whatever init() loaded.
         this.onSettingsChanged = null;
       }
     }
@@ -304,9 +234,6 @@ window.NexusExt = window.NexusExt || {};
       this.showAlertsOnError = next.ShowAlertsOnError !== false;
       this.downloadFolder = next.DownloadFolder ?? '';
       NXTK.setForceEnglish(next.ForceEnglish);
-      /* downloadMethod is deliberately NOT applied. The deck's radio owns it, and
-         swapping Vortex <-> Browser underneath a run in progress would leave the loop
-         and the worker queue disagreeing about who owns the transfer. */
     }
 
     async fetchMods(collectionId = this.collectionId, revision = this.revision) {
@@ -325,8 +252,6 @@ window.NexusExt = window.NexusExt || {};
       }, {
         timeoutMs: this.requestTimeout,
         context: 'Loading collection details',
-        // Page-scoped: also used by the revision comparison, which must survive a
-        // Stop but be cancelled by a route change.
         signal: this.lifecycleSignal
       });
 
@@ -394,9 +319,6 @@ window.NexusExt = window.NexusExt || {};
           || '';
 
         if (!downloadUrl && NexusExt.NNW?.getDownloadUrl) {
-          /* Hand over the response already fetched above. getDownloadUrl would
-             otherwise GET this exact URL again with the same credentials and
-             headers, doubling the authenticated requests per mod. */
           const resolved = await NexusExt.NNW.getDownloadUrl({
             fileId: mod.fileId || mod.file.fileId,
             gameId: mod.file.mod.game.id,
@@ -448,10 +370,6 @@ window.NexusExt = window.NexusExt || {};
       };
     }
 
-    /* Records a rate-limit response so this run — and any other tab — backs off.
-       `retryAfterSeconds` comes from the response when Nexus sends Retry-After;
-       otherwise a bounded exponential backoff is used, doubling per consecutive
-       429 so a server that is still refusing is not hammered. */
     noteRateLimited(retryAfterSeconds) {
       const explicit = Number(retryAfterSeconds);
       this.rateLimitStrikes = Math.min((this.rateLimitStrikes || 0) + 1, RATE_LIMIT_MAX_STRIKES);
@@ -460,7 +378,6 @@ window.NexusExt = window.NexusExt || {};
         : Math.min(RATE_LIMIT_BASE_SECONDS * Math.pow(2, this.rateLimitStrikes - 1), RATE_LIMIT_MAX_SECONDS);
       const until = Date.now() + Math.min(backoff, RATE_LIMIT_MAX_SECONDS) * 1000;
       this.rateLimitedUntil = Math.max(this.rateLimitedUntil || 0, until);
-      // Shared so a second tab downloading the same collection also backs off.
       NexusExt.Storage.saveRateLimit?.({ until: this.rateLimitedUntil });
       return Math.round((this.rateLimitedUntil - Date.now()) / 1000);
     }
@@ -469,8 +386,6 @@ window.NexusExt = window.NexusExt || {};
       this.rateLimitStrikes = 0;
     }
 
-    /* Blocks until any active cooldown expires. Reads the shared value first so a
-       cooldown started in another tab is honoured here too. */
     async waitOutRateLimit() {
       const shared = await NexusExt.Storage.getRateLimit();
       const until = Math.max(this.rateLimitedUntil || 0, Number(shared?.until) || 0);
@@ -489,10 +404,6 @@ window.NexusExt = window.NexusExt || {};
           const msgSpan = logRow?.querySelector('.nxtk-log-msg');
           remaining = Math.round((until - Date.now()) / 1000);
 
-          /* Paused: keep WAITING, but keep the label honest. The cooldown is a server
-             clock and runs down whether or not the user has paused, so freezing the
-             whole tick left a stale countdown frozen on screen — it read as a hung
-             queue. Only the resume is withheld, which is what Pause actually means. */
           if (this.runStatus === STATUS_PAUSED) {
             if (msgSpan) {
               msgSpan.textContent = remaining > 0
@@ -514,9 +425,6 @@ window.NexusExt = window.NexusExt || {};
       });
     }
 
-    /* Sleep that honours Stop and Pause. Uses elapsed wall-clock rather than a fixed
-       100 ms per tick: Chromium throttles background-tab timers, which turned a 2 s wait
-       into ~20 s. Time spent explicitly paused is still excluded. */
     delayWithPause(totalMs) {
       return new Promise((resolve) => {
         let remaining = Math.max(0, Number(totalMs) || 0);
@@ -542,7 +450,6 @@ window.NexusExt = window.NexusExt || {};
       });
     }
 
-    /* Normalizes whatever fetchDownloadLink returned into a concrete error. */
     resolveLinkError(result) {
       return Errors.normalize(
         result?.error
@@ -551,9 +458,6 @@ window.NexusExt = window.NexusExt || {};
       );
     }
 
-    /* Bounded retry around fetchDownloadLink. Blocking errors are never retried — they
-       need the user to act first. The caller sees one final result, so progress and
-       failed bookkeeping still happen once. */
     async fetchDownloadLinkWithRetry(mod, { attempts = 2, delayMs = 500, onAttemptFailed = null } = {}) {
       let result;
       for (let attempt = 1; attempt <= attempts; attempt++) {
@@ -576,9 +480,6 @@ window.NexusExt = window.NexusExt || {};
         const error = this.resolveLinkError(result);
         result.error = error;
 
-        /* A real 429 sets the shared cooldown, honouring Retry-After when the
-           response exposed it and falling back to bounded backoff when it did not
-           (the cross-origin GraphQL endpoint typically hides the header). */
         if (error.code === 'rate_limited') {
           const waitSeconds = this.noteRateLimited(result.rateLimit?.retryAfterSeconds);
           this.ui.logText(TS('logBackingOff', [formatDuration(waitSeconds)],
@@ -598,9 +499,6 @@ window.NexusExt = window.NexusExt || {};
       return result;
     }
 
-    /* Hands a resolved link to Vortex via its nxm:// handler. Vortex-only: browser-mode
-       collections go to the worker queue instead. Shared by the main loop and Retry so
-       both use the same fail-closed validator. Returns whether the hand-off happened. */
     handOffDownload(mod, downloadUrl, prefix) {
       const sizeStr = convertSize(mod.file.size);
       const fileName = escapeHtml(mod.file.name);
@@ -610,7 +508,6 @@ window.NexusExt = window.NexusExt || {};
 
       const verdict = NXTK.validateDownloadTarget(downloadUrl, { method: DOWNLOAD_METHOD_VORTEX });
       if (!verdict.ok) {
-        // detail is a fixed slug (never the URL itself) so it is safe in a report.
         const error = Errors.create('unsafe_download_url', {
           context: 'Validating download target',
           technicalMessage: `rejected: ${verdict.detail} | method=vortex`
@@ -624,24 +521,16 @@ window.NexusExt = window.NexusExt || {};
       return true;
     }
 
-    /* Retries one mod outside the main loop — wired to the Retry button on the
-       error dialog. History/progress bookkeeping is intentionally left alone: the
-       main run already accounted for this file as failed. */
     async retryMod(mod) {
-      /* The error dialog outlives the failure that raised it, so Retry can be pressed after
-         Stop. Without these guards it handed Vortex a download the user had cancelled. */
       if (this.isStopped()) {
         this.ui?.logText(T('logRetryIgnored', 'Retry ignored: this collection run was stopped.'), 'info');
         return;
       }
 
       const result = await this.fetchDownloadLinkWithRetry(mod);
-      // Re-checked: the fetch above is two network round-trips, which is exactly the
-      // window in which Stop gets pressed.
       if (this.isStopped()) return;
 
       if (result.downloadUrl) {
-        // Only count it once the hand-off actually happened.
         if (this.handOffDownload(mod, result.downloadUrl, 'Retry:')) NXTK.bumpTotalDownloads?.();
         return;
       }
@@ -649,17 +538,11 @@ window.NexusExt = window.NexusExt || {};
       const error = this.resolveLinkError(result);
       const link = `<a href="${escapeHtml(mod.file.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(mod.file.name)}</a>`;
       this.ui.log(`${TS('logRetryFailed', [escapeHtml(Errors.toLogMessage(error))], `Retry failed: ${escapeHtml(Errors.toLogMessage(error))}`)} ${link}`, 'error');
-      /* Re-display here rather than throwing: ui.js's retry handler funnels a
-         thrown value through Errors.fromException, which reads cause.message and
-         would flatten this into a generic network_error, losing the real code. */
       if (this.showAlertsOnError && error.retryable) {
         NexusExt.UI.showError(error, { title: NXTK.t('dlgDownloadIssue', null, 'Download issue'), onRetry: () => this.retryMod(mod) });
       }
     }
 
-    /* Serialised in the service worker so a concurrent run (another tab, an
-       overlapping "all"/"mandatory" run) cannot drop this entry. Still returns the
-       merged object, which the loop assigns back to its local `history`. */
     async recordHistoryEntry(type, fileId) {
       return NexusExt.Storage.addHistoryEntry({
         gameId: this.gameId,
@@ -669,8 +552,6 @@ window.NexusExt = window.NexusExt || {};
       });
     }
 
-    /* Browser-mode collections are owned by the worker: it persists the queue, resolves
-       each signed URL and advances on downloads.onChanged even if this page is frozen. */
     async downloadBrowserQueue(mods, type, history, { restart = false } = {}) {
       this.ui.startDownload(mods.length);
       const alreadyDownloaded = type === null
@@ -691,9 +572,6 @@ window.NexusExt = window.NexusExt || {};
           gameId: mod.file.mod.game.id,
           name: mod.file.name,
           pageUrl: mod.file.url,
-          /* Nexus publishes this in the same GraphQL payload as the file list (KB).
-             The worker checks the finished transfer against it, so a truncated or
-             empty archive is caught instead of being recorded as a success. */
           sizeKb: mod.file.size
         });
       }
@@ -723,10 +601,6 @@ window.NexusExt = window.NexusExt || {};
       });
     }
 
-    /* ===== Reconnecting to a run already in the worker =====
-       Split out of downloadBrowserQueue so it can also be entered WITHOUT starting
-       anything (see resumeBackgroundRun). `start` is the only difference between the
-       two callers: omit it and this simply attaches to whatever is already running. */
     watchBackgroundJob({
       queueProgressBase = 0,
       visibleTotal = 0,
@@ -752,7 +626,6 @@ window.NexusExt = window.NexusExt || {};
           this.settleBrowserQueue = null;
           this.backgroundJobId = null;
           this.downloadController = null;
-          // `running` is released by downloadMods' finally — single owner.
         };
 
         const finish = (outcome = 'error', error = '') => {
@@ -764,13 +637,8 @@ window.NexusExt = window.NexusExt || {};
           resolve();
         };
 
-        /* Exposed so Stop and dispose() can end this wait even when the worker will
-           never send NXT_NDC_DONE (no such job, or the page is being torn down). */
         this.settleBrowserQueue = (outcome = 'stopped') => finish(outcome);
 
-        /* Every queue event is a fire-and-forget tabs.sendMessage that a frozen tab never
-           receives, and nothing is re-sent on wake. One lost NXT_NDC_DONE stranded the deck
-           forever with `running` latched. Polling the worker's own state closes that. */
         const TERMINAL_STATUS = {
           finished: 'finished',
           partial: 'partial',
@@ -817,8 +685,6 @@ window.NexusExt = window.NexusExt || {};
           pollQueueStatus().catch(() => undefined);
         };
         watchdogTimer = setInterval(runWatchdog, 7000);
-        // Timers are throttled hard in a hidden tab, so also resync on refocus —
-        // which is exactly when a frozen tab needs to catch up on what it missed.
         onVisibilityChange = () => {
           if (!settled && !document.hidden) runWatchdog();
         };
@@ -854,9 +720,6 @@ window.NexusExt = window.NexusExt || {};
           }
         };
 
-        /* Claimed by collection, not only by jobId: events arriving before backgroundJobId
-           was set used to be dropped, so a run downloaded correctly while the deck showed
-           nothing. The id is latched from the first event for the fast path. */
         const onQueueEvent = (message) => {
           if (!/^NXT_NDC_/.test(String(message?.type || ''))) return false;
           if (this.backgroundJobId) {
@@ -876,8 +739,6 @@ window.NexusExt = window.NexusExt || {};
           return;
         }
 
-        // Reattach mode: the job already exists and the listener above is all that
-        // was missing. Nothing to start.
         if (typeof start !== 'function') {
           runWatchdog();
           return;
@@ -890,9 +751,6 @@ window.NexusExt = window.NexusExt || {};
           }
           this.backgroundJobId = reply.value.jobId;
           if (!reply.value.adopted) return;
-          /* The worker handed back a job that was already downloading this collection
-             instead of starting a rival one. Re-baseline the bar against it, otherwise
-             the deck counts from zero over a run that is already part-done. */
           this.ui.logText(T('logReconnectedAdopted', 'Reconnected to the download already running in the background.'), 'info');
           const queueIndex = Math.min(
             Number(reply.value.index) || 0,
@@ -904,16 +762,8 @@ window.NexusExt = window.NexusExt || {};
       });
     }
 
-    /* A browser-mode run deliberately survives its page, but the whole receiving end —
-       listener, watchdog, deck, and the Stop button that only exists inside the progress
-       area — used to be created solely by clicking Download. A reopened tab therefore
-       showed an idle deck over a live run with no way to stop it. Called by main.js once
-       the deck mounts; re-points the worker at this tab and re-enters the wait loop. */
     async resumeBackgroundRun() {
       if (!this.ui || this.disposed) return false;
-      /* A watch loop can already be live while React rebuilds the deck. It closes over
-         `this`, so it already drives the new bridge — only the visible state is missing.
-         Bailing out here left a remounted deck showing the idle panel over a live run. */
       const alreadyWatching = this.running;
 
       let reply;
@@ -929,7 +779,6 @@ window.NexusExt = window.NexusExt || {};
 
       const snapshot = reply.value;
       if (snapshot.status !== 'running' && snapshot.status !== 'paused') return false;
-      // Re-checked after the await: a route change or a click could have landed.
       if (this.disposed || !this.ui) return false;
       if (this.running !== alreadyWatching) return false;
 
@@ -946,8 +795,6 @@ window.NexusExt = window.NexusExt || {};
       }
 
       this.backgroundJobId = snapshot.jobId;
-      /* Claimed here so the Download buttons refuse while the reattached run is live,
-         exactly as they do for a run started in this tab. */
       this.running = true;
       try {
         this.ui.logText(T('logReconnectedBackground', 'Reconnected to a collection download still running in the background.'), 'info');
@@ -964,9 +811,6 @@ window.NexusExt = window.NexusExt || {};
 
     async downloadMods(mods, type = null) {
       if (!this.ui || this.disposed) return;
-      /* Checked before `running` is claimed, so there is nothing to release. A
-         collection with no optional mods otherwise flashed the whole start/finish
-         sequence at 0/0 and issued a pointless history clear on an empty list. */
       if (!mods.length) {
         this.ui.logText(T('logNothingToDownload', 'There are no mods to download for this selection.'), 'info');
         return;
@@ -975,17 +819,9 @@ window.NexusExt = window.NexusExt || {};
         this.ui.logText(T('logAlreadyRunning', 'A download is already running. Please wait or stop it first.'), 'info');
         return;
       }
-      /* This wrapper exists purely to own the `running` lifetime: with the claim inline,
-         a rejection from any of the awaits before the loop left it stuck true for the
-         page's lifetime, and every later Download was refused. */
       this.running = true;
-      // Fresh per-run scope, so a previous Stop cannot cancel this run's requests.
       this.downloadController = typeof AbortController === 'function' ? new AbortController() : null;
       try {
-        /* One run per collection across the whole browser. Browser mode is already
-           protected by the worker's one-job-per-collection rule, but Vortex mode had
-           nothing at all: two tabs on the same collection each walked the full list and
-           handed every mod to Vortex twice. */
         const claim = await this.acquireRunClaim();
         if (!claim.granted) {
           this.ui.logText(
@@ -1004,7 +840,6 @@ window.NexusExt = window.NexusExt || {};
     }
 
     async runCollection(mods, type) {
-      // A new run clears the stopped state the previous Stop left behind.
       if (this.runStatus === STATUS_STOPPED) this.runStatus = STATUS_DOWNLOADING;
 
       const loginError = Auth?.getDocumentLoginError?.(document, 'Starting collection download');
@@ -1021,9 +856,6 @@ window.NexusExt = window.NexusExt || {};
       }
 
       let history = null;
-      /* "Re-download all" is an explicit instruction to start over. Without carrying it
-         to the worker, a job still running for this collection got adopted instead and
-         the bar resumed mid-way (59/258) as though nothing had been asked. */
       let restart = false;
       if (type !== null) {
         history = await NexusExt.Storage.getHistory();
@@ -1061,9 +893,6 @@ window.NexusExt = window.NexusExt || {};
       }
 
       this.ui.startDownload(mods.length);
-      /* Stated up front because the queue cannot tell: a hand-off is a navigation to
-         nxm://, and the transfer happens inside Vortex where the browser sees nothing. If
-         Vortex is not running, files are still recorded as sent and a resume skips them. */
       if (history) {
         this.ui.logText(T('logVortexNotice',
           'Vortex must be running. Files are recorded once sent to it — the browser cannot see whether Vortex actually received them.'
@@ -1081,10 +910,6 @@ window.NexusExt = window.NexusExt || {};
         const fileName = escapeHtml(mod.file.name);
         const fileUrl = escapeHtml(mod.file.url);
 
-        /* Stop is checked BEFORE the history skip. With the order reversed, pressing
-           Stop over a stretch of already-downloaded files kept logging and advancing
-           the bar through all of them until it happened to reach one that still needed
-           fetching — so Stop looked ignored for as long as that stretch lasted. */
         if (this.isStopped()) {
           outcome = 'stopped';
           this.ui.logText(T('logDownloadStopped', 'Download stopped.'), 'info');
@@ -1097,11 +922,7 @@ window.NexusExt = window.NexusExt || {};
           continue;
         }
 
-        /* Immediately before the request, not after the previous one: the cooldown is
-           shared through storage, so another tab can start one while we were pausing —
-           and the first mod of a run was never checked at all. */
         await this.waitOutRateLimit();
-        // The wait can last minutes; Stop during it must end the run, not fetch once more.
         if (this.isStopped()) {
           outcome = 'stopped';
           this.ui.logText(T('logDownloadStopped', 'Download stopped.'), 'info');
@@ -1115,8 +936,6 @@ window.NexusExt = window.NexusExt || {};
           )
         });
 
-        // Stop pressed (or route changed) while the link fetch was in flight —
-        // without this check the mod would still download one extra time.
         if (this.isStopped()) {
           outcome = 'stopped';
           this.ui.logText(T('logDownloadStopped', 'Download stopped.'), 'info');
@@ -1140,9 +959,6 @@ window.NexusExt = window.NexusExt || {};
               });
             }
           } else {
-            // Retries are already exhausted by fetchDownloadLinkWithRetry, so this
-            // counts once. onRetry lets the user re-attempt just this mod — the
-            // Retry button was previously unreachable from collections.
             this.ui.incrementProgress();
             failedDownload.push({ mod, error: downloadError });
             if (this.showAlertsOnError && downloadError.retryable) {
@@ -1153,9 +969,6 @@ window.NexusExt = window.NexusExt || {};
             }
           }
         } else if (!this.handOffDownload(mod, downloadResult.downloadUrl, `[${modNumber}]`)) {
-          /* The link failed validation, so nothing was handed to Vortex. Advance the
-             bar but do NOT record history — otherwise a re-run would skip a file that
-             never arrived. */
           this.ui.incrementProgress();
           failedDownload.push({
             mod,
@@ -1176,9 +989,6 @@ window.NexusExt = window.NexusExt || {};
         }
 
         if (index < mods.length - 1) {
-          /* The size term ESTIMATES the transfer, which is required because Vortex gives no
-             completion event. Values are re-read each tick so a settings change lands
-             mid-countdown. */
           const computePause = () => {
             if (this.pauseBetweenDownload === 0) return 0;
             const { speed } = this.resolveDownloadSpeed();
@@ -1188,8 +998,6 @@ window.NexusExt = window.NexusExt || {};
           let pause = computePause();
           if (pause > 0) {
             const sizeStr = convertSize(mod.file.size);
-            // Shows the speed actually used and its origin, so an unexpectedly
-            // long or short wait is self-explanatory in the log.
             const pauseMessage = (remaining) => {
               const { speed, source } = this.resolveDownloadSpeed();
               return TS('logPausing',
@@ -1208,13 +1016,10 @@ window.NexusExt = window.NexusExt || {};
                   clearInterval(intervalId);
                   return resolve();
                 }
-                // Explicit Pause freezes active elapsed time. Background-tab timer
-                // throttling does not: the next tick accounts for the full gap.
                 if (this.runStatus === STATUS_PAUSED) {
                   return;
                 }
                 activeElapsedMs += elapsedSinceTick;
-                // Re-read the configured values while the countdown is active.
                 pause = computePause();
                 if (pause <= 0) {
                   clearInterval(intervalId);
@@ -1250,8 +1055,6 @@ window.NexusExt = window.NexusExt || {};
       if (outcome === 'finished' && this.isStopped()) outcome = 'stopped';
 
       if (history && outcome === 'finished' && !failedDownload.length && this.ui.progress === this.ui.modsCount) {
-        /* Clears only this gameId + collectionId + type. Serialised in the worker,
-           so entries another tab added meanwhile are preserved. */
         await NexusExt.Storage.clearHistoryType({
           gameId: this.gameId,
           collectionId: this.collectionId,
@@ -1277,8 +1080,6 @@ window.NexusExt = window.NexusExt || {};
         this.ui.logText(TS('logRunStopped', [Errors.toLogMessage(error)],
           `Collection download stopped: ${Errors.toLogMessage(error)}`), 'error');
       } finally {
-        // Only endDownload here: `running` belongs to downloadMods' finally, which
-        // also covers the awaits above this try block.
         this.ui.endDownload(outcome);
       }
     }
@@ -1299,7 +1100,6 @@ window.NexusExt = window.NexusExt || {};
       }, {
         timeoutMs: this.requestTimeout,
         context: 'Loading collection revisions',
-        // Page-scoped: a route change must cancel this, a Stop must not.
         signal: this.lifecycleSignal
       });
       if (!response.ok) {
@@ -1324,7 +1124,6 @@ window.NexusExt = window.NexusExt || {};
     }
   }
 
-  // Public
   window.NexusExt.NDC = NDC;
   window.NexusExt.NDC_CONSTANTS = {
     DOWNLOAD_METHOD_VORTEX,

@@ -1,4 +1,3 @@
-/* auth.js — central Nexus Mods login-state detection and recovery */
 window.NexusExt = window.NexusExt || {};
 
 (function () {
@@ -47,10 +46,6 @@ window.NexusExt = window.NexusExt || {};
     }
   }
 
-  /* Positive signed-in markers in the live page. The header's profile menu
-     and avatar only render for an authenticated user, so their presence must
-     override any "Log in" text found elsewhere in the markup (the Next.js
-     Nexus UI ships login strings even for signed-in users). */
   function isSignedIn(root = document) {
     try {
       const marker = root.querySelector?.(

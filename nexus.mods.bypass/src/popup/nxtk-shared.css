@@ -1,13 +1,4 @@
-/* ============================================================
-   nxtk-shared.css — Shared UI primitives (popup + content)
-   iOS 26/27 "Liquid Glass" design system
-   - Strong perimeter glass (luminous rim, dual hairline)
-   - Multi-layer liquid interior (tint + refraction + specular + grain)
-   - Background fully masked behind opaque tint + heavy backdrop blur
-   ============================================================ */
-
 :root {
-  /* Base palette */
   --nxtk-bg-deep: #0b0c14;
   --nxtk-accent: #d98f40;
   --nxtk-accent-hover: #f0a352;
@@ -16,20 +7,17 @@
   --nxtk-accent-glow: 0 0 24px rgba(217, 143, 64, 0.35);
   --nxtk-accent-glow-strong: 0 0 40px rgba(217, 143, 64, 0.55);
 
-  /* Liquid glass tints — high opacity so the page behind never bleeds through */
   --nxtk-glass-tint: rgba(18, 20, 32, 0.78);
   --nxtk-glass-tint-strong: rgba(14, 16, 26, 0.88);
   --nxtk-glass-tint-soft: rgba(28, 30, 44, 0.62);
   --nxtk-glass-blur: blur(32px) saturate(180%) contrast(1.05);
   --nxtk-glass-blur-strong: blur(44px) saturate(200%) contrast(1.08);
 
-  /* Perimeter glass — the signature iOS 26 luminous rim */
   --nxtk-rim-light: rgba(255, 255, 255, 0.55);
   --nxtk-rim-light-soft: rgba(255, 255, 255, 0.22);
   --nxtk-rim-dark: rgba(0, 0, 0, 0.55);
   --nxtk-rim-hairline: rgba(255, 255, 255, 0.08);
 
-  /* Combined perimeter shadow stack — applied to every glass surface */
   --nxtk-rim:
     inset 0 1.2px 0 var(--nxtk-rim-light),
     inset 0 -1px 0 var(--nxtk-rim-dark),
@@ -51,7 +39,6 @@
     0 0 0 1px rgba(217, 143, 64, 0.3),
     0 0 30px rgba(217, 143, 64, 0.18);
 
-  /* Specular highlight gradients */
   --nxtk-specular: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.22) 0%,
@@ -69,10 +56,8 @@
     transparent 55%
   );
 
-  /* SVG grain — adds the wet/glassy texture without showing the page */
   --nxtk-noise: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.06 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 
-  /* Surfaces */
   --nxtk-surface: var(--nxtk-glass-tint);
   --nxtk-surface-high: var(--nxtk-glass-tint-strong);
   --nxtk-border: rgba(217, 143, 64, 0.22);
@@ -80,23 +65,19 @@
   --nxtk-glass-border: rgba(255, 255, 255, 0.08);
   --nxtk-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 
-  /* Text */
   --nxtk-text: #ececf3;
   --nxtk-text-dim: #8a8a99;
   --nxtk-text-bright: #ffffff;
 
-  /* Status */
   --nxtk-danger: #ff5c5c;
   --nxtk-success: #4ddb78;
   --nxtk-info: #58b8ea;
 
-  /* Radii — iOS 26 "pebble" squircle */
   --nxtk-radius: 22px;
   --nxtk-radius-sm: 14px;
   --nxtk-radius-xs: 10px;
   --nxtk-radius-pill: 999px;
 
-  /* Motion */
   --nxtk-transition: all 0.32s cubic-bezier(0.32, 0.72, 0.24, 1);
   --nxtk-transition-fast: all 0.18s cubic-bezier(0.32, 0.72, 0.24, 1);
 
@@ -104,9 +85,6 @@
   --nxtk-shadow-elevated: 0 28px 70px rgba(0, 0, 0, 0.6), 0 8px 20px rgba(0, 0, 0, 0.35);
 }
 
-/* ============================================================
-   Buttons — liquid glass pills
-   ============================================================ */
 .nxtk-btn {
   position: relative;
   display: inline-flex;
@@ -192,7 +170,6 @@
   flex-shrink: 0;
 }
 
-/* Primary — luminous orange liquid */
 .nxtk-btn-primary {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 50%),
@@ -215,7 +192,6 @@
     var(--nxtk-accent-glow-strong);
 }
 
-/* Secondary — clear liquid glass */
 .nxtk-btn-secondary {
   background: var(--nxtk-glass-tint);
   color: var(--nxtk-text);
@@ -226,7 +202,6 @@
   color: var(--nxtk-text-bright);
 }
 
-/* Ghost */
 .nxtk-btn-ghost {
   background: transparent;
   color: var(--nxtk-text-dim);
@@ -252,9 +227,6 @@
   border-radius: 50%;
 }
 
-/* ============================================================
-   Badge
-   ============================================================ */
 .nxtk-badge {
   display: inline-flex;
   align-items: center;
@@ -286,9 +258,6 @@
   -webkit-backdrop-filter: var(--nxtk-glass-blur);
 }
 
-/* ============================================================
-   Toggle Switch — liquid glass pill with floating bead
-   ============================================================ */
 .nxtk-toggle {
   position: relative;
   display: inline-block;
@@ -358,9 +327,6 @@
     0 0 0 0.5px rgba(0, 0, 0, 0.15);
 }
 
-/* ============================================================
-   Animations
-   ============================================================ */
 @keyframes nxtk-slideUp {
   from { opacity: 0; transform: translateY(20px) scale(0.96); filter: blur(8px); }
   to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
@@ -388,7 +354,6 @@
   to { background-position: 200% 0; }
 }
 
-/* Liquid breathing on accent glow */
 @keyframes nxtk-glow-breathe {
   0%, 100% { box-shadow: 0 0 24px rgba(217, 143, 64, 0.25); }
   50% { box-shadow: 0 0 36px rgba(217, 143, 64, 0.45); }

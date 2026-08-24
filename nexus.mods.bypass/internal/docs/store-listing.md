@@ -73,7 +73,7 @@ Productivity → Workflow & Planning
 Nexus Mods, Vortex, mod manager, collection downloader, auto download, skip wait, download
 helper, Skyrim, Fallout, modding
 
-## Assets — all present in `../store-assets/`
+## Assets — all present in `../store-assets/` (the folder moved under `internal/`)
 
 | Asset | Size | File |
 |---|---|---|

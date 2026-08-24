@@ -1,7 +1,3 @@
-/* ui.js — Custom UI: control deck, settings modal, select/update mods modals
-   iOS 26/27 Liquid Glass redesign — adds glass-layer wrappers (specular + sheen)
-   to deck and modals. All original logic, events, and public API preserved.
-*/
 window.NexusExt = window.NexusExt || {};
 
 (function () {
@@ -10,7 +6,6 @@ window.NexusExt = window.NexusExt || {};
   const { NDC_CONSTANTS } = NexusExt;
   const { DOWNLOAD_METHOD_VORTEX, DOWNLOAD_METHOD_BROWSER, STATUS_DOWNLOADING, STATUS_PAUSED, STATUS_FINISHED, STATUS_STOPPED, STATUS_TEXT, convertSize } = NDC_CONSTANTS;
 
-  /* ===== SVG Icons ===== */
   const ICONS = {
     chevronDown: '<svg viewBox="0 0 24 24"><path d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z"/></svg>',
     chevronRight: '<svg viewBox="0 0 24 24"><path d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>',
@@ -42,13 +37,8 @@ window.NexusExt = window.NexusExt || {};
 
   const nameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
-  // Localized text, escaped once, ready for a template literal.
   const L = (key, fallback) => escapeHtml(NXTK.t(key, null, fallback));
 
-  /* Match both legacy Nexus `uri` filenames and the human file names now used by
-     Browser Download mode. The collection API can return an opaque UUID-like uri,
-     so relying on uri alone would make newly downloaded `file.name.zip` archives
-     impossible to import back into history. */
   function normalizeImportName(value) {
     return String(value || '')
       .replace(/\.[a-z0-9]{1,8}$/i, '')
@@ -57,9 +47,6 @@ window.NexusExt = window.NexusExt || {};
       .trim();
   }
 
-  /* Split so the import scan can normalise each side ONCE. Matching every file against
-     every mod re-ran three regex passes per pair, which is what made a Vortex downloads
-     folder take a third of a second on the main thread. */
   function normalizeModKeys(mod) {
     return {
       uri: normalizeImportName(mod?.file?.uri),
@@ -79,9 +66,6 @@ window.NexusExt = window.NexusExt || {};
     return normalizedNameMatches(normalizeImportName(fileName), normalizeModKeys(mod));
   }
 
-  /* Returns the mods matched by at least one of `fileNames`, plus how many of those
-     names matched nothing. Counted by position, not by value: two identically named
-     files in different folders are two unmatched files, as they were before. */
   function matchModsToFileNames(mods, fileNames) {
     const candidates = fileNames.map(normalizeImportName);
     const modKeys = mods.map(normalizeModKeys);
@@ -107,24 +91,15 @@ window.NexusExt = window.NexusExt || {};
     window.open(url, '_blank', 'noopener,noreferrer');
   }
 
-  /* Copies the FULL diagnostic report to the clipboard, then opens GitHub with
-     the issue form already prefilled (title + compact report via URL params).
-     Even if the clipboard copy fails, the compact report still arrives through
-     the URL, so the diagnostic is never lost. */
   async function copyReportAndOpenIssue(button, currentError = null) {
     let copied = false;
     let complete = false;
     let issueUrl = NXTK.REPORT_ISSUE_URL;
     try {
       const report = await NXTK.buildBugReport(currentError);
-      // Built once and handed over, so the report is not assembled twice.
       const result = await NXTK.buildReportIssueUrl(currentError, { fullReport: report });
       issueUrl = result.url;
       complete = result.complete;
-      /* Clipboard only as a FALLBACK. Copying unconditionally meant every report
-         wiped whatever the user had on their clipboard — including anything they had
-         prepared to describe the bug — and then the form told them to paste it back.
-         When the whole report is already in the form there is nothing to paste. */
       if (!complete) copied = await NXTK.copyText(report);
     } catch (_) {
       copied = false;
@@ -142,9 +117,6 @@ window.NexusExt = window.NexusExt || {};
         button.textContent = originalText;
       }, 2500);
     }
-    // Open right away (not after a delay): the primary path goes through the
-    // background service worker, and the window.open fallback needs to stay
-    // within the user-activation window to avoid the popup blocker.
     openReportIssue(issueUrl);
   }
 
@@ -159,10 +131,6 @@ window.NexusExt = window.NexusExt || {};
       });
   }
 
-  /* ===== Liquid Glass layer injection =====
-     Adds static specular/sheen overlays to glass surfaces. The overlays
-     are cosmetic and never block pointer events.
-  */
   function applyGlassLayers(el) {
     if (!el || el.dataset.nxtkGlass === '1') return;
     el.dataset.nxtkGlass = '1';
@@ -175,8 +143,6 @@ window.NexusExt = window.NexusExt || {};
     sheen.className = 'nxtk-glass-sheen';
     sheen.setAttribute('aria-hidden', 'true');
 
-    // Insert as the FIRST children so existing content stacks above them
-    // (their z-index in CSS keeps them between background and content).
     el.insertBefore(sheen, el.firstChild);
     el.insertBefore(specular, el.firstChild);
   }
@@ -214,9 +180,6 @@ window.NexusExt = window.NexusExt || {};
 
   let dropdownInteractionBlockerBound = false;
 
-  // Live registry of open menus + trigger cache, so the wheel/touchmove/
-  // pointerdown blockers (which run on every event while a menu is open)
-  // never have to do document-wide querySelectorAll scans.
   const openDropdownMenuSet = new Set();
   const dropdownTriggers = new WeakMap();
 
@@ -237,8 +200,6 @@ window.NexusExt = window.NexusExt || {};
       .find((trigger) => trigger.getAttribute('aria-controls') === menu.id) || null;
   }
 
-  // A portaled menu is visually outside its original surface, but it still
-  // belongs to that surface for close/disposal behavior.
   const dropdownPortals = new Map();
   const dropdownControllers = new WeakMap();
 
@@ -388,8 +349,6 @@ window.NexusExt = window.NexusExt || {};
     return openMenus.some((menu) => menu.contains(target) || findDropdownTrigger(menu)?.contains(target));
   }
 
-  // Remembers the inline z-index/position we override on site ancestors while
-  // a deck dropdown is open, so they can be restored exactly on close.
   const liftedAncestors = new Map();
 
   function releaseAllLifts() {
@@ -400,12 +359,6 @@ window.NexusExt = window.NexusExt || {};
     liftedAncestors.clear();
   }
 
-  /* The deck is a stacking context (backdrop-filter), and it is injected INSIDE
-     one of Nexus's `.next-container` blocks. A dropdown menu overflowing the
-     deck is therefore trapped and gets painted behind sibling `.next-container`
-     blocks that follow in the DOM. Raising the deck alone is not enough — its
-     ancestors up to <body> must also out-rank those siblings. We lift the chain
-     while the menu is open and fully restore it on close. */
   function setDeckLift(deck, lift) {
     if (!lift) {
       releaseAllLifts();
@@ -433,15 +386,10 @@ window.NexusExt = window.NexusExt || {};
         !dropdownPortals.has(menu) && getDropdownSurface(menu) === surface
       ));
       surface.classList.toggle('nxtk-dropdown-active', active);
-      // Only decks live inside the site's stacking contexts; modals are
-      // already fixed-position overlays at a high z-index.
       if (surface.classList.contains('nxtk-deck')) setDeckLift(surface, active);
     });
   }
 
-  // The page is a SPA and can remove a mounted deck without a click/keydown
-  // close event. Release its temporary stacking changes before that happens,
-  // otherwise the Nexus containers that were lifted for the menu stay lifted.
   function disposeControlDeck(deck) {
     if (!deck) return;
 
@@ -459,9 +407,6 @@ window.NexusExt = window.NexusExt || {};
     syncDropdownSurfaces();
   }
 
-  /* React can unmount the deck subtree directly (SPA re-render), skipping our
-     dispose path. Any portaled menu whose trigger is gone must be disposed or
-     its window resize/scroll listeners and ResizeObserver leak forever. */
   function cleanupOrphanedPortals() {
     Array.from(dropdownPortals.keys()).forEach((menu) => {
       const state = dropdownPortals.get(menu);
@@ -469,8 +414,6 @@ window.NexusExt = window.NexusExt || {};
     });
   }
 
-  // Modals whose handlers close over an NDC instance. The settings/confirm
-  // dialogs are page-level and deliberately survive route changes.
   const NDC_BOUND_MODAL_IDS = [
     'nxtk-error-modal',
     'nxtk-history-modal',
@@ -479,8 +422,6 @@ window.NexusExt = window.NexusExt || {};
     'nxtk-update-modal'
   ];
 
-  /* Called by main.js on SPA route changes: open modals close over the old
-     NDC instance and would drive a destroyed deck if left open. */
   function closeExtensionOverlays() {
     NDC_BOUND_MODAL_IDS.forEach(closeModal);
     closeAllDropdownMenus();
@@ -645,8 +586,6 @@ window.NexusExt = window.NexusExt || {};
 
     button.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
-        // Swallow the click the browser synthesizes for keyboard activation,
-        // otherwise the menu toggles twice and ends up closed again.
         pointerHandled = true;
         toggleMenu(e);
       } else if (e.key === 'Escape') {
@@ -742,7 +681,6 @@ window.NexusExt = window.NexusExt || {};
     };
   }
 
-  /* ===== Settings FAB + Modal ===== */
   function createSettingsFAB() {
     let host = document.getElementById('nxtk-extension-root');
     if (!host) {
@@ -772,9 +710,6 @@ window.NexusExt = window.NexusExt || {};
     { key: 'ShowAlertsOnError', label: () => NXTK.t('setShowAlertsOnErrorLabel', null, 'Show error popups'), type: 'bool', desc: () => NXTK.t('setShowAlertsOnErrorDesc', null, 'Show a clear message when Nexus does not return a usable download link.') },
     { key: 'HidePremiumUpsells', label: () => NXTK.t('setHidePremiumUpsellsLabel', null, 'Hide ads and Premium panels'), type: 'bool', desc: () => NXTK.t('setHidePremiumUpsellsDesc', null, 'Hide Nexus advertising slots, empty ad containers, Premium banners and upgrade panels while browsing.') },
     { key: 'HandleArchivedFiles', label: () => NXTK.t('setHandleArchivedFilesLabel', null, 'Add buttons for archived files'), type: 'bool', desc: () => NXTK.t('setHandleArchivedFilesDesc', null, 'Add Vortex and browser download buttons to archived file entries when Nexus hides them.') },
-    /* `advanced: true` collapses a row into the bottom section: developer-only controls,
-       or ones that only matter while troubleshooting — not merely rarely-changed ones. */
-    // `group` keeps this out of Download Flow: a display preference, not a download step.
     {
       key: 'ForceEnglish',
       group: 'language',
@@ -785,12 +720,7 @@ window.NexusExt = window.NexusExt || {};
     { key: 'DebugLogs', label: () => NXTK.t('setDebugLogsLabel', null, 'Verbose extension logs'), type: 'bool', advanced: true, desc: () => NXTK.t('setDebugLogsDesc', null, 'Print detailed NexusMods Bypass activity in the console. Errors are always shown, and bug reports are unaffected by this setting.') },
     { key: 'DownloadFolder', label: () => NXTK.t('setDownloadFolderLabel', null, 'Browser download folder'), type: 'text', desc: () => NXTK.t('setDownloadFolderDesc', null, 'Subfolder inside your browser Downloads directory for Browser Download mode. Vortex downloads are handled by Vortex and are unaffected.') },
     { key: 'RequestTimeout', label: () => NXTK.t('setRequestTimeoutLabel', null, 'Download request timeout'), type: 'number', unit: () => NXTK.t('unitSeconds', null, 'Seconds'), scale: 1000, advanced: true, desc: () => NXTK.t('setRequestTimeoutDesc', null, 'How long the extension waits for Nexus to return a download link before it gives up.') },
-    /* Advanced because it is triple-coupled: the delay only ever runs when a download was
-       auto-started AND "Close Vortex handoff tabs" is on AND the method is Vortex. In
-       Browser mode, or for any download started by clicking, it does nothing at all. */
     { key: 'CloseTabDelay', label: () => NXTK.t('setCloseTabDelayLabel', null, 'Close-tab delay'), type: 'number', unit: () => NXTK.t('unitSeconds', null, 'Seconds'), scale: 1000, advanced: true, desc: () => NXTK.t('setCloseTabDelayDesc', null, 'Only applies to auto-started Vortex downloads that close their tab. Increase it if Vortex misses links.') },
-    /* Kept OUT of the advanced section on purpose: the pause below is the master switch
-       for the whole estimate, so hiding it would leave this speed field silently inert. */
     {
       key: 'NDC_downloadSpeed',
       label: () => NXTK.t('setDownloadSpeedLabel', null, 'Your Nexus download speed'),
@@ -812,9 +742,6 @@ window.NexusExt = window.NexusExt || {};
   async function showSettingsModal() {
     closeModal('nxtk-settings-modal');
 
-    // If the extension was reloaded/updated while this tab stayed open, the
-    // content script can no longer reach chrome.storage. Prompt for a refresh
-    // instead of opening a settings panel whose changes can't be saved.
     if (NexusExt.Storage.isContextValid && !NexusExt.Storage.isContextValid()) {
       await nxtkAlert(NXTK.t('alertContextInvalid', null,
         'NexusMods Bypass was updated or reloaded.\nPlease refresh this page to open settings.'));
@@ -830,8 +757,6 @@ window.NexusExt = window.NexusExt || {};
     const modal = document.createElement('div');
     modal.className = 'nxtk-modal nxtk-modal-sm';
 
-    /* label/desc/unit are thunks so the catalogue is read when the panel opens, not when
-       this module is evaluated — the locale is not guaranteed ready at load time. */
     const text = (v) => (typeof v === 'function' ? v() : (v ?? ''));
     const buildRow = (s) => {
       const copy = `<span class="nxtk-setting-copy"><span class="nxtk-setting-title">${escapeHtml(text(s.label))}</span><span class="nxtk-setting-desc">${escapeHtml(text(s.desc))}</span></span>`;
@@ -840,8 +765,6 @@ window.NexusExt = window.NexusExt || {};
         return `<div class="nxtk-setting-row" data-key="${s.key}"><label class="nxtk-setting-label"><span class="nxtk-toggle"><input type="checkbox" data-setting="${s.key}" ${cfg[s.key] ? 'checked' : ''}><span class="nxtk-toggle-track"></span></span>${copy}</label></div>`;
       }
       if (s.type === 'number' || s.type === 'decimal') {
-        // `data-decimal` tells the change handler to parseFloat: parseInt would
-        // silently turn a 1.5 MB/s entry into 1.
         const decimal = s.type === 'decimal' ? ' data-decimal="1"' : '';
         const scale = Number(s.scale) || 1;
         const scaleAttr = scale === 1 ? '' : ` data-scale="${scale}"`;
@@ -859,9 +782,7 @@ window.NexusExt = window.NexusExt || {};
     const isField = (s) => s.type === 'number' || s.type === 'decimal' || s.type === 'text';
     const features = SETTINGS_UI.filter(s => s.type === 'bool' && !s.advanced && !s.group).map(buildRow).join('');
     const language = SETTINGS_UI.filter(s => s.group === 'language').map(buildRow).join('');
-    // Text rows sit with the pacing fields — both are "field" rows visually.
     const timing = SETTINGS_UI.filter(s => isField(s) && !s.advanced).map(buildRow).join('');
-    // Advanced keeps its own order, so a toggle and a field can sit side by side there.
     const advanced = SETTINGS_UI.filter(s => s.advanced).map(buildRow).join('');
 
     modal.innerHTML = `
@@ -901,11 +822,9 @@ window.NexusExt = window.NexusExt || {};
       if (el.type === 'checkbox') {
         value = el.checked;
       } else if (el.type === 'text') {
-        // Kept as a plain string; the worker sanitises it into a safe path segment.
         value = el.value.trim();
       } else if (el.dataset.decimal) {
         value = parseFloat(el.value);
-        // A speed of 0 would make the pause estimate divide by zero.
         if (!Number.isFinite(value) || value <= 0) return;
       } else {
         value = parseInt(el.value, 10);
@@ -918,9 +837,6 @@ window.NexusExt = window.NexusExt || {};
 
     };
 
-    // Every close path must go through close() so the document keydown
-    // listener is always removed; the guard also self-heals if the backdrop
-    // was removed externally (closeModal from a route change).
     const onKeyDown = (e) => {
       if (!document.contains(backdrop)) {
         document.removeEventListener('keydown', onKeyDown);
@@ -940,8 +856,6 @@ window.NexusExt = window.NexusExt || {};
     modal.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', close));
     modal.querySelectorAll('[data-report-issue]').forEach(b => b.addEventListener('click', () => copyReportAndOpenIssue(b)));
 
-    /* The advanced rows are inside `modal`, so the delegated change/input listeners above
-       already reach them — this only controls visibility. */
     const advancedToggle = modal.querySelector('#nxtk-advanced-toggle');
     const advancedBody = modal.querySelector('#nxtk-advanced-body');
     advancedToggle.addEventListener('click', () => {
@@ -1012,7 +926,6 @@ window.NexusExt = window.NexusExt || {};
 
       let finished = false;
       const onKeyDown = (e) => {
-        // Removed externally: settle rather than silently dropping the listener.
         if (!document.contains(backdrop)) {
           finish('cancel');
           return;
@@ -1026,7 +939,6 @@ window.NexusExt = window.NexusExt || {};
         backdrop.remove();
         resolve(choice);
       };
-      // Route changes and closeModal() both go through this.
       registerModalSettle(backdrop, () => finish('cancel'));
 
       modal.querySelectorAll('[data-choice]').forEach((button) => {
@@ -1120,7 +1032,6 @@ window.NexusExt = window.NexusExt || {};
       };
     const canRetry = normalized.retryable && typeof onRetry === 'function';
     const requiresLogin = normalized.code === 'requires_login';
-    // Rendering only: `normalized` keeps the English text the report and issue title read.
     const shown = NexusExt.Errors?.displayText
       ? NexusExt.Errors.displayText(normalized)
       : { message: normalized.userMessage, recovery: normalized.recovery };
@@ -1167,8 +1078,6 @@ window.NexusExt = window.NexusExt || {};
 
       let closed = false;
       const onKeyDown = (event) => {
-        // Backstop for an external removal; registerModalSettle below normally
-        // settles immediately instead of waiting for the next keystroke.
         if (!document.contains(backdrop)) {
           finish();
           return;
@@ -1291,8 +1200,6 @@ window.NexusExt = window.NexusExt || {};
 
       let finished = false;
       const finish = (value) => {
-        // Without this guard a global Enter/Escape after an external removal could
-        // resolve this promise a second time, and resolve a newer dialog's too.
         if (finished) return;
         finished = true;
         backdrop.remove();
@@ -1307,7 +1214,6 @@ window.NexusExt = window.NexusExt || {};
         if (e.key === 'Escape') finish(false);
         if (e.key === 'Enter') finish(true);
       };
-      // External close is a cancel, never a confirm.
       registerModalSettle(backdrop, () => finish(false));
 
       modal.querySelectorAll('[data-cancel]').forEach(button => button.addEventListener('click', () => finish(false)));
@@ -1321,9 +1227,6 @@ window.NexusExt = window.NexusExt || {};
     });
   }
 
-  /* Removing a backdrop from anywhere must resolve its pending promise, or the awaiting
-     caller hangs. showHistoryDecisionModal is awaited inside downloadMods while `running`
-     is true, so a stranded promise also wedged the instance permanently. */
   const MODAL_SETTLE = Symbol('nxtkModalSettle');
 
   function registerModalSettle(backdrop, settle) {
@@ -1333,12 +1236,10 @@ window.NexusExt = window.NexusExt || {};
   function settleModalBackdrop(backdrop) {
     const settle = backdrop && backdrop[MODAL_SETTLE];
     if (typeof settle !== 'function') return;
-    // Clear first: settle() removes the backdrop, which can re-enter this path.
     backdrop[MODAL_SETTLE] = null;
     try {
       settle();
     } catch (_) {
-      // A settle callback must never block teardown.
     }
   }
 
@@ -1352,22 +1253,17 @@ window.NexusExt = window.NexusExt || {};
     }
   }
 
-  /* ===== Collection Control Deck ===== */
   function createControlDeck(ndc) {
     const deck = document.createElement('div');
     deck.className = 'nxtk-deck';
     deck.id = 'nxtk-control-deck';
 
-    // State for progress tracking
-    /* No `status` here on purpose: the run's stop/pause state belongs to the NDC
-       instance, which outlives this deck and is what the download loop actually polls. */
     const state = {
       modsCount: 0,
       progress: 0,
       logHidden: true
     };
 
-    // Bridge: ndc.ui points to methods deck exposes
     const ui = {
       get progress() { return state.progress; },
       get modsCount() { return state.modsCount; },
@@ -1380,7 +1276,6 @@ window.NexusExt = window.NexusExt || {};
       endDownload: null
     };
 
-    /* -- Build HTML -- */
     deck.innerHTML = `
       <div class="nxtk-deck-header">
         <div class="nxtk-deck-heading">
@@ -1501,19 +1396,15 @@ window.NexusExt = window.NexusExt || {};
       </div>
     `;
 
-    /* -- Wire up events -- */
     prepareToolkitSurface(deck);
     const $ = (sel) => deck.querySelector(sel);
 
-    // Counts
-    // Plural-aware: Russian and Polish need more than one/other.
     $('#nxtk-total-mods').textContent =
       NXTK.tPlural('deckModCount', ndc.mods.all.length, `${ndc.mods.all.length} mods`);
     $('#nxtk-all-count').textContent = `${ndc.mods.all.length}`;
     $('#nxtk-mand-count').textContent = `${ndc.mods.mandatory.length}`;
     $('#nxtk-opt-count').textContent = `${ndc.mods.optional.length}`;
 
-    // Radio
     const syncDownloadMethodUI = () => {
       deck.querySelectorAll('.nxtk-radio-label').forEach(label => {
         const input = label.querySelector('input[name="nxtk-dl-method"]');
@@ -1531,19 +1422,13 @@ window.NexusExt = window.NexusExt || {};
     });
     syncDownloadMethodUI();
 
-    // Import mods
     $('#nxtk-import-mods').addEventListener('click', () => {
       const input = document.createElement('input');
       input.type = 'file';
       input.multiple = true;
       input.addEventListener('change', async () => {
-        /* The FileList used to be re-spread INSIDE the per-mod callback, and the
-           unmatched list then re-ran every comparison a second time. One pass now
-           produces both answers. */
         const fileNames = Array.from(input.files, (file) => file.name);
         const { matched: downloaded, unmatchedCount } = matchModsToFileNames(ndc.mods.all, fileNames);
-        // All three lists in one atomic mutation — three separate writes would not
-        // be atomic together, and another tab could interleave between them.
         await NexusExt.Storage.setCollectionHistory({
           gameId: ndc.gameId,
           collectionId: ndc.collectionId,
@@ -1553,9 +1438,6 @@ window.NexusExt = window.NexusExt || {};
             optional: downloaded.filter(m => m.optional).map(m => m.fileId)
           }
         });
-        /* Summary counts, not a full dump: selecting a Vortex downloads folder can
-           mean hundreds of names, which produced an unreadable and unscrollable
-           alert (and then a second one). */
         const summary = [
           NXTK.t('alertImportedMods', [String(downloaded.length), String(ndc.mods.all.length)],
             `Imported ${downloaded.length} of ${ndc.mods.all.length} collection mods into history.`),
@@ -1574,7 +1456,6 @@ window.NexusExt = window.NexusExt || {};
     const menu = $('#nxtk-dl-menu');
     const menuController = bindDropdownToggle($('#nxtk-menu-toggle'), menu, { portal: true });
 
-    // Download buttons
     const startCollectionDownload = (mods, type) => {
       menuController?.close();
       runUiTask(
@@ -1588,28 +1469,18 @@ window.NexusExt = window.NexusExt || {};
     $('#nxtk-select-mods').addEventListener('click', () => { menuController?.close(); showSelectModsModal(ndc); });
     $('#nxtk-update-collection').addEventListener('click', () => { menuController?.close(); showUpdateModal(ndc); });
 
-    // Progress controls
     $('#nxtk-play-pause').addEventListener('click', () => {
       const pausing = ndc.runStatus !== STATUS_PAUSED;
       ndc.setPaused?.(pausing);
-      // Routed through the bridge so the icon, the aria-label, the status text and
-      // the shimmer state can never drift apart from each other.
       ui.setDownloadStatus(pausing ? 'paused' : 'running');
     });
     $('#nxtk-stop').addEventListener('click', () => {
-      /* Aborts the in-flight request too, instead of only flipping the flag the
-         loop polls — a fetch already in progress used to run to completion.
-         stopDownload cancels the run scope only, so the deck stays usable. */
       ndc.stopDownload?.();
       ndc.runStatus = STATUS_STOPPED;
       $('#nxtk-status-text').textContent = statusLabel(STATUS_STOPPED);
-      /* Vortex mode never calls endDownload from here (its loop notices the flag on
-         the next iteration), so freeze the shimmer immediately — the bar otherwise
-         kept animating after Stop as though the run were still live. */
       $('#nxtk-progress-area').dataset.runState = 'stopped';
     });
 
-    // Log toggle
     const logContainer = $('#nxtk-log-container');
     const logToggle = $('#nxtk-log-toggle');
     const setLogsOpen = (open) => {
@@ -1621,11 +1492,8 @@ window.NexusExt = window.NexusExt || {};
       setLogsOpen(state.logHidden);
     });
 
-    /* -- UI bridge methods -- */
     const MAX_LOG_ROWS = 300;
     let logScrollFrame = 0;
-    /* Rows are capped and scrolling is coalesced to one rAF so large collections don't
-       reflow per log line. */
     const appendLogRow = (type, applyMessage) => {
       const row = document.createElement('div');
       row.className = 'nxtk-log-row';
@@ -1654,14 +1522,10 @@ window.NexusExt = window.NexusExt || {};
       return row;
     };
 
-    // Default path. Takes plain text and escapes nothing, because nothing is parsed.
     ui.logText = (text, type) => appendLogRow(type, (node) => {
       node.textContent = String(text ?? '');
     });
 
-    /* CONTRACT: `message` is an HTML fragment — every caller MUST escape dynamic values
-       (mod/file names, URLs) with NXTK.escapeHtml before interpolating. Reserved for the
-       rows that genuinely build a link; everything else belongs on logText. */
     ui.log = (message, type) => appendLogRow(type, (node) => {
       node.innerHTML = message;
     });
@@ -1671,9 +1535,6 @@ window.NexusExt = window.NexusExt || {};
       renderProgress();
     };
 
-    /* Background downloads survive page reloads and route remounts. Their messages
-       therefore carry an absolute queue position; applying that snapshot prevents one
-       missed event from leaving the bar permanently behind the real download. */
     ui.setProgress = (progress, count = state.modsCount) => {
       const nextCount = Math.max(0, Number(count) || 0);
       const nextProgress = Math.max(0, Number(progress) || 0);
@@ -1682,8 +1543,6 @@ window.NexusExt = window.NexusExt || {};
       renderProgress();
     };
 
-    // Drives the shimmer and the visibility of the transport controls (see the
-    // [data-run-state] rules in content-styles.css).
     const setRunState = (runState) => {
       $('#nxtk-progress-area').dataset.runState = runState;
     };
@@ -1697,9 +1556,6 @@ window.NexusExt = window.NexusExt || {};
         ? STATUS_PAUSED
         : STATUS_DOWNLOADING;
       if (ndc.runStatus === normalized) return;
-      /* A queue event already in flight when Stop was pressed would otherwise move the
-         run back to "downloading" — startDownload/endDownload assign runStatus directly,
-         so a genuinely new run is not blocked by this. */
       if (ndc.runStatus === STATUS_STOPPED || ndc.runStatus === STATUS_FINISHED) return;
       ndc.runStatus = normalized;
       const paused = normalized === STATUS_PAUSED;
@@ -1715,9 +1571,6 @@ window.NexusExt = window.NexusExt || {};
         : NXTK.t('annResumed', null, 'Download resumed.'));
     };
 
-    /* `resumed` is set when the deck is reattaching to a run that is already going in
-       the service worker (page reload / reopened tab), where "Download started." would
-       be a lie — the caller logs its own reconnect line instead. */
     ui.startDownload = (count, { resumed = false } = {}) => {
       menuController?.close();
       state.modsCount = count;
@@ -1732,8 +1585,6 @@ window.NexusExt = window.NexusExt || {};
       button.innerHTML = svgIcon('pause');
       button.setAttribute('aria-label', NXTK.t('ariaPause', null, 'Pause download'));
       $('#nxtk-status-text').textContent = statusLabel(STATUS_DOWNLOADING);
-      /* Plural-aware and placeholder-driven: the count is a substitution, so a locale is
-         free to place it anywhere in the sentence. */
       if (resumed) {
         announce(NXTK.tPlural('annReconnected', count,
           `Reconnected to a download in progress: ${count} mods.`));
@@ -1779,12 +1630,9 @@ window.NexusExt = window.NexusExt || {};
       const result = outcomes[outcome] || outcomes.error;
       ndc.runStatus = result.status;
       $('#nxtk-status-text').textContent = result.label;
-      /* The bar deliberately stays mounted: removing nxtk-active hid the final count and
-         label the instant a run ended. Controls are hidden by [data-run-state="done"]. */
       setRunState('done');
       $('#nxtk-buttons-area').style.display = '';
       $('#nxtk-download-method-panel').style.display = '';
-      // Two substitutions — the message owns the separator so a locale can reorder them.
       announce(NXTK.t('annOutcome', [result.label, progressText()],
         `${result.label}. ${state.progress} of ${state.modsCount} mods.`));
       ui.logText(result.message, outcome === 'error' ? 'error' : 'info');
@@ -1800,14 +1648,12 @@ window.NexusExt = window.NexusExt || {};
       bar.setAttribute('aria-valuetext', progressText());
     }
 
-    // "N of M mods", plural on the total. Shared by the live region and aria-valuetext.
     function progressText() {
       return NXTK.tPlural('progressOfTotal', state.modsCount,
         `${state.progress} of ${state.modsCount} mods`,
         [String(state.progress), String(state.modsCount)]);
     }
 
-    // STATUS_TEXT stays the English source; the deck renders the localized label.
     function statusLabel(status) {
       const keys = {
         [STATUS_DOWNLOADING]: 'statusDownloading',
@@ -1822,7 +1668,6 @@ window.NexusExt = window.NexusExt || {};
     return deck;
   }
 
-  /* ===== Select Mods Modal ===== */
   function showSelectModsModal(ndc) {
     closeModal('nxtk-select-modal');
     const backdrop = document.createElement('div');
@@ -1909,9 +1754,6 @@ window.NexusExt = window.NexusExt || {};
           <span class="nxtk-ml-size">${convertSize(mod.file.size)}</span>
           <span class="nxtk-ml-req"><span class="nxtk-tag ${mod.optional ? 'nxtk-tag-optional' : 'nxtk-tag-mandatory'}">${mod.optional ? L('tagOptional', 'Optional') : L('tagMandatory', 'Mandatory')}</span></span>
         `;
-        /* Cached once here so the search handler never re-reads textContent. Taken
-           after the markup is in place, so it keeps matching exactly what the old
-           per-keystroke `el.textContent` matched — size and Optional/Mandatory too. */
         item.dataset.search = item.textContent.replace(/\s+/g, ' ').trim().toLowerCase();
         item.addEventListener('click', (e) => {
           item.classList.toggle('nxtk-selected');
@@ -1933,7 +1775,6 @@ window.NexusExt = window.NexusExt || {};
 
     renderList(ndc.mods.all);
 
-    // Options menu
     const optsMenu = $('#nxtk-sel-opts-menu');
     bindDropdownToggle($('#nxtk-sel-opts-toggle'), optsMenu);
 
@@ -1944,12 +1785,10 @@ window.NexusExt = window.NexusExt || {};
       placeholder: 'Mod name A-Z'
     });
 
-    // Select all / deselect / invert
     $('#nxtk-sel-all').addEventListener('click', () => { listEl.querySelectorAll('.nxtk-mod-item').forEach(el => el.classList.add('nxtk-selected')); updateCount(); });
     $('#nxtk-desel-all').addEventListener('click', () => { listEl.querySelectorAll('.nxtk-mod-item').forEach(el => el.classList.remove('nxtk-selected')); updateCount(); });
     $('#nxtk-invert-sel').addEventListener('click', () => { listEl.querySelectorAll('.nxtk-mod-item').forEach(el => el.classList.toggle('nxtk-selected')); updateCount(); });
 
-    // Export / Import selection
     $('#nxtk-export-sel').addEventListener('click', () => {
       const selected = [];
       listEl.querySelectorAll('.nxtk-mod-item.nxtk-selected').forEach(el => {
@@ -1958,9 +1797,6 @@ window.NexusExt = window.NexusExt || {};
         if (mod) selected.push(mod);
       });
       if (!selected.length) { nxtkAlert(NXTK.t('alertPickOneToExport', null, 'Select at least one mod to export.')); return; }
-      /* Export only what the importer consumes. Dumping whole mod objects wrote
-         the full GraphQL payload (including the resolved file URL) to disk for no
-         benefit, and invited re-importing arbitrary nested data. */
       const payload = {
         schema: SELECTION_SCHEMA_VERSION,
         gameId: ndc.gameId,
@@ -1973,7 +1809,6 @@ window.NexusExt = window.NexusExt || {};
       a.href = url;
       a.download = `nxtk_selection_${ndc.gameId}_${ndc.collectionId}_${Date.now()}.json`;
       a.click();
-      // Revoking synchronously can cancel the download in some Chromium builds.
       setTimeout(() => URL.revokeObjectURL(url), 10000);
     });
 
@@ -1998,15 +1833,9 @@ window.NexusExt = window.NexusExt || {};
             return;
           }
           const { fileIds } = selection;
-          /* Nexus file IDs are globally unique, so a file exported from another
-             collection matches nothing rather than matching the wrong mods. Say so
-             explicitly — "Imported 0 of N" on its own reads like a broken file. */
           const foreign = (selection.gameId && selection.gameId !== ndc.gameId)
             || (selection.collectionId && selection.collectionId !== ndc.collectionId);
 
-          /* Match against the mods actually in this collection. IDs that are not
-             present are ignored rather than trusted — an imported file must never
-             introduce entries the current revision does not have. */
           const wanted = new Set(fileIds.map((id) => String(id)));
           let matched = 0;
           Array.from(listEl.children).forEach((child) => {
@@ -2032,7 +1861,6 @@ window.NexusExt = window.NexusExt || {};
       input.click();
     });
 
-    // Import downloaded mods (select NOT downloaded)
     $('#nxtk-import-dl-mods').addEventListener('click', () => {
       const input = document.createElement('input');
       input.type = 'file';
@@ -2053,9 +1881,6 @@ window.NexusExt = window.NexusExt || {};
       input.click();
     });
 
-    /* Search. Debounced because each pass touches every row: on a 500-mod collection
-       the undebounced version did 500 textContent reads plus 500 style writes for
-       every single keystroke. The text itself is precomputed in renderList. */
     let searchTimer = null;
     const applySearch = (query) => {
       const q = query.replace(/\s+/g, ' ').trim().toLowerCase();
@@ -2070,7 +1895,6 @@ window.NexusExt = window.NexusExt || {};
       searchTimer = setTimeout(() => applySearch(value), 120);
     });
 
-    // Sort
     $('#nxtk-mod-sort').addEventListener('change', (e) => {
       const mods = [...ndc.mods.all];
       const sortMap = {
@@ -2082,20 +1906,16 @@ window.NexusExt = window.NexusExt || {};
         size_desc: (a, b) => b.file.size - a.file.size
       };
       mods.sort(sortMap[e.target.value]);
-      // Save selected state
       const selectedIds = new Set();
       listEl.querySelectorAll('.nxtk-mod-item.nxtk-selected').forEach(el => selectedIds.add(el.dataset.fileId));
       renderList(mods);
       listEl.querySelectorAll('.nxtk-mod-item').forEach(el => {
         if (selectedIds.has(el.dataset.fileId)) el.classList.add('nxtk-selected');
       });
-      // renderList rebuilds the rows, so an active search filter would otherwise be
-      // silently dropped while its query stayed in the box.
       applySearch($('#nxtk-mod-search').value);
       updateCount();
     });
 
-    // Download selected
     $('#nxtk-dl-selected').addEventListener('click', () => {
       const selected = [];
       listEl.querySelectorAll('.nxtk-mod-item.nxtk-selected').forEach(el => {
@@ -2110,17 +1930,12 @@ window.NexusExt = window.NexusExt || {};
       );
     });
 
-    // Close through closeModal so bound dropdowns are disposed with it.
     modal.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => closeModal('nxtk-select-modal')));
     backdrop.addEventListener('click', e => { if (e.target === backdrop) closeModal('nxtk-select-modal'); });
     backdrop.appendChild(modal);
     document.body.appendChild(backdrop);
   }
 
-  /* ===== Selection import/export =====
-     The file comes from disk, so it is untrusted input. Only a list of file IDs is
-     ever read out of it; every other field is ignored, and the IDs are matched
-     against the current revision before use. */
   const SELECTION_SCHEMA_VERSION = 1;
   const MAX_SELECTION_FILE_BYTES = 512 * 1024;
   const MAX_SELECTION_IDS = 10000;
@@ -2131,19 +1946,11 @@ window.NexusExt = window.NexusExt || {};
     return null;
   }
 
-  // Free-text label read back out of an untrusted file — kept short and inert.
   function readSelectionLabel(value) {
     const text = String(value ?? '').trim();
     return /^[\w.-]{1,64}$/.test(text) ? text : '';
   }
 
-  /* Accepts the current { schema, fileIds } shape and the legacy array-of-mod-objects
-     export, so selections saved by older builds still import. Returns null when the
-     input is unusable — callers show a message rather than partially applying it.
-
-     gameId/collectionId are reported back purely so the caller can say "this file is
-     from another collection". They are never used to select anything: the IDs are
-     still matched against the current revision. */
   function parseSelectionFile(raw) {
     let parsed;
     try {
@@ -2179,9 +1986,6 @@ window.NexusExt = window.NexusExt || {};
     return fileIds.length ? { fileIds, gameId, collectionId } : null;
   }
 
-  /* Compares two revisions grouped by modId, walking the UNION of both sides so a mod
-     absent from the new revision is still reported as removed. "Updated" comes from a
-     fingerprint, not `version`: authors routinely re-upload under the same version. */
   function fileFingerprint(entry) {
     const file = entry?.file || {};
     return [
@@ -2199,9 +2003,6 @@ window.NexusExt = window.NexusExt || {};
     return String(value ?? '').trim().toLowerCase();
   }
 
-  /* Matching order: an exact fileId is authoritative; otherwise fall back to a
-     logical identity (uri, else file name) so a re-upload with a new fileId is
-     recognised as the same logical file rather than an add + remove pair. */
   function findCounterpart(entry, candidates, taken) {
     const byId = candidates.find((c) => !taken.has(c) && c.file?.fileId != null && c.file.fileId === entry.file?.fileId);
     if (byId) return byId;
@@ -2226,8 +2027,6 @@ window.NexusExt = window.NexusExt || {};
     for (const modId of modIds) {
       const curFiles = curMods[modId] || [];
       const newFiles = newMods[modId] || [];
-      // `taken` makes matching one-to-one, so two new files cannot both claim the
-      // same current file and leave a phantom removal behind.
       const taken = new Set();
 
       for (const newFile of newFiles) {
@@ -2258,7 +2057,6 @@ window.NexusExt = window.NexusExt || {};
     return { added: dedupe(added), updated: dedupe(updated), removed: dedupe(removed) };
   }
 
-  /* ===== Update Collection Modal ===== */
   function showUpdateModal(ndc) {
     closeModal('nxtk-update-modal');
     const backdrop = document.createElement('div');
@@ -2421,7 +2219,6 @@ window.NexusExt = window.NexusExt || {};
     document.body.appendChild(backdrop);
   }
 
-  /* ===== Public API ===== */
   window.NexusExt.UI = {
     createSettingsFAB,
     createControlDeck,
