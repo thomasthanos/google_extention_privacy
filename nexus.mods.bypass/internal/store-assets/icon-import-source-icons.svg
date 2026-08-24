@@ -1,0 +1,23 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="18" y1="10" x2="110" y2="120" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFB648"/>
+      <stop offset="1" stop-color="#D07213"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="128" height="128" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <rect x="5" y="5" width="118" height="118" rx="30" fill="url(#bg)"/>
+    <rect x="7.5" y="7.5" width="113" height="113" rx="27.5" stroke="#241F24" stroke-width="5"/>
+    <rect x="10" y="10" width="108" height="108" rx="24" stroke="rgba(255,246,225,0.28)" stroke-width="2"/>
+  </g>
+
+  <ellipse cx="52" cy="35" rx="28" ry="17" fill="#FFF4D6" fill-opacity="0.14"/>
+  <path d="M33 84L45 95H83L95 84" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M64 24V67" stroke="white" stroke-width="9" stroke-linecap="round"/>
+  <path d="M41 53H87L64 81L41 53Z" fill="white"/>
+  <path d="M26 60C30 43 43 31 59 27" stroke="#FFE8C6" stroke-opacity="0.45" stroke-width="2" stroke-linecap="round"/>
+</svg>

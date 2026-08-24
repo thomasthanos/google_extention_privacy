@@ -73,11 +73,7 @@ Productivity → Workflow & Planning
 Nexus Mods, Vortex, mod manager, collection downloader, auto download, skip wait, download
 helper, Skyrim, Fallout, modding
 
-## Assets — in `../store-assets/`, local only
-
-That folder is gitignored and is not on GitHub: 3.3 MB of screenshots and promo tiles that
-no build step reads and that every clone would otherwise carry. Keep a backup of it
-somewhere outside the repository — losing it means re-rendering the listing artwork.
+## Assets — all present in `../store-assets/` (the folder moved under `internal/`)
 
 | Asset | Size | File |
 |---|---|---|
