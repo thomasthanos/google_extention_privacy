@@ -1208,21 +1208,6 @@
   "supportValueFree": {
     "message": "Zawsze za darmo"
   },
-  "supportPrimary": {
-    "message": "Wesprzyj na Ko-fi"
-  },
-  "supportPrimaryHint": {
-    "message": "Jednorazowo lub co miesiąc — Ty decydujesz"
-  },
-  "supportPrimaryPending": {
-    "message": "Strona Ko-fi już wkrótce"
-  },
-  "supportPrimaryPendingHint": {
-    "message": "Bezpieczne wsparcie jest właśnie podłączane"
-  },
-  "supportTrust": {
-    "message": "Bezpieczna płatność na Ko-fi. Otwiera się w nowej karcie."
-  },
   "supportFreeTitle": {
     "message": "Możesz pomóc również za darmo"
   },
@@ -1398,5 +1383,17 @@
   },
   "setCloudflareFallbackDesc": {
     "message": "Gdy Nexus odpowiada na żądanie pobrania w tle stroną weryfikacji, otwiera stronę pliku, abyś mógł ukończyć sprawdzenie, zamiast kończyć błędem. Dlatego karta czasem sama zmienia adres."
+  },
+  "tabControls": {
+    "message": "Controls",
+    "description": "Tab bar button for the quick controls panel."
+  },
+  "tabHelp": {
+    "message": "Help & Bugs",
+    "description": "Tab bar button for the help and bug report panel."
+  },
+  "sectionHelpBugs": {
+    "message": "Help & Bugs",
+    "description": "Section heading above help and bug report items."
   }
 }

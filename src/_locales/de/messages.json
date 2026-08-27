@@ -1090,21 +1090,6 @@
   "supportValueFree": {
     "message": "Immer kostenlos"
   },
-  "supportPrimary": {
-    "message": "Auf Ko-fi unterstützen"
-  },
-  "supportPrimaryHint": {
-    "message": "Einmalig oder monatlich — du entscheidest"
-  },
-  "supportPrimaryPending": {
-    "message": "Ko-fi-Seite folgt in Kürze"
-  },
-  "supportPrimaryPendingHint": {
-    "message": "Die sichere Unterstützung wird gerade eingerichtet"
-  },
-  "supportTrust": {
-    "message": "Sichere Zahlung über Ko-fi. Öffnet in einem neuen Tab."
-  },
   "supportFreeTitle": {
     "message": "Du kannst auch kostenlos helfen"
   },
@@ -1246,5 +1231,17 @@
   },
   "setCloudflareFallbackDesc": {
     "message": "Wenn Nexus eine Download-Anfrage im Hintergrund mit einer Überprüfungsseite beantwortet, die Dateiseite öffnen, damit du die Prüfung abschließen kannst, statt abzubrechen. Deshalb wechselt der Tab manchmal von selbst."
+  },
+  "tabControls": {
+    "message": "Controls",
+    "description": "Tab bar button for the quick controls panel."
+  },
+  "tabHelp": {
+    "message": "Help & Bugs",
+    "description": "Tab bar button for the help and bug report panel."
+  },
+  "sectionHelpBugs": {
+    "message": "Help & Bugs",
+    "description": "Section heading above help and bug report items."
   }
 }

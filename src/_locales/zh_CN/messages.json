@@ -1031,21 +1031,6 @@
   "supportValueFree": {
     "message": "永久免费"
   },
-  "supportPrimary": {
-    "message": "在 Ko-fi 上支持"
-  },
-  "supportPrimaryHint": {
-    "message": "一次性或按月——由你决定"
-  },
-  "supportPrimaryPending": {
-    "message": "Ko-fi 页面即将上线"
-  },
-  "supportPrimaryPendingHint": {
-    "message": "安全支持方式正在接入中"
-  },
-  "supportTrust": {
-    "message": "在 Ko-fi 上安全结账。将在新标签页中打开。"
-  },
   "supportFreeTitle": {
     "message": "你也可以免费提供帮助"
   },
@@ -1170,5 +1155,17 @@
   },
   "setCloudflareFallbackDesc": {
     "message": "当 Nexus 对后台下载请求返回验证页面时，打开文件页面让你完成验证，而不是直接失败。这就是标签页有时会自行跳转的原因。"
+  },
+  "tabControls": {
+    "message": "Controls",
+    "description": "Tab bar button for the quick controls panel."
+  },
+  "tabHelp": {
+    "message": "Help & Bugs",
+    "description": "Tab bar button for the help and bug report panel."
+  },
+  "sectionHelpBugs": {
+    "message": "Help & Bugs",
+    "description": "Section heading above help and bug report items."
   }
 }

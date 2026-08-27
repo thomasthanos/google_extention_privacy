@@ -1031,21 +1031,6 @@
   "supportValueFree": {
     "message": "いつでも無料"
   },
-  "supportPrimary": {
-    "message": "Ko-fi で支援する"
-  },
-  "supportPrimaryHint": {
-    "message": "一回でも毎月でも、あなた次第です"
-  },
-  "supportPrimaryPending": {
-    "message": "Ko-fi ページは近日公開"
-  },
-  "supportPrimaryPendingHint": {
-    "message": "安全な支援方法を準備しています"
-  },
-  "supportTrust": {
-    "message": "Ko-fi の安全な決済ページ。新しいタブで開きます。"
-  },
   "supportFreeTitle": {
     "message": "無料でも力になれます"
   },
@@ -1170,5 +1155,17 @@
   },
   "setCloudflareFallbackDesc": {
     "message": "バックグラウンドのダウンロード要求に Nexus が確認ページを返した場合、失敗させる代わりにファイルページを開いて確認を完了できるようにします。タブが自動的に移動するのはこのためです。"
+  },
+  "tabControls": {
+    "message": "Controls",
+    "description": "Tab bar button for the quick controls panel."
+  },
+  "tabHelp": {
+    "message": "Help & Bugs",
+    "description": "Tab bar button for the help and bug report panel."
+  },
+  "sectionHelpBugs": {
+    "message": "Help & Bugs",
+    "description": "Section heading above help and bug report items."
   }
 }

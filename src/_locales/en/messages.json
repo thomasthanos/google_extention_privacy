@@ -1341,21 +1341,6 @@
   "supportValueFree": {
     "message": "Always free"
   },
-  "supportPrimary": {
-    "message": "Support on Ko-fi"
-  },
-  "supportPrimaryHint": {
-    "message": "One-time or monthly — you choose"
-  },
-  "supportPrimaryPending": {
-    "message": "Ko-fi page coming soon"
-  },
-  "supportPrimaryPendingHint": {
-    "message": "Secure support is being connected"
-  },
-  "supportTrust": {
-    "message": "Secure checkout on Ko-fi. Opens in a new tab."
-  },
   "supportFreeTitle": {
     "message": "You can also help for free"
   },
@@ -1508,5 +1493,17 @@
   "setCloudflareFallbackDesc": {
     "message": "When Nexus answers a background download request with a browser verification page, open the file page so you can complete the check, instead of failing. This is why the tab sometimes navigates on its own.",
     "description": "Settings-panel description. Explains why the tab navigates on its own when Cloudflare challenges a background request."
+  },
+  "tabControls": {
+    "message": "Controls",
+    "description": "Tab bar button for the quick controls panel."
+  },
+  "tabHelp": {
+    "message": "Help & Bugs",
+    "description": "Tab bar button for the help and bug report panel."
+  },
+  "sectionHelpBugs": {
+    "message": "Help & Bugs",
+    "description": "Section heading above help and bug report items."
   }
 }

@@ -1090,21 +1090,6 @@
   "supportValueFree": {
     "message": "Siempre gratis"
   },
-  "supportPrimary": {
-    "message": "Apoyar en Ko-fi"
-  },
-  "supportPrimaryHint": {
-    "message": "Una vez o cada mes: tú eliges"
-  },
-  "supportPrimaryPending": {
-    "message": "La página de Ko-fi llegará pronto"
-  },
-  "supportPrimaryPendingHint": {
-    "message": "Se está preparando el apoyo seguro"
-  },
-  "supportTrust": {
-    "message": "Pago seguro en Ko-fi. Se abre en una pestaña nueva."
-  },
   "supportFreeTitle": {
     "message": "También puedes ayudar gratis"
   },
@@ -1246,5 +1231,17 @@
   },
   "setCloudflareFallbackDesc": {
     "message": "Cuando Nexus responde a una petición de descarga en segundo plano con una página de verificación, abre la página del archivo para que completes la comprobación, en lugar de fallar. Por eso a veces la pestaña navega sola."
+  },
+  "tabControls": {
+    "message": "Controls",
+    "description": "Tab bar button for the quick controls panel."
+  },
+  "tabHelp": {
+    "message": "Help & Bugs",
+    "description": "Tab bar button for the help and bug report panel."
+  },
+  "sectionHelpBugs": {
+    "message": "Help & Bugs",
+    "description": "Section heading above help and bug report items."
   }
 }

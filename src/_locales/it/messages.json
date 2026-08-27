@@ -1090,21 +1090,6 @@
   "supportValueFree": {
     "message": "Sempre gratuito"
   },
-  "supportPrimary": {
-    "message": "Sostieni su Ko-fi"
-  },
-  "supportPrimaryHint": {
-    "message": "Una tantum o mensile — decidi tu"
-  },
-  "supportPrimaryPending": {
-    "message": "La pagina Ko-fi arriverà presto"
-  },
-  "supportPrimaryPendingHint": {
-    "message": "Il supporto sicuro è in fase di attivazione"
-  },
-  "supportTrust": {
-    "message": "Pagamento sicuro su Ko-fi. Si apre in una nuova scheda."
-  },
   "supportFreeTitle": {
     "message": "Puoi aiutare anche gratis"
   },
@@ -1246,5 +1231,17 @@
   },
   "setCloudflareFallbackDesc": {
     "message": "Quando Nexus risponde a una richiesta di download in background con una pagina di verifica, apre la pagina del file così puoi completare il controllo, invece di fallire. È per questo che a volte la scheda cambia da sola."
+  },
+  "tabControls": {
+    "message": "Controls",
+    "description": "Tab bar button for the quick controls panel."
+  },
+  "tabHelp": {
+    "message": "Help & Bugs",
+    "description": "Tab bar button for the help and bug report panel."
+  },
+  "sectionHelpBugs": {
+    "message": "Help & Bugs",
+    "description": "Section heading above help and bug report items."
   }
 }

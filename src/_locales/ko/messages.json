@@ -1031,21 +1031,6 @@
   "supportValueFree": {
     "message": "항상 무료"
   },
-  "supportPrimary": {
-    "message": "Ko-fi에서 후원하기"
-  },
-  "supportPrimaryHint": {
-    "message": "일회성 또는 매월 — 선택은 자유입니다"
-  },
-  "supportPrimaryPending": {
-    "message": "Ko-fi 페이지 준비 중"
-  },
-  "supportPrimaryPendingHint": {
-    "message": "안전한 후원 수단을 연결하는 중입니다"
-  },
-  "supportTrust": {
-    "message": "Ko-fi에서 안전하게 결제합니다. 새 탭에서 열립니다."
-  },
   "supportFreeTitle": {
     "message": "무료로도 도울 수 있습니다"
   },
@@ -1170,5 +1155,17 @@
   },
   "setCloudflareFallbackDesc": {
     "message": "백그라운드 다운로드 요청에 Nexus가 확인 페이지로 응답하면, 실패시키는 대신 파일 페이지를 열어 확인을 완료할 수 있게 합니다. 탭이 가끔 저절로 이동하는 이유입니다."
+  },
+  "tabControls": {
+    "message": "Controls",
+    "description": "Tab bar button for the quick controls panel."
+  },
+  "tabHelp": {
+    "message": "Help & Bugs",
+    "description": "Tab bar button for the help and bug report panel."
+  },
+  "sectionHelpBugs": {
+    "message": "Help & Bugs",
+    "description": "Section heading above help and bug report items."
   }
 }

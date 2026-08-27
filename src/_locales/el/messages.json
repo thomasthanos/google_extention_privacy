@@ -1090,21 +1090,6 @@
   "supportValueFree": {
     "message": "Πάντα δωρεάν"
   },
-  "supportPrimary": {
-    "message": "Στήριξε στο Ko-fi"
-  },
-  "supportPrimaryHint": {
-    "message": "Μία φορά ή μηνιαία — εσύ αποφασίζεις"
-  },
-  "supportPrimaryPending": {
-    "message": "Η σελίδα Ko-fi έρχεται σύντομα"
-  },
-  "supportPrimaryPendingHint": {
-    "message": "Η ασφαλής στήριξη ετοιμάζεται"
-  },
-  "supportTrust": {
-    "message": "Ασφαλής πληρωμή στο Ko-fi. Ανοίγει σε νέα καρτέλα."
-  },
   "supportFreeTitle": {
     "message": "Μπορείς να βοηθήσεις και δωρεάν"
   },
@@ -1246,5 +1231,17 @@
   },
   "setCloudflareFallbackDesc": {
     "message": "Όταν το Nexus απαντά σε ένα αίτημα λήψης στο παρασκήνιο με σελίδα επαλήθευσης, να ανοίγει τη σελίδα του αρχείου ώστε να ολοκληρώσεις τον έλεγχο, αντί να αποτυγχάνει. Γι᾽ αυτό η καρτέλα μερικές φορές αλλάζει μόνη της."
+  },
+  "tabControls": {
+    "message": "Controls",
+    "description": "Tab bar button for the quick controls panel."
+  },
+  "tabHelp": {
+    "message": "Help & Bugs",
+    "description": "Tab bar button for the help and bug report panel."
+  },
+  "sectionHelpBugs": {
+    "message": "Help & Bugs",
+    "description": "Section heading above help and bug report items."
   }
 }

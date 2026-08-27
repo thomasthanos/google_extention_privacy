@@ -1208,21 +1208,6 @@
   "supportValueFree": {
     "message": "Всегда бесплатно"
   },
-  "supportPrimary": {
-    "message": "Поддержать на Ko-fi"
-  },
-  "supportPrimaryHint": {
-    "message": "Разово или ежемесячно — на ваш выбор"
-  },
-  "supportPrimaryPending": {
-    "message": "Страница Ko-fi скоро появится"
-  },
-  "supportPrimaryPendingHint": {
-    "message": "Безопасная поддержка настраивается"
-  },
-  "supportTrust": {
-    "message": "Безопасная оплата на Ko-fi. Откроется в новой вкладке."
-  },
   "supportFreeTitle": {
     "message": "Помочь можно и бесплатно"
   },
@@ -1398,5 +1383,17 @@
   },
   "setCloudflareFallbackDesc": {
     "message": "Когда Nexus отвечает на фоновый запрос загрузки страницей проверки, открывать страницу файла, чтобы вы прошли проверку, вместо ошибки. Поэтому вкладка иногда переходит сама."
+  },
+  "tabControls": {
+    "message": "Controls",
+    "description": "Tab bar button for the quick controls panel."
+  },
+  "tabHelp": {
+    "message": "Help & Bugs",
+    "description": "Tab bar button for the help and bug report panel."
+  },
+  "sectionHelpBugs": {
+    "message": "Help & Bugs",
+    "description": "Section heading above help and bug report items."
   }
 }

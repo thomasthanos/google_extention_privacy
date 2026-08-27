@@ -1090,21 +1090,6 @@
   "supportValueFree": {
     "message": "Her zaman ücretsiz"
   },
-  "supportPrimary": {
-    "message": "Ko-fi'de destekle"
-  },
-  "supportPrimaryHint": {
-    "message": "Tek seferlik ya da aylık — seçim sizin"
-  },
-  "supportPrimaryPending": {
-    "message": "Ko-fi sayfası çok yakında"
-  },
-  "supportPrimaryPendingHint": {
-    "message": "Güvenli destek bağlanıyor"
-  },
-  "supportTrust": {
-    "message": "Ko-fi üzerinden güvenli ödeme. Yeni sekmede açılır."
-  },
   "supportFreeTitle": {
     "message": "Ücretsiz olarak da yardım edebilirsiniz"
   },
@@ -1246,5 +1231,17 @@
   },
   "setCloudflareFallbackDesc": {
     "message": "Nexus, arka plandaki bir indirme isteğine doğrulama sayfasıyla yanıt verdiğinde, hata vermek yerine dosya sayfasını açar ve doğrulamayı tamamlamanı sağlar. Sekmenin bazen kendiliğinden gitmesinin nedeni budur."
+  },
+  "tabControls": {
+    "message": "Controls",
+    "description": "Tab bar button for the quick controls panel."
+  },
+  "tabHelp": {
+    "message": "Help & Bugs",
+    "description": "Tab bar button for the help and bug report panel."
+  },
+  "sectionHelpBugs": {
+    "message": "Help & Bugs",
+    "description": "Section heading above help and bug report items."
   }
 }
