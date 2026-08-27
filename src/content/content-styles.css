@@ -1615,3 +1615,101 @@
     width: 9ch;
   }
 }
+
+/* Sits above .nxtk-settings-fab, which is fixed at bottom 28px and is ~46px tall, and is on every
+   page. Their z-indexes cannot be reordered — the ladder is 999997 dropdown portal, 999998 FAB,
+   999999 modal backdrop, and this toast has to stay under a modal — so the two are kept apart by
+   position instead. Move the FAB and this has to move with it, or the FAB covers Keep open. */
+.nxtk-close-toast {
+  position: fixed;
+  right: 28px;
+  bottom: 88px;
+  z-index: 999997;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: min(380px, calc(100vw - 56px));
+  padding: 13px 15px;
+  overflow: hidden;
+  border: 1px solid var(--nxtk-accent-border);
+  border-radius: var(--nxtk-radius-md);
+  background: var(--nxtk-glass-tint-deep);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5), var(--nxtk-accent-glow);
+  color: var(--nxtk-text);
+  font-size: 13px;
+  line-height: 1.35;
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 200ms var(--nxtk-ease),
+    transform 200ms var(--nxtk-ease);
+}
+
+@supports (backdrop-filter: blur(1px)) {
+  .nxtk-close-toast {
+    backdrop-filter: blur(18px) saturate(140%);
+  }
+}
+
+.nxtk-close-toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.nxtk-close-toast.is-leaving {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.nxtk-close-toast-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nxtk-close-toast-copy strong {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--nxtk-text-bright);
+}
+
+.nxtk-close-toast-copy span {
+  font-size: 12px;
+  color: var(--nxtk-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.nxtk-close-toast-keep {
+  flex: none;
+  padding: 7px 13px;
+  font-size: 12px;
+}
+
+.nxtk-close-toast-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 2px;
+  transform-origin: left center;
+  background: var(--nxtk-accent);
+  animation: nxtk-close-drain var(--nxtk-close-duration, 3000ms) linear forwards;
+}
+
+@keyframes nxtk-close-drain {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nxtk-close-toast {
+    transition: none;
+    opacity: 1;
+    transform: none;
+  }
+  .nxtk-close-toast-bar {
+    animation: none;
+  }
+}

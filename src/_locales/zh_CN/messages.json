@@ -1072,10 +1072,6 @@
     "message": "报告已复制 — 正在打开已填写的 GitHub…",
     "description": "Report button state when the report was copied and the form is prefilled."
   },
-  "dlgReportOpeningPrefilled": {
-    "message": "正在打开已填写的 GitHub…",
-    "description": "Report button state when only the shortened report could be sent."
-  },
   "dlgHistoryMarked": {
     "message": "$2 个模组中有 $1 个已标记为已下载。",
     "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
@@ -1139,5 +1135,40 @@
   "speedSourceDefault": {
     "message": "默认值",
     "description": "Names the speed used in the pause countdown: the stock value."
+  },
+  "helpTitle": {
+    "message": "工作原理"
+  },
+  "helpStep1": {
+    "message": "在 Nexus Mods 上打开任意模组页面，切换到 Files 标签页。"
+  },
+  "helpStep2": {
+    "message": "像平常一样点击 Mod manager download 或 Manual download。"
+  },
+  "helpStep3": {
+    "message": "扩展会在后台解析下载链接，跳过等待、广告面板和前置需求页面。"
+  },
+  "helpSignIn": {
+    "message": "你必须登录 Nexus Mods 账号。未登录时，Nexus 返回的是验证页面而不是下载链接。"
+  },
+  "toastSentToVortex": {
+    "message": "已发送到 Vortex"
+  },
+  "toastKeepOpen": {
+    "message": "保持打开"
+  },
+  "toastClosingIn_other": {
+    "message": "此标签页将在 $1 秒后关闭",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "setCloudflareFallbackLabel": {
+    "message": "Cloudflare 回退"
+  },
+  "setCloudflareFallbackDesc": {
+    "message": "当 Nexus 对后台下载请求返回验证页面时，打开文件页面让你完成验证，而不是直接失败。这就是标签页有时会自行跳转的原因。"
   }
 }

@@ -1131,10 +1131,6 @@
     "message": "Rapporto copiato — GitHub si apre precompilato…",
     "description": "Report button state when the report was copied and the form is prefilled."
   },
-  "dlgReportOpeningPrefilled": {
-    "message": "GitHub si apre precompilato…",
-    "description": "Report button state when only the shortened report could be sent."
-  },
   "dlgHistoryMarked": {
     "message": "$1 di $2 mod sono contrassegnate come scaricate.",
     "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
@@ -1207,5 +1203,48 @@
   "speedSourceDefault": {
     "message": "predefinito",
     "description": "Names the speed used in the pause countdown: the stock value."
+  },
+  "helpTitle": {
+    "message": "Come funziona?"
+  },
+  "helpStep1": {
+    "message": "Apri una qualsiasi pagina di mod su Nexus Mods e vai alla scheda Files."
+  },
+  "helpStep2": {
+    "message": "Premi Mod manager download o Manual download come faresti normalmente."
+  },
+  "helpStep3": {
+    "message": "L'estensione risolve il link in background e salta l'attesa, il pannello pubblicitario e le schermate dei requisiti."
+  },
+  "helpSignIn": {
+    "message": "Devi aver effettuato l'accesso al tuo account Nexus Mods. Da disconnesso, Nexus risponde con una pagina di verifica invece che con un link di download."
+  },
+  "toastSentToVortex": {
+    "message": "Inviato a Vortex"
+  },
+  "toastKeepOpen": {
+    "message": "Mantieni aperta"
+  },
+  "toastClosingIn_one": {
+    "message": "Questa scheda si chiude tra $1 secondo",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastClosingIn_other": {
+    "message": "Questa scheda si chiude tra $1 secondi",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "setCloudflareFallbackLabel": {
+    "message": "Ripiego per Cloudflare"
+  },
+  "setCloudflareFallbackDesc": {
+    "message": "Quando Nexus risponde a una richiesta di download in background con una pagina di verifica, apre la pagina del file così puoi completare il controllo, invece di fallire. È per questo che a volte la scheda cambia da sola."
   }
 }

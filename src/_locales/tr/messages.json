@@ -1131,10 +1131,6 @@
     "message": "Rapor kopyalandı — GitHub önceden doldurulmuş açılıyor…",
     "description": "Report button state when the report was copied and the form is prefilled."
   },
-  "dlgReportOpeningPrefilled": {
-    "message": "GitHub önceden doldurulmuş açılıyor…",
-    "description": "Report button state when only the shortened report could be sent."
-  },
   "dlgHistoryMarked": {
     "message": "$2 moddan $1 tanesi indirilmiş olarak işaretli.",
     "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
@@ -1207,5 +1203,48 @@
   "speedSourceDefault": {
     "message": "varsayılan",
     "description": "Names the speed used in the pause countdown: the stock value."
+  },
+  "helpTitle": {
+    "message": "Nasıl çalışır?"
+  },
+  "helpStep1": {
+    "message": "Nexus Mods'ta herhangi bir mod sayfasını aç ve Files sekmesine geç."
+  },
+  "helpStep2": {
+    "message": "Her zamanki gibi Mod manager download veya Manual download düğmesine bas."
+  },
+  "helpStep3": {
+    "message": "Eklenti bağlantıyı arka planda çözer; bekleme süresini, reklam panelini ve gereksinim ekranlarını atlar."
+  },
+  "helpSignIn": {
+    "message": "Nexus Mods hesabında oturum açmış olman gerekir. Oturum kapalıyken Nexus, indirme bağlantısı yerine bir doğrulama sayfası döndürür."
+  },
+  "toastSentToVortex": {
+    "message": "Vortex'e gönderildi"
+  },
+  "toastKeepOpen": {
+    "message": "Açık tut"
+  },
+  "toastClosingIn_one": {
+    "message": "Bu sekme $1 saniye içinde kapanacak",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastClosingIn_other": {
+    "message": "Bu sekme $1 saniye içinde kapanacak",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "setCloudflareFallbackLabel": {
+    "message": "Cloudflare yedeği"
+  },
+  "setCloudflareFallbackDesc": {
+    "message": "Nexus, arka plandaki bir indirme isteğine doğrulama sayfasıyla yanıt verdiğinde, hata vermek yerine dosya sayfasını açar ve doğrulamayı tamamlamanı sağlar. Sekmenin bazen kendiliğinden gitmesinin nedeni budur."
   }
 }

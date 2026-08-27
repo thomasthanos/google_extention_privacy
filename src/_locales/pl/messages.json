@@ -1249,10 +1249,6 @@
     "message": "Raport skopiowany — GitHub otworzy się wypełniony…",
     "description": "Report button state when the report was copied and the form is prefilled."
   },
-  "dlgReportOpeningPrefilled": {
-    "message": "GitHub otworzy się wypełniony…",
-    "description": "Report button state when only the shortened report could be sent."
-  },
   "dlgHistoryMarked": {
     "message": "$1 z $2 modów jest oznaczonych jako pobrane.",
     "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
@@ -1343,5 +1339,64 @@
   "speedSourceDefault": {
     "message": "domyślne",
     "description": "Names the speed used in the pause countdown: the stock value."
+  },
+  "helpTitle": {
+    "message": "Jak to działa?"
+  },
+  "helpStep1": {
+    "message": "Otwórz dowolną stronę moda na Nexus Mods i przejdź do zakładki Files."
+  },
+  "helpStep2": {
+    "message": "Kliknij Mod manager download lub Manual download tak jak zwykle."
+  },
+  "helpStep3": {
+    "message": "Rozszerzenie ustala link w tle i pomija oczekiwanie, panel reklamowy oraz ekrany wymagań."
+  },
+  "helpSignIn": {
+    "message": "Musisz być zalogowany na swoje konto Nexus Mods. Bez logowania Nexus odpowiada stroną weryfikacji zamiast linkiem do pobrania."
+  },
+  "toastSentToVortex": {
+    "message": "Wysłano do Vortex"
+  },
+  "toastKeepOpen": {
+    "message": "Zostaw otwartą"
+  },
+  "toastClosingIn_one": {
+    "message": "Ta karta zamknie się za $1 sekundę",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastClosingIn_few": {
+    "message": "Ta karta zamknie się za $1 sekundy",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastClosingIn_many": {
+    "message": "Ta karta zamknie się za $1 sekund",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastClosingIn_other": {
+    "message": "Ta karta zamknie się za $1 sekundy",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "setCloudflareFallbackLabel": {
+    "message": "Zapasowa ścieżka Cloudflare"
+  },
+  "setCloudflareFallbackDesc": {
+    "message": "Gdy Nexus odpowiada na żądanie pobrania w tle stroną weryfikacji, otwiera stronę pliku, abyś mógł ukończyć sprawdzenie, zamiast kończyć błędem. Dlatego karta czasem sama zmienia adres."
   }
 }

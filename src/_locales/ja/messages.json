@@ -1072,10 +1072,6 @@
     "message": "レポートをコピーしました — 入力済みの GitHub を開いています…",
     "description": "Report button state when the report was copied and the form is prefilled."
   },
-  "dlgReportOpeningPrefilled": {
-    "message": "入力済みの GitHub を開いています…",
-    "description": "Report button state when only the shortened report could be sent."
-  },
   "dlgHistoryMarked": {
     "message": "$2 個中 $1 個の Mod がダウンロード済みとして記録されています。",
     "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
@@ -1139,5 +1135,40 @@
   "speedSourceDefault": {
     "message": "既定値",
     "description": "Names the speed used in the pause countdown: the stock value."
+  },
+  "helpTitle": {
+    "message": "使い方"
+  },
+  "helpStep1": {
+    "message": "Nexus Mods の任意の MOD ページを開き、Files タブに移動します。"
+  },
+  "helpStep2": {
+    "message": "いつもどおり Mod manager download または Manual download を押します。"
+  },
+  "helpStep3": {
+    "message": "拡張機能がバックグラウンドでリンクを取得し、待ち時間・広告パネル・必要MOD画面をスキップします。"
+  },
+  "helpSignIn": {
+    "message": "Nexus Mods アカウントにログインしている必要があります。ログアウト状態では、ダウンロードリンクではなく確認ページが返されます。"
+  },
+  "toastSentToVortex": {
+    "message": "Vortex に送信しました"
+  },
+  "toastKeepOpen": {
+    "message": "閉じない"
+  },
+  "toastClosingIn_other": {
+    "message": "このタブは $1 秒後に閉じます",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "setCloudflareFallbackLabel": {
+    "message": "Cloudflare フォールバック"
+  },
+  "setCloudflareFallbackDesc": {
+    "message": "バックグラウンドのダウンロード要求に Nexus が確認ページを返した場合、失敗させる代わりにファイルページを開いて確認を完了できるようにします。タブが自動的に移動するのはこのためです。"
   }
 }

@@ -9,6 +9,9 @@ window.NexusExt = window.NexusExt || {};
   let premiumObserver = null;
   let premiumObserverTimer = null;
   let closeTabTimer = null;
+  let closeTabToast = null;
+  let fallbackWatchdogTimer = null;
+  let fallbackWatchdogDeadline = 0;
   let downloadAttemptSequence = 0;
   let nativeFallbackKey = '';
   let nativeFallbackIsNMM = null;
@@ -19,6 +22,8 @@ window.NexusExt = window.NexusExt || {};
 
   const CLOUDFLARE_FALLBACK_KEY = 'nxtk_cloudflare_native_fallback';
   const CLOUDFLARE_FALLBACK_TTL_MS = 5 * 60 * 1000;
+  const FALLBACK_WATCHDOG_MS = 12000;
+  const FALLBACK_WATCHDOG_MAX_MS = 3 * 60 * 1000;
 
   const LOG_BADGE = 'background:#d98f40;color:#191106;font-weight:700;padding:1px 6px;border-radius:3px';
   const LOG_STYLES = {
@@ -203,6 +208,7 @@ window.NexusExt = window.NexusExt || {};
     const currentKey = getCurrentFileKey();
     if (nativeFallbackKey && nativeFallbackKey === currentKey) return true;
 
+    cancelFallbackWatchdog();
     nativeFallbackKey = '';
     nativeFallbackIsNMM = null;
     nativeFallbackAutoStartPending = false;
@@ -220,6 +226,7 @@ window.NexusExt = window.NexusExt || {};
     nativeFallbackKey = currentKey;
     nativeFallbackIsNMM = typeof marker.isNMM === 'boolean' ? marker.isNMM : null;
     nativeFallbackAutoStartPending = marker.autoStartPending !== false;
+    armFallbackWatchdog();
     return true;
   }
 
@@ -229,9 +236,79 @@ window.NexusExt = window.NexusExt || {};
   }
 
   function cancelScheduledTabClose() {
+    if (closeTabToast) {
+      try { closeTabToast(); } catch (_) { }
+      closeTabToast = null;
+    }
     if (closeTabTimer === null) return;
     clearTimeout(closeTabTimer);
     closeTabTimer = null;
+  }
+
+  /* The fallback hands control back to Nexus's own download button. If that button never appears
+     — a still-challenged page, a layout the selectors do not know, a disabled control — every
+     entry point short-circuits on isNativeFallbackActive() and the extension goes quiet with
+     nothing on screen. This gives that state a deadline and a visible ending. */
+  function cancelFallbackWatchdog() {
+    fallbackWatchdogDeadline = 0;
+    if (fallbackWatchdogTimer === null) return;
+    clearTimeout(fallbackWatchdogTimer);
+    fallbackWatchdogTimer = null;
+  }
+
+  function clearNativeFallbackState() {
+    cancelFallbackWatchdog();
+    clearStoredCloudflareFallback();
+    nativeFallbackKey = '';
+    nativeFallbackIsNMM = null;
+    nativeFallbackAutoStartPending = false;
+    nativeFallbackAutoStarted = false;
+  }
+
+  function abandonNativeFallback(reason) {
+    if (!isNativeFallbackActive()) {
+      cancelFallbackWatchdog();
+      return;
+    }
+    const wasNMM = nativeFallbackIsNMM;
+    clearNativeFallbackState();
+    Logger.warn('Cloudflare fallback gave up:', reason);
+
+    try {
+      setupSlowDownloadIntercept();
+    } catch (cause) {
+      Logger.warn('Could not restore the download interceptors:', cause);
+    }
+
+    NXTK.setActivity?.({ trigger: 'fallback', method: 'native', fallbackActive: true });
+    handleError(null, Errors.create('cloudflare', {
+      context: 'Cloudflare fallback',
+      technicalMessage: `native download control unavailable after ${FALLBACK_WATCHDOG_MS}ms | ${reason} | method=${wasNMM ? 'vortex' : 'browser'}`
+    }));
+  }
+
+  function armFallbackWatchdog({ extend = false } = {}) {
+    const deadline = extend && fallbackWatchdogDeadline
+      ? fallbackWatchdogDeadline
+      : Date.now() + FALLBACK_WATCHDOG_MAX_MS;
+    cancelFallbackWatchdog();
+    if (!nativeFallbackAutoStartPending) return;
+    fallbackWatchdogDeadline = deadline;
+
+    fallbackWatchdogTimer = setTimeout(() => {
+      fallbackWatchdogTimer = null;
+      if (!isNativeFallbackActive() || nativeFallbackAutoStarted) return;
+      if (!nativeFallbackAutoStartPending) return;
+
+      if (isCloudflareChallengeDocument() && Date.now() < fallbackWatchdogDeadline) {
+        Logger.info('Cloudflare verification still on screen; waiting for you to complete it.');
+        armFallbackWatchdog({ extend: true });
+        return;
+      }
+      abandonNativeFallback(isCloudflareChallengeDocument()
+        ? 'Cloudflare verification was never completed'
+        : 'native download control was never found');
+    }, FALLBACK_WATCHDOG_MS);
   }
 
   function beginDownloadAttempt() {
@@ -739,11 +816,20 @@ window.NexusExt = window.NexusExt || {};
     nativeFallbackAutoStarted = false;
     restoreButtonState(button);
     Logger.warn('Cloudflare blocked the extension request; using the native Nexus download control.');
+    armFallbackWatchdog();
     syncSlowDownloadIntercept();
     return true;
   }
 
   function activateCloudflareFallback({ button = null, fileId, isNMM, href } = {}) {
+    /* Returning false hands the caller back to the normal error path, which reports the Cloudflare
+       block instead of navigating the tab. That navigation is the surprising part of this feature,
+       so it is the part that has to be switchable. */
+    if (cfg.CloudflareFallback === false) {
+      Logger.info('Cloudflare fallback is turned off; reporting the block instead of opening the page.');
+      return false;
+    }
+
     let target;
     try {
       target = new URL(href || location.href, location.href);
@@ -802,6 +888,14 @@ window.NexusExt = window.NexusExt || {};
       closeTabAfterStart = false
     } = options;
     const attemptId = beginDownloadAttempt();
+
+    NXTK.setActivity?.({
+      trigger: button ? 'manual' : 'automatic',
+      method: isNMM ? 'vortex' : 'browser',
+      fileId: String(fileId || ''),
+      autoClose: !!(closeTabAfterStart && cfg.AutoCloseTab && isNMM),
+      fallbackActive: isNativeFallbackActive()
+    });
 
     const loginError = Auth?.getDocumentLoginError?.(document, 'Starting download');
     if (loginError) {
@@ -882,11 +976,26 @@ window.NexusExt = window.NexusExt || {};
     if (closeTabAfterStart && cfg.AutoCloseTab && isNMM && attemptId === downloadAttemptSequence) {
       const configuredDelay = Number(cfg.CloseTabDelay);
       const closeDelay = Math.min(Math.max(Number.isFinite(configuredDelay) ? configuredDelay : 2000, 0), 60000);
-      closeTabTimer = setTimeout(() => {
+      const closeNow = () => {
         closeTabTimer = null;
+        closeTabToast = null;
         if (attemptId !== downloadAttemptSequence) return;
         safeSendMessage({ type: 'CLOSE_TAB' });
-      }, closeDelay);
+      };
+
+      if (NexusExt.UI?.showCloseCountdown && closeDelay >= 1000) {
+        closeTabToast = NexusExt.UI.showCloseCountdown({
+          ms: closeDelay,
+          onDone: closeNow,
+          onCancel: () => {
+            closeTabToast = null;
+            invalidateDownloadAttempts();
+            Logger.info('Tab close cancelled — leaving this page open.');
+          }
+        });
+      } else {
+        closeTabTimer = setTimeout(closeNow, closeDelay);
+      }
     }
     return true;
   }
@@ -1042,8 +1151,15 @@ window.NexusExt = window.NexusExt || {};
     if (!button || button.disabled) return;
 
     nativeFallbackAutoStarted = true;
+    cancelFallbackWatchdog();
     setStoredCloudflareAutoStartPending(false);
     restoreButtonState(button);
+    NXTK.setActivity?.({
+      trigger: 'fallback',
+      method: 'native',
+      fileId: String(fileId || ''),
+      fallbackActive: true
+    });
     Logger.info('Starting the native Nexus download after the Cloudflare fallback.');
     Promise.resolve().then(() => {
       if (!isNativeFallbackActive() || !button.isConnected) return;
@@ -1051,6 +1167,7 @@ window.NexusExt = window.NexusExt || {};
     }).catch((cause) => {
       nativeFallbackAutoStarted = false;
       setStoredCloudflareAutoStartPending(true);
+      armFallbackWatchdog();
       Logger.warn('Could not start the native Nexus download:', cause);
     });
   }
@@ -1411,6 +1528,25 @@ window.NexusExt = window.NexusExt || {};
 
   const ARCHIVED_FILE_ID_PATTERN = /^\d{1,12}$/;
 
+  const ARCHIVED_DOWNLOADS_CLASS = 'accordion-downloads';
+
+  /* Nexus renders each archived file as a header followed by its own downloads box. This used to
+     match the two collections by array index, which assumed they stay the same length and in the
+     same order; one stray box and every file after it silently received another file's buttons.
+
+     There is deliberately no index fallback. A fixture with one header missing its box showed the
+     fallback handing that header the *next* file's box — the exact defect, reintroduced by the
+     escape hatch meant to be safe. When neither relationship finds a box, the file gets no buttons,
+     which is recoverable; wrong buttons hand you a different mod version and look correct. */
+  function findArchivedDownloadBox(header) {
+    if (!header) return null;
+
+    const sibling = header.nextElementSibling;
+    if (sibling?.classList?.contains(ARCHIVED_DOWNLOADS_CLASS)) return sibling;
+
+    return header.parentElement?.querySelector(`.${ARCHIVED_DOWNLOADS_CLASS}`) || null;
+  }
+
   function buildArchivedDownloadLink(href, label) {
     const anchor = document.createElement('a');
     anchor.className = 'btn inline-flex';
@@ -1437,25 +1573,35 @@ window.NexusExt = window.NexusExt || {};
         }
         const hasArchiveBtn = footer.querySelector('[data-nxtk-archive]');
         if (!hasArchiveBtn) {
-          const btn = document.createElement('a');
-          btn.href = url + '&category=archived';
-          btn.className = 'nxtk-archive-btn';
+          /* Built by the same helper as the archived download links, so it carries Nexus's own
+             button classes. On its own an nxtk- class styles nothing — this extension ships no
+             rule for it — and the link rendered as bare underlined text among real buttons. */
+          const btn = buildArchivedDownloadLink(
+            url + '&category=archived',
+            NXTK.t('btnFileArchive', null, 'File archive')
+          );
+          btn.classList.add('nxtk-archive-btn');
           btn.dataset.nxtkArchive = '1';
-          const label = document.createElement('span');
-          label.textContent = NXTK.t('btnFileArchive', null, 'File archive');
-          btn.appendChild(label);
           footer.appendChild(btn);
         }
       });
     }
     if (!url.includes('category=archived')) return;
     const headers = Array.from(document.getElementsByClassName('file-expander-header'));
-    const downloads = Array.from(document.getElementsByClassName('accordion-downloads'));
     const base = location.origin + location.pathname;
-    for (const [i, header] of headers.entries()) {
+    const claimed = new Set();
+    for (const header of headers) {
       const fileId = String(header?.dataset?.id ?? '');
-      const box = downloads[i];
+      const box = findArchivedDownloadBox(header);
       if (!ARCHIVED_FILE_ID_PATTERN.test(fileId) || !box || box.dataset.nxtkDone) continue;
+      /* Pairing a header with a box that another header already took would put file A's buttons on
+         file B — you press download on one version and receive a different one. Dropping the
+         buttons is the safe failure. */
+      if (claimed.has(box)) {
+        Logger.warn('Archived files: two headers resolved to the same download box; skipping', fileId);
+        continue;
+      }
+      claimed.add(box);
       box.dataset.nxtkDone = '1';
       box._nxtkOriginalHtml = box.innerHTML;
       box.replaceChildren(
@@ -1562,11 +1708,18 @@ window.NexusExt = window.NexusExt || {};
     scheduleDomEnhancements();
   }
 
+  /* True while this page is one the extension can act on. main.js uses it to decide how often to
+     poll for navigations — most of nexusmods.com (forums, profiles, search, news) is neither. */
+  function isActionablePage() {
+    return isModPage() || isNativeFallbackActive();
+  }
+
   window.NexusExt.NNW = {
     init,
     onNavigate,
     updateConfig,
     getDownloadUrl,
+    isActionablePage,
     Logger,
     waitForDomSettled,
     parseDownloadURLFromResponse,

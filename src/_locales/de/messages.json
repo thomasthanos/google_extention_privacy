@@ -1131,10 +1131,6 @@
     "message": "Bericht kopiert – GitHub wird vorausgefüllt geöffnet …",
     "description": "Report button state when the report was copied and the form is prefilled."
   },
-  "dlgReportOpeningPrefilled": {
-    "message": "GitHub wird vorausgefüllt geöffnet …",
-    "description": "Report button state when only the shortened report could be sent."
-  },
   "dlgHistoryMarked": {
     "message": "$1 von $2 Mods sind als heruntergeladen markiert.",
     "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
@@ -1207,5 +1203,48 @@
   "speedSourceDefault": {
     "message": "Standard",
     "description": "Names the speed used in the pause countdown: the stock value."
+  },
+  "helpTitle": {
+    "message": "Wie funktioniert das?"
+  },
+  "helpStep1": {
+    "message": "Öffne eine beliebige Mod-Seite auf Nexus Mods und wechsle zum Reiter Files."
+  },
+  "helpStep2": {
+    "message": "Klicke wie gewohnt auf Mod manager download oder Manual download."
+  },
+  "helpStep3": {
+    "message": "Die Erweiterung ermittelt den Link im Hintergrund und überspringt Wartezeit, Werbefenster und Anforderungsseiten."
+  },
+  "helpSignIn": {
+    "message": "Du musst bei deinem Nexus-Mods-Konto angemeldet sein. Abgemeldet antwortet Nexus mit einer Überprüfungsseite statt mit einem Download-Link."
+  },
+  "toastSentToVortex": {
+    "message": "An Vortex gesendet"
+  },
+  "toastKeepOpen": {
+    "message": "Offen lassen"
+  },
+  "toastClosingIn_one": {
+    "message": "Dieser Tab schließt in $1 Sekunde",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastClosingIn_other": {
+    "message": "Dieser Tab schließt in $1 Sekunden",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "setCloudflareFallbackLabel": {
+    "message": "Cloudflare-Fallback"
+  },
+  "setCloudflareFallbackDesc": {
+    "message": "Wenn Nexus eine Download-Anfrage im Hintergrund mit einer Überprüfungsseite beantwortet, die Dateiseite öffnen, damit du die Prüfung abschließen kannst, statt abzubrechen. Deshalb wechselt der Tab manchmal von selbst."
   }
 }

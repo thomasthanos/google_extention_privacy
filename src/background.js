@@ -11,6 +11,7 @@ const NXTK = (() => {
     SkipRequirements: true,
     ShowAlertsOnError: true,
     HandleArchivedFiles: true,
+    CloudflareFallback: true,
     HidePremiumUpsells: true,
     DebugLogs: false,
     DownloadFolder: 'NexusMods',

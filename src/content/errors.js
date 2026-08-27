@@ -405,11 +405,28 @@ window.NexusExt = window.NexusExt || {};
   }
 
   function openReportIssue(url = REPORT_ISSUE_URL) {
-    const fallback = () => window.open(url, '_blank', 'noopener,noreferrer');
+    let fallbackUsed = false;
+    const fallback = () => {
+      if (fallbackUsed) return;
+      fallbackUsed = true;
+      try {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } catch (_) {
+      }
+    };
+    /* Callback form on purpose. Firefox's chrome.* namespace returns undefined rather than a
+       promise, so testing the return value opened GitHub twice there: the background created one
+       tab and the fallback created another. The callback also makes the background's own reply
+       visible — as a promise, {ok:false} resolves, so a tabs.create that failed left the button
+       doing nothing at all. */
     try {
-      const result = chrome.runtime?.sendMessage({ type: 'OPEN_REPORT_ISSUE', url });
-      if (result && typeof result.catch === 'function') result.catch(fallback);
-      else if (!result) fallback();
+      if (!chrome.runtime?.id) {
+        fallback();
+        return;
+      }
+      chrome.runtime.sendMessage({ type: 'OPEN_REPORT_ISSUE', url }, (reply) => {
+        if (chrome.runtime.lastError || !reply?.ok) fallback();
+      });
     } catch (_) {
       fallback();
     }

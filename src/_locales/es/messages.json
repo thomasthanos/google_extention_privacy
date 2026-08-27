@@ -1131,10 +1131,6 @@
     "message": "Informe copiado: GitHub se abre precompletado…",
     "description": "Report button state when the report was copied and the form is prefilled."
   },
-  "dlgReportOpeningPrefilled": {
-    "message": "GitHub se abre precompletado…",
-    "description": "Report button state when only the shortened report could be sent."
-  },
   "dlgHistoryMarked": {
     "message": "$1 de $2 mods están marcados como descargados.",
     "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
@@ -1207,5 +1203,48 @@
   "speedSourceDefault": {
     "message": "predeterminado",
     "description": "Names the speed used in the pause countdown: the stock value."
+  },
+  "helpTitle": {
+    "message": "¿Cómo funciona?"
+  },
+  "helpStep1": {
+    "message": "Abre cualquier página de mod en Nexus Mods y ve a la pestaña Files."
+  },
+  "helpStep2": {
+    "message": "Pulsa Mod manager download o Manual download como harías normalmente."
+  },
+  "helpStep3": {
+    "message": "La extensión resuelve el enlace en segundo plano y se salta la espera, el panel de anuncios y las pantallas de requisitos."
+  },
+  "helpSignIn": {
+    "message": "Debes haber iniciado sesión en tu cuenta de Nexus Mods. Sin sesión, Nexus responde con una página de verificación en lugar de un enlace de descarga."
+  },
+  "toastSentToVortex": {
+    "message": "Enviado a Vortex"
+  },
+  "toastKeepOpen": {
+    "message": "Mantener abierta"
+  },
+  "toastClosingIn_one": {
+    "message": "Esta pestaña se cierra en $1 segundo",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastClosingIn_other": {
+    "message": "Esta pestaña se cierra en $1 segundos",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "setCloudflareFallbackLabel": {
+    "message": "Alternativa para Cloudflare"
+  },
+  "setCloudflareFallbackDesc": {
+    "message": "Cuando Nexus responde a una petición de descarga en segundo plano con una página de verificación, abre la página del archivo para que completes la comprobación, en lugar de fallar. Por eso a veces la pestaña navega sola."
   }
 }

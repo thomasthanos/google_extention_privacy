@@ -820,6 +820,13 @@ window.NexusExt = window.NexusExt || {};
         return;
       }
       this.running = true;
+      NXTK.setActivity?.({
+        trigger: 'collection',
+        method: this.downloadMethod === DOWNLOAD_METHOD_BROWSER ? 'browser' : 'vortex',
+        fileId: '',
+        autoClose: false,
+        fallbackActive: false
+      });
       this.downloadController = typeof AbortController === 'function' ? new AbortController() : null;
       try {
         const claim = await this.acquireRunClaim();

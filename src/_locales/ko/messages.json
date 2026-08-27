@@ -1072,10 +1072,6 @@
     "message": "보고서를 복사했습니다 — 미리 채워진 GitHub를 여는 중…",
     "description": "Report button state when the report was copied and the form is prefilled."
   },
-  "dlgReportOpeningPrefilled": {
-    "message": "미리 채워진 GitHub를 여는 중…",
-    "description": "Report button state when only the shortened report could be sent."
-  },
   "dlgHistoryMarked": {
     "message": "$2개 중 $1개의 모드가 다운로드됨으로 표시되어 있습니다.",
     "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
@@ -1139,5 +1135,40 @@
   "speedSourceDefault": {
     "message": "기본값",
     "description": "Names the speed used in the pause countdown: the stock value."
+  },
+  "helpTitle": {
+    "message": "어떻게 작동하나요?"
+  },
+  "helpStep1": {
+    "message": "Nexus Mods에서 아무 모드 페이지나 열고 Files 탭으로 이동하세요."
+  },
+  "helpStep2": {
+    "message": "평소처럼 Mod manager download 또는 Manual download를 누르세요."
+  },
+  "helpStep3": {
+    "message": "확장 프로그램이 백그라운드에서 링크를 확인하고 대기 시간, 광고 패널, 필수 항목 화면을 건너뜁니다."
+  },
+  "helpSignIn": {
+    "message": "Nexus Mods 계정에 로그인되어 있어야 합니다. 로그아웃 상태에서는 다운로드 링크 대신 확인 페이지가 반환됩니다."
+  },
+  "toastSentToVortex": {
+    "message": "Vortex로 전송됨"
+  },
+  "toastKeepOpen": {
+    "message": "열어 두기"
+  },
+  "toastClosingIn_other": {
+    "message": "이 탭은 $1초 후에 닫힙니다",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "setCloudflareFallbackLabel": {
+    "message": "Cloudflare 대체 동작"
+  },
+  "setCloudflareFallbackDesc": {
+    "message": "백그라운드 다운로드 요청에 Nexus가 확인 페이지로 응답하면, 실패시키는 대신 파일 페이지를 열어 확인을 완료할 수 있게 합니다. 탭이 가끔 저절로 이동하는 이유입니다."
   }
 }

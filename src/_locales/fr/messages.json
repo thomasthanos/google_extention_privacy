@@ -1131,10 +1131,6 @@
     "message": "Rapport copié — GitHub s’ouvre prérempli…",
     "description": "Report button state when the report was copied and the form is prefilled."
   },
-  "dlgReportOpeningPrefilled": {
-    "message": "GitHub s’ouvre prérempli…",
-    "description": "Report button state when only the shortened report could be sent."
-  },
   "dlgHistoryMarked": {
     "message": "$1 mods sur $2 sont marqués comme téléchargés.",
     "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
@@ -1207,5 +1203,48 @@
   "speedSourceDefault": {
     "message": "par défaut",
     "description": "Names the speed used in the pause countdown: the stock value."
+  },
+  "helpTitle": {
+    "message": "Comment ça marche ?"
+  },
+  "helpStep1": {
+    "message": "Ouvre n'importe quelle page de mod sur Nexus Mods et va dans l'onglet Files."
+  },
+  "helpStep2": {
+    "message": "Clique sur Mod manager download ou Manual download comme d'habitude."
+  },
+  "helpStep3": {
+    "message": "L'extension récupère le lien en arrière-plan et saute l'attente, le panneau publicitaire et les écrans de prérequis."
+  },
+  "helpSignIn": {
+    "message": "Tu dois être connecté à ton compte Nexus Mods. Déconnecté, Nexus renvoie une page de vérification au lieu d'un lien de téléchargement."
+  },
+  "toastSentToVortex": {
+    "message": "Envoyé à Vortex"
+  },
+  "toastKeepOpen": {
+    "message": "Garder ouvert"
+  },
+  "toastClosingIn_one": {
+    "message": "Cet onglet se ferme dans $1 seconde",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastClosingIn_other": {
+    "message": "Cet onglet se ferme dans $1 secondes",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "setCloudflareFallbackLabel": {
+    "message": "Solution de secours Cloudflare"
+  },
+  "setCloudflareFallbackDesc": {
+    "message": "Quand Nexus répond à une demande de téléchargement en arrière-plan par une page de vérification, ouvrir la page du fichier pour que tu puisses valider le contrôle, au lieu d'échouer. C'est pour cela que l'onglet change parfois tout seul."
   }
 }

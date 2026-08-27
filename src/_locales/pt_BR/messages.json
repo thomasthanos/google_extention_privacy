@@ -1131,10 +1131,6 @@
     "message": "Relatório copiado — o GitHub abre preenchido…",
     "description": "Report button state when the report was copied and the form is prefilled."
   },
-  "dlgReportOpeningPrefilled": {
-    "message": "O GitHub abre preenchido…",
-    "description": "Report button state when only the shortened report could be sent."
-  },
   "dlgHistoryMarked": {
     "message": "$1 de $2 mods estão marcados como baixados.",
     "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
@@ -1207,5 +1203,48 @@
   "speedSourceDefault": {
     "message": "padrão",
     "description": "Names the speed used in the pause countdown: the stock value."
+  },
+  "helpTitle": {
+    "message": "Como funciona?"
+  },
+  "helpStep1": {
+    "message": "Abra qualquer página de mod no Nexus Mods e vá para a aba Files."
+  },
+  "helpStep2": {
+    "message": "Clique em Mod manager download ou Manual download como faria normalmente."
+  },
+  "helpStep3": {
+    "message": "A extensão resolve o link em segundo plano e pula a espera, o painel de anúncios e as telas de requisitos."
+  },
+  "helpSignIn": {
+    "message": "Você precisa estar conectado à sua conta do Nexus Mods. Desconectado, o Nexus responde com uma página de verificação em vez de um link de download."
+  },
+  "toastSentToVortex": {
+    "message": "Enviado ao Vortex"
+  },
+  "toastKeepOpen": {
+    "message": "Manter aberta"
+  },
+  "toastClosingIn_one": {
+    "message": "Esta aba fecha em $1 segundo",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastClosingIn_other": {
+    "message": "Esta aba fecha em $1 segundos",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "setCloudflareFallbackLabel": {
+    "message": "Alternativa do Cloudflare"
+  },
+  "setCloudflareFallbackDesc": {
+    "message": "Quando o Nexus responde a um pedido de download em segundo plano com uma página de verificação, abre a página do arquivo para você concluir a checagem, em vez de falhar. É por isso que a aba às vezes navega sozinha."
   }
 }

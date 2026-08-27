@@ -107,11 +107,15 @@ window.NexusExt = window.NexusExt || {};
     if (button) {
       const originalText = button.textContent;
       button.disabled = true;
+      /* The third case is truncated *and* not on the clipboard, so the maintainer will only ever
+         see the short report. popupReportNoCopy is the popup's wording for the same outcome and
+         is already translated in all 13 locales; dlgReportOpeningPrefilled would claim the report
+         went through. */
       button.textContent = complete
         ? NXTK.t('dlgReportOpeningFull', null, 'GitHub opens with the full report…')
         : copied
           ? NXTK.t('dlgReportOpeningCopied', null, 'Report copied — GitHub opens prefilled…')
-          : NXTK.t('dlgReportOpeningPrefilled', null, 'GitHub opens prefilled…');
+          : NXTK.t('popupReportNoCopy', null, 'GitHub opens prefilled — the full report could not be copied.');
       setTimeout(() => {
         button.disabled = false;
         button.textContent = originalText;
@@ -705,11 +709,12 @@ window.NexusExt = window.NexusExt || {};
 
   const SETTINGS_UI = [
     { key: 'AutoStartDownload', label: () => NXTK.t('setAutoStartDownloadLabel', null, 'Start downloads automatically'), type: 'bool', desc: () => NXTK.t('setAutoStartDownloadDesc', null, 'When you open a Nexus file download page, start the Vortex handoff or browser download without another click.') },
-    { key: 'AutoCloseTab', label: () => NXTK.t('setAutoCloseTabLabel', null, 'Close Vortex handoff tabs'), type: 'bool', desc: () => NXTK.t('setAutoCloseTabDesc', null, 'After a Vortex link is sent, close the temporary Nexus tab after the delay below.') },
+    { key: 'AutoCloseTab', label: () => NXTK.t('setAutoCloseTabLabel', null, 'Close Vortex tabs'), type: 'bool', desc: () => NXTK.t('setAutoCloseTabDesc', null, 'After a Vortex link is sent, close the temporary Nexus tab after the delay below.') },
     { key: 'SkipRequirements', label: () => NXTK.t('setSkipRequirementsLabel', null, 'Skip requirement screens'), type: 'bool', desc: () => NXTK.t('setSkipRequirementsDesc', null, 'Continue past Nexus requirements popups and go straight to the download step.') },
     { key: 'ShowAlertsOnError', label: () => NXTK.t('setShowAlertsOnErrorLabel', null, 'Show error popups'), type: 'bool', desc: () => NXTK.t('setShowAlertsOnErrorDesc', null, 'Show a clear message when Nexus does not return a usable download link.') },
     { key: 'HidePremiumUpsells', label: () => NXTK.t('setHidePremiumUpsellsLabel', null, 'Hide ads and Premium panels'), type: 'bool', desc: () => NXTK.t('setHidePremiumUpsellsDesc', null, 'Hide Nexus advertising slots, empty ad containers, Premium banners and upgrade panels while browsing.') },
-    { key: 'HandleArchivedFiles', label: () => NXTK.t('setHandleArchivedFilesLabel', null, 'Add buttons for archived files'), type: 'bool', desc: () => NXTK.t('setHandleArchivedFilesDesc', null, 'Add Vortex and browser download buttons to archived file entries when Nexus hides them.') },
+    { key: 'HandleArchivedFiles', label: () => NXTK.t('setHandleArchivedFilesLabel', null, 'Archived file buttons'), type: 'bool', desc: () => NXTK.t('setHandleArchivedFilesDesc', null, 'Add Vortex and browser download buttons to archived file entries when Nexus hides them.') },
+    { key: 'CloudflareFallback', label: () => NXTK.t('setCloudflareFallbackLabel', null, 'Cloudflare fallback'), type: 'bool', desc: () => NXTK.t('setCloudflareFallbackDesc', null, 'When Nexus answers a background download request with a browser verification page, open the file page so you can complete the check, instead of failing. This is why the tab sometimes navigates on its own.') },
     {
       key: 'ForceEnglish',
       group: 'language',
@@ -718,7 +723,7 @@ window.NexusExt = window.NexusExt || {};
       desc: () => NXTK.t('setForceEnglishDesc', null, 'Show this extension in English even when your browser is set to another language. Useful when following guides written in English. The extension name in your browser list still follows the browser language.')
     },
     { key: 'DebugLogs', label: () => NXTK.t('setDebugLogsLabel', null, 'Verbose extension logs'), type: 'bool', advanced: true, desc: () => NXTK.t('setDebugLogsDesc', null, 'Print detailed NexusMods Bypass activity in the console. Errors are always shown, and bug reports are unaffected by this setting.') },
-    { key: 'DownloadFolder', label: () => NXTK.t('setDownloadFolderLabel', null, 'Browser download folder'), type: 'text', desc: () => NXTK.t('setDownloadFolderDesc', null, 'Subfolder inside your browser Downloads directory for Browser Download mode. Vortex downloads are handled by Vortex and are unaffected.') },
+    { key: 'DownloadFolder', label: () => NXTK.t('setDownloadFolderLabel', null, 'Browser download folder'), type: 'text', desc: () => NXTK.t('setDownloadFolderDesc', null, 'Subfolder inside your browser Downloads directory, used by Browser Download mode. Leave it empty to save straight into Downloads — some mod managers only watch that folder and never look inside subfolders. Vortex downloads are handled by Vortex and are unaffected.') },
     { key: 'RequestTimeout', label: () => NXTK.t('setRequestTimeoutLabel', null, 'Download request timeout'), type: 'number', unit: () => NXTK.t('unitSeconds', null, 'Seconds'), scale: 1000, advanced: true, desc: () => NXTK.t('setRequestTimeoutDesc', null, 'How long the extension waits for Nexus to return a download link before it gives up.') },
     { key: 'CloseTabDelay', label: () => NXTK.t('setCloseTabDelayLabel', null, 'Close-tab delay'), type: 'number', unit: () => NXTK.t('unitSeconds', null, 'Seconds'), scale: 1000, advanced: true, desc: () => NXTK.t('setCloseTabDelayDesc', null, 'Only applies to auto-started Vortex downloads that close their tab. Increase it if Vortex misses links.') },
     {
@@ -2219,6 +2224,89 @@ window.NexusExt = window.NexusExt || {};
     document.body.appendChild(backdrop);
   }
 
+  /* Announces the tab close that follows a Vortex handoff, and lets the user stop it. The page
+     cannot tell whether Vortex actually received the nxm: link, so the close is the one moment
+     where a failed handoff is still recoverable — it must not happen silently. Returns a disposer;
+     calling it dismisses the toast WITHOUT running onCancel, so an internal cancellation is not
+     mistaken for the user pressing the button. */
+  function showCloseCountdown({ ms = 3000, onDone = null, onCancel = null } = {}) {
+    const total = Math.max(1000, Number(ms) || 3000);
+    let remaining = Math.ceil(total / 1000);
+    let finished = false;
+    let ticker = null;
+
+    const toast = document.createElement('div');
+    toast.className = 'nxtk-close-toast';
+    toast.setAttribute('role', 'group');
+    toast.setAttribute('aria-label', NXTK.t('toastSentToVortex', null, 'Sent to Vortex'));
+
+    const copy = document.createElement('div');
+    copy.className = 'nxtk-close-toast-copy';
+
+    /* The live region is the title, which is written once. The countdown beside it is rewritten
+       every second, so it is hidden from assistive tech — announcing the whole toast on each tick
+       is noise, and the Keep open button already carries the action. */
+    const title = document.createElement('strong');
+    title.setAttribute('role', 'status');
+    title.setAttribute('aria-live', 'polite');
+    title.textContent = NXTK.t('toastSentToVortex', null, 'Sent to Vortex');
+
+    const detail = document.createElement('span');
+    detail.setAttribute('aria-hidden', 'true');
+    const renderDetail = () => {
+      detail.textContent = NXTK.tPlural(
+        'toastClosingIn',
+        remaining,
+        `Closing this tab in ${remaining}s`,
+        [String(remaining)]
+      );
+    };
+    renderDetail();
+
+    copy.append(title, detail);
+
+    const keep = document.createElement('button');
+    keep.type = 'button';
+    keep.className = 'nxtk-btn nxtk-btn-secondary nxtk-close-toast-keep';
+    keep.textContent = NXTK.t('toastKeepOpen', null, 'Keep open');
+
+    const bar = document.createElement('span');
+    bar.className = 'nxtk-close-toast-bar';
+    bar.style.setProperty('--nxtk-close-duration', `${total}ms`);
+
+    toast.append(copy, keep, bar);
+
+    const teardown = () => {
+      if (finished) return false;
+      finished = true;
+      clearInterval(ticker);
+      toast.classList.add('is-leaving');
+      setTimeout(() => toast.remove(), 200);
+      return true;
+    };
+
+    keep.addEventListener('click', () => {
+      if (!teardown()) return;
+      try { onCancel?.(); } catch (_) { }
+    });
+
+    ticker = setInterval(() => {
+      remaining -= 1;
+      if (remaining > 0) {
+        renderDetail();
+        return;
+      }
+      if (!teardown()) return;
+      try { onDone?.(); } catch (_) { }
+    }, 1000);
+
+    prepareToolkitSurface(toast);
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('is-visible'));
+
+    return () => { teardown(); };
+  }
+
   window.NexusExt.UI = {
     createSettingsFAB,
     createControlDeck,
@@ -2228,6 +2316,7 @@ window.NexusExt = window.NexusExt || {};
     showSettingsModal,
     showHistoryDecisionModal,
     showError,
+    showCloseCountdown,
     nxtkAlert
   };
 })();

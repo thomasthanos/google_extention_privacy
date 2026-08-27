@@ -17,6 +17,7 @@
     SkipRequirements: true,
     ShowAlertsOnError: true,
     HandleArchivedFiles: true,
+    CloudflareFallback: true,
     HidePremiumUpsells: true,
     DebugLogs: false,
     DownloadFolder: 'NexusMods',
@@ -161,6 +162,47 @@
     }
   }
 
+  const TRIGGER_LABELS = {
+    manual: 'manual (you clicked a download button)',
+    automatic: 'automatic (started by the extension)',
+    collection: 'collection run (queued by the download deck)',
+    fallback: 'Cloudflare fallback (handed back to the native Nexus button)',
+    popup: 'popup action'
+  };
+
+  const METHOD_LABELS = {
+    vortex: 'Vortex handoff (nxm:)',
+    browser: 'browser download',
+    native: 'native Nexus control'
+  };
+
+  let activity = {};
+
+  function setActivity(patch) {
+    if (!patch || typeof patch !== 'object') return;
+    activity = { ...activity, ...patch, at: Date.now() };
+  }
+
+  function clearActivity() {
+    activity = {};
+  }
+
+  function getActivity() {
+    return { ...activity };
+  }
+
+  function describeActivity(source = activity) {
+    if (!source || !source.trigger) return '';
+    const parts = [TRIGGER_LABELS[source.trigger] || String(source.trigger)];
+    if (source.method) parts.push(METHOD_LABELS[source.method] || String(source.method));
+    if (source.fileId) parts.push('file ' + String(source.fileId).slice(0, 12));
+    if (source.attempt) parts.push('attempt ' + source.attempt);
+    if (source.autoClose === true) parts.push('tab auto-close armed');
+    if (source.autoClose === false) parts.push('tab auto-close off');
+    if (source.fallbackActive) parts.push('after a Cloudflare fallback');
+    return parts.join(' · ');
+  }
+
   function recordError(error) {
     const entry = {
       at: Date.now(),
@@ -172,6 +214,8 @@
       stack: sanitizeDiagnosticText(error?.stack, 1500),
       url: typeof location !== 'undefined' && location?.href ? sanitizeUrlForReport(location.href) : ''
     };
+    const action = describeActivity();
+    if (action) entry.action = sanitizeDiagnosticText(action, 200);
     try {
       if (!chrome?.runtime?.id) return;
       chrome.runtime.sendMessage({ type: 'ERROR_LOG_APPEND', payload: { entry } }, () => {
@@ -225,8 +269,9 @@
     const lines = [];
     const status = entry.status ? ` (HTTP ${entry.status})` : '';
     lines.push(`[${new Date(entry.at).toLocaleString('en-GB')}] ${entry.code}${status}`);
+    if (entry.action) lines.push(`    action:  ${sanitizeDiagnosticText(entry.action, 200)}`);
     if (entry.context) lines.push(`    context: ${sanitizeDiagnosticText(entry.context, 300)}`);
-    if (entry.userMessage) lines.push(`    ${entry.userMessage}`);
+    if (entry.userMessage) lines.push(`    ${sanitizeDiagnosticText(entry.userMessage, 300)}`);
     if (entry.technicalMessage) lines.push(`    technical: ${sanitizeDiagnosticText(entry.technicalMessage, 600)}`);
     if (entry.stack) {
       lines.push(`    stack: ${sanitizeDiagnosticText(entry.stack, 1500).split('\n').join('\n           ')}`);
@@ -337,10 +382,12 @@
   function describeCurrentError(currentError, stackLimit = 1500) {
     const lines = ['──────── Current error ────────'];
     lines.push(`Code:      ${currentError.code || 'request_failed'}`);
+    const currentAction = describeActivity(currentError.action ? { trigger: currentError.action } : activity);
+    if (currentAction) lines.push(`Action:    ${currentAction}`);
     if (Number.isInteger(currentError.status)) lines.push(`HTTP:      ${currentError.status}`);
     if (currentError.context) lines.push(`Context:   ${sanitizeDiagnosticText(currentError.context, 300)}`);
-    lines.push(`Message:   ${currentError.userMessage || '(none)'}`);
-    if (currentError.recovery) lines.push(`Recovery:  ${currentError.recovery}`);
+    lines.push(`Message:   ${sanitizeDiagnosticText(currentError.userMessage, 300) || '(none)'}`);
+    if (currentError.recovery) lines.push(`Recovery:  ${sanitizeDiagnosticText(currentError.recovery, 300)}`);
     if (currentError.technicalMessage) {
       lines.push(`Technical: ${sanitizeDiagnosticText(currentError.technicalMessage, 600)}`);
     }
@@ -354,7 +401,7 @@
   function describeSettings(cfg) {
     const lines = ['──────── Settings ────────'];
     for (const [key, value] of Object.entries(cfg)) {
-      let line = `${key}: ${value}`;
+      let line = `${key}: ${sanitizeDiagnosticText(value, 120)}`;
       if (key === 'NDC_downloadMethod') {
         line += value === 0 ? ' (Vortex)' : value === 1 ? ' (Browser)' : '';
       }
@@ -383,6 +430,59 @@
     }
   }
 
+  function readTotalDownloads() {
+    return new Promise((resolve) => {
+      try {
+        if (!chrome?.runtime?.id) {
+          resolve(null);
+          return;
+        }
+        chrome.storage.local.get(TOTAL_DOWNLOADS_KEY, (result) => {
+          if (chrome.runtime.lastError) {
+            resolve(null);
+            return;
+          }
+          const value = Number(result?.[TOTAL_DOWNLOADS_KEY]);
+          resolve(Number.isFinite(value) ? value : 0);
+        });
+      } catch (_) {
+        resolve(null);
+      }
+    });
+  }
+
+  function readFallbackMarker() {
+    try {
+      if (typeof sessionStorage === 'undefined') return null;
+      const raw = sessionStorage.getItem('nxtk_cloudflare_native_fallback');
+      if (!raw) return null;
+      const marker = JSON.parse(raw);
+      const left = Number(marker?.expiresAt) - Date.now();
+      return [
+        marker?.isNMM ? 'Vortex' : 'browser',
+        marker?.fileId ? 'file ' + String(marker.fileId).slice(0, 12) : '',
+        marker?.autoStartPending === false ? 'already handed over' : 'still waiting to hand over',
+        Number.isFinite(left) ? (left > 0 ? Math.round(left / 1000) + 's left' : 'expired') : ''
+      ].filter(Boolean).join(' · ');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function describeSession(errorCount) {
+    const lines = ['──────── Session ────────'];
+    const total = await readTotalDownloads();
+    lines.push(`Downloads counted: ${total === null ? '(unavailable)' : total}`);
+    lines.push(`Errors in log:     ${errorCount}`);
+
+    const action = describeActivity();
+    lines.push(`Last action:       ${action || '(none recorded this page)'}`);
+
+    const marker = readFallbackMarker();
+    lines.push(`Cloudflare fallback: ${marker || 'not active'}`);
+    return lines;
+  }
+
   async function buildBugReport(currentError = null) {
     const cfg = await getStoredSettings();
     const errors = await getErrorLog();
@@ -405,6 +505,9 @@
     }
 
     lines.push('');
+    lines.push(...await describeSession(errors.length));
+
+    lines.push('');
     lines.push(...describeSettings(cfg));
 
     lines.push('');
@@ -419,8 +522,7 @@
 
     lines.push('');
     lines.push('════════ END OF REPORT ════════');
-    const report = lines.join('\n');
-    return sanitizeDiagnosticText(report, report.length);
+    return lines.join('\n');
   }
 
   async function buildCompactBugReport(currentError = null, { maxEntries = 3, stackChars = 300 } = {}) {
@@ -444,6 +546,9 @@
       lines.push('');
       lines.push(...describeCurrentError(currentError, 300));
     }
+
+    lines.push('');
+    lines.push(...await describeSession(errors.length));
 
     lines.push('');
     lines.push(...describeSettings(cfg));
@@ -631,6 +736,10 @@
     validateDownloadTarget,
     isSafeNexusPageUrl,
     recordError,
+    setActivity,
+    clearActivity,
+    getActivity,
+    describeActivity,
     buildBugReport,
     buildReportIssueUrl,
     bumpTotalDownloads,

@@ -1382,10 +1382,6 @@
     "message": "Report copied — GitHub opens prefilled…",
     "description": "Report button state when the report was copied and the form is prefilled."
   },
-  "dlgReportOpeningPrefilled": {
-    "message": "GitHub opens prefilled…",
-    "description": "Report button state when only the shortened report could be sent."
-  },
   "dlgHistoryMarked": {
     "message": "$1 of $2 mods are marked as downloaded.",
     "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
@@ -1458,5 +1454,59 @@
   "speedSourceDefault": {
     "message": "default",
     "description": "Names the speed used in the pause countdown: the stock value."
+  },
+  "helpTitle": {
+    "message": "How does it work?",
+    "description": "Collapsible explainer in the popup."
+  },
+  "helpStep1": {
+    "message": "Open any mod page on Nexus Mods and go to the Files tab.",
+    "description": "Step 1 of the popup explainer."
+  },
+  "helpStep2": {
+    "message": "Press Mod manager download or Manual download as you normally would.",
+    "description": "Step 2 of the popup explainer. \"Mod manager download\" and \"Manual download\" are Nexus Mods button labels and stay in English."
+  },
+  "helpStep3": {
+    "message": "The extension resolves the link in the background and skips the wait, the ad panel and the requirement screens.",
+    "description": "Step 3 of the popup explainer."
+  },
+  "helpSignIn": {
+    "message": "You must be signed in to your Nexus Mods account. Signed out, Nexus answers with a verification page instead of a download link.",
+    "description": "Warning under the popup explainer: downloads need an active Nexus Mods session."
+  },
+  "toastSentToVortex": {
+    "message": "Sent to Vortex",
+    "description": "Title of the toast shown after a Vortex handoff."
+  },
+  "toastKeepOpen": {
+    "message": "Keep open",
+    "description": "Button that cancels the automatic tab close."
+  },
+  "toastClosingIn_one": {
+    "message": "Closing this tab in $1 second",
+    "description": "Plural form \"one\". Countdown before the Vortex handoff tab closes. $1 is the remaining seconds.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastClosingIn_other": {
+    "message": "Closing this tab in $1 seconds",
+    "description": "Countdown before the Vortex handoff tab closes. $1 is the remaining seconds.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "setCloudflareFallbackLabel": {
+    "message": "Cloudflare fallback",
+    "description": "Settings-panel label. \"Cloudflare\" is a product name and stays as-is."
+  },
+  "setCloudflareFallbackDesc": {
+    "message": "When Nexus answers a background download request with a browser verification page, open the file page so you can complete the check, instead of failing. This is why the tab sometimes navigates on its own.",
+    "description": "Settings-panel description. Explains why the tab navigates on its own when Cloudflare challenges a background request."
   }
 }

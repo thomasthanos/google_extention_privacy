@@ -4,6 +4,7 @@
   --nxtk-accent-hover: #f0a352;
   --nxtk-accent-dim: #b87a30;
   --nxtk-accent-soft: rgba(217, 143, 64, 0.18);
+  --nxtk-accent-border: rgba(217, 143, 64, 0.45);
   --nxtk-accent-glow: 0 0 24px rgba(217, 143, 64, 0.35);
   --nxtk-accent-glow-strong: 0 0 40px rgba(217, 143, 64, 0.55);
 
@@ -67,6 +68,7 @@
 
   --nxtk-text: #ececf3;
   --nxtk-text-dim: #8a8a99;
+  --nxtk-text-muted: rgba(236, 234, 242, 0.62);
   --nxtk-text-bright: #ffffff;
 
   --nxtk-danger: #ff5c5c;
@@ -78,6 +80,7 @@
   --nxtk-radius-xs: 10px;
   --nxtk-radius-pill: 999px;
 
+  --nxtk-ease: cubic-bezier(0.32, 0.72, 0, 1);
   --nxtk-transition: all 0.32s cubic-bezier(0.32, 0.72, 0.24, 1);
   --nxtk-transition-fast: all 0.18s cubic-bezier(0.32, 0.72, 0.24, 1);
 

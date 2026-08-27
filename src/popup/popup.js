@@ -280,6 +280,7 @@
     });
 
     document.getElementById('reportBug').addEventListener('click', async () => {
+      NXTK.setActivity({ trigger: 'popup' });
       let issueUrl = NXTK.REPORT_ISSUE_URL;
       let copied = false;
       let complete = false;

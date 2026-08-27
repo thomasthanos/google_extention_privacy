@@ -1249,10 +1249,6 @@
     "message": "Отчёт скопирован — GitHub откроется заполненным…",
     "description": "Report button state when the report was copied and the form is prefilled."
   },
-  "dlgReportOpeningPrefilled": {
-    "message": "GitHub откроется заполненным…",
-    "description": "Report button state when only the shortened report could be sent."
-  },
   "dlgHistoryMarked": {
     "message": "$1 из $2 модов отмечены как загруженные.",
     "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
@@ -1343,5 +1339,64 @@
   "speedSourceDefault": {
     "message": "по умолчанию",
     "description": "Names the speed used in the pause countdown: the stock value."
+  },
+  "helpTitle": {
+    "message": "Как это работает?"
+  },
+  "helpStep1": {
+    "message": "Откройте любую страницу мода на Nexus Mods и перейдите на вкладку Files."
+  },
+  "helpStep2": {
+    "message": "Нажмите Mod manager download или Manual download как обычно."
+  },
+  "helpStep3": {
+    "message": "Расширение получает ссылку в фоне и пропускает ожидание, рекламную панель и экраны требований."
+  },
+  "helpSignIn": {
+    "message": "Нужно войти в свой аккаунт Nexus Mods. Без входа Nexus отвечает страницей проверки вместо ссылки на загрузку."
+  },
+  "toastSentToVortex": {
+    "message": "Отправлено в Vortex"
+  },
+  "toastKeepOpen": {
+    "message": "Оставить открытой"
+  },
+  "toastClosingIn_one": {
+    "message": "Вкладка закроется через $1 секунду",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastClosingIn_few": {
+    "message": "Вкладка закроется через $1 секунды",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastClosingIn_many": {
+    "message": "Вкладка закроется через $1 секунд",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastClosingIn_other": {
+    "message": "Вкладка закроется через $1 секунды",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "setCloudflareFallbackLabel": {
+    "message": "Запасной путь Cloudflare"
+  },
+  "setCloudflareFallbackDesc": {
+    "message": "Когда Nexus отвечает на фоновый запрос загрузки страницей проверки, открывать страницу файла, чтобы вы прошли проверку, вместо ошибки. Поэтому вкладка иногда переходит сама."
   }
 }

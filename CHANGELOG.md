@@ -9,13 +9,99 @@ they are simply not listed.
 
 ## [Unreleased]
 
+## [2.4.5] — 2026-08-27
+
+### Added
+
+- **The Vortex handoff announces itself before closing the tab.** `location.assign('nxm:…')`
+  cannot report whether Vortex received the link — an unregistered protocol handler is
+  indistinguishable from success — so a handoff that went nowhere used to end with the tab
+  closing on its own and nothing downloaded. The close is now a toast with the remaining
+  seconds and a **Keep open** button, which is the last moment a failed handoff is still
+  recoverable. Cancelling also invalidates the attempt, so nothing closes the tab afterwards.
+- **A "How does it work?" panel in the popup**, with the three steps and, more importantly, the
+  sentence that was missing: you have to be signed in to Nexus Mods. Signed out, Nexus answers a
+  download request with a verification page, which the extension could only report as a Cloudflare
+  block — accurate, and useless to the person reading it.
+- **Bug reports now say what the extension was doing.** Every logged error carries the action that
+  produced it — manual (you clicked a button), automatic, a collection run, or the Cloudflare
+  fallback — together with the transfer method, the file id and whether the tab auto-close was
+  armed. A new **Session** block records the download count, the size of the error log, the last
+  action, and whether the page is currently parked in the Cloudflare fallback. "cloudflare 403"
+  was the same line whether the user pressed a button or the extension acted alone; those two
+  fail for different reasons and now read differently.
+- **A Cloudflare fallback setting.** The fallback already ran unconditionally, and the tab
+  navigating on its own is the part of it nobody expects. It now has a switch in the page settings
+  panel that says what it does, and turning it off reports the Cloudflare block instead of moving
+  the tab.
+
 ### Fixed
 
-- When Cloudflare challenges a hidden download request, the single-file flow now hands the action
-  back to Nexus's native download control (or opens the Nexus page for visible verification) and
-  keeps the tab open instead of repeating a request that cannot complete the challenge.
-- A pending Vortex auto-close is now cancelled by a retry, error-path fallback, or page navigation;
-  an older overlapping attempt can no longer close the tab after a newer attempt has failed.
+- **Archived file buttons could be attached to the wrong file.** The archived list matched headers
+  to their download boxes by array index, which assumed the two collections stay the same length
+  and in the same order. One stray box and every file after it received another file's buttons —
+  you press download on one version and get a different one, with nothing on screen to suggest it.
+  Each header now finds its own box through the DOM. There is deliberately no index fallback: a
+  fixture with one header missing its box showed the fallback handing that header the *next* file's
+  box, which is the same defect wearing a safety label. A file whose box cannot be identified gets
+  no buttons, which is recoverable.
+- **The navigation poll no longer runs at full speed on the whole site.** The content script loads
+  on every `nexusmods.com` URL and polled once a second for the lifetime of the tab, including on
+  forums, profiles, search and news where it has nothing to do. It stays at one second on mod and
+  collection pages and while a fallback is in progress, and drops to five seconds elsewhere. The
+  poll cannot be replaced outright: Nexus routes with `pushState` from the page's own world, which
+  a content script in an isolated world cannot observe.
+
+- **The Cloudflare fallback could stop without saying so.** After handing control back to Nexus's
+  own download button, every entry point short-circuits while the fallback is active. If that
+  button never appeared — a layout the selectors do not know, a disabled control, a method
+  mismatch — the retry poll kept looking for it once a second, silently, for as long as the page
+  stayed open: no download, no error, no explanation. The fallback now has a deadline. When it
+  expires the state is cleared, the normal interceptors are restored and the Cloudflare error is
+  shown with its recovery text. A genuine Cloudflare challenge on screen extends the deadline
+  rather than tripping it, up to three minutes, because there the user is being asked to verify
+  and Cloudflare's own interface is visible.
+- **The bug report redacted its own error code.** The report was assembled from individually
+  sanitised fields and then sanitised once more as a whole document — and that final pass cannot
+  tell the report's `Code:` label from a `code=` query parameter, so every report generated from a
+  live error arrived with `Code: [redacted]`. The per-field contract now stands on its own, with
+  `Message:`, `Recovery:` and the settings values sanitised at the point they are built.
+- **Three popup design tokens were never defined.** `--nxtk-text-muted` resolved to nothing in the
+  popup's stylesheet scope, so the status line and two other elements fell back to an inherited
+  colour; `--nxtk-accent-border` and `--nxtk-ease` were missing for the same reason. All three now
+  exist in `popup/nxtk-shared.css` with the values `content/content-styles.css` already used, so
+  the two surfaces agree.
+- The popup header no longer ships a stale hardcoded `v2.4.0` that the script replaced a moment
+  later.
+- **"Report a bug" opened GitHub twice on Firefox, and nothing at all when the tab could not be
+  created.** The content script asked the service worker to open the issue and treated the return
+  value of `chrome.runtime.sendMessage` as a promise. Firefox's `chrome.*` namespace is
+  callback-based and returns `undefined`, so the guard fell through to `window.open` after the
+  background had already opened a tab — two tabs, two half-filled reports. In Chrome the opposite
+  happened: the background answers a failed `tabs.create` with `{ok: false}`, which *resolves*,
+  so `.catch()` never ran and the button did nothing. Both now go through the callback form, which
+  behaves the same in every browser and is the only place the background's own reply is visible.
+- **The "File archive" button had no styling.** It was created with `className = 'nxtk-archive-btn'`,
+  and this extension ships no rule for that class, so the link Nexus users see in place of the
+  hidden footer text rendered as bare underlined text between real buttons. It is now built by the
+  same helper as the archived download links and carries Nexus's own button classes; the class name
+  is kept alongside them as a hook.
+- **The error dialog said a truncated report had gone through.** When a report was too long for the
+  issue URL *and* the clipboard copy failed, the button read "GitHub opens prefilled…" — the same
+  as a successful shortened report, with nothing to say the full text was lost. It now reuses the
+  popup's wording for that outcome, which states it plainly and is already translated everywhere.
+- **Three settings read differently with "Always use English" turned on.** That switch returns the
+  hardcoded fallback string instead of the locale entry, and three had drifted apart: the archived
+  files and auto-close labels, and the download folder description — which in the locale explains
+  that leaving the folder empty saves straight into Downloads, because some mod managers never look
+  inside subfolders. All 104 call sites that carry an English fallback now match their locale
+  entry exactly.
+- **The settings table in the README described a panel that does not exist.** Archived file buttons
+  and the request timeout were listed in the wrong sections, ad hiding was filed under Advanced when
+  it is not, the close-tab delay was folded into another row, and the Cloudflare fallback was absent
+  entirely. The table now lists what the panel actually shows, checked row by row against the
+  grouping rules the panel builds itself from, and the feature list mentions the close countdown
+  and the fallback.
 
 ### Changed
 
@@ -23,6 +109,15 @@ they are simply not listed.
   previously shared this repository now live in their own standalone repositories, each
   with its folder history preserved.
 - Renamed the GitHub repository from `google_extention_privacy` to `nexusmods-bypass`.
+
+### Internal
+
+- The two `toastClosingIn` plural entries declare their `$1` substitution in a `placeholders`
+  block, which the other 39 substituting entries already did. Positional arguments are replaced
+  without it — the block is the context the translated files carry, and it was the only place in
+  the 13 locales where that was missing.
+- `content/errors.js` carried eight LF lines in an otherwise CRLF file. Normalised; every tracked
+  source file is now consistent with itself.
 
 ## [2.4.4] — 2026-08-24
 

@@ -12,6 +12,8 @@
 
   const INIT_RETRY_BASE_MS = 15000;
   const INIT_RETRY_MAX_MS = 5 * 60 * 1000;
+  const ACTIVE_POLL_MS = 1000;
+  const IDLE_POLL_MS = 5000;
 
   function toExtensionError(cause, context) {
     return window.NexusExt.Errors?.fromException
@@ -245,6 +247,10 @@
       if (mutations.every(isExtensionOwnedMutation)) return;
       syncNavigation();
       handleRouteChange();
+      /* An SPA navigation always rewrites the page, so this — not the poll — is what actually
+         notices one. Re-rate here so arriving on a mod page speeds the backstop up immediately
+         instead of on the next idle tick. */
+      syncPollRate();
     });
 
     let observedRoot = null;
@@ -260,14 +266,34 @@
     syncObserverRoot();
     handleRouteChange();
 
-    setInterval(() => {
+    /* Nexus routes with pushState from the page's own world, which a content script in an isolated
+       world cannot observe — hence the poll. It only has to be quick on pages the extension acts
+       on; on the rest of the site (forums, profiles, search, news) a slower beat is enough, and
+       this content script runs on all of them for the whole time a tab is open. */
+    let pollTimer = null;
+    let pollInterval = 0;
+
+    function syncPollRate() {
+      const actionable = NNW.isActionablePage?.() || !!extractRouteDetails(location.pathname);
+      const next = actionable ? ACTIVE_POLL_MS : IDLE_POLL_MS;
+      if (next === pollInterval) return;
+      pollInterval = next;
+      clearInterval(pollTimer);
+      pollTimer = setInterval(tick, next);
+    }
+
+    function tick() {
       syncObserverRoot();
       syncNavigation();
-    }, 1000);
+      syncPollRate();
+    }
+
+    syncPollRate();
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) return;
       syncObserverRoot();
       syncNavigation();
+      syncPollRate();
     });
   }
 

@@ -1131,10 +1131,6 @@
     "message": "Η αναφορά αντιγράφηκε — το GitHub ανοίγει συμπληρωμένο…",
     "description": "Report button state when the report was copied and the form is prefilled."
   },
-  "dlgReportOpeningPrefilled": {
-    "message": "Το GitHub ανοίγει συμπληρωμένο…",
-    "description": "Report button state when only the shortened report could be sent."
-  },
   "dlgHistoryMarked": {
     "message": "$1 από $2 mods είναι σημειωμένα ως ληφθέντα.",
     "description": "History dialog lead. $1 already-downloaded count, $2 total mods.",
@@ -1207,5 +1203,48 @@
   "speedSourceDefault": {
     "message": "προεπιλογή",
     "description": "Names the speed used in the pause countdown: the stock value."
+  },
+  "helpTitle": {
+    "message": "Πώς δουλεύει;"
+  },
+  "helpStep1": {
+    "message": "Άνοιξε οποιαδήποτε σελίδα mod στο Nexus Mods και πήγαινε στην καρτέλα Files."
+  },
+  "helpStep2": {
+    "message": "Πάτα Mod manager download ή Manual download όπως θα έκανες κανονικά."
+  },
+  "helpStep3": {
+    "message": "Η επέκταση βρίσκει τον σύνδεσμο στο παρασκήνιο και προσπερνά την αναμονή, το διαφημιστικό panel και τις οθόνες απαιτήσεων."
+  },
+  "helpSignIn": {
+    "message": "Πρέπει να είσαι συνδεδεμένος στον λογαριασμό σου στο Nexus Mods. Αποσυνδεδεμένος, το Nexus απαντά με σελίδα επαλήθευσης αντί για σύνδεσμο λήψης."
+  },
+  "toastSentToVortex": {
+    "message": "Στάλθηκε στο Vortex"
+  },
+  "toastKeepOpen": {
+    "message": "Κράτα την ανοιχτή"
+  },
+  "toastClosingIn_one": {
+    "message": "Η καρτέλα κλείνει σε $1 δευτερόλεπτο",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastClosingIn_other": {
+    "message": "Η καρτέλα κλείνει σε $1 δευτερόλεπτα",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "setCloudflareFallbackLabel": {
+    "message": "Cloudflare fallback"
+  },
+  "setCloudflareFallbackDesc": {
+    "message": "Όταν το Nexus απαντά σε ένα αίτημα λήψης στο παρασκήνιο με σελίδα επαλήθευσης, να ανοίγει τη σελίδα του αρχείου ώστε να ολοκληρώσεις τον έλεγχο, αντί να αποτυγχάνει. Γι᾽ αυτό η καρτέλα μερικές φορές αλλάζει μόνη της."
   }
 }

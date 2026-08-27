@@ -39,7 +39,12 @@ can pick up where it stopped instead of starting over.
 - **Skip requirement screens** and go straight to the download step.
 - **Archived file buttons** — adds Vortex and browser download buttons back to archived entries that
   Nexus hides.
-- **Auto-close Vortex tabs** after the handoff, with a delay you control.
+- **Auto-close Vortex tabs** after the handoff, with a delay you control. The tab announces the
+  close with a countdown and a **Keep open** button, because nothing can confirm that Vortex
+  actually received the link.
+- **Cloudflare fallback** — when Nexus answers a background request with a verification page, the
+  file page is opened so you can clear the check, rather than the download simply failing. It can
+  be switched off, and it gives up on its own if the page never produces a download control.
 - **Clear error messages** when Nexus fails to return a usable link, instead of a silent dead end.
 
 ### Collection downloader
@@ -108,9 +113,9 @@ Reachable from the popup → **Page settings**. Changes save instantly.
 
 | Group | Settings |
 |---|---|
-| **Download Flow** | Start downloads automatically · Close Vortex tabs (+ delay) · Skip requirement screens · Show error popups |
-| **Files & Pacing** | Archived file buttons · Browser download folder · Download request timeout · Your Nexus download speed · Pause between mods |
-| **Advanced** | Hide ads and Premium panels · Verbose extension logs |
+| **Download Flow** | Start downloads automatically · Close Vortex tabs · Skip requirement screens · Show error popups · Hide ads and Premium panels · Archived file buttons · Cloudflare fallback |
+| **Files & Pacing** | Browser download folder · Your Nexus download speed · Pause between mods |
+| **Advanced** | Verbose extension logs · Download request timeout · Close-tab delay |
 | **Language** | Always use English |
 
 **Restore Defaults** resets everything and refreshes the Nexus page.
