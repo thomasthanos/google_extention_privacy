@@ -312,9 +312,12 @@ window.NexusExt = window.NexusExt || {};
         redirectedToLogin = false;
       }
       const respInfo = describeResponse(finalUrl, response.status, text);
+      const cloudflareMitigation = String(response.headers?.get?.('Cf-Mitigated') || '').trim().toLowerCase();
       const semanticError = redirectedToLogin
         ? create('requires_login', { status: response.status || null, context, technicalMessage: `login signal: redirected to ${safeUrl(finalUrl)} | ${respInfo}` })
-        : classifyContent(text, { status: response.status || null, context, extra: respInfo });
+        : cloudflareMitigation === 'challenge'
+          ? create('cloudflare', { status: response.status || null, context, technicalMessage: `cf-mitigated: challenge | ${respInfo}` })
+          : classifyContent(text, { status: response.status || null, context, extra: respInfo });
       if (semanticError) {
         return {
           ok: false,

@@ -9,6 +9,14 @@ they are simply not listed.
 
 ## [Unreleased]
 
+### Fixed
+
+- When Cloudflare challenges a hidden download request, the single-file flow now hands the action
+  back to Nexus's native download control (or opens the Nexus page for visible verification) and
+  keeps the tab open instead of repeating a request that cannot complete the challenge.
+- A pending Vortex auto-close is now cancelled by a retry, error-path fallback, or page navigation;
+  an older overlapping attempt can no longer close the tab after a newer attempt has failed.
+
 ### Changed
 
 - Promoted NexusMods Bypass to the repository root. The three unrelated extensions that

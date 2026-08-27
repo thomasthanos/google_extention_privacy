@@ -8,8 +8,17 @@ window.NexusExt = window.NexusExt || {};
   let domEnhancementRun = 0;
   let premiumObserver = null;
   let premiumObserverTimer = null;
+  let closeTabTimer = null;
+  let downloadAttemptSequence = 0;
+  let nativeFallbackKey = '';
+  let nativeFallbackIsNMM = null;
+  let nativeFallbackAutoStartPending = false;
+  let nativeFallbackAutoStarted = false;
   const Errors = NexusExt.Errors;
   const Auth = NexusExt.Auth;
+
+  const CLOUDFLARE_FALLBACK_KEY = 'nxtk_cloudflare_native_fallback';
+  const CLOUDFLARE_FALLBACK_TTL_MS = 5 * 60 * 1000;
 
   const LOG_BADGE = 'background:#d98f40;color:#191106;font-weight:700;padding:1px 6px;border-radius:3px';
   const LOG_STYLES = {
@@ -96,6 +105,144 @@ window.NexusExt = window.NexusExt || {};
   const MOD_PAGE_PATTERN = /\/mods\/\d+$/;
   function isModPage() {
     return MOD_PAGE_PATTERN.test(location.pathname);
+  }
+
+  function getModPagePath(value = location.href) {
+    try {
+      const parsed = new URL(value, location.href);
+      const pathname = parsed.pathname.replace(/\/$/, '');
+      if (!MOD_PAGE_PATTERN.test(pathname)) return '';
+      return `${parsed.origin}${pathname}`;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function getCurrentFileId() {
+    try {
+      const fileId = new URLSearchParams(location.search).get('file_id') || '';
+      return /^\d{1,12}$/.test(fileId) ? fileId : '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function getCurrentFileKey() {
+    const modPage = getModPagePath();
+    const fileId = getCurrentFileId();
+    return modPage && fileId ? `${modPage}?file_id=${fileId}` : '';
+  }
+
+  function isCloudflareChallengeDocument() {
+    try {
+      if (/just a moment|attention required|checking your browser|security verification/i.test(document.title || '')) {
+        return true;
+      }
+      if (document.documentElement?.classList?.contains('cf-chl-interstitial')) return true;
+      return !!document.querySelector('#challenge-form');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function clearStoredCloudflareFallback() {
+    try {
+      sessionStorage.removeItem(CLOUDFLARE_FALLBACK_KEY);
+    } catch (_) {
+    }
+  }
+
+  function readStoredCloudflareFallback() {
+    try {
+      const parsed = JSON.parse(sessionStorage.getItem(CLOUDFLARE_FALLBACK_KEY) || 'null');
+      if (!parsed || parsed.expiresAt < Date.now() || !parsed.modPage) {
+        clearStoredCloudflareFallback();
+        return null;
+      }
+      return parsed;
+    } catch (_) {
+      clearStoredCloudflareFallback();
+      return null;
+    }
+  }
+
+  function rememberCloudflareFallback(targetUrl, fileId, isNMM, autoStartPending = cfg.AutoStartDownload) {
+    try {
+      const target = new URL(targetUrl, location.href);
+      const modPage = getModPagePath(target.href) || getModPagePath(location.href);
+      if (!modPage) return;
+      const targetFileId = target.searchParams.get('file_id');
+      const expectedFileId = /^\d{1,12}$/.test(targetFileId || '')
+        ? targetFileId
+        : getModPagePath(target.href) && /^\d{1,12}$/.test(String(fileId || ''))
+          ? String(fileId)
+          : '';
+      sessionStorage.setItem(CLOUDFLARE_FALLBACK_KEY, JSON.stringify({
+        modPage,
+        fileId: expectedFileId,
+        isNMM: !!isNMM,
+        autoStartPending: !!autoStartPending,
+        expiresAt: Date.now() + CLOUDFLARE_FALLBACK_TTL_MS
+      }));
+    } catch (_) {
+    }
+  }
+
+  function setStoredCloudflareAutoStartPending(pending) {
+    nativeFallbackAutoStartPending = !!pending;
+    try {
+      const marker = readStoredCloudflareFallback();
+      if (!marker) return;
+      marker.autoStartPending = !!pending;
+      sessionStorage.setItem(CLOUDFLARE_FALLBACK_KEY, JSON.stringify(marker));
+    } catch (_) {
+    }
+  }
+
+  function syncNativeFallbackState() {
+    const currentKey = getCurrentFileKey();
+    if (nativeFallbackKey && nativeFallbackKey === currentKey) return true;
+
+    nativeFallbackKey = '';
+    nativeFallbackIsNMM = null;
+    nativeFallbackAutoStartPending = false;
+    nativeFallbackAutoStarted = false;
+    const marker = readStoredCloudflareFallback();
+    if (!marker || !currentKey) return false;
+
+    const modPage = getModPagePath();
+    const fileId = getCurrentFileId();
+    if (marker.modPage !== modPage || (marker.fileId && marker.fileId !== fileId)) {
+      clearStoredCloudflareFallback();
+      return false;
+    }
+
+    nativeFallbackKey = currentKey;
+    nativeFallbackIsNMM = typeof marker.isNMM === 'boolean' ? marker.isNMM : null;
+    nativeFallbackAutoStartPending = marker.autoStartPending !== false;
+    return true;
+  }
+
+  function isNativeFallbackActive() {
+    const currentKey = getCurrentFileKey();
+    return !!currentKey && nativeFallbackKey === currentKey;
+  }
+
+  function cancelScheduledTabClose() {
+    if (closeTabTimer === null) return;
+    clearTimeout(closeTabTimer);
+    closeTabTimer = null;
+  }
+
+  function beginDownloadAttempt() {
+    cancelScheduledTabClose();
+    downloadAttemptSequence += 1;
+    return downloadAttemptSequence;
+  }
+
+  function invalidateDownloadAttempts() {
+    cancelScheduledTabClose();
+    downloadAttemptSequence += 1;
   }
 
   function waitForDomSettled({ root = document.getElementById('mainContent') || document.body, quietMs = 500, timeoutMs = 4000 } = {}) {
@@ -486,6 +633,13 @@ window.NexusExt = window.NexusExt || {};
 
   function setButtonState(button, state, message) {
     const textElement = button.querySelector('span.flex-label, span') || button;
+    if (!button._nxtkOriginalButtonState) {
+      button._nxtkOriginalButtonState = {
+        textElement,
+        text: textElement.innerText,
+        color: button.style.color
+      };
+    }
     const stateConfig = {
       waiting: { text: message || NXTK.t('btnStatePleaseWait', null, 'Please Wait...'), color: 'orange' },
       downloading: { text: NXTK.t('btnStateDownloading', null, 'Downloading!'), color: '#3dbb5e' },
@@ -494,6 +648,14 @@ window.NexusExt = window.NexusExt || {};
     const config = stateConfig[state] || stateConfig.error;
     textElement.innerText = config.text;
     button.style.color = config.color;
+  }
+
+  function restoreButtonState(button) {
+    const original = button?._nxtkOriginalButtonState;
+    if (!original) return;
+    if (original.textElement?.isConnected) original.textElement.innerText = original.text;
+    button.style.color = original.color;
+    delete button._nxtkOriginalButtonState;
   }
 
   function inferBrowserDownloadName(url, fileId) {
@@ -540,6 +702,78 @@ window.NexusExt = window.NexusExt || {};
     }
   }
 
+  function getCurrentNativeDownloadHost(fileId = getCurrentFileId(), isNMM = null) {
+    const expectedFileId = String(fileId || '');
+    const hosts = getSearchRoots(document)
+      .flatMap((root) => Array.from(root.querySelectorAll('mod-file-download[file-id]')))
+      .filter((element) => element.getAttribute('file-id') === expectedFileId);
+    if (typeof isNMM !== 'boolean') return hosts[0] || null;
+    return hosts.find((element) => element.getAttribute('is-nmm-download') === String(isNMM))
+      || hosts[0]
+      || null;
+  }
+
+  function currentNativeMethodMatches(isNMM, fileId) {
+    const host = getCurrentNativeDownloadHost(fileId, !!isNMM);
+    const method = host?.getAttribute('is-nmm-download');
+    if (method === 'true' || method === 'false') return (method === 'true') === !!isNMM;
+    try {
+      return new URLSearchParams(location.search).has('nmm') === !!isNMM;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function enableNativeFallbackForCurrentFile(fileId, isNMM, button = null) {
+    const currentFileId = getCurrentFileId();
+    const currentKey = getCurrentFileKey();
+    if (!currentKey || (fileId && String(fileId) !== currentFileId)
+      || !currentNativeMethodMatches(isNMM, currentFileId)) return false;
+
+    cancelScheduledTabClose();
+    const shouldAutoStart = !!button || !!cfg.AutoStartDownload;
+    rememberCloudflareFallback(location.href, currentFileId, isNMM, shouldAutoStart);
+    nativeFallbackKey = currentKey;
+    nativeFallbackIsNMM = !!isNMM;
+    nativeFallbackAutoStartPending = shouldAutoStart;
+    nativeFallbackAutoStarted = false;
+    restoreButtonState(button);
+    Logger.warn('Cloudflare blocked the extension request; using the native Nexus download control.');
+    syncSlowDownloadIntercept();
+    return true;
+  }
+
+  function activateCloudflareFallback({ button = null, fileId, isNMM, href } = {}) {
+    let target;
+    try {
+      target = new URL(href || location.href, location.href);
+      if (isNMM) target.searchParams.set('nmm', '1');
+    } catch (_) {
+      return false;
+    }
+
+    if (!NXTK.isSafeNexusPageUrl(target.href) || target.hostname !== location.hostname) return false;
+
+    const currentModPage = getModPagePath(location.href);
+    const targetModPage = getModPagePath(target.href);
+    const targetFileId = target.searchParams.get('file_id') || '';
+    const currentFileId = getCurrentFileId();
+    if (currentModPage && targetModPage === currentModPage && currentFileId
+      && (!targetFileId || targetFileId === currentFileId)
+      && enableNativeFallbackForCurrentFile(fileId || currentFileId, isNMM, button)) {
+      return true;
+    }
+
+    rememberCloudflareFallback(target.href, fileId, isNMM, !!button || !!cfg.AutoStartDownload);
+    invalidateDownloadAttempts();
+    if (button) {
+      setButtonState(button, 'waiting', NXTK.t('btnStateOpeningPage', null, 'Opening file page...'));
+    }
+    Logger.warn('Cloudflare blocked the extension request; opening the Nexus page for verification.');
+    location.assign(target.href);
+    return true;
+  }
+
   function handleError(btn, error, { onRetry = null } = {}) {
     const normalized = Errors.normalize(error);
     const shown = Errors.displayText ? Errors.displayText(normalized) : {
@@ -567,6 +801,7 @@ window.NexusExt = window.NexusExt || {};
       openFilePageOnNoUrl = false,
       closeTabAfterStart = false
     } = options;
+    const attemptId = beginDownloadAttempt();
 
     const loginError = Auth?.getDocumentLoginError?.(document, 'Starting download');
     if (loginError) {
@@ -583,10 +818,13 @@ window.NexusExt = window.NexusExt || {};
     } catch (cause) {
       result = { url: null, error: Errors.fromException(cause, { context: 'Resolving download link' }) };
     }
-
     let error = result?.error || (!result?.url ? Errors.create(isNMM ? 'no_nmm_link' : 'no_download_url') : null);
     if (error) {
       error = Errors.normalize(error);
+      if (error.code === 'cloudflare') {
+        if (attemptId !== downloadAttemptSequence) return false;
+        if (activateCloudflareFallback({ button, fileId, isNMM, href })) return false;
+      }
       const shouldOpenFilePage = openFilePageOnNoUrl && !isNMM && href
         && error.code === 'no_download_url' && isDifferentPage(href);
       if (shouldOpenFilePage) {
@@ -615,7 +853,6 @@ window.NexusExt = window.NexusExt || {};
       });
       return false;
     }
-
     if (!finalUrl) {
       handleError(button, Errors.create(isNMM ? 'no_nmm_link' : 'no_download_url'), {
         onRetry: () => runDownload(options)
@@ -632,7 +869,6 @@ window.NexusExt = window.NexusExt || {};
       handleError(button, unsafe);
       return false;
     }
-
     if (isNMM) {
       location.assign(finalUrl);
     } else if (!await startManagedFileDownload(finalUrl, fileId)) {
@@ -642,11 +878,15 @@ window.NexusExt = window.NexusExt || {};
       }), { onRetry: () => runDownload(options) });
       return false;
     }
-
     globalThis.NXTK?.bumpTotalDownloads?.();
-    if (closeTabAfterStart && cfg.AutoCloseTab && isNMM) {
-      const closeDelay = Math.min(Math.max(Number(cfg.CloseTabDelay) || 2000, 0), 60000);
-      setTimeout(() => safeSendMessage({ type: 'CLOSE_TAB' }), closeDelay);
+    if (closeTabAfterStart && cfg.AutoCloseTab && isNMM && attemptId === downloadAttemptSequence) {
+      const configuredDelay = Number(cfg.CloseTabDelay);
+      const closeDelay = Math.min(Math.max(Number.isFinite(configuredDelay) ? configuredDelay : 2000, 0), 60000);
+      closeTabTimer = setTimeout(() => {
+        closeTabTimer = null;
+        if (attemptId !== downloadAttemptSequence) return;
+        safeSendMessage({ type: 'CLOSE_TAB' });
+      }, closeDelay);
     }
     return true;
   }
@@ -678,6 +918,7 @@ window.NexusExt = window.NexusExt || {};
 
     document.body.addEventListener('click', async function (event) {
       if (!isModPage()) return;
+      if (isNativeFallbackActive()) return;
 
       if (cfg.SkipRequirements && event.composedPath) {
         const path = event.composedPath();
@@ -741,7 +982,7 @@ window.NexusExt = window.NexusExt || {};
     return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
   }
 
-  const SHADOW_HOST_SELECTOR = 'mod-file-download, download-modal';
+  const SHADOW_HOST_SELECTOR = 'mod-file-download, mod-download-modal, download-modal';
 
   function getSearchRoots(root = document) {
     const roots = [root];
@@ -764,8 +1005,9 @@ window.NexusExt = window.NexusExt || {};
     return roots;
   }
 
-  function findSlowDownloadButtons(root) {
-    const buttons = Array.from(root.querySelectorAll('button:not([data-nxtk-slow-bound])'));
+  function findSlowDownloadButtons(root, { includeBound = false } = {}) {
+    const selector = includeBound ? 'button' : 'button:not([data-nxtk-slow-bound])';
+    const buttons = Array.from(root.querySelectorAll(selector));
     return buttons.filter((button) => {
       const buttonText = normalizeText(button.textContent);
       if (!buttonText.includes('slow download')) return false;
@@ -777,6 +1019,39 @@ window.NexusExt = window.NexusExt || {};
         || cardText.includes('delay before each download')
         || cardText.includes('throttled downloads')
       );
+    });
+  }
+
+  function startNativeFallbackIfReady() {
+    if (!isNativeFallbackActive() || !nativeFallbackAutoStartPending
+      || nativeFallbackAutoStarted) return;
+    if (isCloudflareChallengeDocument()) return;
+
+    const fileId = getCurrentFileId();
+    if (typeof nativeFallbackIsNMM === 'boolean'
+      && !currentNativeMethodMatches(nativeFallbackIsNMM, fileId)) return;
+
+    const host = getCurrentNativeDownloadHost(fileId, nativeFallbackIsNMM);
+    const roots = host?.shadowRoot ? getSearchRoots(host.shadowRoot) : getSearchRoots(document);
+    const button = host?.shadowRoot?.querySelector('#slowDownloadButton')
+      || roots.flatMap((root) => Array.from(root.querySelectorAll(
+        '#slowDownloadButton, button[data-nxtk-slow-bound]'
+      )))[0]
+      || roots
+        .flatMap((root) => findSlowDownloadButtons(root, { includeBound: true }))[0];
+    if (!button || button.disabled) return;
+
+    nativeFallbackAutoStarted = true;
+    setStoredCloudflareAutoStartPending(false);
+    restoreButtonState(button);
+    Logger.info('Starting the native Nexus download after the Cloudflare fallback.');
+    Promise.resolve().then(() => {
+      if (!isNativeFallbackActive() || !button.isConnected) return;
+      button.click();
+    }).catch((cause) => {
+      nativeFallbackAutoStarted = false;
+      setStoredCloudflareAutoStartPending(true);
+      Logger.warn('Could not start the native Nexus download:', cause);
     });
   }
 
@@ -797,12 +1072,18 @@ window.NexusExt = window.NexusExt || {};
   }
 
   function setupSlowDownloadIntercept() {
+    if (isNativeFallbackActive()) {
+      startNativeFallbackIfReady();
+      return;
+    }
+
     const roots = getSearchRoots(document);
     for (const root of roots) {
       const slowDownloadButtons = findSlowDownloadButtons(root);
       for (const slowDownloadBtn of slowDownloadButtons) {
         slowDownloadBtn.dataset.nxtkSlowBound = '1';
         slowDownloadBtn.addEventListener('click', (event) => {
+          if (isNativeFallbackActive()) return;
           handleSlowDownloadClick(slowDownloadBtn, event)
             .catch((cause) => handleError(
               slowDownloadBtn,
@@ -862,10 +1143,15 @@ window.NexusExt = window.NexusExt || {};
 
   async function autoStartDownload() {
     if (!cfg.AutoStartDownload) return;
+    if (isCloudflareChallengeDocument()) return;
     if (!isModPage()) return;
     const params = new URLSearchParams(location.search);
     const fileId = params.get('file_id');
     if (!fileId) return;
+    if (isNativeFallbackActive()) {
+      startNativeFallbackIfReady();
+      return;
+    }
     const autoStartKey = location.origin + location.pathname + location.search;
     if (lastAutoStartHref === autoStartKey) return;
     lastAutoStartHref = autoStartKey;
@@ -1214,11 +1500,17 @@ window.NexusExt = window.NexusExt || {};
   async function init() {
     cfg = await NexusExt.Storage.getSettings();
     NXTK.setForceEnglish(cfg.ForceEnglish);
+    syncNativeFallbackState();
     if (!listenersAttached) {
       attachClickInterceptor();
       interceptRequirementsTab();
       watchStoredSettings();
       listenersAttached = true;
+    }
+    if (isCloudflareChallengeDocument()) {
+      Logger.info('Cloudflare verification page detected; automatic actions are paused.');
+      syncSlowDownloadIntercept();
+      return;
     }
     syncSlowDownloadIntercept();
     scheduleDomEnhancements();
@@ -1227,9 +1519,15 @@ window.NexusExt = window.NexusExt || {};
   }
 
   async function onNavigate() {
+    invalidateDownloadAttempts();
     cfg = await NexusExt.Storage.getSettings();
+    syncNativeFallbackState();
     cancelArchivedFooterWait?.();
     cancelArchivedFooterWait = null;
+    if (isCloudflareChallengeDocument()) {
+      syncSlowDownloadIntercept();
+      return;
+    }
     syncSlowDownloadIntercept();
     scheduleDomEnhancements();
     startAutoDownload();
@@ -1249,6 +1547,9 @@ window.NexusExt = window.NexusExt || {};
     const previousCfg = { ...cfg };
     cfg = { ...(NexusExt.Storage?.DEFAULTS || {}), ...(newCfg || {}) };
     NXTK.setForceEnglish(cfg.ForceEnglish);
+
+    if (!cfg.AutoCloseTab) cancelScheduledTabClose();
+    if (isNativeFallbackActive()) startNativeFallbackIfReady();
 
     if (!cfg.HidePremiumUpsells && previousCfg.HidePremiumUpsells) {
       resetUpsellBlocker();
