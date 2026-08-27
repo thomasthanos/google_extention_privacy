@@ -79,9 +79,9 @@ switch for when your browser language and your Nexus language disagree.
 
 The recommended and easiest way to install NexusMods Bypass is directly through your browser's official store:
 
-- <img src=".github/assets/cmd-chrome-extensions.svg" width="16" align="middle"> **[Chrome Web Store](https://chrome.google.com/webstore)** *(Link pending)*
-- <img src=".github/assets/cmd-edge-extensions.svg" width="16" align="middle"> **[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons)** *(Link pending)*
-- <img src=".github/assets/icon-globe.svg" width="16" align="middle"> **[Firefox Add-ons (AMO)](https://addons.mozilla.org/)** *(Link pending)*
+- <img src=".github/assets/cmd-chrome-extensions.svg" width="16" align="middle"> **[Chrome Web Store](https://chromewebstore.google.com/detail/nexusmods-bypass/chfghiknjhpcncpcjopglefnckckdlpj)**
+- <img src=".github/assets/cmd-edge-extensions.svg" width="16" align="middle"> **[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/nexusmods-bypass/hcjpcnajmkanhodhpkoinodjbkeolgaa)**
+- <img src=".github/assets/icon-globe.svg" width="16" align="middle"> **[Firefox Add-ons (AMO)](https://addons.mozilla.org/en-US/firefox/addon/nexusmods-bypass/)**
 
 <details>
 <summary><b>Manual Installation (Developer Mode)</b></summary>
