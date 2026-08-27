@@ -127,6 +127,75 @@ html, body {
   margin-bottom: 12px;
 }
 
+/* ── Tab bar ─────────────────────────────────── */
+.popup-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-bottom: 12px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.popup-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--nxtk-text-dim);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+  white-space: nowrap;
+}
+
+.popup-tab svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  fill: currentColor;
+  transition: fill 0.18s ease;
+}
+
+.popup-tab:hover:not(.is-active) {
+  color: var(--nxtk-text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.popup-tab.is-active {
+  color: var(--nxtk-text-bright);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    inset 0 -1px 0 rgba(0,0,0,0.25),
+    inset 0 0 0 1px rgba(217,143,64,0.20),
+    0 2px 8px rgba(0,0,0,0.18);
+}
+
+/* ── Tab panels ──────────────────────────────── */
+.popup-tab-panel[hidden] { display: none; }
+
+.popup-tab-panel.is-active {
+  animation: panel-enter 0.22s cubic-bezier(0.32, 0.72, 0.24, 1) both;
+}
+
+@keyframes panel-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .popup-section-title {
   font-size: 10px;
   font-weight: 700;
@@ -192,6 +261,28 @@ html, body {
 .popup-actions {
   margin-bottom: 10px;
 }
+
+.popup-bug-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  color: var(--nxtk-text-muted);
+  letter-spacing: .015em;
+  text-transform: none;
+  font-size: 12px;
+}
+.popup-bug-btn svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  fill: currentColor;
+}
+.popup-bug-btn:hover,
+.popup-bug-btn:focus-visible { color: var(--nxtk-text-bright); }
 
 .popup-actions-grid {
   display: grid;
@@ -569,42 +660,117 @@ html, body {
   box-shadow: 0 0 8px rgba(77, 219, 120, 0.45);
 }
 
-.support-primary {
-  width: 100%;
-  min-height: 62px;
-  justify-content: flex-start;
-  padding: 9px 13px;
-  border-radius: 17px;
-  text-align: left;
-  text-transform: none;
-  letter-spacing: 0;
+/* ── Donate grid (replaces Ko-fi primary) ─── */
+.support-donate-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 4px;
 }
 
-.support-primary-icon {
+.support-donate-btn {
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 14px;
+  color: var(--nxtk-text);
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.22),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.support-donate-btn:hover,
+.support-donate-btn:focus-visible {
+  outline: none;
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10),
+    0 6px 16px rgba(0, 0, 0, 0.22);
+}
+
+.support-donate-icon {
   width: 34px;
   height: 34px;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  border-radius: 11px;
-  background: rgba(71, 35, 11, 0.20);
+  border-radius: 10px;
+}
+
+.support-donate-icon svg {
+  width: 17px;
+  height: 17px;
+  fill: #fff;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+}
+
+/* GitHub — dark */
+.support-donate-icon--github {
+  background: linear-gradient(145deg, #3a3a4a, #24292e);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.20),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    0 4px 10px rgba(0,0,0,0.35);
 }
 
-.support-primary-icon svg {
-  width: 16px;
-  height: 16px;
+/* PayPal — blue */
+.support-donate-icon--paypal {
+  background: linear-gradient(145deg, #009cde, #003087);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.25),
+    0 4px 10px rgba(0, 112, 200, 0.40);
 }
 
-.support-primary-copy {
+/* Revolut — slate-purple */
+.support-donate-icon--revolut {
+  background: linear-gradient(145deg, #7c3fe4, #191c2e);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.20),
+    0 4px 10px rgba(100, 50, 200, 0.40);
+}
+
+.support-donate-copy {
+  flex: 1;
   min-width: 0;
   display: flex;
-  flex: 1;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
+
+.support-donate-copy strong {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--nxtk-text-bright);
+  line-height: 1.1;
+}
+
+.support-donate-copy small {
+  font-size: 10px;
+  color: var(--nxtk-text-dim);
+  line-height: 1.2;
+}
+
+.support-donate-btn .support-external {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  fill: var(--nxtk-text-dim);
+  opacity: 0.5;
+  transition: opacity 0.18s ease;
+}
+
+.support-donate-btn:hover .support-external { opacity: 0.9; }
 
 .support-primary-copy strong {
   font-size: 12.5px;

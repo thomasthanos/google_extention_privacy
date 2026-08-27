@@ -9,9 +9,23 @@
 <body>
   <main class="wrap">
     <header class="hero">
-      <img class="hero-icon" src="../icons/icon128.png" alt="" width="72" height="72">
+      <img class="hero-icon" src="../icons/icon128.png" alt="" width="64" height="64">
       <h1 data-i18n="welcomeTitle">NexusMods Bypass is ready!</h1>
       <p class="hero-sub" data-i18n="welcomeSubtitle">Download Nexus Mods files and whole collections with less clicking — queued, paced and resumable.</p>
+      <div class="badges">
+        <span class="badge">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+          Installed &amp; active
+        </span>
+        <span class="badge">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.4 8.3 8 9 4.6-.7 8-4 8-9V6l-8-3Z"/></svg>
+          Privacy-first
+        </span>
+        <span class="badge">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6 2 12l6 6"/><path d="m16 6 6 6-6 6"/></svg>
+          Open source
+        </span>
+      </div>
     </header>
 
     <section class="steps">
@@ -35,7 +49,7 @@
           <span class="step-num">3</span>
           <div>
             <strong data-i18n="step3Title">Tune it your way</strong>
-            <p data-i18n="step3Text">Click the extension icon for quick toggles, or the ⚙ button on any Nexus page for full settings.</p>
+            <p data-i18n="step3Text">Click the extension icon for quick toggles, or the settings button on any Nexus page for full settings.</p>
           </div>
         </li>
       </ol>
@@ -43,27 +57,42 @@
 
     <section class="cards">
       <div class="card">
-        <h3 data-i18n="privacyCardTitle">🔒 Private by design</h3>
+        <span class="card-icon" aria-hidden="true">
+          <svg class="ico" viewBox="0 0 24 24"><rect x="4" y="10.5" width="16" height="10" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>
+        </span>
+        <h3 data-i18n="privacyCardTitle">Private by design</h3>
         <p data-i18n="privacyCardText">No analytics, no accounts, no external servers. Everything stays in your browser.</p>
       </div>
       <div class="card">
-        <h3 data-i18n="bugCardTitle">🐛 Something broke?</h3>
+        <span class="card-icon" aria-hidden="true">
+          <svg class="ico" viewBox="0 0 24 24"><rect x="8" y="7" width="8" height="12" rx="4"/><path d="M4 11h4M16 11h4M4.8 16.5 8 15M19.2 16.5 16 15M5.5 6.5 8.6 8.4M18.5 6.5 15.4 8.4M12 7V4"/></svg>
+        </span>
+        <h3 data-i18n="bugCardTitle">Something broke?</h3>
         <p data-i18n="bugCardText">Every "Report a bug" button copies a full diagnostic report and opens a prefilled GitHub issue.</p>
       </div>
       <div class="card">
-        <h3 data-i18n="starCardTitle">⭐ Enjoying it?</h3>
+        <span class="card-icon" aria-hidden="true">
+          <svg class="ico" viewBox="0 0 24 24"><path d="m12 4 2.5 5.1 5.5.8-4 3.9.9 5.6-4.9-2.6-4.9 2.6.9-5.6-4-3.9 5.5-.8L12 4Z"/></svg>
+        </span>
+        <h3 data-i18n="starCardTitle">Enjoying it?</h3>
         <p data-i18n="starCardText">A star on GitHub helps more modders find the extension.</p>
       </div>
     </section>
 
     <footer class="actions">
-      <a class="btn btn-primary" href="https://www.nexusmods.com" target="_blank" rel="noopener noreferrer" data-i18n="openNexusBtn">Open Nexus Mods</a>
-      <a class="btn btn-secondary" href="https://github.com/thomasthanos/nexusmods-bypass" target="_blank" rel="noopener noreferrer" data-i18n="starBtn">Star on GitHub</a>
+      <a class="btn btn-primary" href="https://www.nexusmods.com" target="_blank" rel="noopener noreferrer">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+        <span data-i18n="openNexusBtn">Open Nexus Mods</span>
+      </a>
+      <a class="btn btn-secondary" href="https://github.com/thomasthanos/nexusmods-bypass" target="_blank" rel="noopener noreferrer">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 4 2.5 5.1 5.5.8-4 3.9.9 5.6-4.9-2.6-4.9 2.6.9-5.6-4-3.9 5.5-.8L12 4Z"/></svg>
+        <span data-i18n="starBtn">Star on GitHub</span>
+      </a>
     </footer>
 
     <p class="disclaimer" data-i18n="disclaimer">Not affiliated with Nexus Mods. You need your own Nexus Mods account; premium-only content stays premium-only.</p>
   </main>
   <script src="../shared.js"></script>
   <script src="welcome.js"></script>
-</body>
+<script src="/__l5e/lovable.js" type="module"></script></body>
 </html>

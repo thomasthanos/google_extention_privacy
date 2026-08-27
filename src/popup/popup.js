@@ -2,7 +2,9 @@
   'use strict';
 
   const PROJECT_URL = NXTK.GITHUB_REPO_URL;
-  const SUPPORT_URL = 'https://ko-fi.com/thomasth';
+  const GITHUB_SPONSOR_URL = 'https://github.com/sponsors/thomasthanos';
+  const PAYPAL_URL = 'https://paypal.me/Thomasthanos';
+  const REVOLUT_URL = 'https://revolut.me/thomas2873';
   let supportViewOpen = false;
 
   function getRuntimeError() {
@@ -89,14 +91,6 @@
     status.hidden = !message;
   }
 
-  function isTrustedSupportUrl(value) {
-    try {
-      const url = new URL(value);
-      return url.protocol === 'https:' && (url.hostname === 'ko-fi.com' || url.hostname === 'www.ko-fi.com');
-    } catch (_) {
-      return false;
-    }
-  }
 
   function setSupportView(open) {
     const main = document.getElementById('popupMainView');
@@ -136,28 +130,6 @@
     trigger.focus({ preventScroll: true });
   }
 
-  function configureSupportAction() {
-    const button = document.getElementById('supportPrimary');
-    if (!button) return;
-
-    if (isTrustedSupportUrl(SUPPORT_URL)) {
-      button.addEventListener('click', () => createTab(SUPPORT_URL));
-      return;
-    }
-
-    button.disabled = true;
-    button.setAttribute('aria-disabled', 'true');
-    const title = button.querySelector('[data-i18n="supportPrimary"]');
-    const hint = button.querySelector('[data-i18n="supportPrimaryHint"]');
-    if (title) {
-      title.dataset.i18n = 'supportPrimaryPending';
-      title.textContent = NXTK.t('supportPrimaryPending', null, 'Ko-fi page coming soon');
-    }
-    if (hint) {
-      hint.dataset.i18n = 'supportPrimaryPendingHint';
-      hint.textContent = NXTK.t('supportPrimaryPendingHint', null, 'Secure support is being connected');
-    }
-  }
 
   function maybeShowRatingPrompt() {
     try {
@@ -194,6 +166,27 @@
     });
   }
 
+  function switchTab(tabId) {
+    const tabs = document.querySelectorAll('.popup-tab');
+    const panels = document.querySelectorAll('.popup-tab-panel');
+
+    tabs.forEach(t => {
+      const active = t.id === tabId;
+      t.classList.toggle('is-active', active);
+      t.setAttribute('aria-selected', String(active));
+    });
+
+    panels.forEach(p => {
+      const panelId = 'panel' + tabId.replace('tab', '');
+      const active = p.id === panelId;
+      p.classList.remove('is-active');
+      p.hidden = !active;
+      if (active) {
+        requestAnimationFrame(() => p.classList.add('is-active'));
+      }
+    });
+  }
+
   async function init() {
     const cfg = await getSettings();
     NXTK.setForceEnglish(cfg.ForceEnglish);
@@ -201,6 +194,9 @@
 
     const versionEl = document.querySelector('.popup-version');
     if (versionEl) versionEl.textContent = `v${chrome.runtime.getManifest().version}`;
+
+    document.getElementById('tabControls')?.addEventListener('click', () => switchTab('tabControls'));
+    document.getElementById('tabHelp')?.addEventListener('click', () => switchTab('tabHelp'));
 
     document.querySelectorAll('[data-key]').forEach(input => {
       const key = input.dataset.key;
@@ -303,7 +299,10 @@
       setTimeout(() => createTab(issueUrl), 600);
     });
 
-    configureSupportAction();
+    document.getElementById('supportGithubSponsor')?.addEventListener('click', () => createTab(GITHUB_SPONSOR_URL));
+    document.getElementById('supportPaypal')?.addEventListener('click', () => createTab(PAYPAL_URL));
+    document.getElementById('supportRevolut')?.addEventListener('click', () => createTab(REVOLUT_URL));
+
     bindPressFeedback();
     maybeShowRatingPrompt();
   }

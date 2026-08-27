@@ -25,77 +25,99 @@
         </div>
       </div>
 
-      <div class="popup-section">
-        <div class="popup-section-title" data-i18n="sectionQuickControls">Quick Controls</div>
-
-        <label class="popup-toggle-row nxtk-stagger-1">
-          <span class="nxtk-toggle">
-            <input type="checkbox" data-key="AutoStartDownload">
-            <span class="nxtk-toggle-track"></span>
-          </span>
-          <span class="popup-toggle-text" data-i18n="toggleAutoStart">Start downloads automatically</span>
-        </label>
-
-        <label class="popup-toggle-row nxtk-stagger-2">
-          <span class="nxtk-toggle">
-            <input type="checkbox" data-key="SkipRequirements">
-            <span class="nxtk-toggle-track"></span>
-          </span>
-          <span class="popup-toggle-text" data-i18n="toggleSkipReq">Skip requirement screens</span>
-        </label>
-
-        <label class="popup-toggle-row nxtk-stagger-3">
-          <span class="nxtk-toggle">
-            <input type="checkbox" data-key="HidePremiumUpsells">
-            <span class="nxtk-toggle-track"></span>
-          </span>
-          <span class="popup-toggle-text" data-i18n="toggleHideUpsells">Hide ads and premium panels</span>
-        </label>
-
-        <label class="popup-toggle-row nxtk-stagger-4">
-          <span class="nxtk-toggle">
-            <input type="checkbox" data-key="ForceEnglish">
-            <span class="nxtk-toggle-track"></span>
-          </span>
-          <span class="popup-toggle-text" data-i18n="setForceEnglishLabel">Always use English</span>
-        </label>
-
+      <!-- Tab Bar -->
+      <div class="popup-tabs" role="tablist" aria-label="Sections">
+        <button class="popup-tab is-active" id="tabControls" role="tab" aria-selected="true" aria-controls="panelControls">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
+          <span data-i18n="tabControls">Controls</span>
+        </button>
+        <button class="popup-tab" id="tabHelp" role="tab" aria-selected="false" aria-controls="panelHelp">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18h2v-2h-2v2Zm1-16A10 10 0 1 0 22 12 10 10 0 0 0 12 2Zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8ZM12 6a4 4 0 0 0-4 4h2a2 2 0 1 1 4 0c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5a4 4 0 0 0-4-4Z"/></svg>
+          <span data-i18n="tabHelp">Help &amp; Bugs</span>
+        </button>
       </div>
 
-      <div class="popup-actions nxtk-stagger-5">
-        <div class="popup-actions-grid">
-          <button class="popup-btn nxtk-btn nxtk-btn-primary" id="openSettings" data-i18n="btnPageSettings">Page settings</button>
-          <button class="popup-btn nxtk-btn nxtk-btn-secondary" id="goToNexus" data-i18n="btnGoNexus">NexusMods</button>
+      <!-- Panel: Controls -->
+      <div class="popup-tab-panel is-active" id="panelControls" role="tabpanel" aria-labelledby="tabControls">
+        <div class="popup-section">
+          <div class="popup-section-title" data-i18n="sectionQuickControls">Quick Controls</div>
+
+          <label class="popup-toggle-row nxtk-stagger-1">
+            <span class="nxtk-toggle">
+              <input type="checkbox" data-key="AutoStartDownload">
+              <span class="nxtk-toggle-track"></span>
+            </span>
+            <span class="popup-toggle-text" data-i18n="toggleAutoStart">Start downloads automatically</span>
+          </label>
+
+          <label class="popup-toggle-row nxtk-stagger-2">
+            <span class="nxtk-toggle">
+              <input type="checkbox" data-key="SkipRequirements">
+              <span class="nxtk-toggle-track"></span>
+            </span>
+            <span class="popup-toggle-text" data-i18n="toggleSkipReq">Skip requirement screens</span>
+          </label>
+
+          <label class="popup-toggle-row nxtk-stagger-3">
+            <span class="nxtk-toggle">
+              <input type="checkbox" data-key="HidePremiumUpsells">
+              <span class="nxtk-toggle-track"></span>
+            </span>
+            <span class="popup-toggle-text" data-i18n="toggleHideUpsells">Hide ads and premium panels</span>
+          </label>
+
+          <label class="popup-toggle-row nxtk-stagger-4">
+            <span class="nxtk-toggle">
+              <input type="checkbox" data-key="ForceEnglish">
+              <span class="nxtk-toggle-track"></span>
+            </span>
+            <span class="popup-toggle-text" data-i18n="setForceEnglishLabel">Always use English</span>
+          </label>
         </div>
-        <button class="popup-btn popup-support-btn nxtk-btn nxtk-btn-secondary" id="reportBug" data-i18n="btnReportBug">Report a bug — copies error report</button>
-      </div>
 
-      <details class="popup-help nxtk-stagger-5" id="popupHelp">
-        <summary class="popup-help-summary">
-          <svg class="popup-help-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18h2v-2h-2v2Zm1-16A10 10 0 1 0 22 12 10 10 0 0 0 12 2Zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8ZM12 6a4 4 0 0 0-4 4h2a2 2 0 1 1 4 0c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5a4 4 0 0 0-4-4Z"/></svg>
-          <span data-i18n="helpTitle">How does it work?</span>
-          <svg class="popup-help-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.58 12 13.17l4.59-4.59L18 10l-6 6-6-6 1.41-1.42Z"/></svg>
-        </summary>
-        <div class="popup-help-body">
-          <ol class="popup-help-steps">
-            <li data-i18n="helpStep1">Open any mod page on Nexus Mods and go to the Files tab.</li>
-            <li data-i18n="helpStep2">Press Mod manager download or Manual download as you normally would.</li>
-            <li data-i18n="helpStep3">The extension resolves the link in the background and skips the wait, the ad panel and the requirement screens.</li>
-          </ol>
-          <p class="popup-help-note">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3Zm-1 6h2v5h-2V8Zm0 7h2v2h-2v-2Z"/></svg>
-            <span data-i18n="helpSignIn">You must be signed in to your Nexus Mods account. Signed out, Nexus answers with a verification page instead of a download link.</span>
-          </p>
+        <div class="popup-actions nxtk-stagger-5">
+          <div class="popup-actions-grid">
+            <button class="popup-btn nxtk-btn nxtk-btn-primary" id="openSettings" data-i18n="btnPageSettings">Page settings</button>
+            <button class="popup-btn nxtk-btn nxtk-btn-secondary" id="goToNexus" data-i18n="btnGoNexus">NexusMods</button>
+          </div>
         </div>
-      </details>
 
-      <div class="popup-rating" id="popupRating" hidden>
-        <a id="ratingLink" href="https://github.com/thomasthanos/nexusmods-bypass" target="_blank" rel="noopener noreferrer" data-i18n="ratingPrompt">Enjoying it? ⭐ Star it on GitHub</a>
-        <button type="button" id="ratingDismiss" aria-label="Dismiss" data-i18n-aria-label="ratingDismiss" data-i18n="ratingDismiss">Dismiss</button>
+        <div class="popup-rating" id="popupRating" hidden>
+          <a id="ratingLink" href="https://github.com/thomasthanos/nexusmods-bypass" target="_blank" rel="noopener noreferrer" data-i18n="ratingPrompt">Enjoying it? ⭐ Star it on GitHub</a>
+          <button type="button" id="ratingDismiss" aria-label="Dismiss" data-i18n-aria-label="ratingDismiss" data-i18n="ratingDismiss">Dismiss</button>
+        </div>
+
+        <div class="popup-status" id="popupStatus" role="status" aria-live="polite" hidden></div>
       </div>
 
-      <div class="popup-status" id="popupStatus" role="status" aria-live="polite" hidden></div>
+      <!-- Panel: Help & Bugs -->
+      <div class="popup-tab-panel" id="panelHelp" role="tabpanel" aria-labelledby="tabHelp" hidden>
+        <button class="popup-btn popup-bug-btn nxtk-btn nxtk-btn-secondary" id="reportBug" data-i18n="btnReportBug">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17a6.002 6.002 0 0 0-2.84 0L8.41 3 7 4.41l1.62 2.63C7.88 7.55 7.26 8.22 6.81 9H4v2h2.09A5.98 5.98 0 0 0 6 12v1H4v2h2v1a6 6 0 0 0 6 6 6 6 0 0 0 6-6v-1h2v-2h-2v-1c0-.34-.03-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/></svg>
+          <span data-i18n="btnReportBug">Report a bug — copies error report</span>
+        </button>
 
+        <details class="popup-help" id="popupHelp">
+          <summary class="popup-help-summary">
+            <svg class="popup-help-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18h2v-2h-2v2Zm1-16A10 10 0 1 0 22 12 10 10 0 0 0 12 2Zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8ZM12 6a4 4 0 0 0-4 4h2a2 2 0 1 1 4 0c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5a4 4 0 0 0-4-4Z"/></svg>
+            <span data-i18n="helpTitle">How does it work?</span>
+            <svg class="popup-help-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.58 12 13.17l4.59-4.59L18 10l-6 6-6-6 1.41-1.42Z"/></svg>
+          </summary>
+          <div class="popup-help-body">
+            <ol class="popup-help-steps">
+              <li data-i18n="helpStep1">Open any mod page on Nexus Mods and go to the Files tab.</li>
+              <li data-i18n="helpStep2">Press Mod manager download or Manual download as you normally would.</li>
+              <li data-i18n="helpStep3">The extension resolves the link in the background and skips the wait, the ad panel and the requirement screens.</li>
+            </ol>
+            <p class="popup-help-note">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3Zm-1 6h2v5h-2V8Zm0 7h2v2h-2v-2Z"/></svg>
+              <span data-i18n="helpSignIn">You must be signed in to your Nexus Mods account. Signed out, Nexus answers with a verification page instead of a download link.</span>
+            </p>
+          </div>
+        </details>
+      </div>
+
+      <!-- Always-visible bottom -->
       <button class="popup-support-entry nxtk-stagger-6" id="openSupport" type="button"
               aria-controls="popupSupportView" aria-expanded="false">
         <span class="popup-support-entry-icon" aria-hidden="true">
@@ -139,20 +161,41 @@
         <span role="listitem"><i></i><span data-i18n="supportValueFree">Always free</span></span>
       </div>
 
-      <button class="support-primary nxtk-btn nxtk-btn-primary" id="supportPrimary" type="button">
-        <span class="support-primary-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M12 21.35 10.55 20.03C5.4 15.36 2 12.27 2 8.5 2 5.41 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.08C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.41 22 8.5c0 3.77-3.4 6.86-8.55 11.54L12 21.35Z"/></svg>
-        </span>
-        <span class="support-primary-copy">
-          <strong data-i18n="supportPrimary">Support on Ko-fi</strong>
-          <small data-i18n="supportPrimaryHint">One-time or monthly — you choose</small>
-        </span>
-        <svg class="support-external" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7ZM19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7Z"/></svg>
-      </button>
+      <div class="support-donate-grid">
 
-      <div class="support-trust">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4Zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8Z"/></svg>
-        <span data-i18n="supportTrust">Secure checkout on Ko-fi. Opens in a new tab.</span>
+        <button class="support-donate-btn" id="supportGithubSponsor" type="button">
+          <span class="support-donate-icon support-donate-icon--github" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 .7a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2.24c-3.22.7-3.9-1.37-3.9-1.37-.53-1.34-1.29-1.69-1.29-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.04 1.77 2.72 1.26 3.38.96.1-.75.41-1.26.74-1.55-2.57-.29-5.27-1.29-5.27-5.69 0-1.26.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.04 0 0 .97-.31 3.16 1.18A10.9 10.9 0 0 1 12 6.14c.98 0 1.96.13 2.88.39 2.19-1.49 3.16-1.18 3.16-1.18.63 1.58.23 2.75.11 3.04.74.8 1.19 1.82 1.19 3.08 0 4.41-2.71 5.39-5.29 5.68.42.36.78 1.07.78 2.16v3.24c0 .31.21.68.8.56A11.5 11.5 0 0 0 12 .7Z"/></svg>
+          </span>
+          <span class="support-donate-copy">
+            <strong>GitHub Sponsors</strong>
+            <small>@thomasthanos</small>
+          </span>
+          <svg class="support-external" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7ZM19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7Z"/></svg>
+        </button>
+
+        <button class="support-donate-btn" id="supportPaypal" type="button">
+          <span class="support-donate-icon support-donate-icon--paypal" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944 3.72a.771.771 0 0 1 .76-.644h7.395c2.433 0 4.228.575 5.33 1.71 1.06 1.09 1.42 2.61 1.07 4.52-.02.09-.04.18-.06.27C18.5 12.66 16.27 14.3 13.18 14.3H11.3a.96.96 0 0 0-.948.81l-.02.11-.737 4.67-.033.21a.77.77 0 0 1-.76.637H7.076ZM19.5 8.18c-.01.06-.02.12-.03.18C18.54 13.1 15.57 15.6 11.3 15.6H9.42l-.96 6.1h3.26l.74-4.68a.96.96 0 0 1 .95-.81h1.88c3.09 0 5.32-1.64 6.26-4.68.35-1.18.3-2.22-.05-3.35Z"/></svg>
+          </span>
+          <span class="support-donate-copy">
+            <strong>PayPal</strong>
+            <small>@Thomasthanos</small>
+          </span>
+          <svg class="support-external" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7ZM19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7Z"/></svg>
+        </button>
+
+        <button class="support-donate-btn" id="supportRevolut" type="button">
+          <span class="support-donate-icon support-donate-icon--revolut" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2ZM14 8V3.5L18.5 8H14Zm-2 9c-2.21 0-4-1.79-4-4s1.79-4 4-4c.74 0 1.43.21 2.02.56L12.56 11c-.18-.04-.37-.06-.56-.06-1.1 0-2 .9-2 2s.9 2 2 2c.19 0 .38-.02.56-.06l1.46 1.44A3.94 3.94 0 0 1 12 17Z"/></svg>
+          </span>
+          <span class="support-donate-copy">
+            <strong>Revolut</strong>
+            <small>@thomas2873</small>
+          </span>
+          <svg class="support-external" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7ZM19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7Z"/></svg>
+        </button>
+
       </div>
 
       <div class="support-divider"><span data-i18n="supportFreeTitle">You can also help for free</span></div>
