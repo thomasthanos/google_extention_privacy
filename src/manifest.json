@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_appName__",
-  "version": "2.4.5",
+  "version": "2.5.0",
   "description": "__MSG_appDesc__",
   "default_locale": "en",
   "homepage_url": "https://github.com/thomasthanos/nexusmods-bypass",
@@ -34,8 +34,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.nexusmods.com/*"],
-      "css": ["content/content-styles.css"],
+      "matches": [
+        "https://www.nexusmods.com/*"
+      ],
+      "css": [
+        "content/content-styles.css"
+      ],
       "js": [
         "shared.js",
         "content/storage.js",
