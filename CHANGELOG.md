@@ -9,6 +9,13 @@ they are simply not listed.
 
 ## [Unreleased]
 
+## [2.5.0] — 2026-08-27
+
+### Added
+
+- **Tabbed navigation in popup:** Controls and Help & Bugs are now organized into separate tabs for a cleaner, user-friendly UI.
+- **Direct donation options:** Added support buttons for GitHub Sponsors, PayPal (`@Thomasthanos`), and Revolut (`@thomas2873`).
+
 ## [2.4.5] — 2026-08-27
 
 ### Added
