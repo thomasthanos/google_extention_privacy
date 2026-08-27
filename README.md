@@ -77,29 +77,26 @@ switch for when your browser language and your Nexus language disagree.
 
 ## <img src=".github/assets/icon-install.svg" width="22" align="middle"> Install
 
-**Chrome and Edge**
+**Chrome, Edge, Brave, Opera**
 
-1. Download the repository (`Code` → `Download ZIP`) and unzip it.
-2. Open <img src=".github/assets/cmd-chrome-extensions.svg" alt="chrome://extensions" align="middle"> (or <img src=".github/assets/cmd-edge-extensions.svg" alt="edge://extensions" align="middle">).
-3. Enable **Developer mode**.
-4. Click **Load unpacked** and select the **`src` folder** inside it — that is the
-   extension; `tools/`, `dist/` and `internal/` beside it are not part of the package.
-5. Open a Nexus Mods page — the welcome screen appears on first run.
+1. Download the latest `nexus.mods.bypass-<version>.zip` from the [Releases page](https://github.com/thomasthanos/nexusmods-bypass/releases/latest).
+2. Extract the `.zip` file into a new folder.
+3. Open <img src=".github/assets/cmd-chrome-extensions.svg" alt="chrome://extensions" align="middle"> (or <img src=".github/assets/cmd-edge-extensions.svg" alt="edge://extensions" align="middle">).
+4. Enable **Developer mode** in the top right.
+5. Click **Load unpacked** and select the folder you just extracted.
+6. Open a Nexus Mods page — the welcome screen appears on first run.
 
 **Firefox 140 or newer**
 
-Firefox needs its own package rather than the `src` folder: `manifest.json` declares a
-Chrome service worker, and Gecko runs the same background file as an event page instead.
-`tools/build-zip.mjs` writes both packages from the one tree.
+A pre-built Firefox package is included in every release. You do not need to build it yourself.
 
-1. Download and unzip the repository as above, then run `node tools/build-zip.mjs`.
+1. Download the latest `nexus.mods.bypass-<version>-firefox.zip` from the [Releases page](https://github.com/thomasthanos/nexusmods-bypass/releases/latest).
 2. Open `about:debugging#/runtime/this-firefox`.
-3. Click **Load Temporary Add-on** and pick `dist/nexus.mods.bypass-<version>-firefox.zip`.
+3. Click **Load Temporary Add-on** and select the `.zip` file directly (no need to extract it).
 4. Open a Nexus Mods page and let the add-on run on `nexusmods.com` when Firefox asks —
    Manifest V3 leaves that grant to you, and nothing on the page changes until you give it.
 
-A temporary add-on is unloaded when Firefox closes. Installing it permanently needs a
-build signed by AMO.
+A temporary add-on is unloaded when Firefox closes. Installing it permanently requires a build signed by AMO.
 
 ![Note](.github/assets/callout-note.svg)
 > **Vortex mode requires Vortex to be running.** The browser hands the link over and cannot verify
