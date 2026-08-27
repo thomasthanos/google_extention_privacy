@@ -77,26 +77,32 @@ switch for when your browser language and your Nexus language disagree.
 
 ## <img src=".github/assets/icon-install.svg" width="22" align="middle"> Install
 
-**Chrome, Edge, Brave, Opera**
+The recommended and easiest way to install NexusMods Bypass is directly through your browser's official store:
 
+- <img src=".github/assets/cmd-chrome-extensions.svg" width="16" align="middle"> **[Chrome Web Store](https://chrome.google.com/webstore)** *(Link pending)*
+- <img src=".github/assets/cmd-edge-extensions.svg" width="16" align="middle"> **[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons)** *(Link pending)*
+- <img src=".github/assets/icon-globe.svg" width="16" align="middle"> **[Firefox Add-ons (AMO)](https://addons.mozilla.org/)** *(Link pending)*
+
+<details>
+<summary><b>Manual Installation (Developer Mode)</b></summary>
+<br>
+
+If you want to install manually from the source releases:
+
+**Chrome, Edge, Brave, Opera**
 1. Download the latest `nexus.mods.bypass-<version>.zip` from the [Releases page](https://github.com/thomasthanos/nexusmods-bypass/releases/latest).
 2. Extract the `.zip` file into a new folder.
-3. Open <img src=".github/assets/cmd-chrome-extensions.svg" alt="chrome://extensions" align="middle"> (or <img src=".github/assets/cmd-edge-extensions.svg" alt="edge://extensions" align="middle">).
+3. Open `chrome://extensions` (or `edge://extensions`).
 4. Enable **Developer mode** in the top right.
 5. Click **Load unpacked** and select the folder you just extracted.
-6. Open a Nexus Mods page — the welcome screen appears on first run.
 
 **Firefox 140 or newer**
-
-A pre-built Firefox package is included in every release. You do not need to build it yourself.
-
 1. Download the latest `nexus.mods.bypass-<version>-firefox.zip` from the [Releases page](https://github.com/thomasthanos/nexusmods-bypass/releases/latest).
 2. Open `about:debugging#/runtime/this-firefox`.
 3. Click **Load Temporary Add-on** and select the `.zip` file directly (no need to extract it).
-4. Open a Nexus Mods page and let the add-on run on `nexusmods.com` when Firefox asks —
-   Manifest V3 leaves that grant to you, and nothing on the page changes until you give it.
 
-A temporary add-on is unloaded when Firefox closes. Installing it permanently requires a build signed by AMO.
+*Note: A temporary add-on is unloaded when Firefox closes. Installing it permanently requires downloading from the official AMO store.*
+</details>
 
 ![Note](.github/assets/callout-note.svg)
 > **Vortex mode requires Vortex to be running.** The browser hands the link over and cannot verify
