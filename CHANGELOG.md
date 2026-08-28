@@ -9,6 +9,8 @@ they are simply not listed.
 
 ## [Unreleased]
 
+## [2.5.2] — 2026-08-28
+
 ### Changed
 
 - **The popup keeps one height on both tabs.** Controls and Help & Bugs differed by roughly 170px,
