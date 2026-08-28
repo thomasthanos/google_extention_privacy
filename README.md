@@ -5,13 +5,24 @@
 [![Manifest V3](.github/assets/badge-manifest.svg)](src/manifest.json)
 [![13 languages](.github/assets/badge-lang-13.svg)](src/_locales)
 [![Data stays local](.github/assets/badge-local.svg)](PRIVACY.md)
+
 <br>
-[![Install](.github/assets/btn-install.svg)](#-install)
+<br>
+
+[![Chrome Web Store](https://img.shields.io/badge/Chrome-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/nexusmods-bypass/chfghiknjhpcncpcjopglefnckckdlpj)
+[![Firefox Add-ons](https://img.shields.io/badge/Firefox-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white)](https://addons.mozilla.org/en-US/firefox/addon/nexusmods-bypass/)
+[![Edge Add-ons](https://img.shields.io/badge/Edge-0078D7?style=for-the-badge&logo=microsoftedge&logoColor=white)](https://microsoftedge.microsoft.com/addons/detail/hcjpcnajmkanhodhpkoinodjbkeolgaa)
+
+<br>
+<br>
+
 [![Features](.github/assets/btn-features.svg)](#-features)
 [![Settings](.github/assets/btn-settings.svg)](#-settings)
 [![Permissions](.github/assets/btn-permissions.svg)](#-permissions-explained)
 [![Privacy](.github/assets/btn-privacy.svg)](PRIVACY.md)
 [![Troubleshooting](.github/assets/btn-troubleshooting.svg)](#-troubleshooting)
+<br>
+<br>
 
 <img src=".github/assets/spec-nexus.svg" alt="At a glance">
 
