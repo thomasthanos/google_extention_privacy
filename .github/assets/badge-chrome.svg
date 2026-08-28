@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="95" height="26" viewBox="0 0 95 26" role="img" aria-label="Chrome">
+  <defs>
+    <linearGradient id="pill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#18253c"/><stop offset="1" stop-color="#0b1422"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".36"/>
+      <stop offset=".5" stop-color="#ffffff" stop-opacity=".10"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity=".04"/>
+    </linearGradient>
+    <radialGradient id="wash-chrome" cx="1" cy=".5" r=".95">
+      <stop offset="0" stop-color="#4285F4" stop-opacity=".15"/>
+      <stop offset="1" stop-color="#4285F4" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x=".55" y=".55" width="93.9" height="24.9" rx="12.45" fill="url(#pill)"/>
+  <rect x=".55" y=".55" width="93.9" height="24.9" rx="12.45" fill="url(#wash-chrome)"/>
+  <rect x=".55" y=".55" width="93.9" height="24.9" rx="12.45" fill="none" stroke="url(#edge)" stroke-width="1.1"/>
+  <circle cx="15.4" cy="13.0" r="3.8" fill="#4285F4"/>
+  <text x="26" y="17.2" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" font-weight="700" fill="#93a6c0" letter-spacing="1">CHROME</text>
+</svg>
