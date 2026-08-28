@@ -12,3 +12,4 @@ node_modules/
 nexus.mods.bypass/.claude/settings.local.json
 .claude/settings.local.json
 /internal/promo
+/ai-lead-finder
