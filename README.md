@@ -15,9 +15,9 @@
 <img src=".github/assets/spec-nexus.svg" alt="At a glance">
 
 <br>
-[![Chrome](.github/assets/btn-chrome.svg)](https://chromewebstore.google.com/detail/nexusmods-bypass/chfghiknjhpcncpcjopglefnckckdlpj)
-[![Firefox](.github/assets/btn-firefox.svg)](https://addons.mozilla.org/en-US/firefox/addon/nexusmods-bypass/)
-[![Edge](.github/assets/btn-edge.svg)](https://microsoftedge.microsoft.com/addons/detail/hcjpcnajmkanhodhpkoinodjbkeolgaa)
+<a href="https://chromewebstore.google.com/detail/nexusmods-bypass/chfghiknjhpcncpcjopglefnckckdlpj"><img src=".github/assets/btn-chrome.svg" alt="Chrome"></a>
+<a href="https://addons.mozilla.org/en-US/firefox/addon/nexusmods-bypass/"><img src=".github/assets/btn-firefox.svg" alt="Firefox"></a>
+<a href="https://microsoftedge.microsoft.com/addons/detail/hcjpcnajmkanhodhpkoinodjbkeolgaa"><img src=".github/assets/btn-edge.svg" alt="Edge"></a>
 
 </div>
 
