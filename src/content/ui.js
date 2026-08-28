@@ -420,6 +420,7 @@ window.NexusExt = window.NexusExt || {};
 
   const NDC_BOUND_MODAL_IDS = [
     'nxtk-error-modal',
+    'nxtk-vortex-check-modal',
     'nxtk-history-modal',
     'nxtk-import-info-modal',
     'nxtk-select-modal',
@@ -799,9 +800,9 @@ window.NexusExt = window.NexusExt || {};
         <button class="nxtk-modal-close" data-close aria-label="${L('ariaClose', 'Close')}">&times;</button>
       </div>
       <div class="nxtk-modal-scroll">
-        <div class="nxtk-settings-section"><div class="nxtk-settings-section-title">${L('setSectionFlow', 'Download Flow')}</div>${features}</div>
-        <div class="nxtk-settings-section"><div class="nxtk-settings-section-title">${L('setSectionLanguage', 'Language')}</div>${language}</div>
-        <div class="nxtk-settings-section"><div class="nxtk-settings-section-title">${L('setSectionPacing', 'Files & Pacing')}</div>${timing}</div>
+        <div class="nxtk-settings-section nxtk-settings-flow"><div class="nxtk-settings-section-title">${L('setSectionFlow', 'Download Flow')}</div>${features}</div>
+        <div class="nxtk-settings-section nxtk-settings-language"><div class="nxtk-settings-section-title">${L('setSectionLanguage', 'Language')}</div>${language}</div>
+        <div class="nxtk-settings-section nxtk-settings-pacing"><div class="nxtk-settings-section-title">${L('setSectionPacing', 'Files & Pacing')}</div>${timing}</div>
         <div class="nxtk-settings-section nxtk-settings-advanced">
           <button type="button" class="nxtk-settings-advanced-toggle" id="nxtk-advanced-toggle"
                   aria-expanded="false" aria-controls="nxtk-advanced-body">${svgIcon('chevronRight')} ${L('setSectionAdvanced', 'Advanced')}</button>
@@ -886,6 +887,78 @@ window.NexusExt = window.NexusExt || {};
     backdrop.addEventListener('click', e => { if (e.target === backdrop) close(); });
     document.addEventListener('keydown', onKeyDown);
     document.body.appendChild(backdrop);
+  }
+
+  function showVortexHandoffModal() {
+    closeModal('nxtk-vortex-check-modal');
+
+    return new Promise((resolve) => {
+      const backdrop = document.createElement('div');
+      backdrop.className = 'nxtk-modal-backdrop';
+      backdrop.id = 'nxtk-vortex-check-modal';
+
+      const modal = document.createElement('div');
+      modal.className = 'nxtk-modal nxtk-modal-sm nxtk-vortex-check-modal';
+      modal.setAttribute('role', 'dialog');
+      modal.setAttribute('aria-modal', 'true');
+      modal.innerHTML = `
+        <div class="nxtk-modal-header">
+          <div>
+            <div class="nxtk-modal-title">${L('deckMethodVortex', 'Send to Vortex')}</div>
+            <div class="nxtk-modal-subtitle">${L('deckMethodVortexHint', 'Best for one-click handoff into your Vortex queue.')}</div>
+          </div>
+          <button class="nxtk-modal-close" data-cancel aria-label="${L('ariaClose', 'Close')}">&times;</button>
+        </div>
+        <div class="nxtk-history-summary">
+          <div class="nxtk-history-copy">
+            <div class="nxtk-history-lead">${L('logVortexNotice', 'Vortex must be running. Files are recorded once sent to it — the browser cannot see whether Vortex actually received them.')}</div>
+            <div class="nxtk-history-text">${L('deckMethodBrowserHint', 'Use native browser downloads when Vortex is not handling links.')}</div>
+          </div>
+          <div class="nxtk-history-grid">
+            <button type="button" class="nxtk-history-option nxtk-history-option-accent" data-choice="vortex">
+              <span class="nxtk-history-option-title">${L('deckMethodVortex', 'Send to Vortex')}</span>
+              <span class="nxtk-history-option-text">${L('deckMethodVortexHint', 'Best for one-click handoff into your Vortex queue.')}</span>
+            </button>
+            <button type="button" class="nxtk-history-option" data-choice="browser">
+              <span class="nxtk-history-option-title">${L('deckMethodBrowser', 'Browser Download')}</span>
+              <span class="nxtk-history-option-text">${L('deckMethodBrowserHint', 'Use native browser downloads when Vortex is not handling links.')}</span>
+            </button>
+          </div>
+        </div>
+        <div class="nxtk-modal-footer">
+          <button type="button" class="nxtk-btn nxtk-btn-secondary" data-cancel>${L('btnCancel', 'Cancel')}</button>
+        </div>
+      `;
+      prepareToolkitSurface(modal);
+
+      let finished = false;
+      const finish = (choice) => {
+        if (finished) return;
+        finished = true;
+        document.removeEventListener('keydown', onKeyDown);
+        backdrop.remove();
+        resolve(choice);
+      };
+      const onKeyDown = (event) => {
+        if (!document.contains(backdrop) || event.key === 'Escape') finish('cancel');
+      };
+      registerModalSettle(backdrop, () => finish('cancel'));
+
+      modal.querySelectorAll('[data-choice]').forEach((button) => {
+        button.addEventListener('click', () => finish(button.dataset.choice));
+      });
+      modal.querySelectorAll('[data-cancel]').forEach((button) => {
+        button.addEventListener('click', () => finish('cancel'));
+      });
+      backdrop.addEventListener('click', (event) => {
+        if (event.target === backdrop) finish('cancel');
+      });
+      document.addEventListener('keydown', onKeyDown);
+
+      backdrop.appendChild(modal);
+      document.body.appendChild(backdrop);
+      modal.querySelector('[data-choice="vortex"]')?.focus();
+    });
   }
 
   function showHistoryDecisionModal({ downloadedCount, totalCount }) {
@@ -1276,6 +1349,7 @@ window.NexusExt = window.NexusExt || {};
       logText: null,
       incrementProgress: null,
       setProgress: null,
+      setDownloadMethod: null,
       setDownloadStatus: null,
       startDownload: null,
       endDownload: null
@@ -1417,11 +1491,20 @@ window.NexusExt = window.NexusExt || {};
       });
     };
 
+    ui.setDownloadMethod = (method) => {
+      const normalized = Number(method);
+      if (normalized !== DOWNLOAD_METHOD_VORTEX && normalized !== DOWNLOAD_METHOD_BROWSER) return;
+      ndc.downloadMethod = normalized;
+      deck.querySelectorAll('input[name="nxtk-dl-method"]').forEach((radio) => {
+        radio.checked = Number(radio.value) === normalized;
+      });
+      syncDownloadMethodUI();
+    };
+
     deck.querySelectorAll('input[name="nxtk-dl-method"]').forEach(r => {
       if (parseInt(r.value) === ndc.downloadMethod) r.checked = true;
       r.addEventListener('change', () => {
-        ndc.downloadMethod = parseInt(r.value);
-        syncDownloadMethodUI();
+        ui.setDownloadMethod(parseInt(r.value));
         NexusExt.Storage.patchSetting('NDC_downloadMethod', ndc.downloadMethod);
       });
     });
@@ -1595,16 +1678,28 @@ window.NexusExt = window.NexusExt || {};
           `Reconnected to a download in progress: ${count} mods.`));
         return;
       }
+      if (ndc.downloadMethod === DOWNLOAD_METHOD_VORTEX) {
+        const notice = NXTK.t('logVortexNotice', null,
+          'Vortex must be running. Files are recorded once sent to it — the browser cannot see whether Vortex actually received them.');
+        announce(notice);
+        ui.logText(notice, 'info');
+        return;
+      }
       announce(NXTK.tPlural('annStarted', count, `Download started: ${count} mods.`));
       ui.logText(NXTK.t('logDownloadStarted', null, 'Download started.'), 'info');
     };
 
     ui.endDownload = (outcome = 'finished') => {
+      const vortexHandoff = ndc.downloadMethod === DOWNLOAD_METHOD_VORTEX;
       const outcomes = {
         finished: {
           status: STATUS_FINISHED,
-          label: statusLabel(STATUS_FINISHED),
-          message: NXTK.t('logDownloadFinished', null, 'Download finished.')
+          label: vortexHandoff
+            ? NXTK.t('toastSentToVortex', null, 'Sent to Vortex')
+            : statusLabel(STATUS_FINISHED),
+          message: vortexHandoff
+            ? NXTK.t('toastSentToVortex', null, 'Sent to Vortex')
+            : NXTK.t('logDownloadFinished', null, 'Download finished.')
         },
         partial: {
           status: STATUS_FINISHED,
@@ -1660,6 +1755,14 @@ window.NexusExt = window.NexusExt || {};
     }
 
     function statusLabel(status) {
+      if (ndc.downloadMethod === DOWNLOAD_METHOD_VORTEX) {
+        if (status === STATUS_DOWNLOADING) {
+          return NXTK.t('deckMethodVortex', null, 'Send to Vortex');
+        }
+        if (status === STATUS_FINISHED) {
+          return NXTK.t('toastSentToVortex', null, 'Sent to Vortex');
+        }
+      }
       const keys = {
         [STATUS_DOWNLOADING]: 'statusDownloading',
         [STATUS_PAUSED]: 'statusPaused',
@@ -2314,6 +2417,7 @@ window.NexusExt = window.NexusExt || {};
     closeExtensionOverlays,
     cleanupOrphanedPortals,
     showSettingsModal,
+    showVortexHandoffModal,
     showHistoryDecisionModal,
     showError,
     showCloseCountdown,

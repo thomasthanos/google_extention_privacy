@@ -188,12 +188,12 @@
   }
 
   async function init() {
+    const versionEl = document.querySelector('.popup-version');
+    if (versionEl) versionEl.textContent = `v${chrome.runtime.getManifest().version}`;
+
     const cfg = await getSettings();
     NXTK.setForceEnglish(cfg.ForceEnglish);
     applyI18n();
-
-    const versionEl = document.querySelector('.popup-version');
-    if (versionEl) versionEl.textContent = `v${chrome.runtime.getManifest().version}`;
 
     document.getElementById('tabControls')?.addEventListener('click', () => switchTab('tabControls'));
     document.getElementById('tabHelp')?.addEventListener('click', () => switchTab('tabHelp'));

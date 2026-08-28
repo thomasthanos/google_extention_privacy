@@ -1176,6 +1176,143 @@
   transform: translateX(20px);
 }
 
+/* Settings use a wider two-column canvas on desktop so the common controls remain
+   visible without an inner scrollbar at 720p, while narrow/zoomed layouts retain
+   the normal overflow fallback. */
+#nxtk-settings-modal {
+  padding: clamp(10px, 2.5vh, 24px);
+}
+#nxtk-settings-modal .nxtk-modal-sm {
+  box-sizing: border-box;
+  width: min(940px, 100%);
+  max-height: calc(100dvh - 20px);
+  padding: clamp(16px, 2vh, 22px);
+}
+#nxtk-settings-modal .nxtk-modal-scroll {
+  scrollbar-gutter: stable;
+}
+#nxtk-settings-modal .nxtk-settings-section {
+  margin-bottom: 12px;
+  padding: 14px;
+}
+#nxtk-settings-modal .nxtk-settings-support { margin-top: 9px; }
+#nxtk-settings-modal .nxtk-settings-version { margin-top: 5px; }
+
+@media (min-width: 760px) {
+  #nxtk-settings-modal .nxtk-modal-scroll {
+    display: grid;
+    grid-template-columns: minmax(0, 1.18fr) minmax(320px, .82fr);
+    grid-template-areas:
+      "flow language"
+      "flow pacing"
+      "flow advanced";
+    align-content: start;
+    gap: 12px;
+  }
+  #nxtk-settings-modal .nxtk-settings-section { margin: 0; }
+  #nxtk-settings-modal .nxtk-settings-flow { grid-area: flow; }
+  #nxtk-settings-modal .nxtk-settings-language { grid-area: language; }
+  #nxtk-settings-modal .nxtk-settings-pacing { grid-area: pacing; }
+  #nxtk-settings-modal .nxtk-settings-advanced { grid-area: advanced; }
+}
+
+@media (min-width: 760px) {
+  #nxtk-settings-modal { padding: 10px; }
+  #nxtk-settings-modal .nxtk-modal-sm {
+    max-height: calc(100dvh - 20px);
+    padding: 12px 16px;
+  }
+  #nxtk-settings-modal .nxtk-modal-header {
+    gap: 10px;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+  }
+  #nxtk-settings-modal .nxtk-modal-title {
+    font-size: 18px;
+  }
+  #nxtk-settings-modal .nxtk-modal-subtitle {
+    margin-top: 3px;
+    font-size: 11.5px;
+  }
+  #nxtk-settings-modal .nxtk-modal-close {
+    width: 30px;
+    height: 30px;
+    font-size: 20px;
+  }
+  #nxtk-settings-modal .nxtk-modal-scroll {
+    gap: 9px;
+    margin: 0 -5px;
+    padding: 0 5px 3px;
+  }
+  #nxtk-settings-modal .nxtk-settings-section {
+    padding: 10px 12px;
+  }
+  #nxtk-settings-modal .nxtk-settings-section-title {
+    margin-bottom: 8px;
+    font-size: 10px;
+  }
+  #nxtk-settings-modal .nxtk-setting-row {
+    padding: 4px 0;
+  }
+  #nxtk-settings-modal .nxtk-setting-label {
+    gap: 10px;
+  }
+  #nxtk-settings-modal .nxtk-setting-copy {
+    gap: 1px;
+  }
+  #nxtk-settings-modal .nxtk-setting-title {
+    font-size: 12.5px;
+  }
+  #nxtk-settings-modal .nxtk-setting-desc {
+    font-size: 10.75px;
+    line-height: 1.3;
+  }
+  #nxtk-settings-modal .nxtk-setting-field input {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  #nxtk-settings-modal .nxtk-setting-unit {
+    font-size: 10.5px;
+  }
+  #nxtk-settings-modal .nxtk-toggle {
+    width: 42px;
+    height: 24px;
+  }
+  #nxtk-settings-modal .nxtk-toggle-track::before {
+    width: 18px;
+    height: 18px;
+  }
+  #nxtk-settings-modal .nxtk-toggle input:checked + .nxtk-toggle-track::before {
+    transform: translateX(18px);
+  }
+  #nxtk-settings-modal .nxtk-settings-advanced-toggle {
+    min-height: 24px;
+    padding: 3px 9px;
+    font-size: 10px;
+  }
+  #nxtk-settings-modal .nxtk-settings-advanced-body {
+    margin-top: 7px;
+  }
+  #nxtk-settings-modal .nxtk-modal-footer {
+    padding-top: 8px;
+    margin-top: 8px;
+  }
+  #nxtk-settings-modal .nxtk-btn {
+    min-height: 34px;
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+  #nxtk-settings-modal .nxtk-settings-support {
+    gap: 5px;
+    margin-top: 5px;
+    font-size: 10.5px;
+  }
+  #nxtk-settings-modal .nxtk-settings-version {
+    margin-top: 2px;
+    font-size: 10px;
+  }
+}
+
 .nxtk-hidden { display: none !important; }
 
 .nxtk-upsell-hidden,

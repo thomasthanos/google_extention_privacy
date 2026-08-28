@@ -9,6 +9,27 @@ they are simply not listed.
 
 ## [Unreleased]
 
+## [2.5.1] — 2026-08-28
+
+### Changed
+
+- The page settings dialog now uses a compact two-column desktop layout and height-aware
+  spacing, keeping the normal collapsed view visible without scrolling at 720p, 1080p,
+  1440p and 4K while preserving safe overflow for narrow windows, zoom and expanded
+  Advanced settings.
+- The popup reads its version from `manifest.json` before loading settings. Together with
+  the settings dialog and package builder, the manifest is now the only displayed/build
+  version that needs updating.
+- Collection runs now ask the user to confirm that Vortex is installed and running before
+  any links are sent. Choosing Browser Download switches and saves the method; cancelling leaves
+  progress and history untouched.
+
+### Fixed
+
+- Vortex handoffs no longer claim that a file is downloading or downloaded when Chromium
+  can only verify that an `nxm://` link was sent. Single-file buttons briefly show
+  **Sent to Vortex** and recover, and collection progress is labelled as a Vortex handoff.
+
 ## [2.5.0] — 2026-08-27
 
 ### Added

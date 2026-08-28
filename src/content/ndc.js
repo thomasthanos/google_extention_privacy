@@ -862,6 +862,27 @@ window.NexusExt = window.NexusExt || {};
         return;
       }
 
+      if (this.downloadMethod === DOWNLOAD_METHOD_VORTEX
+        && typeof NexusExt.UI?.showVortexHandoffModal === 'function') {
+        const choice = await NexusExt.UI.showVortexHandoffModal();
+        if (choice === 'cancel') {
+          this.ui.logText(T('logCanceledBeforeStart', 'Download canceled before start.'), 'info');
+          return;
+        }
+        if (choice === 'browser') {
+          this.downloadMethod = DOWNLOAD_METHOD_BROWSER;
+          this.ui.setDownloadMethod?.(DOWNLOAD_METHOD_BROWSER);
+          await NexusExt.Storage.patchSetting('NDC_downloadMethod', DOWNLOAD_METHOD_BROWSER);
+          NXTK.setActivity?.({
+            trigger: 'collection',
+            method: 'browser',
+            fileId: '',
+            autoClose: false,
+            fallbackActive: false
+          });
+        }
+      }
+
       let history = null;
       let restart = false;
       if (type !== null) {
@@ -900,11 +921,6 @@ window.NexusExt = window.NexusExt || {};
       }
 
       this.ui.startDownload(mods.length);
-      if (history) {
-        this.ui.logText(T('logVortexNotice',
-          'Vortex must be running. Files are recorded once sent to it — the browser cannot see whether Vortex actually received them.'
-        ), 'info');
-      }
       let outcome = 'finished';
 
       try {

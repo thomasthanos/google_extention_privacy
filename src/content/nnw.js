@@ -720,6 +720,7 @@ window.NexusExt = window.NexusExt || {};
     const stateConfig = {
       waiting: { text: message || NXTK.t('btnStatePleaseWait', null, 'Please Wait...'), color: 'orange' },
       downloading: { text: NXTK.t('btnStateDownloading', null, 'Downloading!'), color: '#3dbb5e' },
+      sent: { text: NXTK.t('toastSentToVortex', null, 'Sent to Vortex'), color: '#3dbb5e' },
       error: { text: message || NXTK.t('btnStateError', null, 'Error'), color: '#e04040' }
     };
     const config = stateConfig[state] || stateConfig.error;
@@ -937,7 +938,7 @@ window.NexusExt = window.NexusExt || {};
       return false;
     }
 
-    if (button) setButtonState(button, 'downloading');
+    if (button) setButtonState(button, isNMM ? 'waiting' : 'downloading');
     let finalUrl = null;
     try {
       finalUrl = await normalizeDownloadUrl(result.url, isNMM);
@@ -964,7 +965,20 @@ window.NexusExt = window.NexusExt || {};
       return false;
     }
     if (isNMM) {
-      location.assign(finalUrl);
+      try {
+        location.assign(finalUrl);
+      } catch (cause) {
+        handleError(button, Errors.fromException(cause, { context: 'Sending link to Vortex' }), {
+          onRetry: () => runDownload(options)
+        });
+        return false;
+      }
+      if (button) {
+        setButtonState(button, 'sent');
+        setTimeout(() => {
+          if (attemptId === downloadAttemptSequence && button.isConnected) restoreButtonState(button);
+        }, 2500);
+      }
     } else if (!await startManagedFileDownload(finalUrl, fileId)) {
       handleError(button, Errors.create('request_failed', {
         context: 'Starting browser download',

@@ -35,6 +35,12 @@ const locales = spawnSync(process.execPath, [join(root, 'tools', 'check-locales.
 });
 if (locales.status !== 0) fail('check-locales.mjs did not pass — package not built.');
 
+const vortexPreflight = spawnSync(process.execPath, [join(root, 'tools', 'vortex-preflight-test.cjs')], {
+  cwd: root,
+  stdio: 'inherit'
+});
+if (vortexPreflight.status !== 0) fail('vortex-preflight-test.cjs did not pass — package not built.');
+
 function walk(absolute, prefix, allowedExt) {
   const found = [];
   for (const name of readdirSync(absolute).sort()) {
