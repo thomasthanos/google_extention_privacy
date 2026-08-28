@@ -6,10 +6,6 @@
 [![13 languages](.github/assets/badge-lang-13.svg)](src/_locales)
 [![Data stays local](.github/assets/badge-local.svg)](PRIVACY.md)
 <br>
-[![Chrome](.github/assets/btn-chrome.svg)](https://chromewebstore.google.com/detail/nexusmods-bypass/chfghiknjhpcncpcjopglefnckckdlpj)
-[![Firefox](.github/assets/btn-firefox.svg)](https://addons.mozilla.org/en-US/firefox/addon/nexusmods-bypass/)
-[![Edge](.github/assets/btn-edge.svg)](https://microsoftedge.microsoft.com/addons/detail/hcjpcnajmkanhodhpkoinodjbkeolgaa)
-<br>
 [![Features](.github/assets/btn-features.svg)](#-features)
 [![Settings](.github/assets/btn-settings.svg)](#-settings)
 [![Permissions](.github/assets/btn-permissions.svg)](#-permissions-explained)
@@ -17,6 +13,11 @@
 [![Troubleshooting](.github/assets/btn-troubleshooting.svg)](#-troubleshooting)
 
 <img src=".github/assets/spec-nexus.svg" alt="At a glance">
+
+<br>
+[![Chrome](.github/assets/btn-chrome.svg)](https://chromewebstore.google.com/detail/nexusmods-bypass/chfghiknjhpcncpcjopglefnckckdlpj)
+[![Firefox](.github/assets/btn-firefox.svg)](https://addons.mozilla.org/en-US/firefox/addon/nexusmods-bypass/)
+[![Edge](.github/assets/btn-edge.svg)](https://microsoftedge.microsoft.com/addons/detail/hcjpcnajmkanhodhpkoinodjbkeolgaa)
 
 </div>
 
