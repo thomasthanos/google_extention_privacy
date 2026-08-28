@@ -1,7 +1,7 @@
 :root {
   --nxtk-bg-deep: #0b0c14;
   --nxtk-accent: #d98f40;
-  --nxtk-accent-hover: #f0a352;
+  --nxtk-accent-hover: #ecaa5a;
   --nxtk-accent-dim: #b87a30;
   --nxtk-accent-soft: rgba(217, 143, 64, 0.18);
   --nxtk-accent-border: rgba(217, 143, 64, 0.45);
@@ -76,8 +76,9 @@
   --nxtk-info: #58b8ea;
 
   --nxtk-radius: 22px;
-  --nxtk-radius-sm: 14px;
-  --nxtk-radius-xs: 10px;
+  --nxtk-radius-md: 16px;
+  --nxtk-radius-sm: 12px;
+  --nxtk-radius-xs: 8px;
   --nxtk-radius-pill: 999px;
 
   --nxtk-ease: cubic-bezier(0.32, 0.72, 0, 1);
@@ -264,8 +265,8 @@
 .nxtk-toggle {
   position: relative;
   display: inline-block;
-  width: 44px;
-  height: 26px;
+  width: 42px;
+  height: 24px;
   flex-shrink: 0;
 }
 
@@ -294,8 +295,8 @@
 .nxtk-toggle-track::after {
   content: "";
   position: absolute;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   left: 3px;
   top: 3px;
   border-radius: 50%;

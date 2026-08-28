@@ -19,19 +19,20 @@
         <div class="popup-logo-wrap">
           <svg class="popup-logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z"/></svg>
         </div>
-        <div>
-          <div class="popup-title">NexusMods Bypass</div>
-          <div class="popup-version">v—</div>
+        <div class="popup-heading">
+          <span class="popup-title">NexusMods Bypass</span>
+          <span class="popup-version">v—</span>
         </div>
       </div>
 
       <!-- Tab Bar -->
-      <div class="popup-tabs" role="tablist" aria-label="Sections">
-        <button class="popup-tab is-active" id="tabControls" role="tab" aria-selected="true" aria-controls="panelControls">
+      <div class="popup-tabs" role="tablist" aria-label="Sections" data-tab="tabControls">
+        <span class="popup-tab-indicator" aria-hidden="true"></span>
+        <button class="popup-tab is-active" id="tabControls" role="tab" aria-selected="true" aria-controls="panelControls" tabindex="0">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
           <span data-i18n="tabControls">Controls</span>
         </button>
-        <button class="popup-tab" id="tabHelp" role="tab" aria-selected="false" aria-controls="panelHelp">
+        <button class="popup-tab" id="tabHelp" role="tab" aria-selected="false" aria-controls="panelHelp" tabindex="-1">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18h2v-2h-2v2Zm1-16A10 10 0 1 0 22 12 10 10 0 0 0 12 2Zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8ZM12 6a4 4 0 0 0-4 4h2a2 2 0 1 1 4 0c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5a4 4 0 0 0-4-4Z"/></svg>
           <span data-i18n="tabHelp">Help &amp; Bugs</span>
         </button>
@@ -40,8 +41,6 @@
       <!-- Panel: Controls -->
       <div class="popup-tab-panel is-active" id="panelControls" role="tabpanel" aria-labelledby="tabControls">
         <div class="popup-section">
-          <div class="popup-section-title" data-i18n="sectionQuickControls">Quick Controls</div>
-
           <label class="popup-toggle-row nxtk-stagger-1">
             <span class="nxtk-toggle">
               <input type="checkbox" data-key="AutoStartDownload">
@@ -76,10 +75,8 @@
         </div>
 
         <div class="popup-actions nxtk-stagger-5">
-          <div class="popup-actions-grid">
-            <button class="popup-btn nxtk-btn nxtk-btn-primary" id="openSettings" data-i18n="btnPageSettings">Page settings</button>
-            <button class="popup-btn nxtk-btn nxtk-btn-secondary" id="goToNexus" data-i18n="btnGoNexus">NexusMods</button>
-          </div>
+          <button class="popup-btn nxtk-btn nxtk-btn-primary" id="openSettings" data-i18n="btnPageSettings">Page settings</button>
+          <button class="popup-btn nxtk-btn nxtk-btn-secondary" id="goToNexus" data-i18n="btnGoNexus">NexusMods</button>
         </div>
 
         <div class="popup-rating" id="popupRating" hidden>
@@ -92,29 +89,26 @@
 
       <!-- Panel: Help & Bugs -->
       <div class="popup-tab-panel" id="panelHelp" role="tabpanel" aria-labelledby="tabHelp" hidden>
-        <button class="popup-btn popup-bug-btn nxtk-btn nxtk-btn-secondary" id="reportBug" data-i18n="btnReportBug">
+        <button class="popup-btn popup-bug-btn nxtk-btn nxtk-btn-secondary" id="reportBug">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17a6.002 6.002 0 0 0-2.84 0L8.41 3 7 4.41l1.62 2.63C7.88 7.55 7.26 8.22 6.81 9H4v2h2.09A5.98 5.98 0 0 0 6 12v1H4v2h2v1a6 6 0 0 0 6 6 6 6 0 0 0 6-6v-1h2v-2h-2v-1c0-.34-.03-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/></svg>
           <span data-i18n="btnReportBug">Report a bug — copies error report</span>
         </button>
 
-        <details class="popup-help" id="popupHelp">
-          <summary class="popup-help-summary">
+        <section class="popup-help" id="popupHelp">
+          <h2 class="popup-help-title">
             <svg class="popup-help-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18h2v-2h-2v2Zm1-16A10 10 0 1 0 22 12 10 10 0 0 0 12 2Zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8ZM12 6a4 4 0 0 0-4 4h2a2 2 0 1 1 4 0c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5a4 4 0 0 0-4-4Z"/></svg>
             <span data-i18n="helpTitle">How does it work?</span>
-            <svg class="popup-help-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.58 12 13.17l4.59-4.59L18 10l-6 6-6-6 1.41-1.42Z"/></svg>
-          </summary>
-          <div class="popup-help-body">
-            <ol class="popup-help-steps">
-              <li data-i18n="helpStep1">Open any mod page on Nexus Mods and go to the Files tab.</li>
-              <li data-i18n="helpStep2">Press Mod manager download or Manual download as you normally would.</li>
-              <li data-i18n="helpStep3">The extension resolves the link in the background and skips the wait, the ad panel and the requirement screens.</li>
-            </ol>
-            <p class="popup-help-note">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3Zm-1 6h2v5h-2V8Zm0 7h2v2h-2v-2Z"/></svg>
-              <span data-i18n="helpSignIn">You must be signed in to your Nexus Mods account. Signed out, Nexus answers with a verification page instead of a download link.</span>
-            </p>
-          </div>
-        </details>
+          </h2>
+          <ol class="popup-help-steps">
+            <li data-i18n="helpStep1">Open any mod page on Nexus Mods and go to the Files tab.</li>
+            <li data-i18n="helpStep2">Press Mod manager download or Manual download as you normally would.</li>
+            <li data-i18n="helpStep3">The extension resolves the link in the background and skips the wait, the ad panel and the requirement screens.</li>
+          </ol>
+          <p class="popup-help-note">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3Zm-1 6h2v5h-2V8Zm0 7h2v2h-2v-2Z"/></svg>
+            <span data-i18n="helpSignIn">You must be signed in to your Nexus Mods account. Signed out, Nexus answers with a verification page instead of a download link.</span>
+          </p>
+        </section>
       </div>
 
       <!-- Always-visible bottom -->

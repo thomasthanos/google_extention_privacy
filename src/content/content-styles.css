@@ -930,29 +930,66 @@
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   margin-top: 12px;
   color: var(--nxtk-text-muted);
   font-size: 11.5px;
 }
 .nxtk-settings-report {
-  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
   color: var(--nxtk-accent-hover);
-  background: transparent;
+  background: rgba(217, 143, 64, 0.1);
   border: 0;
+  border-radius: var(--nxtk-radius-pill);
+  box-shadow: inset 0 0 0 1px rgba(217, 143, 64, 0.3);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  transition: var(--nxtk-transition-fast);
+}
+.nxtk-settings-report svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  fill: currentColor;
 }
 .nxtk-settings-report:hover,
-.nxtk-settings-report:focus-visible { color: var(--nxtk-text-bright); }
+.nxtk-settings-report:focus-visible {
+  color: var(--nxtk-text-bright);
+  background: rgba(217, 143, 64, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(217, 143, 64, 0.5);
+}
+.nxtk-settings-report[disabled] {
+  cursor: default;
+  opacity: 0.75;
+}
 .nxtk-settings-version {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 8px;
   color: var(--nxtk-text-dim);
   font-size: 11px;
   text-align: center;
+}
+.nxtk-settings-version-name {
+  letter-spacing: 0.02em;
+}
+/* same stamp as the popup header, so the two surfaces label themselves alike */
+.nxtk-settings-version-tag {
+  padding: 1px 8px;
+  border-radius: var(--nxtk-radius-pill);
+  background: rgba(217, 143, 64, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(217, 143, 64, 0.24);
+  color: #d9a56d;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 
 .nxtk-settings-section {
@@ -1145,7 +1182,7 @@
 
 .nxtk-toggle {
   position: relative;
-  width: 50px; height: 30px;
+  width: 42px; height: 24px;
   flex-shrink: 0;
 }
 .nxtk-toggle input { opacity: 0; width: 0; height: 0; }
@@ -1161,7 +1198,7 @@
 .nxtk-toggle-track::before {
   content:""; position: absolute;
   top: 2px; left: 2px;
-  width: 24px; height: 24px;
+  width: 18px; height: 18px;
   background: linear-gradient(180deg, #fff, #d8d8e0);
   border-radius: 50%;
   box-shadow: 0 2px 6px rgba(0,0,0,.5), inset 0 1px 0 #fff;
@@ -1173,13 +1210,18 @@
   box-shadow: inset 0 1px 2px rgba(0,0,0,.3), 0 0 12px var(--nxtk-accent-soft);
 }
 .nxtk-toggle input:checked + .nxtk-toggle-track::before {
-  transform: translateX(20px);
+  transform: translateX(18px);
 }
 
-/* Settings use a wider two-column canvas on desktop so the common controls remain
-   visible without an inner scrollbar at 720p, while narrow/zoomed layouts retain
-   the normal overflow fallback. */
+/* Settings dialog: two content columns on desktop, one column on narrow or zoomed
+   windows. Density lives in three custom properties, so the compact desktop scale is
+   one override block instead of a rule per element. The columns stretch to the same
+   height and the help/version footnote is pushed to the foot of the side column, which
+   is what keeps both columns ending level without stretching the cards themselves. */
 #nxtk-settings-modal {
+  --nxtk-set-gap: 12px;
+  --nxtk-set-pad: 14px;
+  --nxtk-set-row-pad: 10px;
   padding: clamp(10px, 2.5vh, 24px);
 }
 #nxtk-settings-modal .nxtk-modal-sm {
@@ -1189,38 +1231,138 @@
   padding: clamp(16px, 2vh, 22px);
 }
 #nxtk-settings-modal .nxtk-modal-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nxtk-set-gap);
   scrollbar-gutter: stable;
 }
+#nxtk-settings-modal .nxtk-settings-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nxtk-set-gap);
+  min-width: 0;
+}
+/* However much the two columns differ — fonts and translations both move it — the
+   side cards soak it up as a little extra breathing room around their own rows, so
+   it never shows up as a gap between the cards or a hole under them. */
+#nxtk-settings-modal .nxtk-settings-col-side > .nxtk-settings-section {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+#nxtk-settings-modal .nxtk-settings-col-side .nxtk-settings-rows {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
 #nxtk-settings-modal .nxtk-settings-section {
-  margin-bottom: 12px;
-  padding: 14px;
+  margin: 0;
+  padding: var(--nxtk-set-pad);
 }
-#nxtk-settings-modal .nxtk-settings-support { margin-top: 9px; }
-#nxtk-settings-modal .nxtk-settings-version { margin-top: 5px; }
+#nxtk-settings-modal .nxtk-setting-row {
+  padding: var(--nxtk-set-row-pad) 0;
+}
+
+/* Advanced is a full-width strip rather than a card — a card holding a single pill
+   spent a whole block of space on nothing, and expanding it inside a column emptied
+   out the bottom of the other one. Its rows lay out side by side, so the open panel
+   is a short band instead of a tall stack. */
+#nxtk-settings-modal .nxtk-settings-advanced {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin: 0;
+}
+/* The body is the drawer: a single grid row that animates from 0fr to 1fr, which
+   gives a real height transition without measuring anything in script. */
+#nxtk-settings-modal .nxtk-settings-advanced-body {
+  align-self: stretch;
+  display: grid;
+  grid-template-rows: 0fr;
+  margin: 0;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.26s var(--nxtk-ease),
+    opacity 0.2s var(--nxtk-ease);
+}
+#nxtk-settings-modal .nxtk-settings-advanced-body.nxtk-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+/* the display above outranks the UA's [hidden] rule, so restore it explicitly */
+#nxtk-settings-modal .nxtk-settings-advanced-body[hidden] {
+  display: none;
+}
+
+#nxtk-settings-modal .nxtk-settings-advanced-panel {
+  box-sizing: border-box;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  align-items: center;
+  gap: 0 20px;
+  padding: 4px var(--nxtk-set-pad) var(--nxtk-set-pad);
+  border: 1px solid var(--nxtk-border);
+  border-radius: var(--nxtk-radius-md);
+  background: var(--nxtk-glass-tint-soft);
+}
+/* clipping is only needed while the drawer grows; once open the panel must let the
+   info tooltips out again */
+#nxtk-settings-modal .nxtk-settings-advanced-body.nxtk-settled .nxtk-settings-advanced-panel {
+  overflow: visible;
+}
+#nxtk-settings-modal .nxtk-settings-advanced-panel .nxtk-setting-row {
+  border-top: none;
+}
+/* the short numeric settings sit centred in their share of the band, so the three
+   items read as one row instead of drifting to the column edges */
+#nxtk-settings-modal .nxtk-settings-advanced-panel .nxtk-setting-row-field .nxtk-setting-label {
+  justify-content: center;
+  gap: 12px;
+}
+#nxtk-settings-modal .nxtk-settings-advanced-panel .nxtk-setting-field {
+  margin-left: 0;
+}
+
+/* The Advanced row was a pill with an empty half-metre of space beside it, so the
+   help line moved in next to it: one closing bar, no extra height. */
+#nxtk-settings-modal .nxtk-settings-advanced-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  width: 100%;
+}
+#nxtk-settings-modal .nxtk-settings-support { margin-top: 0; }
+#nxtk-settings-modal .nxtk-settings-version { margin-top: 0; }
 
 @media (min-width: 760px) {
-  #nxtk-settings-modal .nxtk-modal-scroll {
-    display: grid;
-    grid-template-columns: minmax(0, 1.18fr) minmax(320px, .82fr);
-    grid-template-areas:
-      "flow language"
-      "flow pacing"
-      "flow advanced";
-    align-content: start;
-    gap: 12px;
+  #nxtk-settings-modal {
+    --nxtk-set-gap: 9px;
+    --nxtk-set-pad: 11px;
+    --nxtk-set-row-pad: 4px;
+    padding: 10px;
   }
-  #nxtk-settings-modal .nxtk-settings-section { margin: 0; }
-  #nxtk-settings-modal .nxtk-settings-flow { grid-area: flow; }
-  #nxtk-settings-modal .nxtk-settings-language { grid-area: language; }
-  #nxtk-settings-modal .nxtk-settings-pacing { grid-area: pacing; }
-  #nxtk-settings-modal .nxtk-settings-advanced { grid-area: advanced; }
-}
-
-@media (min-width: 760px) {
-  #nxtk-settings-modal { padding: 10px; }
   #nxtk-settings-modal .nxtk-modal-sm {
     max-height: calc(100dvh - 20px);
     padding: 12px 16px;
+  }
+  #nxtk-settings-modal .nxtk-modal-scroll {
+    display: grid;
+    /* 1.3/0.7 is where the two columns come out near the same natural height:
+       a wider Download Flow wraps its descriptions less, a narrower side column
+       wraps its own a little more. space-between absorbs whatever is left over,
+       which is what other locales will differ by. */
+    grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
+    margin: 0 -5px;
+    padding: 0 5px 3px;
+  }
+  #nxtk-settings-modal .nxtk-settings-advanced {
+    grid-column: 1 / -1;
   }
   #nxtk-settings-modal .nxtk-modal-header {
     gap: 10px;
@@ -1239,20 +1381,9 @@
     height: 30px;
     font-size: 20px;
   }
-  #nxtk-settings-modal .nxtk-modal-scroll {
-    gap: 9px;
-    margin: 0 -5px;
-    padding: 0 5px 3px;
-  }
-  #nxtk-settings-modal .nxtk-settings-section {
-    padding: 10px 12px;
-  }
   #nxtk-settings-modal .nxtk-settings-section-title {
     margin-bottom: 8px;
     font-size: 10px;
-  }
-  #nxtk-settings-modal .nxtk-setting-row {
-    padding: 4px 0;
   }
   #nxtk-settings-modal .nxtk-setting-label {
     gap: 10px;
@@ -1265,7 +1396,7 @@
   }
   #nxtk-settings-modal .nxtk-setting-desc {
     font-size: 10.75px;
-    line-height: 1.3;
+    line-height: 1.35;
   }
   #nxtk-settings-modal .nxtk-setting-field input {
     padding: 6px 8px;
@@ -1274,24 +1405,10 @@
   #nxtk-settings-modal .nxtk-setting-unit {
     font-size: 10.5px;
   }
-  #nxtk-settings-modal .nxtk-toggle {
-    width: 42px;
-    height: 24px;
-  }
-  #nxtk-settings-modal .nxtk-toggle-track::before {
-    width: 18px;
-    height: 18px;
-  }
-  #nxtk-settings-modal .nxtk-toggle input:checked + .nxtk-toggle-track::before {
-    transform: translateX(18px);
-  }
   #nxtk-settings-modal .nxtk-settings-advanced-toggle {
     min-height: 24px;
     padding: 3px 9px;
     font-size: 10px;
-  }
-  #nxtk-settings-modal .nxtk-settings-advanced-body {
-    margin-top: 7px;
   }
   #nxtk-settings-modal .nxtk-modal-footer {
     padding-top: 8px;
@@ -1304,11 +1421,10 @@
   }
   #nxtk-settings-modal .nxtk-settings-support {
     gap: 5px;
-    margin-top: 5px;
     font-size: 10.5px;
   }
   #nxtk-settings-modal .nxtk-settings-version {
-    margin-top: 2px;
+    gap: 7px;
     font-size: 10px;
   }
 }

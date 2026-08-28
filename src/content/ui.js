@@ -24,7 +24,8 @@ window.NexusExt = window.NexusExt || {};
     invert: '<svg viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M6.5 9L10 5.5L13.5 9H11V13H9V9H6.5M17.5 15L14 18.5L10.5 15H13V11H15V15H17.5Z"/></svg>',
     exportIcon: '<svg viewBox="0 0 24 24"><path d="M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z"/></svg>',
     importIcon: '<svg viewBox="0 0 24 24"><path d="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z"/></svg>',
-    spinner: '<svg viewBox="0 0 24 24"><path d="M12,4V2A10,10 0 0,0 2,12H4A8,8 0 0,1 12,4Z"/></svg>'
+    spinner: '<svg viewBox="0 0 24 24"><path d="M12,4V2A10,10 0 0,0 2,12H4A8,8 0 0,1 12,4Z"/></svg>',
+    github: '<svg viewBox="0 0 24 24"><path d="M12 .7a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2.24c-3.22.7-3.9-1.37-3.9-1.37-.53-1.34-1.29-1.69-1.29-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.04 1.77 2.72 1.26 3.38.96.1-.75.41-1.26.74-1.55-2.57-.29-5.27-1.29-5.27-5.69 0-1.26.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.04 0 0 .97-.31 3.16 1.18A10.9 10.9 0 0 1 12 6.14c.98 0 1.96.13 2.88.39 2.19-1.49 3.16-1.18 3.16-1.18.63 1.58.23 2.75.11 3.04.74.8 1.19 1.82 1.19 3.08 0 4.41-2.71 5.39-5.29 5.68.42.36.78 1.07.78 2.16v3.24c0 .31.21.68.8.56A11.5 11.5 0 0 0 12 .7Z"/></svg>'
   };
 
   function svgIcon(name, extraClass) {
@@ -105,20 +106,21 @@ window.NexusExt = window.NexusExt || {};
       copied = false;
     }
     if (button) {
-      const originalText = button.textContent;
+      const label = button.querySelector('[data-report-label]') || button;
+      const originalText = label.textContent;
       button.disabled = true;
       /* The third case is truncated *and* not on the clipboard, so the maintainer will only ever
          see the short report. popupReportNoCopy is the popup's wording for the same outcome and
          is already translated in all 13 locales; dlgReportOpeningPrefilled would claim the report
          went through. */
-      button.textContent = complete
+      label.textContent = complete
         ? NXTK.t('dlgReportOpeningFull', null, 'GitHub opens with the full report…')
         : copied
           ? NXTK.t('dlgReportOpeningCopied', null, 'Report copied — GitHub opens prefilled…')
           : NXTK.t('popupReportNoCopy', null, 'GitHub opens prefilled — the full report could not be copied.');
       setTimeout(() => {
         button.disabled = false;
-        button.textContent = originalText;
+        label.textContent = originalText;
       }, 2500);
     }
     openReportIssue(issueUrl);
@@ -800,24 +802,35 @@ window.NexusExt = window.NexusExt || {};
         <button class="nxtk-modal-close" data-close aria-label="${L('ariaClose', 'Close')}">&times;</button>
       </div>
       <div class="nxtk-modal-scroll">
-        <div class="nxtk-settings-section nxtk-settings-flow"><div class="nxtk-settings-section-title">${L('setSectionFlow', 'Download Flow')}</div>${features}</div>
-        <div class="nxtk-settings-section nxtk-settings-language"><div class="nxtk-settings-section-title">${L('setSectionLanguage', 'Language')}</div>${language}</div>
-        <div class="nxtk-settings-section nxtk-settings-pacing"><div class="nxtk-settings-section-title">${L('setSectionPacing', 'Files & Pacing')}</div>${timing}</div>
-        <div class="nxtk-settings-section nxtk-settings-advanced">
-          <button type="button" class="nxtk-settings-advanced-toggle" id="nxtk-advanced-toggle"
-                  aria-expanded="false" aria-controls="nxtk-advanced-body">${svgIcon('chevronRight')} ${L('setSectionAdvanced', 'Advanced')}</button>
-          <div class="nxtk-settings-advanced-body" id="nxtk-advanced-body" hidden>${advanced}</div>
+        <div class="nxtk-settings-col nxtk-settings-col-main">
+          <div class="nxtk-settings-section nxtk-settings-flow"><div class="nxtk-settings-section-title">${L('setSectionFlow', 'Download Flow')}</div><div class="nxtk-settings-rows">${features}</div></div>
+        </div>
+        <div class="nxtk-settings-col nxtk-settings-col-side">
+          <div class="nxtk-settings-section nxtk-settings-language"><div class="nxtk-settings-section-title">${L('setSectionLanguage', 'Language')}</div><div class="nxtk-settings-rows">${language}</div></div>
+          <div class="nxtk-settings-section nxtk-settings-pacing"><div class="nxtk-settings-section-title">${L('setSectionPacing', 'Files & Pacing')}</div><div class="nxtk-settings-rows">${timing}</div></div>
+          <div class="nxtk-settings-version">
+            <span class="nxtk-settings-version-name">${L('appName', 'NexusMods Bypass')}</span>
+            <span class="nxtk-settings-version-tag">v${escapeHtml(chrome.runtime.getManifest().version)}</span>
+          </div>
+        </div>
+        <div class="nxtk-settings-advanced">
+          <div class="nxtk-settings-advanced-bar">
+            <button type="button" class="nxtk-settings-advanced-toggle" id="nxtk-advanced-toggle"
+                    aria-expanded="false" aria-controls="nxtk-advanced-body">${svgIcon('chevronRight')} ${L('setSectionAdvanced', 'Advanced')}</button>
+            <div class="nxtk-settings-support">
+              <span>${L('setNeedHelp', 'Need help with a download?')}</span>
+              <button type="button" class="nxtk-settings-report" data-report-issue>${svgIcon('github')}<span data-report-label>${L('setReportOnGithub', 'Report a bug on GitHub')}</span></button>
+            </div>
+          </div>
+          <div class="nxtk-settings-advanced-body" id="nxtk-advanced-body" hidden>
+            <div class="nxtk-settings-advanced-panel">${advanced}</div>
+          </div>
         </div>
       </div>
       <div class="nxtk-modal-footer">
         <button class="nxtk-btn nxtk-btn-secondary" data-reset>${L('setRestoreDefaults', 'Restore Defaults & Refresh')}</button>
         <button class="nxtk-btn nxtk-btn-primary" data-close>${L('btnDone', 'Done')}</button>
       </div>
-      <div class="nxtk-settings-support">
-        <span>${L('setNeedHelp', 'Need help with a download?')}</span>
-        <button type="button" class="nxtk-settings-report" data-report-issue>${L('setReportOnGithub', 'Report a bug on GitHub')}</button>
-      </div>
-      <div class="nxtk-settings-version">v${chrome.runtime.getManifest().version} · NexusMods Bypass</div>
     `;
     prepareToolkitSurface(modal);
 
@@ -864,12 +877,24 @@ window.NexusExt = window.NexusExt || {};
 
     const advancedToggle = modal.querySelector('#nxtk-advanced-toggle');
     const advancedBody = modal.querySelector('#nxtk-advanced-body');
-    advancedToggle.addEventListener('click', () => {
-      const open = advancedBody.hidden;
-      advancedBody.hidden = !open;
+    let advancedCloseTimer = 0;
+    const setAdvanced = (open) => {
+      clearTimeout(advancedCloseTimer);
       advancedToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
       advancedToggle.classList.toggle('nxtk-expanded', open);
-    });
+      if (open) {
+        advancedBody.hidden = false;
+        void advancedBody.offsetHeight; // flush the collapsed state so the transition has a start value
+        advancedBody.classList.add('nxtk-open');
+        // the panel clips itself while it grows; let tooltips escape once it has settled
+        advancedCloseTimer = setTimeout(() => advancedBody.classList.add('nxtk-settled'), 280);
+        return;
+      }
+      advancedBody.classList.remove('nxtk-open', 'nxtk-settled');
+      // hide it only once it has finished collapsing, so it stays out of the tab order
+      advancedCloseTimer = setTimeout(() => { advancedBody.hidden = true; }, 280);
+    };
+    advancedToggle.addEventListener('click', () => setAdvanced(!advancedBody.classList.contains('nxtk-open')));
     modal.querySelector('[data-reset]').addEventListener('click', async () => {
       const confirmed = await nxtkConfirm({
         title: NXTK.t('setRestoreTitle', null, 'Restore Defaults'),

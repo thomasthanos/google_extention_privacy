@@ -5,7 +5,7 @@
 }
 
 html, body {
-  width: 360px;
+  width: 380px;
   background: #10111a;
   font-family: -apple-system, "SF Pro Display", "Inter", system-ui, sans-serif;
   color: var(--nxtk-text);
@@ -14,8 +14,10 @@ html, body {
 }
 
 .popup {
+  --popup-panel-min-h: 233px;
+  --popup-view-max-h: 572px;
   position: relative;
-  padding: 14px 16px 12px;
+  padding: 13px 15px 11px;
   border-radius: 0;
   background:
     radial-gradient(circle at 50% -15%, rgba(217, 143, 64, 0.10), transparent 38%),
@@ -45,7 +47,7 @@ html, body {
   height: 180px;
   border-radius: 50%;
   filter: blur(52px);
-  opacity: 0.15;
+  opacity: 0.11;
 }
 
 .popup-ambient span:first-child {
@@ -58,10 +60,27 @@ html, body {
   left: -100px;
   bottom: -120px;
   background: #7f54d9;
-  opacity: 0.08;
+  opacity: 0.06;
 }
 
 .popup-view[hidden] { display: none; }
+
+.popup-view {
+  max-height: var(--popup-view-max-h);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(217, 143, 64, 0.35) transparent;
+}
+
+.popup-view::-webkit-scrollbar { width: 6px; }
+.popup-view::-webkit-scrollbar-track { background: transparent; }
+.popup-view::-webkit-scrollbar-thumb {
+  background: rgba(217, 143, 64, 0.28);
+  border-radius: 999px;
+}
+.popup-view::-webkit-scrollbar-thumb:hover { background: rgba(217, 143, 64, 0.45); }
 
 .popup-view.is-active {
   animation: popup-view-enter 0.4s cubic-bezier(0.32, 0.72, 0.24, 1) both;
@@ -70,11 +89,18 @@ html, body {
 .popup-header {
   display: flex;
   align-items: center;
-  gap: 11px;
-  margin-bottom: 12px;
-  padding-bottom: 11px;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.popup-heading {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
 }
 
 .popup-logo-wrap {
@@ -91,10 +117,8 @@ html, body {
     linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 50%),
     linear-gradient(135deg, rgba(217, 143, 64, 0.4), rgba(184, 122, 48, 0.2));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
-    0 6px 16px rgba(217, 143, 64, 0.3);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 5px 14px rgba(217, 143, 64, 0.26);
 }
 
 .popup-logo {
@@ -116,37 +140,61 @@ html, body {
 }
 
 .popup-version {
-  font-size: 10px;
-  color: var(--nxtk-text-dim);
+  flex: none;
+  padding: 2px 7px;
+  border-radius: var(--nxtk-radius-pill);
+  background: rgba(217, 143, 64, 0.10);
+  box-shadow: inset 0 0 0 1px rgba(217, 143, 64, 0.24);
+  color: #d9a56d;
+  font-size: 9.5px;
+  font-weight: 700;
   letter-spacing: 0.06em;
-  margin-top: 2px;
-  font-weight: 500;
 }
 
 .popup-section {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 /* ── Tab bar ─────────────────────────────────── */
 .popup-tabs {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 5px;
-  margin-bottom: 12px;
-  padding: 4px;
-  border-radius: 12px;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 3px;
+  border-radius: 11px;
   background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.popup-tab-indicator {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 10px) / 2);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.04));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    inset 0 0 0 1px rgba(217, 143, 64, 0.24),
+    0 2px 8px rgba(0, 0, 0, 0.22);
+  transition: transform 0.28s var(--nxtk-ease);
+  pointer-events: none;
+}
+
+.popup-tabs[data-tab="tabHelp"] .popup-tab-indicator {
+  transform: translateX(calc(100% + 4px));
 }
 
 .popup-tab {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 7px 10px;
+  padding: 6px 10px;
   border: 0;
   border-radius: 9px;
   background: transparent;
@@ -170,22 +218,18 @@ html, body {
 
 .popup-tab:hover:not(.is-active) {
   color: var(--nxtk-text);
-  background: rgba(255, 255, 255, 0.05);
 }
 
 .popup-tab.is-active {
   color: var(--nxtk-text-bright);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.18),
-    inset 0 -1px 0 rgba(0,0,0,0.25),
-    inset 0 0 0 1px rgba(217,143,64,0.20),
-    0 2px 8px rgba(0,0,0,0.18);
 }
 
 /* ── Tab panels ──────────────────────────────── */
 .popup-tab-panel[hidden] { display: none; }
+
+.popup-tab-panel {
+  min-height: var(--popup-panel-min-h);
+}
 
 .popup-tab-panel.is-active {
   animation: panel-enter 0.22s cubic-bezier(0.32, 0.72, 0.24, 1) both;
@@ -196,58 +240,31 @@ html, body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.popup-section-title {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--nxtk-text-dim);
-  margin-bottom: 7px;
-  padding-left: 4px;
-}
-
 .popup-toggle-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 7px 10px;
-  margin-bottom: 5px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
   border-radius: var(--nxtk-radius-sm);
   cursor: pointer;
   position: relative;
-  isolation: isolate;
-  background: rgba(255, 255, 255, 0.03);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.04);
-  transition: var(--nxtk-transition-fast);
-  overflow: hidden;
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.055);
+  transition: background 0.18s var(--nxtk-ease), box-shadow 0.18s var(--nxtk-ease);
 }
 
 .popup-toggle-row:last-child {
   margin-bottom: 0;
 }
 
-.popup-toggle-row::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 50%);
-  pointer-events: none;
-  z-index: -1;
+.popup-toggle-row:hover,
+.popup-toggle-row:focus-within {
+  background: rgba(217, 143, 64, 0.09);
+  box-shadow: inset 0 0 0 1px rgba(217, 143, 64, 0.26);
 }
 
-.popup-toggle-row:hover {
-  background: rgba(217, 143, 64, 0.1);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-    inset 0 0 0 1px rgba(217, 143, 64, 0.25),
-    0 0 16px rgba(217, 143, 64, 0.12);
-  transform: translateY(-0.5px);
-}
+.popup-toggle-row:active { background: rgba(217, 143, 64, 0.14); }
 
 .popup-toggle-text {
   font-size: 12.5px;
@@ -255,10 +272,13 @@ html, body {
   color: var(--nxtk-text);
   user-select: none;
   flex: 1;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 
 .popup-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
   margin-bottom: 10px;
 }
 
@@ -269,7 +289,7 @@ html, body {
   gap: 8px;
   width: 100%;
   margin-bottom: 10px;
-  padding: 10px 14px;
+  padding: 9px 14px;
   color: var(--nxtk-text-muted);
   letter-spacing: .015em;
   text-transform: none;
@@ -284,18 +304,11 @@ html, body {
 .popup-bug-btn:hover,
 .popup-bug-btn:focus-visible { color: var(--nxtk-text-bright); }
 
-.popup-actions-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
 .popup-btn {
   display: flex;
   width: 100%;
   justify-content: center;
-  padding: 10px 12px;
+  padding: 9px 12px;
   font-size: 11.5px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -362,19 +375,20 @@ html, body {
   font-size: 10px;
   color: var(--nxtk-text-dim);
   opacity: 0.55;
-  padding-top: 10px;
+  padding-top: 8px;
+  margin-top: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   letter-spacing: 0.04em;
 }
 
 .popup-support-entry {
   width: 100%;
-  min-height: 58px;
+  min-height: 52px;
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
   margin-top: 2px;
-  padding: 9px 10px;
+  padding: 8px 10px;
   border: 0;
   border-radius: var(--nxtk-radius-sm);
   color: var(--nxtk-text);
@@ -385,10 +399,7 @@ html, body {
   overflow: hidden;
   background:
     linear-gradient(110deg, rgba(217, 143, 64, 0.14), rgba(255, 255, 255, 0.035) 52%, rgba(127, 84, 217, 0.07));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.10),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
-    inset 0 0 0 1px rgba(217, 143, 64, 0.20);
+  box-shadow: inset 0 0 0 1px rgba(217, 143, 64, 0.22);
   transition: transform 0.2s cubic-bezier(0.32, 0.72, 0.24, 1),
               background 0.2s ease,
               box-shadow 0.2s ease;
@@ -415,18 +426,21 @@ html, body {
   background:
     linear-gradient(110deg, rgba(217, 143, 64, 0.20), rgba(255, 255, 255, 0.055) 52%, rgba(127, 84, 217, 0.10));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
-    inset 0 0 0 1px rgba(217, 143, 64, 0.36),
-    0 9px 22px rgba(0, 0, 0, 0.24),
-    0 0 18px rgba(217, 143, 64, 0.10);
+    inset 0 0 0 1px rgba(217, 143, 64, 0.38),
+    0 8px 20px rgba(0, 0, 0, 0.24);
 }
 
 .popup-support-entry:hover::before { transform: translateX(22px); }
 
+.popup-support-entry:active,
+.support-donate-btn:active,
+.support-free-button:active {
+  transform: translateY(1px) scale(0.99);
+}
+
 .popup-support-entry-icon {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
@@ -436,9 +450,8 @@ html, body {
     linear-gradient(180deg, rgba(255, 255, 255, 0.20), transparent 50%),
     linear-gradient(135deg, #efaa5f, #b96f2f);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.50),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.30),
-    0 5px 15px rgba(217, 143, 64, 0.28);
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 4px 12px rgba(217, 143, 64, 0.26);
 }
 
 .popup-support-entry-icon svg {
@@ -621,7 +634,7 @@ html, body {
 }
 
 .support-hero p {
-  max-width: 304px;
+  max-width: min(100%, 320px);
   margin: 8px auto 0;
   color: #a7a7b5;
   font-size: 11.5px;
@@ -960,80 +973,43 @@ html, body {
 }
 
 .popup-help {
-  margin-bottom: 10px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, .08);
+  padding: 10px 12px;
+  border: 1px solid rgba(217, 143, 64, .22);
   border-radius: var(--nxtk-radius-sm);
-  background: rgba(255, 255, 255, .03);
+  background: rgba(217, 143, 64, .05);
 }
 
-.popup-help[open] {
-  border-color: var(--nxtk-accent-border);
-  background: rgba(217, 143, 64, .06);
-}
-
-.popup-help-summary {
+.popup-help-title {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 11px;
-  color: var(--nxtk-text);
+  margin-bottom: 9px;
+  color: var(--nxtk-text-bright);
   font-size: 12px;
   font-weight: 600;
-  cursor: pointer;
-  list-style: none;
-  user-select: none;
-}
-
-.popup-help-summary::-webkit-details-marker {
-  display: none;
-}
-
-.popup-help-summary:focus-visible {
-  outline: 2px solid var(--nxtk-accent);
-  outline-offset: -2px;
-}
-
-.popup-help-summary > span {
-  flex: 1;
-  min-width: 0;
-}
-
-.popup-help-icon,
-.popup-help-chevron {
-  width: 15px;
-  height: 15px;
-  flex: none;
-  fill: currentColor;
 }
 
 .popup-help-icon {
-  color: var(--nxtk-accent);
-}
-
-.popup-help-chevron {
-  color: var(--nxtk-text-dim);
-  transition: transform 180ms var(--nxtk-ease);
-}
-
-.popup-help[open] .popup-help-chevron {
-  transform: rotate(180deg);
-}
-
-.popup-help-body {
-  padding: 0 11px 11px;
+  width: 15px;
+  height: 15px;
+  flex: none;
+  fill: var(--nxtk-accent);
 }
 
 .popup-help-steps {
   margin: 0;
-  padding-left: 17px;
+  padding-left: 16px;
   color: var(--nxtk-text-muted);
   font-size: 11px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .popup-help-steps li {
-  margin-bottom: 5px;
+  margin-bottom: 4px;
+}
+
+.popup-help-steps li:last-child {
+  margin-bottom: 0;
 }
 
 .popup-help-steps li::marker {
@@ -1045,7 +1021,7 @@ html, body {
   display: flex;
   align-items: flex-start;
   gap: 7px;
-  margin: 9px 0 0;
+  margin: 8px 0 0;
   padding: 7px 9px;
   border-left: 2px solid var(--nxtk-accent);
   border-radius: var(--nxtk-radius-xs);

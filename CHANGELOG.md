@@ -9,6 +9,46 @@ they are simply not listed.
 
 ## [Unreleased]
 
+### Changed
+
+- **The popup keeps one height on both tabs.** Controls and Help & Bugs differed by roughly 170px,
+  so switching tabs resized the window. Both panels now share a minimum height, the popup is 380px
+  wide, and the header, tab bar and toggle rows are tighter — the window is about 60px shorter than
+  the 2.5.1 Controls tab and no longer jumps. Help & Bugs shows the three steps and the sign-in note
+  directly instead of hiding them behind an accordion in an otherwise empty tab, and the version
+  moved into a pill next to the title.
+- **The page settings dialog uses two real columns.** Language, Files & Pacing and Advanced were
+  stretched to the height of the Download Flow list, which left dead space *inside* those cards.
+  The column split is now proportioned so both sides come out at nearly the same natural height,
+  and whatever they still differ by — fonts and translations both move it — is absorbed as a little
+  extra room inside the side cards, so it never appears as a gap between them or a hole underneath.
+  The section titles also lost the stray hairline under them that the existing first-row rule had
+  always been meant to remove.
+  **Advanced** is a full-width strip under both columns and opens its settings side by side, so
+  expanding it no longer empties out the bottom of the other column. At 1280×720 the dialog now
+  measures about 516px collapsed and 606px expanded — the previous layout filled roughly 730px
+  collapsed alone — and neither state needs an inner scrollbar. Narrow and zoomed windows keep
+  the single-column fallback.
+- **Advanced** opens and closes with a short height-and-fade transition rather than appearing
+  instantly, and the three settings in the band are centred on a common line, so the tall toggle
+  and the two short numeric fields no longer sit ragged against the top edge.
+- **The dialog's closing line became a bar.** *Need help with a download?* and the GitHub link
+  moved up beside the **Advanced** pill, which had a full row to itself and used about a tenth of
+  it, so the help line now costs no height at all. The link is a pill with the GitHub mark rather
+  than an underlined word, and the name and version at the foot of the side column are a stamp
+  matching the popup's header pill. Both are read from the extension itself — the version from
+  `manifest.json`, the name from the locale catalogue — so a release only changes the manifest.
+  The button's *report copied…* status now swaps only its label, leaving the icon in place.
+- The popup and the settings dialog now share one toggle size and one radius scale.
+
+### Fixed
+
+- The popup's **Report a bug** button lost its icon. The button carried a `data-i18n` attribute of
+  its own in addition to the one on its label, so applying translations replaced the button's entire
+  contents — icon included — with plain text.
+- The popup's Support view scrolls instead of being clipped. Chrome caps popups at 600px and the
+  body could not scroll, so a longer translation lost the bottom of the view with no way to reach it.
+
 ## [2.5.1] — 2026-08-28
 
 ### Changed

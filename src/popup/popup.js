@@ -154,26 +154,18 @@
     }
   }
 
-  function bindPressFeedback() {
-    document.querySelectorAll('.popup-toggle-row, .nxtk-btn, .popup-support-entry, .support-free-button').forEach((el) => {
-      el.addEventListener('pointerdown', () => {
-        el.style.transform = 'translateY(1px) scale(0.99)';
-      });
-      const release = () => { el.style.transform = ''; };
-      el.addEventListener('pointerup', release);
-      el.addEventListener('pointerleave', release);
-      el.addEventListener('pointercancel', release);
-    });
-  }
-
-  function switchTab(tabId) {
+  function switchTab(tabId, { focus = false } = {}) {
     const tabs = document.querySelectorAll('.popup-tab');
     const panels = document.querySelectorAll('.popup-tab-panel');
+
+    document.querySelector('.popup-tabs')?.setAttribute('data-tab', tabId);
 
     tabs.forEach(t => {
       const active = t.id === tabId;
       t.classList.toggle('is-active', active);
       t.setAttribute('aria-selected', String(active));
+      t.tabIndex = active ? 0 : -1;
+      if (active && focus) t.focus({ preventScroll: true });
     });
 
     panels.forEach(p => {
@@ -195,8 +187,22 @@
     NXTK.setForceEnglish(cfg.ForceEnglish);
     applyI18n();
 
-    document.getElementById('tabControls')?.addEventListener('click', () => switchTab('tabControls'));
-    document.getElementById('tabHelp')?.addEventListener('click', () => switchTab('tabHelp'));
+    const tabList = document.querySelector('.popup-tabs');
+    const tabIds = ['tabControls', 'tabHelp'];
+    tabIds.forEach(id => document.getElementById(id)?.addEventListener('click', () => switchTab(id)));
+
+    tabList?.addEventListener('keydown', (event) => {
+      const current = tabIds.indexOf(document.activeElement?.id);
+      if (current < 0) return;
+      let next = current;
+      if (event.key === 'ArrowRight') next = (current + 1) % tabIds.length;
+      else if (event.key === 'ArrowLeft') next = (current - 1 + tabIds.length) % tabIds.length;
+      else if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = tabIds.length - 1;
+      else return;
+      event.preventDefault();
+      switchTab(tabIds[next], { focus: true });
+    });
 
     document.querySelectorAll('[data-key]').forEach(input => {
       const key = input.dataset.key;
@@ -303,7 +309,6 @@
     document.getElementById('supportPaypal')?.addEventListener('click', () => createTab(PAYPAL_URL));
     document.getElementById('supportRevolut')?.addEventListener('click', () => createTab(REVOLUT_URL));
 
-    bindPressFeedback();
     maybeShowRatingPrompt();
   }
 
