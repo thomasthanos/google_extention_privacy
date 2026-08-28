@@ -78,7 +78,7 @@
     <text x="64" y="185" font-size="19.5" font-weight="500" fill="#a8b6cb">Queue entire collections, skip the friction, keep a local history.</text>
     <g>
       <rect x="1030" y="196" width="106" height="30" rx="15" fill="#ffffff" fill-opacity=".05" stroke="url(#hair)" stroke-width="1"/>
-      <text x="1083.0" y="216" text-anchor="middle" font-size="14" font-weight="700" letter-spacing=".4" fill="#c9d6e8">v2.4.2</text>
+      <text x="1083.0" y="216" text-anchor="middle" font-size="14" font-weight="700" letter-spacing=".4" fill="#c9d6e8">v2.5.2</text>
     </g>
   </g>
 </svg>
