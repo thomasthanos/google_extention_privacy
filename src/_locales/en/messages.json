@@ -682,7 +682,7 @@
     "description": "Setting label."
   },
   "setHidePremiumUpsellsDesc": {
-    "message": "Hide Nexus advertising slots, empty ad containers, Premium banners and upgrade panels while browsing.",
+    "message": "Hide Nexus advertising slots, empty ad containers, Premium banners and upgrade panels while browsing. It also sets the Nexus ad-timer cookie so queued downloads do not wait through the countdown before each link.",
     "description": "Setting description."
   },
   "setHandleArchivedFilesDesc": {

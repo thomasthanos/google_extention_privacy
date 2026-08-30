@@ -1,6 +1,6 @@
 # Privacy policy - NexusMods Bypass
 
-**Last updated:** 24 August 2026
+**Last updated:** 30 August 2026
 **Publisher:** Thomas Thanos
 
 NexusMods Bypass has no analytics SDK, advertising SDK, tracking pixel, telemetry, account system, or remote data service. The published extension source is not minified or obfuscated, so these claims can be audited.
@@ -16,6 +16,10 @@ All of this data is stored in local browser extension storage.
 ## Network activity
 
 The extension makes only the Nexus Mods requests needed to resolve and start downloads - the same requests the browser would make when the corresponding buttons are clicked manually. It does not transmit extension data to the publisher or to an analytics service.
+
+## Cookies
+
+While **Hide ads and Premium panels** is on, the extension writes one first-party Nexus Mods cookie, `ab`, which is the timer Nexus uses to decide whether a download's ad countdown has elapsed. It is written on nexusmods.com only, expires by itself after five minutes, is never read back, and is never sent anywhere other than Nexus Mods. Turning that setting off stops it being written. The extension reads no other cookies and does not request the browser's cookies permission.
 
 ## Bug reports
 

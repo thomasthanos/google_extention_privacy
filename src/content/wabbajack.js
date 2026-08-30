@@ -178,44 +178,54 @@ window.NexusExt = window.NexusExt || {};
      https://github.com/wabbajack-tools/wabbajack/blob/main/Wabbajack.DTOs/Game/GameRegistry.cs
      It is only a fast path — anything missing is resolved from the mod page at download time, so a
      list for a game added after this snapshot still works. Entries Nexus does not host are null. */
-  const GAME_IDS = Object.freeze({
-    Morrowind: 100,
-    Oblivion: 101,
-    OblivionRemastered: 7587,
-    Fallout3: 120,
-    FalloutNewVegas: 130,
-    Skyrim: 110,
-    SkyrimSpecialEdition: 1704,
-    SkyrimVR: 1704,
-    Enderal: 2736,
-    EnderalSpecialEdition: 3685,
-    Fallout4: 1151,
-    Fallout4VR: 1151,
-    DarkestDungeon: 804,
-    Dishonored: 802,
-    Witcher: 150,
-    Witcher3: 952,
-    StardewValley: 1303,
-    KingdomComeDeliverance: 2298,
-    MechWarrior5Mercenaries: 3099,
-    NoMansSky: 1634,
-    DragonAgeOrigins: 140,
-    DragonAge2: 141,
-    DragonAgeInquisition: 728,
-    KerbalSpaceProgram: 272,
+  /* Wabbajack's own game registry, keyed by the GameName its manifest carries:
+     https://github.com/wabbajack-tools/wabbajack/blob/main/Wabbajack.DTOs/Game/GameRegistry.cs
+     Both halves are needed: the numeric id goes to the download endpoint, and the domain builds the
+     mod page URL the queue validates. The domain cannot be guessed from the Wabbajack name —
+     FalloutNewVegas lives at /newvegas — so a game missing here is reported rather than guessed at.
+     Entries Nexus does not host are null. */
+  const GAMES = Object.freeze({
+    Morrowind: { domain: 'morrowind', id: 100 },
+    Oblivion: { domain: 'oblivion', id: 101 },
+    OblivionRemastered: { domain: 'oblivionremastered', id: 7587 },
+    Fallout3: { domain: 'fallout3', id: 120 },
+    FalloutNewVegas: { domain: 'newvegas', id: 130 },
+    Skyrim: { domain: 'skyrim', id: 110 },
+    SkyrimSpecialEdition: { domain: 'skyrimspecialedition', id: 1704 },
+    Fallout4: { domain: 'fallout4', id: 1151 },
+    SkyrimVR: { domain: 'skyrimspecialedition', id: 1704 },
+    Enderal: { domain: 'enderal', id: 2736 },
+    EnderalSpecialEdition: { domain: 'enderalspecialedition', id: 3685 },
+    Fallout4VR: { domain: 'fallout4', id: 1151 },
+    DarkestDungeon: { domain: 'darkestdungeon', id: 804 },
+    Dishonored: { domain: 'dishonored', id: 802 },
+    Witcher: { domain: 'witcher', id: 150 },
+    Witcher3: { domain: 'witcher3', id: 952 },
+    StardewValley: { domain: 'stardewvalley', id: 1303 },
+    KingdomComeDeliverance: { domain: 'kingdomcomedeliverance', id: 2298 },
+    MechWarrior5Mercenaries: { domain: 'mechwarrior5mercenaries', id: 3099 },
+    NoMansSky: { domain: 'nomanssky', id: 1634 },
+    DragonAgeOrigins: { domain: 'dragonage', id: 140 },
+    DragonAge2: { domain: 'dragonage2', id: 141 },
+    DragonAgeInquisition: { domain: 'dragonageinquisition', id: 728 },
+    KerbalSpaceProgram: { domain: 'kerbalspaceprogram', id: 272 },
     Terraria: null,
-    Cyberpunk2077: 3333,
-    Sims4: 641,
-    DragonsDogma: 1249,
+    Cyberpunk2077: { domain: 'cyberpunk2077', id: 3333 },
+    Sims4: { domain: 'thesims4', id: 641 },
+    DragonsDogma: { domain: 'dragonsdogma', id: 1249 },
     KarrynsPrison: null,
-    Valheim: 3667,
-    MountAndBlade2Bannerlord: 3174,
-    FinalFantasy7Remake: 4202,
-    BaldursGate3: 3474,
-    Starfield: 4187,
-    SevenDaysToDie: 1059,
-    ModdingTools: 2295
+    Valheim: { domain: 'valheim', id: 3667 },
+    MountAndBlade2Bannerlord: { domain: 'mountandblade2bannerlord', id: 3174 },
+    FinalFantasy7Remake: { domain: 'finalfantasy7remake', id: 4202 },
+    BaldursGate3: { domain: 'baldursgate3', id: 3474 },
+    Starfield: { domain: 'starfield', id: 4187 },
+    SevenDaysToDie: { domain: '7daystodie', id: 1059 },
+    ModdingTools: { domain: 'site', id: 2295 }
   });
+
+  const GAME_IDS = Object.freeze(Object.fromEntries(
+    Object.entries(GAMES).map(([name, game]) => [name, game ? game.id : null])
+  ));
 
   const NEXUS_STATE_TYPES = /NexusDownloader\+State|NexusDownloader, Wabbajack/i;
 
@@ -232,17 +242,19 @@ window.NexusExt = window.NexusExt || {};
     return Number.isInteger(number) && number > 0 ? number : null;
   }
 
-  /* One entry per Nexus-hosted archive, in the shape the collection queue already consumes, so the
-     existing pacing, history, rate-limit and Vortex handling apply unchanged. */
+  /* Every archive is accounted for: usable ones become items, the rest are named with a reason so the
+     user can see what a list needs that the extension cannot fetch, instead of silently getting a
+     shorter queue than the modlist. */
   function collectNexusArchives(modlist) {
     const archives = Array.isArray(modlist?.Archives) ? modlist.Archives : [];
     const items = [];
     const skipped = [];
+    const skip = (name, reason) => skipped.push({ name: name || '(unnamed archive)', reason });
 
     for (const archive of archives) {
       const name = String(archive?.Name || '').trim();
       if (!isNexusArchive(archive)) {
-        if (name) skipped.push(name);
+        skip(name, 'not-on-nexus');
         continue;
       }
       const state = archive.State;
@@ -250,14 +262,23 @@ window.NexusExt = window.NexusExt || {};
       const fileId = toPositiveInteger(state.FileID);
       const gameName = String(state.GameName || '').trim();
       if (!modId || !fileId || !gameName) {
-        if (name) skipped.push(name);
+        skip(name, 'incomplete-entry');
+        continue;
+      }
+
+      /* The domain cannot be derived from the Wabbajack name, so an unrecognised game is reported
+         rather than guessed — a wrong domain would just 404 for every file of that game. */
+      const game = GAMES[gameName];
+      if (!game) {
+        skip(name, `unknown-game:${gameName}`);
         continue;
       }
 
       const sizeBytes = Number(archive.Size);
       items.push({
         gameName,
-        gameId: GAME_IDS[gameName] ?? null,
+        gameDomain: game.domain,
+        gameId: game.id,
         modId,
         fileId,
         name: name || `${gameName} ${modId}/${fileId}`,
@@ -267,6 +288,28 @@ window.NexusExt = window.NexusExt || {};
     }
 
     return { items, skipped };
+  }
+
+  /* The exact shape the collection GraphQL query produces, so a modlist can be handed to the existing
+     queue untouched — which means its pacing, rate-limit backoff, download history, resume and both
+     the Vortex and browser paths all apply with no queue changes at all. */
+  function toCollectionMods(list) {
+    const items = Array.isArray(list?.items) ? list.items : [];
+    return items.map((item) => ({
+      fileId: item.fileId,
+      optional: false,
+      file: {
+        fileId: item.fileId,
+        name: item.name,
+        size: item.sizeKb,
+        url: `https://www.nexusmods.com/${item.gameDomain}/mods/${item.modId}?tab=files&file_id=${item.fileId}`,
+        mod: {
+          name: item.modName || item.name,
+          modId: item.modId,
+          game: { domainName: item.gameDomain, id: item.gameId }
+        }
+      }
+    }));
   }
 
   async function readModlist(file) {
@@ -299,10 +342,12 @@ window.NexusExt = window.NexusExt || {};
   }
 
   window.NexusExt.Wabbajack = {
+    GAMES,
     GAME_IDS,
     WabbajackError,
     readModlist,
     collectNexusArchives,
+    toCollectionMods,
     readZipEntry
   };
 })();

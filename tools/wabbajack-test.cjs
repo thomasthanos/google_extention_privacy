@@ -8,7 +8,7 @@ const zlib = require('node:zlib');
 
 const context = vm.createContext({
   window: {}, console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder,
-  DataView, Uint8Array, ArrayBuffer, Number, Math, JSON, Object, Array, String, Error, RegExp, Promise
+  DataView, Uint8Array, ArrayBuffer, Number, Math, JSON, Object, Array, String, Error, RegExp, Promise, URL
 });
 vm.runInContext(fs.readFileSync('src/content/wabbajack.js', 'utf8'), context, {
   filename: 'src/content/wabbajack.js'
@@ -152,27 +152,55 @@ const MODLIST = {
 
     assert.equal(second.gameName, 'OblivionRemastered');
     assert.equal(second.gameId, 7587, `${label}: registry covers Oblivion Remastered`);
+    assert.equal(second.gameDomain, 'oblivionremastered');
 
     /* Spread into a host array first: values built inside the vm realm carry that realm's
        Array.prototype, which deepStrictEqual compares and would reject. */
+    const skipped = [...list.skipped].map((entry) => `${entry.name}:${entry.reason}`).sort();
     assert.deepEqual(
-      [...list.skipped].sort(),
-      ['Broken.7z', 'FromGoogleDrive.7z'],
-      `${label}: unusable archives are named, not silently dropped`
+      skipped,
+      ['Broken.7z:incomplete-entry', 'FromGoogleDrive.7z:not-on-nexus'],
+      `${label}: unusable archives are named with a reason, not silently dropped`
     );
+
+    /* The queue is fed straight from this, so the shape has to match what the collection GraphQL
+       query returns field for field — a mismatch here fails at download time, not at import. */
+    const mods = WJ.toCollectionMods(list);
+    assert.equal(mods.length, 2, `${label}: one queue entry per usable archive`);
+    const [queued] = mods;
+    assert.equal(queued.fileId, 1000);
+    assert.equal(queued.file.size, 5120, `${label}: the queue reads file.size as KB`);
+    assert.equal(queued.file.mod.game.id, 1704);
+    assert.equal(queued.file.mod.game.domainName, 'skyrimspecialedition');
+    assert.equal(queued.file.mod.modId, 266);
+    assert.equal(queued.optional, false);
+
+    /* background.js sanitizeNdcJobItem rejects any pageUrl whose pathname is not /<game>/mods/<id>,
+       so the URL this builds has to satisfy that exactly. */
+    const parsed = new URL(queued.file.url);
+    assert.equal(parsed.protocol, 'https:');
+    assert.equal(parsed.hostname, 'www.nexusmods.com');
+    assert.match(parsed.pathname, /^\/[^/]+\/mods\/\d+$/, `${label}: pageUrl passes the worker's check`);
+    assert.equal(parsed.searchParams.get('file_id'), '1000');
   }
 
-  // A game the registry has never heard of must degrade to "resolve it later", not to a wrong id.
+  /* A game the registry has never heard of must be reported, not guessed at: the mod page URL needs
+     the Nexus domain, and that cannot be derived from the Wabbajack name. */
   const unknown = WJ.collectNexusArchives({
     Archives: [{
       Name: 'X.7z', Size: 1024,
       State: { $type: 'NexusDownloader+State', GameName: 'SomeGameShippedNextYear', ModID: 1, FileID: 2 }
     }]
   });
-  assert.equal(unknown.items.length, 1);
-  assert.equal(unknown.items[0].gameId, null, 'an unknown game yields null, never a guessed id');
+  assert.equal(unknown.items.length, 0, 'an unknown game is never queued with a guessed domain');
+  assert.equal(unknown.skipped[0].reason, 'unknown-game:SomeGameShippedNextYear');
+
+  // The domain genuinely cannot be inferred: New Vegas is /newvegas, not /falloutnewvegas.
+  assert.equal(WJ.GAMES.FalloutNewVegas.domain, 'newvegas');
+  assert.equal(WJ.GAMES.SkyrimSpecialEdition.domain, 'skyrimspecialedition');
 
   // Games Nexus does not host are recorded as null in the registry rather than omitted.
+  assert.equal(WJ.GAMES.Terraria, null);
   assert.equal(WJ.GAME_IDS.Terraria, null);
   assert.equal(WJ.GAME_IDS.SkyrimSpecialEdition, 1704);
 

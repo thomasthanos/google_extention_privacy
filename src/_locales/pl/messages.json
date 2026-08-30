@@ -479,7 +479,7 @@
     "message": "Ukryj reklamy i panele Premium"
   },
   "setHidePremiumUpsellsDesc": {
-    "message": "Ukrywa miejsca reklamowe Nexus, puste kontenery reklam, banery Premium i panele ulepszeń podczas przeglądania."
+    "message": "Ukrywa miejsca reklamowe Nexus, puste kontenery reklam, banery Premium i panele ulepszeń podczas przeglądania. Ustawia też ciasteczko licznika reklam Nexusa, dzięki czemu pobierania w kolejce nie czekają na odliczanie przed każdym odnośnikiem."
   },
   "setHandleArchivedFilesDesc": {
     "message": "Dodaje przyciski pobierania Vortex i przeglądarki do wpisów plików archiwalnych, gdy Nexus je ukrywa."

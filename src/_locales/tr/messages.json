@@ -479,7 +479,7 @@
     "message": "Reklamları ve Premium panellerini gizle"
   },
   "setHidePremiumUpsellsDesc": {
-    "message": "Gezinirken Nexus reklam alanlarını, boş reklam kutularını, Premium afişlerini ve yükseltme panellerini gizler."
+    "message": "Gezinirken Nexus reklam alanlarını, boş reklam kutularını, Premium afişlerini ve yükseltme panellerini gizler. Ayrıca Nexus reklam sayacı çerezini ayarlar, böylece kuyruktaki indirmeler her bağlantıdan önce geri sayımı beklemez."
   },
   "setHandleArchivedFilesDesc": {
     "message": "Nexus gizlediğinde, arşivlenmiş dosya girişlerine Vortex ve tarayıcı indirme düğmeleri ekler."

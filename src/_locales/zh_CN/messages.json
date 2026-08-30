@@ -514,7 +514,7 @@
     "message": "隐藏广告和 Premium 面板"
   },
   "setHidePremiumUpsellsDesc": {
-    "message": "浏览时隐藏 Nexus 广告位、空广告容器、Premium 横幅和升级面板。"
+    "message": "浏览时隐藏 Nexus 广告位、空广告容器、Premium 横幅和升级面板。 同时会设置 Nexus 广告计时器 Cookie，使队列中的下载无需在每个链接前等待倒计时。"
   },
   "setHandleArchivedFilesDesc": {
     "message": "当 Nexus 隐藏归档文件时，为其添加 Vortex 与浏览器下载按钮。"

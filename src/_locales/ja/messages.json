@@ -479,7 +479,7 @@
     "message": "広告と Premium パネルを非表示"
   },
   "setHidePremiumUpsellsDesc": {
-    "message": "閲覧中に Nexus の広告枠、空の広告コンテナ、Premium バナー、アップグレード案内を非表示にします。"
+    "message": "閲覧中に Nexus の広告枠、空の広告コンテナ、Premium バナー、アップグレード案内を非表示にします。 Nexus の広告タイマー Cookie も設定するため、キュー内のダウンロードはリンクごとのカウントダウンを待ちません。"
   },
   "setHandleArchivedFilesDesc": {
     "message": "Nexus が非表示にしているアーカイブ済みファイルに、Vortex とブラウザーのダウンロードボタンを追加します。"

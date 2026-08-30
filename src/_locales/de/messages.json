@@ -549,7 +549,7 @@
     "message": "Werbung und Premium-Banner ausblenden"
   },
   "setHidePremiumUpsellsDesc": {
-    "message": "Nexus-Werbeflächen, leere Werbecontainer, Premium-Banner und Upgrade-Panels beim Surfen ausblenden."
+    "message": "Nexus-Werbeflächen, leere Werbecontainer, Premium-Banner und Upgrade-Panels beim Surfen ausblenden. Setzt außerdem das Nexus-Werbetimer-Cookie, damit Downloads in der Warteschlange nicht vor jedem Link den Countdown abwarten."
   },
   "setHandleArchivedFilesDesc": {
     "message": "Vortex- und Browser-Download-Buttons zu archivierten Dateien hinzufügen, wenn Nexus sie ausblendet."

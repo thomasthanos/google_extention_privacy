@@ -479,7 +479,7 @@
     "message": "Nascondi pubblicità e pannelli Premium"
   },
   "setHidePremiumUpsellsDesc": {
-    "message": "Nasconde gli spazi pubblicitari di Nexus, i contenitori vuoti, i banner Premium e i pannelli di upgrade durante la navigazione."
+    "message": "Nasconde gli spazi pubblicitari di Nexus, i contenitori vuoti, i banner Premium e i pannelli di upgrade durante la navigazione. Imposta anche il cookie del timer pubblicitario di Nexus, così i download in coda non attendono il conto alla rovescia prima di ogni collegamento."
   },
   "setHandleArchivedFilesDesc": {
     "message": "Aggiunge i pulsanti di download Vortex e browser alle voci dei file archiviati quando Nexus li nasconde."

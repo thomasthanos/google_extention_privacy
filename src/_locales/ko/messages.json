@@ -479,7 +479,7 @@
     "message": "광고 및 Premium 패널 숨기기"
   },
   "setHidePremiumUpsellsDesc": {
-    "message": "탐색 중 Nexus의 광고 영역, 빈 광고 컨테이너, Premium 배너, 업그레이드 패널을 숨깁니다."
+    "message": "탐색 중 Nexus의 광고 영역, 빈 광고 컨테이너, Premium 배너, 업그레이드 패널을 숨깁니다. Nexus 광고 타이머 쿠키도 설정하므로 대기열의 다운로드가 링크마다 카운트다운을 기다리지 않습니다."
   },
   "setHandleArchivedFilesDesc": {
     "message": "Nexus가 숨기는 보관된 파일 항목에 Vortex 및 브라우저 다운로드 버튼을 추가합니다."

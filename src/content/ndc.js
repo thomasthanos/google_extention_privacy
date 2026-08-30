@@ -335,6 +335,8 @@ window.NexusExt = window.NexusExt || {};
           }
         }
       } else {
+        // Same ad-timer refresh the single-file path uses; see NNW.refreshAdTimerCookie.
+        NexusExt.NNW?.refreshAdTimerCookie?.();
         const generatedResponse = await Errors.request(
           'https://www.nexusmods.com/Core/Libs/Common/Managers/Downloads?GenerateDownloadUrl',
           {

@@ -549,7 +549,7 @@
     "message": "Ocultar anuncios y paneles Premium"
   },
   "setHidePremiumUpsellsDesc": {
-    "message": "Oculta espacios publicitarios, contenedores vacíos, banners Premium y paneles de mejora."
+    "message": "Oculta espacios publicitarios, contenedores vacíos, banners Premium y paneles de mejora. También establece la cookie del temporizador de anuncios de Nexus para que las descargas en cola no esperen la cuenta atrás antes de cada enlace."
   },
   "setHandleArchivedFilesDesc": {
     "message": "Añade botones de descarga de Vortex y navegador a los archivos archivados cuando Nexus los oculta."

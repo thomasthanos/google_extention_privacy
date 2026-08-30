@@ -467,6 +467,7 @@ window.NexusExt = window.NexusExt || {};
 
     const filePageUrl = href || `${location.origin}${location.pathname}?tab=files&file_id=${encodeURIComponent(fileId)}`;
     let resolvedGameId = gameId || getGameId(filePageUrl);
+    refreshAdTimerCookie();
     const endpoint = new URL('/Core/Libs/Common/Managers/Downloads?GenerateDownloadUrl', filePageUrl).href;
     const headers = {
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -1587,6 +1588,34 @@ window.NexusExt = window.NexusExt || {};
     premiumObserver.observe(document.body, { childList: true, subtree: true });
   }
 
+  /* Nexus gates a generated download link behind an ad timer it tracks in a first-party "ab" cookie
+     shaped `<group>|<unix seconds>`. Writing a near-future timestamp satisfies the check, which is
+     what lets a queued run resolve links without sitting through the wait on every file.
+
+     Two differences from the userscript this came from: it rewrote the cookie before every single
+     request, which on a several-hundred-mod queue is hundreds of pointless writes, so this refreshes
+     only when the value is close to lapsing; and it rides the existing "Hide ads and Premium panels"
+     switch, so turning that off turns this off too. The cookie is first-party, expires by itself in
+     five minutes, and is never read back. */
+  const AD_TIMER_WINDOW_MS = 5 * 60 * 1000;
+  const AD_TIMER_REFRESH_MS = 60 * 1000;
+  let adTimerWrittenAt = 0;
+
+  function refreshAdTimerCookie() {
+    if (!cfg.HidePremiumUpsells) return;
+    const now = Date.now();
+    if (now - adTimerWrittenAt < AD_TIMER_REFRESH_MS) return;
+    try {
+      if (typeof document === 'undefined') return;
+      if (!/(?:^|\.)nexusmods\.com$/i.test(location.hostname)) return;
+      const elapsedAt = Math.round((now + AD_TIMER_WINDOW_MS) / 1000);
+      const expires = new Date(now + AD_TIMER_WINDOW_MS).toUTCString();
+      document.cookie = `ab=0|${elapsedAt};expires=${expires};domain=nexusmods.com;path=/;SameSite=Lax;Secure`;
+      adTimerWrittenAt = now;
+    } catch (_) {
+    }
+  }
+
   function hideUpsellElement(el, className = "nxtk-upsell-hidden") {
     if (!el || !el.dataset || el.dataset.nxtkUpsellHidden === "1") return;
     el.dataset.nxtkUpsellHidden = "1";
@@ -1835,6 +1864,7 @@ window.NexusExt = window.NexusExt || {};
     Logger,
     waitForDomSettled,
     parseDownloadURLFromResponse,
-    parseNxmDownloadLink
+    parseNxmDownloadLink,
+    refreshAdTimerCookie
   };
 })();

@@ -549,7 +549,7 @@
     "message": "Masquer les publicités et les panneaux Premium"
   },
   "setHidePremiumUpsellsDesc": {
-    "message": "Masque les emplacements publicitaires, conteneurs vides, bannières Premium et panneaux de mise à niveau."
+    "message": "Masque les emplacements publicitaires, conteneurs vides, bannières Premium et panneaux de mise à niveau. Définit aussi le cookie de minuterie publicitaire de Nexus pour que les téléchargements en file d'attente n'attendent pas le compte à rebours avant chaque lien."
   },
   "setHandleArchivedFilesDesc": {
     "message": "Ajoute des boutons de téléchargement Vortex et navigateur aux fichiers archivés masqués par Nexus."
