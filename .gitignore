@@ -16,3 +16,4 @@ nexus.mods.bypass/.claude/settings.local.json
 
 # Reference userscripts to port from — not part of the package
 you need to add this (gitgnore this folder)/
+nexusmods

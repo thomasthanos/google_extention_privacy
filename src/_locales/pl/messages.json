@@ -479,7 +479,7 @@
     "message": "Ukryj reklamy i panele Premium"
   },
   "setHidePremiumUpsellsDesc": {
-    "message": "Ukrywa miejsca reklamowe Nexus, puste kontenery reklam, banery Premium i panele ulepszeń podczas przeglądania. Ustawia też ciasteczko licznika reklam Nexusa, dzięki czemu pobierania w kolejce nie czekają na odliczanie przed każdym odnośnikiem."
+    "message": "Ukrywa reklamy i banery Premium. Pomija również 5-sekundowe odliczanie przy pobieraniu."
   },
   "setHandleArchivedFilesDesc": {
     "message": "Dodaje przyciski pobierania Vortex i przeglądarki do wpisów plików archiwalnych, gdy Nexus je ukrywa."
@@ -1379,7 +1379,7 @@
     "message": "Zapasowa ścieżka Cloudflare"
   },
   "setCloudflareFallbackDesc": {
-    "message": "Gdy Nexus odpowiada na żądanie pobrania w tle stroną weryfikacji, otwiera stronę pliku, abyś mógł ukończyć sprawdzenie, zamiast kończyć błędem. Dlatego karta czasem sama zmienia adres."
+    "message": "Jeśli pobieranie w tle wymaga weryfikacji, otwiera stronę, aby ją ukończyć, zamiast anulować."
   },
   "tabControls": {
     "message": "Sterowanie",
@@ -1396,7 +1396,7 @@
     "message": "Import listy Wabbajack (beta)"
   },
   "setWabbajackImportDesc": {
-    "message": "Dodaje do tego okna przycisk, który odczytuje plik .wabbajack i kolejkuje wymienione w nim pliki z Nexusa. Pliki hostowane poza Nexusem oraz gry nierozpoznane przez tę wersję są zgłaszane zamiast pobierane."
+    "message": "Czyta plik .wabbajack i dodaje do kolejki modyfikacje z Nexus. Zewnętrzne pliki i nieznane gry są pomijane."
   },
   "btnImportWabbajack": {
     "message": "Importuj listę Wabbajack"

@@ -479,7 +479,7 @@
     "message": "Reklamları ve Premium panellerini gizle"
   },
   "setHidePremiumUpsellsDesc": {
-    "message": "Gezinirken Nexus reklam alanlarını, boş reklam kutularını, Premium afişlerini ve yükseltme panellerini gizler. Ayrıca Nexus reklam sayacı çerezini ayarlar, böylece kuyruktaki indirmeler her bağlantıdan önce geri sayımı beklemez."
+    "message": "Reklamları ve Premium banner'ları gizler. Ayrıca indirmelerdeki 5 saniyelik geri sayımı atlar."
   },
   "setHandleArchivedFilesDesc": {
     "message": "Nexus gizlediğinde, arşivlenmiş dosya girişlerine Vortex ve tarayıcı indirme düğmeleri ekler."
@@ -1227,7 +1227,7 @@
     "message": "Cloudflare yedeği"
   },
   "setCloudflareFallbackDesc": {
-    "message": "Nexus, arka plandaki bir indirme isteğine doğrulama sayfasıyla yanıt verdiğinde, hata vermek yerine dosya sayfasını açar ve doğrulamayı tamamlamanı sağlar. Sekmenin bazen kendiliğinden gitmesinin nedeni budur."
+    "message": "Arka planda indirme işlemi tarayıcı doğrulaması gerektirirse, başarısız olmak yerine tamamlamanız için sayfayı açar."
   },
   "tabControls": {
     "message": "Kontroller",
@@ -1244,7 +1244,7 @@
     "message": "Wabbajack mod listesi içe aktarma (beta)"
   },
   "setWabbajackImportDesc": {
-    "message": "Bu pencereye, bir .wabbajack dosyasını okuyup içindeki Nexus dosyalarını kuyruğa ekleyen bir düğme ekler. Nexus dışında barındırılan dosyalar ve bu sürümün tanımadığı oyunlar indirilmek yerine bildirilir."
+    "message": ".wabbajack dosyasını okuyarak Nexus modlarını sıraya ekler. Harici dosyalar ve bilinmeyen oyunlar atlanır."
   },
   "btnImportWabbajack": {
     "message": "Wabbajack mod listesi içe aktar"

@@ -549,7 +549,7 @@
     "message": "Werbung und Premium-Banner ausblenden"
   },
   "setHidePremiumUpsellsDesc": {
-    "message": "Nexus-Werbeflächen, leere Werbecontainer, Premium-Banner und Upgrade-Panels beim Surfen ausblenden. Setzt außerdem das Nexus-Werbetimer-Cookie, damit Downloads in der Warteschlange nicht vor jedem Link den Countdown abwarten."
+    "message": "Verbirgt Werbung und Premium-Banner. Umgeht zudem den 5-Sekunden-Countdown bei Downloads."
   },
   "setHandleArchivedFilesDesc": {
     "message": "Vortex- und Browser-Download-Buttons zu archivierten Dateien hinzufügen, wenn Nexus sie ausblendet."
@@ -1227,7 +1227,7 @@
     "message": "Cloudflare-Fallback"
   },
   "setCloudflareFallbackDesc": {
-    "message": "Wenn Nexus eine Download-Anfrage im Hintergrund mit einer Überprüfungsseite beantwortet, die Dateiseite öffnen, damit du die Prüfung abschließen kannst, statt abzubrechen. Deshalb wechselt der Tab manchmal von selbst."
+    "message": "Wenn ein Download im Hintergrund eine Browserprüfung erfordert, wird die Seite geöffnet, um diese abzuschließen, anstatt fehlzuschlagen."
   },
   "tabControls": {
     "message": "Steuerung",
@@ -1244,7 +1244,7 @@
     "message": "Wabbajack-Modlisten-Import (Beta)"
   },
   "setWabbajackImportDesc": {
-    "message": "Fügt diesem Dialog eine Schaltfläche hinzu, die eine .wabbajack-Datei liest und die darin aufgeführten Nexus-Dateien einreiht. Dateien außerhalb von Nexus und Spiele, die diese Version nicht kennt, werden gemeldet statt heruntergeladen."
+    "message": "Liest .wabbajack-Dateien und reiht deren Nexus-Mods ein. Externe Dateien und unbekannte Spiele werden übersprungen."
   },
   "btnImportWabbajack": {
     "message": "Wabbajack-Modliste importieren"

@@ -479,7 +479,7 @@
     "message": "광고 및 Premium 패널 숨기기"
   },
   "setHidePremiumUpsellsDesc": {
-    "message": "탐색 중 Nexus의 광고 영역, 빈 광고 컨테이너, Premium 배너, 업그레이드 패널을 숨깁니다. Nexus 광고 타이머 쿠키도 설정하므로 대기열의 다운로드가 링크마다 카운트다운을 기다리지 않습니다."
+    "message": "광고 및 프리미엄 배너를 숨깁니다. 또한 다운로드 시 5초 카운트다운을 건너뜁니다."
   },
   "setHandleArchivedFilesDesc": {
     "message": "Nexus가 숨기는 보관된 파일 항목에 Vortex 및 브라우저 다운로드 버튼을 추가합니다."
@@ -1151,7 +1151,7 @@
     "message": "Cloudflare 대체 동작"
   },
   "setCloudflareFallbackDesc": {
-    "message": "백그라운드 다운로드 요청에 Nexus가 확인 페이지로 응답하면, 실패시키는 대신 파일 페이지를 열어 확인을 완료할 수 있게 합니다. 탭이 가끔 저절로 이동하는 이유입니다."
+    "message": "백그라운드 다운로드 중 브라우저 확인이 필요한 경우, 실패하는 대신 페이지를 열어 완료할 수 있게 합니다."
   },
   "tabControls": {
     "message": "제어",
@@ -1168,7 +1168,7 @@
     "message": "Wabbajack 모드리스트 가져오기 (베타)"
   },
   "setWabbajackImportDesc": {
-    "message": "이 대화 상자에 .wabbajack 파일을 읽어 목록의 Nexus 파일을 대기열에 넣는 버튼을 추가합니다. Nexus 외부에 호스팅된 파일과 이 버전이 인식하지 못하는 게임은 내려받지 않고 보고합니다."
+    "message": ".wabbajack 파일을 읽어 Nexus 모드를 대기열에 추가합니다. 외부 파일과 알 수 없는 게임은 건너뜁니다."
   },
   "btnImportWabbajack": {
     "message": "Wabbajack 모드리스트 가져오기"

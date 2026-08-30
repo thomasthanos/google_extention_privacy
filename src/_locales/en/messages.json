@@ -682,7 +682,7 @@
     "description": "Setting label."
   },
   "setHidePremiumUpsellsDesc": {
-    "message": "Hide Nexus advertising slots, empty ad containers, Premium banners and upgrade panels while browsing. It also sets the Nexus ad-timer cookie so queued downloads do not wait through the countdown before each link.",
+    "message": "Hides ads and Premium banners. It also bypasses the 5-second countdown timer for downloads.",
     "description": "Setting description."
   },
   "setHandleArchivedFilesDesc": {
@@ -1488,7 +1488,7 @@
     "description": "Settings-panel label. \"Cloudflare\" is a product name and stays as-is."
   },
   "setCloudflareFallbackDesc": {
-    "message": "When Nexus answers a background download request with a browser verification page, open the file page so you can complete the check, instead of failing. This is why the tab sometimes navigates on its own.",
+    "message": "If a background download hits a browser check, it opens the page so you can clear it instead of failing.",
     "description": "Settings-panel description. Explains why the tab navigates on its own when Cloudflare challenges a background request."
   },
   "tabControls": {
@@ -1508,7 +1508,7 @@
     "description": "Label for the beta Wabbajack modlist import toggle."
   },
   "setWabbajackImportDesc": {
-    "message": "Adds a button to this dialog that reads a .wabbajack file and queues the Nexus files it lists. Files hosted outside Nexus, and games this build does not recognise, are reported instead of downloaded.",
+    "message": "Reads a .wabbajack file to queue its Nexus mods. External files and unknown games are skipped.",
     "description": "Description for the beta Wabbajack modlist import toggle."
   },
   "btnImportWabbajack": {

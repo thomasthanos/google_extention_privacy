@@ -549,7 +549,7 @@
     "message": "Masquer les publicités et les panneaux Premium"
   },
   "setHidePremiumUpsellsDesc": {
-    "message": "Masque les emplacements publicitaires, conteneurs vides, bannières Premium et panneaux de mise à niveau. Définit aussi le cookie de minuterie publicitaire de Nexus pour que les téléchargements en file d'attente n'attendent pas le compte à rebours avant chaque lien."
+    "message": "Masque les publicités et bannières Premium. Ignore également le compte à rebours de 5 secondes des téléchargements."
   },
   "setHandleArchivedFilesDesc": {
     "message": "Ajoute des boutons de téléchargement Vortex et navigateur aux fichiers archivés masqués par Nexus."
@@ -1227,7 +1227,7 @@
     "message": "Solution de secours Cloudflare"
   },
   "setCloudflareFallbackDesc": {
-    "message": "Quand Nexus répond à une demande de téléchargement en arrière-plan par une page de vérification, ouvrir la page du fichier pour que tu puisses valider le contrôle, au lieu d'échouer. C'est pour cela que l'onglet change parfois tout seul."
+    "message": "Si un téléchargement en arrière-plan nécessite une vérification, ouvre la page pour la valider au lieu d'échouer."
   },
   "tabControls": {
     "message": "Contrôles",
@@ -1244,7 +1244,7 @@
     "message": "Import de liste Wabbajack (bêta)"
   },
   "setWabbajackImportDesc": {
-    "message": "Ajoute à cette fenêtre un bouton qui lit un fichier .wabbajack et met en file d'attente les fichiers Nexus qu'il répertorie. Les fichiers hébergés hors de Nexus, et les jeux que cette version ne reconnaît pas, sont signalés au lieu d'être téléchargés."
+    "message": "Lit un fichier .wabbajack pour mettre en file d'attente ses mods Nexus. Les fichiers externes et jeux inconnus sont ignorés."
   },
   "btnImportWabbajack": {
     "message": "Importer une liste Wabbajack"

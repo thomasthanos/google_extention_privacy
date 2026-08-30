@@ -479,7 +479,7 @@
     "message": "広告と Premium パネルを非表示"
   },
   "setHidePremiumUpsellsDesc": {
-    "message": "閲覧中に Nexus の広告枠、空の広告コンテナ、Premium バナー、アップグレード案内を非表示にします。 Nexus の広告タイマー Cookie も設定するため、キュー内のダウンロードはリンクごとのカウントダウンを待ちません。"
+    "message": "広告やプレミアムバナーを非表示にします。また、ダウンロード時の5秒間のカウントダウンをスキップします。"
   },
   "setHandleArchivedFilesDesc": {
     "message": "Nexus が非表示にしているアーカイブ済みファイルに、Vortex とブラウザーのダウンロードボタンを追加します。"
@@ -1151,7 +1151,7 @@
     "message": "Cloudflare フォールバック"
   },
   "setCloudflareFallbackDesc": {
-    "message": "バックグラウンドのダウンロード要求に Nexus が確認ページを返した場合、失敗させる代わりにファイルページを開いて確認を完了できるようにします。タブが自動的に移動するのはこのためです。"
+    "message": "バックグラウンドでのダウンロード時にブラウザの確認が必要な場合、失敗させずにページを開いて完了できるようにします。"
   },
   "tabControls": {
     "message": "コントロール",
@@ -1168,7 +1168,7 @@
     "message": "Wabbajack モッドリスト読み込み（ベータ）"
   },
   "setWabbajackImportDesc": {
-    "message": "このダイアログに .wabbajack ファイルを読み込み、含まれる Nexus のファイルをキューに入れるボタンを追加します。Nexus 以外でホストされているファイルや、このバージョンが認識できないゲームは、ダウンロードせずに報告します。"
+    "message": ".wabbajackファイルを読み込み、NexusのMODをキューに追加します。外部ファイルや未対応のゲームはスキップされます。"
   },
   "btnImportWabbajack": {
     "message": "Wabbajack モッドリストを読み込む"

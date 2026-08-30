@@ -479,7 +479,7 @@
     "message": "Nascondi pubblicità e pannelli Premium"
   },
   "setHidePremiumUpsellsDesc": {
-    "message": "Nasconde gli spazi pubblicitari di Nexus, i contenitori vuoti, i banner Premium e i pannelli di upgrade durante la navigazione. Imposta anche il cookie del timer pubblicitario di Nexus, così i download in coda non attendono il conto alla rovescia prima di ogni collegamento."
+    "message": "Nasconde annunci e banner Premium. Salta anche il conto alla rovescia di 5 secondi per i download."
   },
   "setHandleArchivedFilesDesc": {
     "message": "Aggiunge i pulsanti di download Vortex e browser alle voci dei file archiviati quando Nexus li nasconde."
@@ -1227,7 +1227,7 @@
     "message": "Ripiego per Cloudflare"
   },
   "setCloudflareFallbackDesc": {
-    "message": "Quando Nexus risponde a una richiesta di download in background con una pagina di verifica, apre la pagina del file così puoi completare il controllo, invece di fallire. È per questo che a volte la scheda cambia da sola."
+    "message": "Se un download in background richiede una verifica, apre la pagina per completarla invece di fallire."
   },
   "tabControls": {
     "message": "Controlli",
@@ -1244,7 +1244,7 @@
     "message": "Importazione modlist Wabbajack (beta)"
   },
   "setWabbajackImportDesc": {
-    "message": "Aggiunge a questa finestra un pulsante che legge un file .wabbajack e accoda i file Nexus elencati. I file ospitati fuori da Nexus, e i giochi che questa versione non riconosce, vengono segnalati anziché scaricati."
+    "message": "Legge un file .wabbajack e accoda i suoi mod di Nexus. File esterni e giochi sconosciuti vengono ignorati."
   },
   "btnImportWabbajack": {
     "message": "Importa modlist Wabbajack"
