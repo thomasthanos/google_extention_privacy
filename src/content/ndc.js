@@ -196,6 +196,7 @@ window.NexusExt = window.NexusExt || {};
       this.requestTimeout = settings.RequestTimeout || Errors.DEFAULT_TIMEOUT_MS;
       this.showAlertsOnError = settings.ShowAlertsOnError !== false;
       this.downloadFolder = settings.DownloadFolder ?? '';
+      this.wabbajackImport = settings.WabbajackImport === true;
 
       this.watchSettings();
 
@@ -233,6 +234,7 @@ window.NexusExt = window.NexusExt || {};
       this.requestTimeout = next.RequestTimeout || Errors.DEFAULT_TIMEOUT_MS;
       this.showAlertsOnError = next.ShowAlertsOnError !== false;
       this.downloadFolder = next.DownloadFolder ?? '';
+      this.wabbajackImport = next.WabbajackImport === true;
       NXTK.setForceEnglish(next.ForceEnglish);
     }
 
@@ -248,6 +250,7 @@ window.NexusExt = window.NexusExt || {};
       this.requestTimeout = settings.RequestTimeout || Errors.DEFAULT_TIMEOUT_MS;
       this.showAlertsOnError = settings.ShowAlertsOnError !== false;
       this.downloadFolder = settings.DownloadFolder ?? '';
+      this.wabbajackImport = settings.WabbajackImport === true;
 
       this.watchSettings();
 

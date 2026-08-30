@@ -195,7 +195,9 @@ they are simply not listed.
   backoff, download history, resume and both the Vortex and browser paths all apply unchanged.
   Archives hosted outside Nexus, and games this build's registry does not recognise, are counted and
   reported rather than silently dropped: the mod page URL needs the Nexus domain, and that cannot be
-  guessed from the Wabbajack game name.
+  guessed from the Wabbajack game name. The same button also appears in the collection deck's
+  **Actions** row while the switch is on, so a modlist can be imported from either place, and both
+  follow the switch immediately instead of waiting for a reload.
 - `tools/check-locales.mjs` now compares which placeholders a translation uses, not how many. Counting
   alone let a translation swap `$1` for `$2`, or drop one while adding another, and still pass — the
   user would see the wrong value, or a literal `$1`, with the build green.

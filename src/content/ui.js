@@ -908,8 +908,12 @@ window.NexusExt = window.NexusExt || {};
       if (NexusExt.NNW) NexusExt.NNW.updateConfig(cfg);
 
       if (key === 'WabbajackImport') {
-        const importButton = modal.querySelector('#nxtk-wj-import');
-        if (importButton) importButton.hidden = !value;
+        /* Two entry points: this dialog, reachable from any Nexus page, and the collection deck's
+           Actions row when one is open. Both follow the switch immediately rather than on reload. */
+        for (const id of ['#nxtk-wj-import', '#nxtk-wj-deck-import']) {
+          const button = id === '#nxtk-wj-import' ? modal.querySelector(id) : document.querySelector(id);
+          if (button) button.hidden = !value;
+        }
       }
 
       if (key === 'ForceEnglish') {
@@ -1590,6 +1594,7 @@ window.NexusExt = window.NexusExt || {};
           <div class="nxtk-btn-row nxtk-btn-row-utility">
             <button class="nxtk-btn nxtk-btn-secondary" id="nxtk-import-mods">${L('deckImportMods', 'Import downloaded mods')}</button>
             <button class="nxtk-btn nxtk-btn-ghost nxtk-btn-icon" id="nxtk-import-info" title="${L('tipImportInfo', 'Info about importing')}">${svgIcon('info')}</button>
+            <button class="nxtk-btn nxtk-btn-secondary" id="nxtk-wj-deck-import" ${ndc.wabbajackImport ? '' : 'hidden'}>${L('btnImportWabbajack', 'Import Wabbajack modlist')}</button>
           </div>
           <div class="nxtk-btn-row">
             <div class="nxtk-btn-split nxtk-grow">
@@ -1743,6 +1748,8 @@ window.NexusExt = window.NexusExt || {};
     $('#nxtk-import-info').addEventListener('click', () => {
       showImportInfoModal(ndc.gameId);
     });
+
+    $('#nxtk-wj-deck-import')?.addEventListener('click', () => importWabbajackModlist());
 
     const menu = $('#nxtk-dl-menu');
     const menuController = bindDropdownToggle($('#nxtk-menu-toggle'), menu, { portal: true });
