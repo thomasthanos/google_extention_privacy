@@ -61,6 +61,7 @@ can pick up where it stopped instead of starting over.
 - **Local download history** — already-downloaded mods are recognised, so you can pick
   *Skip Downloaded* or *Re-download All* when you retry a collection.
 - **Update collection** — compare revisions to see what actually changed.
+- **Wabbajack modlist import (beta)** — read a `.wabbajack` file to seamlessly queue its Nexus mods.
 - Runs in the background service worker, so it survives tab navigation.
 
 ### Quality of life
@@ -121,7 +122,7 @@ Reachable from the popup → **Page settings**. Changes save instantly.
 
 | Group | Settings |
 |---|---|
-| **Download Flow** | Start downloads automatically · Close Vortex tabs · Skip requirement screens · Show error popups · Hide ads and Premium panels · Archived file buttons · Cloudflare fallback |
+| **Download Flow** | Start downloads automatically · Close Vortex tabs · Skip requirement screens · Show error popups · Hide ads and Premium panels · Archived file buttons · Wabbajack modlist import · Cloudflare fallback |
 | **Files & Pacing** | Browser download folder · Your Nexus download speed · Pause between mods |
 | **Advanced** | Verbose extension logs · Download request timeout · Close-tab delay |
 | **Language** | Always use English |
