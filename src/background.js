@@ -192,7 +192,13 @@ const writeQueues = new Map();
 function enqueueStorageTask(storageKey, task) {
   const previous = writeQueues.get(storageKey) || Promise.resolve();
   const next = previous.then(task, task);
-  writeQueues.set(storageKey, next.then(() => undefined, () => undefined));
+  const settled = next.then(() => undefined, () => undefined);
+  writeQueues.set(storageKey, settled);
+  /* Release the key once this is the tail of its chain. Item lists are keyed per job id, so without
+     this the map kept a permanent entry for every collection run the worker had ever seen. */
+  settled.then(() => {
+    if (writeQueues.get(storageKey) === settled) writeQueues.delete(storageKey);
+  });
   return next;
 }
 
@@ -288,6 +294,17 @@ const STORAGE_HANDLERS = {
       const stored = await storageGetLocal(NXTK.SETTINGS_KEY, null);
       const base = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
       const next = { ...NXTK.DEFAULTS, ...base, ...patch };
+      await storageSetLocal(NXTK.SETTINGS_KEY, next);
+      return next;
+    });
+  },
+
+  async SETTINGS_RESET() {
+    /* Restore Defaults used to be written straight to storage from the content script, outside this
+       queue, so a patch still in flight could land afterwards and resurrect the value the user had
+       just reset. */
+    return enqueueStorageTask(NXTK.SETTINGS_KEY, async () => {
+      const next = { ...NXTK.DEFAULTS };
       await storageSetLocal(NXTK.SETTINGS_KEY, next);
       return next;
     });
@@ -613,6 +630,26 @@ async function saveNdcJob(job) {
   return job;
 }
 
+/* Read-modify-write inside the NDC_JOBS_KEY critical section. saveNdcJob writes back a whole job
+   object that the caller may have read several awaits earlier, so every field the caller did not
+   intend to touch is silently rolled back to its stale value. The mutator here runs against the
+   freshly stored job, so only what it changes is written. enqueueStorageTask already serialises on
+   this key, so no new locking is needed. */
+async function mutateNdcJob(jobId, mutate) {
+  let updated = null;
+  await enqueueStorageTask(NDC_JOBS_KEY, async () => {
+    const jobs = await readNdcJobs();
+    const job = jobs[jobId];
+    if (!job) return;
+    mutate(job);
+    job.updatedAt = Date.now();
+    jobs[jobId] = job;
+    await storageSetLocal(NDC_JOBS_KEY, jobs);
+    updated = job;
+  });
+  return updated;
+}
+
 function ndcJobIsActive(job) {
   return !!job && (job.status === 'running' || job.status === 'paused');
 }
@@ -632,6 +669,27 @@ async function findNdcJobByDownloadId(downloadId) {
   }
   const jobs = await readNdcJobs();
   return Object.values(jobs).find((job) => job?.activeDownloadId === downloadId) || null;
+}
+
+function tabExists(tabId) {
+  return new Promise((resolve) => {
+    if (!Number.isInteger(tabId) || tabId < 0) return resolve(false);
+    try {
+      chrome.tabs.get(tabId, (tab) => resolve(!getRuntimeError() && !!tab));
+    } catch (_) {
+      resolve(false);
+    }
+  });
+}
+
+/* Ownership decides which tab closing cancels the run (stopNdcJobsForTab). Handing it to whichever
+   tab attached last meant that opening the same collection in a second tab silently moved the run
+   onto that tab, and closing it — the throwaway one the user never meant to run anything — killed a
+   queue the original tab was still showing. Only adopt an orphan. */
+async function claimNdcJobOwnership(job, tabId) {
+  if (job.tabId === tabId) return job;
+  if (await tabExists(job.tabId)) return job;
+  return (await mutateNdcJob(job.id, (current) => { current.tabId = tabId; })) || job;
 }
 
 function notifyNdcJob(job, type, extra = {}, alsoTabIds = []) {
@@ -854,11 +912,12 @@ async function startNdcDownload(job, item, url) {
 }
 
 async function finishNdcJob(job) {
-  job.status = job.failed.length ? 'partial' : 'finished';
-  job.activeDownloadId = null;
-  job.finishedAt = Date.now();
   clearNdcJobAlarm(job.id);
-  await saveNdcJob(job);
+  job = (await mutateNdcJob(job.id, (current) => {
+    current.status = (Array.isArray(current.failed) && current.failed.length) ? 'partial' : 'finished';
+    current.activeDownloadId = null;
+    current.finishedAt = Date.now();
+  })) || job;
   if (job.type && !job.failed.length) {
     await STORAGE_HANDLERS.NDC_HISTORY_CLEAR_TYPE({
       gameId: job.gameId,
@@ -1056,7 +1115,7 @@ async function applyNdcDownloadTerminal(job, downloadId, state, error) {
   job.activeDownloadId = null;
 
   if (job.status === 'stopped') {
-    await saveNdcJob(job);
+    await mutateNdcJob(job.id, (current) => { current.activeDownloadId = null; });
     return null;
   }
 
@@ -1076,10 +1135,10 @@ async function applyNdcDownloadTerminal(job, downloadId, state, error) {
     }
   }
 
+  /* Each branch mutates the stored job rather than writing this snapshot back. The snapshot was read
+     before readNdcJobItems, verifyTransferSize and the history write, so anything that moved in the
+     meantime — an attach, a pause, the next item starting — would otherwise be rolled back. */
   if (effectiveState === 'complete') {
-    job.completed += 1;
-    job.transferAttempts = 0;
-    job.index += 1;
     if (job.type) {
       await STORAGE_HANDLERS.NDC_HISTORY_ADD({
         gameId: job.gameId,
@@ -1089,24 +1148,34 @@ async function applyNdcDownloadTerminal(job, downloadId, state, error) {
       });
     }
     await STORAGE_HANDLERS.TOTAL_DOWNLOADS_INCREMENT();
-    await saveNdcJob(job);
+    job = (await mutateNdcJob(job.id, (current) => {
+      current.activeDownloadId = null;
+      current.completed = Number(current.completed || 0) + 1;
+      current.transferAttempts = 0;
+      current.index = Number(current.index || 0) + 1;
+    })) || job;
     notifyNdcJob(job, 'NXT_NDC_PROGRESS', {
       itemName: item.name,
       itemState: 'complete'
     });
   } else if ((job.transferAttempts || 0) < 1) {
-    job.transferAttempts = (job.transferAttempts || 0) + 1;
-    await saveNdcJob(job);
+    job = (await mutateNdcJob(job.id, (current) => {
+      current.activeDownloadId = null;
+      current.transferAttempts = Number(current.transferAttempts || 0) + 1;
+    })) || job;
     notifyNdcJob(job, 'NXT_NDC_PROGRESS', {
       itemName: item.name,
       itemState: 'retrying',
       error: effectiveError || 'interrupted'
     });
   } else {
-    job.failed.push({ fileId: item.fileId, code: effectiveError || 'interrupted' });
-    job.transferAttempts = 0;
-    job.index += 1;
-    await saveNdcJob(job);
+    job = (await mutateNdcJob(job.id, (current) => {
+      current.activeDownloadId = null;
+      if (!Array.isArray(current.failed)) current.failed = [];
+      current.failed.push({ fileId: item.fileId, code: effectiveError || 'interrupted' });
+      current.transferAttempts = 0;
+      current.index = Number(current.index || 0) + 1;
+    })) || job;
     notifyNdcJob(job, 'NXT_NDC_PROGRESS', {
       itemName: item.name,
       itemState: 'failed',
@@ -1193,14 +1262,15 @@ const NDC_QUEUE_HANDLERS = {
     if (!isSafeId(gameId) || !isSafeId(collectionId)) throw new Error('invalid-collection-identifier');
 
     const scopeKey = ndcScopeKey(type, items);
-    const existing = await findActiveNdcJobForCollection(gameId, collectionId);
+    let existing = await findActiveNdcJobForCollection(gameId, collectionId);
     const isReconnect = !!existing
       && !payload?.restart
       && existing.type === type
       && (type !== null || existing.scopeKey === scopeKey);
     if (isReconnect) {
-      existing.tabId = tabId;
-      await saveNdcJob(existing);
+      /* Pressing Start in this tab is an explicit claim, so ownership may move here — but write only
+         tabId, never the whole snapshot, which could roll back index/activeDownloadId. */
+      existing = (await mutateNdcJob(existing.id, (current) => { current.tabId = tabId; })) || existing;
       if (existing.status === 'running') {
         processNdcJob(existing.id).catch((cause) => recordBackgroundError('resume adopted job', cause));
       }
@@ -1284,11 +1354,12 @@ const NDC_QUEUE_HANDLERS = {
     const collectionId = String(payload?.collectionId || '');
     if (!isSafeId(gameId) || !isSafeId(collectionId)) throw new Error('invalid-collection-identifier');
 
-    const job = await findActiveNdcJobForCollection(gameId, collectionId);
-    if (!job) return null;
+    const found = await findActiveNdcJobForCollection(gameId, collectionId);
+    if (!found) return null;
 
-    job.tabId = tabId;
-    await saveNdcJob(job);
+    /* Attaching is passive — it happens just by opening the collection page. Taking ownership here
+       meant a second tab silently became the one whose closing cancels the run. */
+    const job = await claimNdcJobOwnership(found, tabId);
 
     if (job.status === 'running' && job.activeDownloadId === null) {
       processNdcJob(job.id).catch((cause) => recordBackgroundError('attach nudge', cause));

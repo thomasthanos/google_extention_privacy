@@ -13,3 +13,6 @@ nexus.mods.bypass/.claude/settings.local.json
 .claude/settings.local.json
 /internal/promo
 /LeadManagerUI
+
+# Reference userscripts to port from — not part of the package
+you need to add this (gitgnore this folder)/

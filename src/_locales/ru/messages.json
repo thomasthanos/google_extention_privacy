@@ -1382,11 +1382,14 @@
     "message": "Когда Nexus отвечает на фоновый запрос загрузки страницей проверки, открывать страницу файла, чтобы вы прошли проверку, вместо ошибки. Поэтому вкладка иногда переходит сама."
   },
   "tabControls": {
-    "message": "Controls",
+    "message": "Управление",
     "description": "Tab bar button for the quick controls panel."
   },
   "tabHelp": {
-    "message": "Help & Bugs",
+    "message": "Помощь и ошибки",
     "description": "Tab bar button for the help and bug report panel."
+  },
+  "popupSectionsAria": {
+    "message": "Разделы"
   }
 }

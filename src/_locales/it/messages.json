@@ -231,7 +231,7 @@
     "message": "Chiudi la finestra di errore"
   },
   "deckTitle": {
-    "message": "Collection Downloader"
+    "message": "Downloader collezioni"
   },
   "deckReadyQueue": {
     "message": "Coda pronta"
@@ -1230,11 +1230,14 @@
     "message": "Quando Nexus risponde a una richiesta di download in background con una pagina di verifica, apre la pagina del file così puoi completare il controllo, invece di fallire. È per questo che a volte la scheda cambia da sola."
   },
   "tabControls": {
-    "message": "Controls",
+    "message": "Controlli",
     "description": "Tab bar button for the quick controls panel."
   },
   "tabHelp": {
-    "message": "Help & Bugs",
+    "message": "Aiuto ed errori",
     "description": "Tab bar button for the help and bug report panel."
+  },
+  "popupSectionsAria": {
+    "message": "Sezioni"
   }
 }

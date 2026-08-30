@@ -9,6 +9,7 @@
   let bootstrapDone = false;
   let initAttempts = 0;
   let initRetryAt = 0;
+  let initRetryTimer = null;
 
   const INIT_RETRY_BASE_MS = 15000;
   const INIT_RETRY_MAX_MS = 5 * 60 * 1000;
@@ -89,6 +90,8 @@
   }
 
   function teardownActiveCollection() {
+    clearTimeout(initRetryTimer);
+    initRetryTimer = null;
     activeNdc?.dispose?.();
     UI.closeExtensionOverlays?.();
 
@@ -187,8 +190,16 @@
     if (activeNdc !== ndc) return;
     if (!success) {
       initAttempts += 1;
-      initRetryAt = Date.now()
-        + Math.min(INIT_RETRY_BASE_MS * Math.pow(2, initAttempts - 1), INIT_RETRY_MAX_MS);
+      const retryDelay = Math.min(INIT_RETRY_BASE_MS * Math.pow(2, initAttempts - 1), INIT_RETRY_MAX_MS);
+      initRetryAt = Date.now() + retryDelay;
+      /* Arm an actual timer. The backoff deadline is only consulted from handleRouteChange, which
+         fires on a URL change or on DOM churn — so on a quiet page nothing ever came back to check
+         it and a collection that failed to load once stayed broken until the user navigated. */
+      clearTimeout(initRetryTimer);
+      initRetryTimer = setTimeout(() => {
+        initRetryTimer = null;
+        if (activeNdc === ndc && !ndc.initialized) handleRouteChange();
+      }, retryDelay);
       if (initAttempts === 1 && ndc.showAlertsOnError) {
         UI.showError(ndc.lastError, { title: NXTK.t('dlgCantLoadCollection', null, 'Could not load collection') });
       }
@@ -196,6 +207,8 @@
     }
     initAttempts = 0;
     initRetryAt = 0;
+    clearTimeout(initRetryTimer);
+    initRetryTimer = null;
     await ensureControlDeckMounted(ndc);
   }
 

@@ -1230,11 +1230,14 @@
     "message": "Quand Nexus répond à une demande de téléchargement en arrière-plan par une page de vérification, ouvrir la page du fichier pour que tu puisses valider le contrôle, au lieu d'échouer. C'est pour cela que l'onglet change parfois tout seul."
   },
   "tabControls": {
-    "message": "Controls",
+    "message": "Contrôles",
     "description": "Tab bar button for the quick controls panel."
   },
   "tabHelp": {
-    "message": "Help & Bugs",
+    "message": "Aide et bogues",
     "description": "Tab bar button for the help and bug report panel."
+  },
+  "popupSectionsAria": {
+    "message": "Sections"
   }
 }

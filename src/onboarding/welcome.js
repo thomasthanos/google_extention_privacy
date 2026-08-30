@@ -11,6 +11,14 @@
         NXTK.setForceEnglish(stored ? stored.ForceEnglish : NXTK.DEFAULTS.ForceEnglish);
       }
       NXTK.applyI18nTo(document);
+      /* Keep the declared document language in step with the language actually rendered. */
+      try {
+        const stored = result?.[NXTK.SETTINGS_KEY];
+        const forceEnglish = stored ? stored.ForceEnglish : NXTK.DEFAULTS.ForceEnglish;
+        const ui = forceEnglish ? 'en' : (chrome.i18n.getUILanguage?.() || '');
+        if (ui) document.documentElement.lang = ui;
+      } catch (_) {
+      }
     });
   } catch (_) {
   }

@@ -231,7 +231,7 @@
     "message": "Hata penceresini kapat"
   },
   "deckTitle": {
-    "message": "Collection Downloader"
+    "message": "Koleksiyon indirici"
   },
   "deckReadyQueue": {
     "message": "Kuyruk hazır"
@@ -1230,11 +1230,14 @@
     "message": "Nexus, arka plandaki bir indirme isteğine doğrulama sayfasıyla yanıt verdiğinde, hata vermek yerine dosya sayfasını açar ve doğrulamayı tamamlamanı sağlar. Sekmenin bazen kendiliğinden gitmesinin nedeni budur."
   },
   "tabControls": {
-    "message": "Controls",
+    "message": "Kontroller",
     "description": "Tab bar button for the quick controls panel."
   },
   "tabHelp": {
-    "message": "Help & Bugs",
+    "message": "Yardım ve hatalar",
     "description": "Tab bar button for the help and bug report panel."
+  },
+  "popupSectionsAria": {
+    "message": "Bölümler"
   }
 }

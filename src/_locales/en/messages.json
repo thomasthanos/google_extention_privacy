@@ -1498,5 +1498,9 @@
   "tabHelp": {
     "message": "Help & Bugs",
     "description": "Tab bar button for the help and bug report panel."
+  },
+  "popupSectionsAria": {
+    "message": "Sections",
+    "description": "Accessible name for the popup tab bar."
   }
 }

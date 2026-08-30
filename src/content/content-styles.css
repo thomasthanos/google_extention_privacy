@@ -114,9 +114,9 @@
               0 0 0 1px var(--nxtk-rim-accent),
               var(--nxtk-accent-glow-strong); }
 }
-@keyframes nxtk-shimmer {
-  0%   { background-position: -250% 0; }
-  100% { background-position:  250% 0; }
+@keyframes nxtk-shimmer-sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
 }
 
 .nxtk-deck,
@@ -171,8 +171,10 @@
   transition: opacity 0.3s var(--nxtk-ease);
   mix-blend-mode: screen;
 }
-.nxtk-deck:hover  > .nxtk-glass-sheen,
-.nxtk-modal:hover > .nxtk-glass-sheen { opacity: 1; }
+/* decorateGlass only ever decorates .nxtk-deck and .nxtk-settings-fab, so a .nxtk-modal variant of
+   this selector could never match. */
+.nxtk-deck:hover > .nxtk-glass-sheen,
+.nxtk-settings-fab:hover > .nxtk-glass-sheen { opacity: 1; }
 
 #nxtk-extension-root {
   display: contents;
@@ -235,7 +237,12 @@
 }
 .nxtk-deck input,
 .nxtk-deck textarea,
-.nxtk-deck select {
+.nxtk-deck select,
+/* The activity log is the one thing in the deck a user needs to copy out of — it carries the error
+   codes and file names they are asked to paste into a bug report — and the deck-wide user-select:none
+   made that impossible. */
+.nxtk-log-container,
+.nxtk-log-container * {
   user-select: text;
 }
 .nxtk-deck.nxtk-dropdown-active {
@@ -265,7 +272,10 @@
   pointer-events: none;
   z-index: 0;
 }
-.nxtk-deck > * { position: relative; z-index: 3; }
+/* The two injected glass layers are direct children of the deck, and this rule has the same
+   specificity as `.nxtk-glass-sheen` / `.nxtk-glass-specular` but comes later, so it was winning and
+   turning both overlays into in-flow relative spans — the specular and sheen never rendered. */
+.nxtk-deck > *:not(.nxtk-glass-specular):not(.nxtk-glass-sheen) { position: relative; z-index: 3; }
 
 .nxtk-deck-header {
   display: flex;
@@ -719,11 +729,24 @@
   background:
     linear-gradient(180deg, rgba(255,255,255,.3), transparent 50%, rgba(0,0,0,.2)),
     linear-gradient(90deg, var(--nxtk-accent-dim), var(--nxtk-accent), var(--nxtk-accent-hover));
-  background-size: 100% 100%, 250% 100%;
-  animation: nxtk-shimmer 3s linear infinite;
   border-radius: var(--nxtk-radius-pill);
   box-shadow: 0 0 24px rgba(217,143,64,.5), inset 0 1px 0 rgba(255,255,255,.45);
   transition: width .4s var(--nxtk-ease);
+  overflow: hidden;
+}
+/* The shimmer used to animate background-position, which repaints the whole bar on every frame for
+   as long as a collection is downloading — hours in a large run. Sweeping an overlay with a transform
+   is handled by the compositor, so the bar itself is painted once. */
+.nxtk-progress-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.28), transparent);
+  transform: translateX(-100%);
+  animation: nxtk-shimmer-sweep 3s linear infinite;
+  will-change: transform;
+  pointer-events: none;
 }
 .nxtk-progress-labels {
   position: absolute; inset: 0;

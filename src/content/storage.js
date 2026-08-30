@@ -71,11 +71,19 @@ window.NexusExt = window.NexusExt || {};
   }
 
   async function resetSettings() {
+    const reply = await mutateWithRetry('SETTINGS_RESET', {});
+    if (reply.ok && reply.value) {
+      cache[SETTINGS_KEY] = reply.value;
+      return true;
+    }
     return saveSettings({ ...DEFAULTS });
   }
 
   async function patchSetting(key, value) {
-    const reply = await sendMutation('SETTINGS_PATCH', { patch: { [key]: value } });
+    /* Retry like every other mutation. A single dropped message fell straight through to the local
+       fallback below, which is an unserialised whole-object write: two settings changed at nearly the
+       same moment — or a change racing Restore Defaults — would clobber each other. */
+    const reply = await mutateWithRetry('SETTINGS_PATCH', { patch: { [key]: value } });
     if (reply.ok && reply.value) {
       cache[SETTINGS_KEY] = reply.value;
       return true;
@@ -114,7 +122,11 @@ window.NexusExt = window.NexusExt || {};
     for (let attempt = 0; attempt <= MUTATION_RETRY_DELAYS.length; attempt += 1) {
       const reply = await sendMutation(type, payload);
       if (reply.ok) return reply;
-      if (reply.error && !/could not establish|receiving end|context-invalid|empty-reply/i.test(reply.error)) {
+      /* "The message port closed before a response was received." is what Chrome reports when the
+         service worker is torn down mid-handling — the single most common transient failure in MV3,
+         and it was the one case this predicate did not recognise, so the retry never ran for it. */
+      const transient = /could not establish|receiving end|message port closed|context invalidated|context-invalid|empty-reply/i;
+      if (reply.error && !transient.test(reply.error)) {
         return reply;
       }
       const delay = MUTATION_RETRY_DELAYS[attempt];
@@ -128,13 +140,31 @@ window.NexusExt = window.NexusExt || {};
     return sendMutation(type, payload);
   }
 
-  async function localHistoryMutate(gameId, collectionId, mutate) {
-    const history = await getHistory();
-    history[gameId] = history[gameId] || {};
-    history[gameId][collectionId] = history[gameId][collectionId] || {};
-    mutate(history[gameId][collectionId]);
-    await saveHistory(history);
-    return history;
+  const MAX_LOCAL_HISTORY_IDS = 10000;
+  let localHistoryChain = Promise.resolve();
+
+  /* Only reached when the worker is unreachable, so it cannot borrow the worker's write queue — but
+     it is still a read-modify-write of the entire history object, and two of them overlapping lose
+     one another's entries. Serialise locally, and apply the same size cap the worker enforces so the
+     fallback path cannot grow history past what the worker would accept. */
+  function localHistoryMutate(gameId, collectionId, mutate) {
+    const run = async () => {
+      const history = await getHistory();
+      history[gameId] = history[gameId] || {};
+      history[gameId][collectionId] = history[gameId][collectionId] || {};
+      const collection = history[gameId][collectionId];
+      mutate(collection);
+      for (const type of ['all', 'mandatory', 'optional']) {
+        if (Array.isArray(collection[type]) && collection[type].length > MAX_LOCAL_HISTORY_IDS) {
+          collection[type] = collection[type].slice(-MAX_LOCAL_HISTORY_IDS);
+        }
+      }
+      await saveHistory(history);
+      return history;
+    };
+    const next = localHistoryChain.then(run, run);
+    localHistoryChain = next.then(() => undefined, () => undefined);
+    return next;
   }
 
   function applyHistoryBranch(value) {

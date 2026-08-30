@@ -183,10 +183,6 @@
     activity = { ...activity, ...patch, at: Date.now() };
   }
 
-  function clearActivity() {
-    activity = {};
-  }
-
   function getActivity() {
     return { ...activity };
   }
@@ -357,7 +353,7 @@
   }
 
   async function describeReportHeader(manifest, { includeUserAgent = true } = {}) {
-    const { browser, os, cpu, ua } = await describeBrowser();
+    const { browser, os, cpu, ua } = await cachedBrowser();
     const lines = [
       `Date:      ${new Date().toISOString()} (local: ${new Date().toLocaleString('en-GB')})`,
       `Extension: ${manifest.name} v${manifest.version}`,
@@ -402,6 +398,12 @@
     const lines = ['──────── Settings ────────'];
     for (const [key, value] of Object.entries(cfg)) {
       let line = `${key}: ${sanitizeDiagnosticText(value, 120)}`;
+      if (key === 'DownloadFolder') {
+        /* Typed by the user, and this report is pasted into a public GitHub issue, so it can carry a
+           real name or a full path. Whether it is set is the diagnostic value; the text is not. */
+        const folder = String(value ?? '');
+        line = `${key}: ${folder ? `(set, ${folder.length} characters)` : '(empty — saves straight to Downloads)'}`;
+      }
       if (key === 'NDC_downloadMethod') {
         line += value === 0 ? ' (Vortex)' : value === 1 ? ' (Browser)' : '';
       }
@@ -471,7 +473,7 @@
 
   async function describeSession(errorCount) {
     const lines = ['──────── Session ────────'];
-    const total = await readTotalDownloads();
+    const total = await cachedTotalDownloads();
     lines.push(`Downloads counted: ${total === null ? '(unavailable)' : total}`);
     lines.push(`Errors in log:     ${errorCount}`);
 
@@ -483,9 +485,43 @@
     return lines;
   }
 
+  /* Fitting a report inside GitHub's URL limit can take up to eight rebuilds. Each one re-read the
+     settings and the whole error log from storage and re-probed the user agent — a probe that races a
+     500ms timeout every time. None of it changes between attempts, so it is gathered once per report
+     and released again afterwards. */
+  let reportCache = null;
+
+  async function cachedSettings() {
+    if (reportCache && 'cfg' in reportCache) return reportCache.cfg;
+    const value = await getStoredSettings();
+    if (reportCache) reportCache.cfg = value;
+    return value;
+  }
+
+  async function cachedErrorLog() {
+    if (reportCache && 'errors' in reportCache) return reportCache.errors;
+    const value = await getErrorLog();
+    if (reportCache) reportCache.errors = value;
+    return value;
+  }
+
+  async function cachedBrowser() {
+    if (reportCache && 'browser' in reportCache) return reportCache.browser;
+    const value = await describeBrowser();
+    if (reportCache) reportCache.browser = value;
+    return value;
+  }
+
+  async function cachedTotalDownloads() {
+    if (reportCache && 'total' in reportCache) return reportCache.total;
+    const value = await readTotalDownloads();
+    if (reportCache) reportCache.total = value;
+    return value;
+  }
+
   async function buildBugReport(currentError = null) {
-    const cfg = await getStoredSettings();
-    const errors = await getErrorLog();
+    const cfg = await cachedSettings();
+    const errors = await cachedErrorLog();
     const manifest = chrome.runtime.getManifest();
 
     const lines = [
@@ -526,8 +562,8 @@
   }
 
   async function buildCompactBugReport(currentError = null, { maxEntries = 3, stackChars = 300 } = {}) {
-    const cfg = await getStoredSettings();
-    const errors = await getErrorLog();
+    const cfg = await cachedSettings();
+    const errors = await cachedErrorLog();
     const manifest = chrome.runtime.getManifest();
     const recent = (maxEntries > 0 ? errors.slice(-maxEntries) : []).map((entry) => ({
       ...entry,
@@ -577,6 +613,8 @@
   }
 
   async function buildReportIssueUrl(currentError = null, { fullReport = null } = {}) {
+    const ownsCache = !reportCache;
+    if (ownsCache) reportCache = {};
     try {
       const title = currentError
         ? `[Bug] ${currentError.code || 'error'} — ${sanitizeDiagnosticText(currentError.userMessage, 60)}`
@@ -603,6 +641,8 @@
       return { url: buildIssueUrl(title, ''), complete: false };
     } catch (_) {
       return { url: REPORT_ISSUE_URL, complete: false };
+    } finally {
+      if (ownsCache) reportCache = null;
     }
   }
 
@@ -737,7 +777,6 @@
     isSafeNexusPageUrl,
     recordError,
     setActivity,
-    clearActivity,
     getActivity,
     describeActivity,
     buildBugReport,

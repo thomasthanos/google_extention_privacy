@@ -803,6 +803,13 @@ window.NexusExt = window.NexusExt || {};
 
     const modal = document.createElement('div');
     modal.className = 'nxtk-modal nxtk-modal-sm';
+    /* Every other dialog in here announces itself; this one did not, so a screen reader read it as
+       plain page content and keyboard focus stayed behind it on the page underneath. */
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', NXTK.t('setTitle', null, 'Download Helper Settings'));
+
+    const previouslyFocused = document.activeElement;
 
     const text = (v) => (typeof v === 'function' ? v() : (v ?? ''));
     const buildRow = (s) => {
@@ -893,6 +900,15 @@ window.NexusExt = window.NexusExt || {};
       NexusExt.Storage.patchSetting(key, value);
       if (NexusExt.NNW) NexusExt.NNW.updateConfig(cfg);
 
+      if (key === 'ForceEnglish') {
+        /* Nothing injected into the page carries data-i18n — every string is baked in at build time
+           by L()/T() — so flipping the flag alone changed nothing the user could see and the switch
+           looked broken. Rebuild this dialog so the change is visible where it was made; the deck
+           picks the new language up the next time it is built. */
+        NXTK.setForceEnglish(value);
+        close();
+        showSettingsModal().catch(() => undefined);
+      }
     };
 
     const onKeyDown = (e) => {
@@ -902,14 +918,42 @@ window.NexusExt = window.NexusExt || {};
       }
       if (e.key === 'Escape') close();
     };
-    const close = () => {
-      document.removeEventListener('keydown', onKeyDown);
-      backdrop.remove();
+    /* Typed fields settle before they are written. `input` fires per keystroke, and update() writes to
+       storage, reloads the whole config and re-broadcasts it to every content script — so typing
+       "45000" into a timeout persisted 4, then 45, then 450, then 4500, then 45000, each a full round
+       trip. Anything still pending is flushed on close, so closing mid-edit does not drop the value. */
+    const SETTING_INPUT_DEBOUNCE_MS = 400;
+    const pendingInputWrites = new Map();
+
+    const flushPendingInputWrites = () => {
+      for (const [target, timer] of pendingInputWrites) {
+        clearTimeout(timer);
+        if (target.isConnected) update(target);
+      }
+      pendingInputWrites.clear();
     };
 
-    modal.addEventListener('change', e => { if (e.target.dataset.setting) update(e.target); });
+    const close = () => {
+      flushPendingInputWrites();
+      document.removeEventListener('keydown', onKeyDown);
+      backdrop.remove();
+      if (previouslyFocused?.isConnected) previouslyFocused.focus?.({ preventScroll: true });
+    };
+
+    modal.addEventListener('change', e => {
+      if (!e.target.dataset.setting) return;
+      clearTimeout(pendingInputWrites.get(e.target));
+      pendingInputWrites.delete(e.target);
+      update(e.target);
+    });
     modal.addEventListener('input', e => {
-      if ((e.target.type === 'number' || e.target.type === 'text') && e.target.dataset.setting) update(e.target);
+      const target = e.target;
+      if ((target.type !== 'number' && target.type !== 'text') || !target.dataset.setting) return;
+      clearTimeout(pendingInputWrites.get(target));
+      pendingInputWrites.set(target, setTimeout(() => {
+        pendingInputWrites.delete(target);
+        if (target.isConnected) update(target);
+      }, SETTING_INPUT_DEBOUNCE_MS));
     });
     modal.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', close));
     modal.querySelectorAll('[data-report-issue]').forEach(b => b.addEventListener('click', () => copyReportAndOpenIssue(b)));
@@ -951,6 +995,7 @@ window.NexusExt = window.NexusExt || {};
     backdrop.addEventListener('click', e => { if (e.target === backdrop) close(); });
     document.addEventListener('keydown', onKeyDown);
     document.body.appendChild(backdrop);
+    modal.querySelector('[data-close]')?.focus?.({ preventScroll: true });
   }
 
   function showVortexHandoffModal() {
@@ -1279,7 +1324,7 @@ window.NexusExt = window.NexusExt || {};
         </div>
         <div class="nxtk-alert-body">${bodyHtml}</div>
         <div class="nxtk-modal-footer nxtk-alert-footer">
-          <button class="nxtk-btn nxtk-btn-primary nxtk-alert-ok" type="button">OK</button>
+          <button class="nxtk-btn nxtk-btn-primary nxtk-alert-ok" type="button">${L('btnOk', 'OK')}</button>
         </div>`;
       prepareToolkitSurface(modal);
 
@@ -1581,13 +1626,22 @@ window.NexusExt = window.NexusExt || {};
       input.addEventListener('change', async () => {
         const fileNames = Array.from(input.files, (file) => file.name);
         const { matched: downloaded, unmatchedCount } = matchModsToFileNames(ndc.mods.all, fileNames);
+        /* Merge, do not replace. setCollectionHistory overwrites the three lists wholesale, so
+           importing a second folder — or importing at all after a partial run — used to wipe every
+           mod already recorded as downloaded, and the next run re-fetched all of them. */
+        const history = await NexusExt.Storage.getHistory();
+        const existing = history?.[ndc.gameId]?.[ndc.collectionId] || {};
+        const merge = (type, ids) => [...new Set([
+          ...(Array.isArray(existing[type]) ? existing[type] : []),
+          ...ids
+        ])];
         await NexusExt.Storage.setCollectionHistory({
           gameId: ndc.gameId,
           collectionId: ndc.collectionId,
           lists: {
-            all: downloaded.map(m => m.fileId),
-            mandatory: downloaded.filter(m => !m.optional).map(m => m.fileId),
-            optional: downloaded.filter(m => m.optional).map(m => m.fileId)
+            all: merge('all', downloaded.map(m => m.fileId)),
+            mandatory: merge('mandatory', downloaded.filter(m => !m.optional).map(m => m.fileId)),
+            optional: merge('optional', downloaded.filter(m => m.optional).map(m => m.fileId))
           }
         });
         const summary = [
@@ -1907,43 +1961,59 @@ window.NexusExt = window.NexusExt || {};
     const listEl = $('#nxtk-mod-list');
     const countBadge = $('#nxtk-sel-count');
     let lastChecked = null;
+    /* Indexed once. Export and Download-selected each did a full linear scan of every mod for every
+       selected row, so selecting most of a large collection cost O(selected x total). */
+    const modsByFileId = new Map(ndc.mods.all.map((mod) => [String(mod.file.fileId), mod]));
 
     function updateCount() {
       const c = listEl.querySelectorAll('.nxtk-mod-item.nxtk-selected').length;
       countBadge.textContent = NXTK.tPlural('selSelectedCount', c, `${c} mods selected`);
     }
 
+    /* Built as one string and parsed once. Each row used to get its own innerHTML assignment, its own
+       textContent read back out of the DOM to build the search key, and its own click closure — on a
+       500-mod collection that is 500 parses, 500 forced text reads and 500 closures, repeated every
+       time the list is sorted or filtered. The click handler is delegated to the container instead. */
     function renderList(mods) {
-      listEl.innerHTML = '';
-      mods.forEach((mod, i) => {
-        const item = document.createElement('div');
-        item.className = 'nxtk-mod-item';
-        item.dataset.fileId = mod.file.fileId;
-        item.innerHTML = `
-          <span class="nxtk-ml-idx">#${i + 1}</span>
-          <span class="nxtk-ml-name">${escapeHtml(mod.file.mod.name)}</span>
-          <span class="nxtk-ml-file">${escapeHtml(mod.file.name)}</span>
-          <span class="nxtk-ml-size">${convertSize(mod.file.size)}</span>
-          <span class="nxtk-ml-req"><span class="nxtk-tag ${mod.optional ? 'nxtk-tag-optional' : 'nxtk-tag-mandatory'}">${mod.optional ? L('tagOptional', 'Optional') : L('tagMandatory', 'Mandatory')}</span></span>
-        `;
-        item.dataset.search = item.textContent.replace(/\s+/g, ' ').trim().toLowerCase();
-        item.addEventListener('click', (e) => {
-          item.classList.toggle('nxtk-selected');
-          if (e.shiftKey && lastChecked) {
-            const items = [...listEl.children];
-            const a = items.indexOf(item);
-            const b = items.indexOf(lastChecked);
-            const selected = item.classList.contains('nxtk-selected');
-            for (let j = Math.min(a, b); j <= Math.max(a, b); j++) {
-              items[j].classList.toggle('nxtk-selected', selected);
-            }
-          }
-          lastChecked = item;
-          updateCount();
-        });
-        listEl.appendChild(item);
+      const rows = mods.map((mod, i) => {
+        const modName = mod.file.mod.name;
+        const fileName = mod.file.name;
+        const size = convertSize(mod.file.size);
+        const tag = mod.optional
+          ? NXTK.t('tagOptional', null, 'Optional')
+          : NXTK.t('tagMandatory', null, 'Mandatory');
+        const search = `#${i + 1} ${modName} ${fileName} ${size} ${tag}`
+          .replace(/\s+/g, ' ').trim().toLowerCase();
+        return `<div class="nxtk-mod-item" data-file-id="${escapeHtml(mod.file.fileId)}" data-search="${escapeHtml(search)}">`
+          + `<span class="nxtk-ml-idx">#${i + 1}</span>`
+          + `<span class="nxtk-ml-name">${escapeHtml(modName)}</span>`
+          + `<span class="nxtk-ml-file">${escapeHtml(fileName)}</span>`
+          + `<span class="nxtk-ml-size">${escapeHtml(size)}</span>`
+          + `<span class="nxtk-ml-req"><span class="nxtk-tag ${mod.optional ? 'nxtk-tag-optional' : 'nxtk-tag-mandatory'}">${escapeHtml(tag)}</span></span>`
+          + '</div>';
       });
+      listEl.innerHTML = rows.join('');
+      lastChecked = null;
     }
+
+    listEl.addEventListener('click', (event) => {
+      const item = event.target.closest('.nxtk-mod-item');
+      if (!item || !listEl.contains(item)) return;
+      item.classList.toggle('nxtk-selected');
+      if (event.shiftKey && lastChecked?.isConnected) {
+        const items = [...listEl.children];
+        const a = items.indexOf(item);
+        const b = items.indexOf(lastChecked);
+        if (a !== -1 && b !== -1) {
+          const selected = item.classList.contains('nxtk-selected');
+          for (let j = Math.min(a, b); j <= Math.max(a, b); j++) {
+            items[j].classList.toggle('nxtk-selected', selected);
+          }
+        }
+      }
+      lastChecked = item;
+      updateCount();
+    });
 
     renderList(ndc.mods.all);
 
@@ -1964,8 +2034,7 @@ window.NexusExt = window.NexusExt || {};
     $('#nxtk-export-sel').addEventListener('click', () => {
       const selected = [];
       listEl.querySelectorAll('.nxtk-mod-item.nxtk-selected').forEach(el => {
-        const fid = el.dataset.fileId;
-        const mod = ndc.mods.all.find(m => String(m.file.fileId) === fid);
+        const mod = modsByFileId.get(el.dataset.fileId);
         if (mod) selected.push(mod);
       });
       if (!selected.length) { nxtkAlert(NXTK.t('alertPickOneToExport', null, 'Select at least one mod to export.')); return; }
@@ -2091,7 +2160,7 @@ window.NexusExt = window.NexusExt || {};
     $('#nxtk-dl-selected').addEventListener('click', () => {
       const selected = [];
       listEl.querySelectorAll('.nxtk-mod-item.nxtk-selected').forEach(el => {
-        const mod = ndc.mods.all.find(m => String(m.file.fileId) === el.dataset.fileId);
+        const mod = modsByFileId.get(el.dataset.fileId);
         if (mod) selected.push(mod);
       });
       if (!selected.length) { nxtkAlert(NXTK.t('alertPickOneMod', null, 'Select at least one mod.')); return; }
@@ -2104,6 +2173,18 @@ window.NexusExt = window.NexusExt || {};
 
     modal.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => closeModal('nxtk-select-modal')));
     backdrop.addEventListener('click', e => { if (e.target === backdrop) closeModal('nxtk-select-modal'); });
+    /* Every other dialog closes on Escape; these two were the exceptions. */
+    const onSelectKeyDown = (event) => {
+      if (!document.contains(backdrop)) {
+        document.removeEventListener('keydown', onSelectKeyDown);
+        return;
+      }
+      if (event.key === 'Escape') {
+        document.removeEventListener('keydown', onSelectKeyDown);
+        closeModal('nxtk-select-modal');
+      }
+    };
+    document.addEventListener('keydown', onSelectKeyDown);
     backdrop.appendChild(modal);
     document.body.appendChild(backdrop);
   }
@@ -2293,6 +2374,17 @@ window.NexusExt = window.NexusExt || {};
         `;
         prepareToolkitSurface(modal);
         modal.querySelector('[data-close]')?.addEventListener('click', () => closeModal('nxtk-update-modal'));
+        const onUpdateKeyDown = (event) => {
+          if (!document.contains(backdrop)) {
+            document.removeEventListener('keydown', onUpdateKeyDown);
+            return;
+          }
+          if (event.key === 'Escape') {
+            document.removeEventListener('keydown', onUpdateKeyDown);
+            closeModal('nxtk-update-modal');
+          }
+        };
+        document.addEventListener('keydown', onUpdateKeyDown);
         return;
       }
 

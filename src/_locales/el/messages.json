@@ -1230,11 +1230,14 @@
     "message": "Όταν το Nexus απαντά σε ένα αίτημα λήψης στο παρασκήνιο με σελίδα επαλήθευσης, να ανοίγει τη σελίδα του αρχείου ώστε να ολοκληρώσεις τον έλεγχο, αντί να αποτυγχάνει. Γι᾽ αυτό η καρτέλα μερικές φορές αλλάζει μόνη της."
   },
   "tabControls": {
-    "message": "Controls",
+    "message": "Ρυθμίσεις",
     "description": "Tab bar button for the quick controls panel."
   },
   "tabHelp": {
-    "message": "Help & Bugs",
+    "message": "Βοήθεια & σφάλματα",
     "description": "Tab bar button for the help and bug report panel."
+  },
+  "popupSectionsAria": {
+    "message": "Ενότητες"
   }
 }

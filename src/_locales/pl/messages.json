@@ -231,7 +231,7 @@
     "message": "Zamknij okno błędu"
   },
   "deckTitle": {
-    "message": "Collection Downloader"
+    "message": "Pobieranie kolekcji"
   },
   "deckReadyQueue": {
     "message": "Kolejka gotowa"
@@ -1382,11 +1382,14 @@
     "message": "Gdy Nexus odpowiada na żądanie pobrania w tle stroną weryfikacji, otwiera stronę pliku, abyś mógł ukończyć sprawdzenie, zamiast kończyć błędem. Dlatego karta czasem sama zmienia adres."
   },
   "tabControls": {
-    "message": "Controls",
+    "message": "Sterowanie",
     "description": "Tab bar button for the quick controls panel."
   },
   "tabHelp": {
-    "message": "Help & Bugs",
+    "message": "Pomoc i błędy",
     "description": "Tab bar button for the help and bug report panel."
+  },
+  "popupSectionsAria": {
+    "message": "Sekcje"
   }
 }

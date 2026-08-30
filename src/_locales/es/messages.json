@@ -1230,11 +1230,14 @@
     "message": "Cuando Nexus responde a una petición de descarga en segundo plano con una página de verificación, abre la página del archivo para que completes la comprobación, en lugar de fallar. Por eso a veces la pestaña navega sola."
   },
   "tabControls": {
-    "message": "Controls",
+    "message": "Controles",
     "description": "Tab bar button for the quick controls panel."
   },
   "tabHelp": {
-    "message": "Help & Bugs",
+    "message": "Ayuda y errores",
     "description": "Tab bar button for the help and bug report panel."
+  },
+  "popupSectionsAria": {
+    "message": "Secciones"
   }
 }

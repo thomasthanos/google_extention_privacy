@@ -148,6 +148,44 @@ function assertHtmlReferencesArePackaged() {
 
 assertHtmlReferencesArePackaged();
 
+/* shared.js (content scripts, popup, onboarding) and background.js each carry their own copy of
+   DEFAULTS. The worker validates every SETTINGS_PATCH against its copy and rejects unknown keys, so
+   if the two ever drift a setting silently stops saving. Fail the build instead. */
+function readDefaultsLiteral(file) {
+  const source = readFileSync(join(pkg, file), 'utf8');
+  const start = source.indexOf('DEFAULTS = {');
+  if (start === -1) fail(`${file}: no DEFAULTS object found`);
+  const open = source.indexOf('{', start);
+  let depth = 0;
+  for (let i = open; i < source.length; i += 1) {
+    if (source[i] === '{') depth += 1;
+    else if (source[i] === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        try {
+          return new Function(`return ${source.slice(open, i + 1)}`)();
+        } catch (cause) {
+          fail(`${file}: DEFAULTS is not a plain literal — ${cause.message}`);
+        }
+      }
+    }
+  }
+  return fail(`${file}: DEFAULTS object is unterminated`);
+}
+
+function assertDefaultsMatch() {
+  const shared = readDefaultsLiteral('shared.js');
+  const worker = readDefaultsLiteral('background.js');
+  const keys = [...new Set([...Object.keys(shared), ...Object.keys(worker)])].sort();
+  const drift = keys.filter((key) => !Object.is(shared[key], worker[key]));
+  if (drift.length) {
+    fail('shared.js and background.js DEFAULTS have drifted:\n  '
+      + drift.map((k) => `${k}: shared=${JSON.stringify(shared[k])} worker=${JSON.stringify(worker[k])}`).join('\n  '));
+  }
+}
+
+assertDefaultsMatch();
+
 const GECKO_ID = 'nexus-mods-bypass@thomasthanos.github.io';
 
 const GECKO_MIN_VERSION = '140.0';

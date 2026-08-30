@@ -1154,11 +1154,14 @@
     "message": "当 Nexus 对后台下载请求返回验证页面时，打开文件页面让你完成验证，而不是直接失败。这就是标签页有时会自行跳转的原因。"
   },
   "tabControls": {
-    "message": "Controls",
+    "message": "控制",
     "description": "Tab bar button for the quick controls panel."
   },
   "tabHelp": {
-    "message": "Help & Bugs",
+    "message": "帮助与问题",
     "description": "Tab bar button for the help and bug report panel."
+  },
+  "popupSectionsAria": {
+    "message": "分区"
   }
 }

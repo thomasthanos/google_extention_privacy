@@ -231,7 +231,7 @@
     "message": "エラーダイアログを閉じる"
   },
   "deckTitle": {
-    "message": "Collection Downloader"
+    "message": "コレクションダウンローダー"
   },
   "deckReadyQueue": {
     "message": "キュー準備完了"
@@ -1154,11 +1154,14 @@
     "message": "バックグラウンドのダウンロード要求に Nexus が確認ページを返した場合、失敗させる代わりにファイルページを開いて確認を完了できるようにします。タブが自動的に移動するのはこのためです。"
   },
   "tabControls": {
-    "message": "Controls",
+    "message": "コントロール",
     "description": "Tab bar button for the quick controls panel."
   },
   "tabHelp": {
-    "message": "Help & Bugs",
+    "message": "ヘルプとバグ",
     "description": "Tab bar button for the help and bug report panel."
+  },
+  "popupSectionsAria": {
+    "message": "セクション"
   }
 }

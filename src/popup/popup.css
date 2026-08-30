@@ -206,6 +206,14 @@ html, body {
   cursor: pointer;
   transition: color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
   white-space: nowrap;
+  /* Flex items default to min-width:auto, so a long translation would push the tab bar wider than
+     the popup rather than shrinking. Ellipsise instead. */
+  min-width: 0;
+}
+
+.popup-tab > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .popup-tab svg {
@@ -313,15 +321,6 @@ html, body {
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
-
-.popup-support-btn {
-  color: var(--nxtk-text-muted);
-  letter-spacing: .025em;
-  text-transform: none;
-  padding: 9px 12px;
-}
-.popup-support-btn:hover,
-.popup-support-btn:focus-visible { color: var(--nxtk-text-bright); }
 
 .popup-status {
   margin: 0 0 10px;
@@ -784,60 +783,6 @@ html, body {
 }
 
 .support-donate-btn:hover .support-external { opacity: 0.9; }
-
-.support-primary-copy strong {
-  font-size: 12.5px;
-  font-weight: 750;
-  line-height: 1.1;
-}
-
-.support-primary-copy small {
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 10px;
-  font-weight: 550;
-  line-height: 1.15;
-}
-
-.support-primary .support-external {
-  width: 16px;
-  height: 16px;
-  opacity: 0.78;
-}
-
-.support-primary[disabled] {
-  cursor: not-allowed;
-  filter: saturate(0.35);
-  opacity: 0.62;
-}
-
-.support-primary[disabled]:hover {
-  transform: none;
-  box-shadow:
-    inset 0 1.2px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
-    0 8px 22px rgba(217, 143, 64, 0.35),
-    0 2px 6px rgba(0, 0, 0, 0.35);
-}
-
-.support-trust {
-  min-height: 27px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  color: #777785;
-  font-size: 9.5px;
-  line-height: 1.25;
-  text-align: center;
-}
-
-.support-trust svg {
-  width: 12px;
-  height: 12px;
-  flex: 0 0 auto;
-  fill: #8b8b98;
-}
 
 .support-divider {
   display: flex;

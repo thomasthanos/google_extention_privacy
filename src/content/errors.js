@@ -214,8 +214,11 @@ window.NexusExt = window.NexusExt || {};
     return null;
   }
 
-  function fromResponse({ status = 0, text = '', context = '', extra = '' } = {}) {
-    const contentError = classifyContent(text, { status, context, extra });
+  function fromResponse({ status = 0, text = '', context = '', extra = '', classified = false } = {}) {
+    /* classifyContent lowercases and runs a dozen regexes over up to 200 KB. Callers that have
+       already run it on this exact body pass classified:true — re-running is guaranteed to return
+       null there, because a truthy result would have short-circuited before reaching here. */
+    const contentError = classified ? null : classifyContent(text, { status, context, extra });
     if (contentError) return contentError;
     const detail = (reason) => ({ status, context, technicalMessage: [reason, extra].filter(Boolean).join(' | ') });
     if (status === 401) return create('requires_login', detail('HTTP 401'));
@@ -336,7 +339,7 @@ window.NexusExt = window.NexusExt || {};
           text,
           finalUrl,
           rateLimit,
-          error: fromResponse({ status: response.status, text, context, extra: respInfo })
+          error: fromResponse({ status: response.status, text, context, extra: respInfo, classified: true })
         };
       }
 

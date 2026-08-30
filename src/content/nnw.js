@@ -868,7 +868,12 @@ window.NexusExt = window.NexusExt || {};
       return false;
     }
 
-    if (!NXTK.isSafeNexusPageUrl(target.href) || target.hostname !== location.hostname) return false;
+    /* getModPagePath returns '' for anything that is not /<game>/mods/<id>, which keeps the tab off
+       Core/Libs widget fragments and /api/files endpoints. Landing on one of those is worse than
+       failing: isModPage() is false there, so every interceptor switches off and the user is left on
+       a bare HTML fragment with no download control at all. */
+    if (!NXTK.isSafeNexusPageUrl(target.href) || target.hostname !== location.hostname
+      || !getModPagePath(target.href)) return false;
 
     const currentModPage = getModPagePath(location.href);
     const targetModPage = getModPagePath(target.href);
@@ -955,7 +960,8 @@ window.NexusExt = window.NexusExt || {};
         if (activateCloudflareFallback({ button, fileId, isNMM, href })) return false;
       }
       const shouldOpenFilePage = openFilePageOnNoUrl && !isNMM && href
-        && error.code === 'no_download_url' && isDifferentPage(href);
+        && error.code === 'no_download_url' && isDifferentPage(href)
+        && !!getModPagePath(href);
       if (shouldOpenFilePage) {
         if (!NXTK.isSafeNexusPageUrl(new URL(href, location.href).href)) {
           handleError(button, Errors.create('unsafe_download_url', {
@@ -1171,10 +1177,15 @@ window.NexusExt = window.NexusExt || {};
   }
 
   function findSlowDownloadButtons(root, { includeBound = false } = {}) {
-    const selector = includeBound ? 'button' : 'button:not([data-nxtk-slow-bound])';
+    /* Mark every button that has been examined, not only the ones that matched. The poll below re-runs
+       this once a second for as long as a file page stays open, and marking only matches meant every
+       other button on the page had its textContent read and normalised again on every single tick.
+       Buttons with no text yet are deliberately left unmarked so a late render is still picked up. */
+    const selector = includeBound ? 'button' : 'button:not([data-nxtk-slow-seen])';
     const buttons = Array.from(root.querySelectorAll(selector));
     return buttons.filter((button) => {
       const buttonText = normalizeText(button.textContent);
+      if (!includeBound && buttonText) button.dataset.nxtkSlowSeen = '1';
       if (!buttonText.includes('slow download')) return false;
 
       const cardText = normalizeText(button.closest('div,section,article')?.textContent);
@@ -1218,7 +1229,14 @@ window.NexusExt = window.NexusExt || {};
     });
     Logger.info('Starting the native Nexus download after the Cloudflare fallback.');
     Promise.resolve().then(() => {
-      if (!isNativeFallbackActive() || !button.isConnected) return;
+      if (!isNativeFallbackActive() || !button.isConnected) {
+        /* The click never happened. The watchdog was already cancelled above, so returning silently
+           here left the fallback armed-but-unwatched and the extension went quiet for good. */
+        nativeFallbackAutoStarted = false;
+        setStoredCloudflareAutoStartPending(true);
+        armFallbackWatchdog();
+        return;
+      }
       button.click();
     }).catch((cause) => {
       nativeFallbackAutoStarted = false;
@@ -1502,14 +1520,40 @@ window.NexusExt = window.NexusExt || {};
     startPremiumObserver();
   }
 
+  const UPSELL_FLUSH_DEBOUNCE_MS = 100;
+  const UPSELL_FLUSH_MAX_WAIT_MS = 500;
+  const UPSELL_FULL_RESCAN_THRESHOLD = 24;
+
   let pendingUpsellRoots = [];
+  let pendingUpsellSince = 0;
+  let pendingUpsellNeedsFullScan = false;
+
+  /* The flush used to be a reset-only debounce: every batch of mutations pushed the timer back another
+     100ms. A page that keeps mutating — Nexus with ad slots streaming in is exactly that — never let
+     it fire, so nothing was ever hidden and pendingUpsellRoots grew without bound for the life of the
+     tab. The queue is now capped, and the total wait is capped too, so a busy page still gets swept. */
+  function scheduleUpsellFlush() {
+    const now = Date.now();
+    if (!pendingUpsellSince) pendingUpsellSince = now;
+    if (now - pendingUpsellSince >= UPSELL_FLUSH_MAX_WAIT_MS) {
+      flushPendingUpsellRoots();
+      return;
+    }
+    clearTimeout(premiumObserverTimer);
+    premiumObserverTimer = setTimeout(flushPendingUpsellRoots, UPSELL_FLUSH_DEBOUNCE_MS);
+  }
 
   function flushPendingUpsellRoots() {
+    clearTimeout(premiumObserverTimer);
+    premiumObserverTimer = null;
     const connected = pendingUpsellRoots.filter((node) => node.isConnected);
+    const needsFullScan = pendingUpsellNeedsFullScan;
     pendingUpsellRoots = [];
+    pendingUpsellSince = 0;
+    pendingUpsellNeedsFullScan = false;
     if (!cfg.HidePremiumUpsells) return;
     const unique = [...new Set(connected)];
-    if (unique.length > 24) {
+    if (needsFullScan || unique.length > UPSELL_FULL_RESCAN_THRESHOLD) {
       applyUpsellHiding(document);
       return;
     }
@@ -1530,13 +1574,15 @@ window.NexusExt = window.NexusExt || {};
         for (const node of mutation.addedNodes) {
           if (node.nodeType !== 1) continue;
           if (node.closest && node.closest("[id^=\"nxtk-\"], .nxtk-deck")) continue;
-          pendingUpsellRoots.push(node);
+          /* Past this many roots a single document sweep is cheaper than scanning each one, so stop
+             accumulating rather than letting the array grow. */
+          if (pendingUpsellRoots.length >= UPSELL_FULL_RESCAN_THRESHOLD) pendingUpsellNeedsFullScan = true;
+          else pendingUpsellRoots.push(node);
           queued = true;
         }
       }
       if (!queued) return;
-      clearTimeout(premiumObserverTimer);
-      premiumObserverTimer = setTimeout(flushPendingUpsellRoots, 100);
+      scheduleUpsellFlush();
     });
     premiumObserver.observe(document.body, { childList: true, subtree: true });
   }
@@ -1556,6 +1602,8 @@ window.NexusExt = window.NexusExt || {};
     clearTimeout(premiumObserverTimer);
     premiumObserverTimer = null;
     pendingUpsellRoots = [];
+    pendingUpsellSince = 0;
+    pendingUpsellNeedsFullScan = false;
 
     document.querySelectorAll('.nxtk-upsell-hidden, .nxtk-ad-hidden, [data-nxtk-upsell-hidden]').forEach((el) => {
       el.classList.remove('nxtk-upsell-hidden');

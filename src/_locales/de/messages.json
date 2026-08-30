@@ -1230,11 +1230,14 @@
     "message": "Wenn Nexus eine Download-Anfrage im Hintergrund mit einer Überprüfungsseite beantwortet, die Dateiseite öffnen, damit du die Prüfung abschließen kannst, statt abzubrechen. Deshalb wechselt der Tab manchmal von selbst."
   },
   "tabControls": {
-    "message": "Controls",
+    "message": "Steuerung",
     "description": "Tab bar button for the quick controls panel."
   },
   "tabHelp": {
-    "message": "Help & Bugs",
+    "message": "Hilfe & Fehler",
     "description": "Tab bar button for the help and bug report panel."
+  },
+  "popupSectionsAria": {
+    "message": "Bereiche"
   }
 }

@@ -9,7 +9,96 @@ they are simply not listed.
 
 ## [Unreleased]
 
+### Security
+
+- **The download folder no longer goes verbatim into a public bug report.** It is typed by the user
+  and the report is pre-filled into a GitHub issue, so it could carry a real name or a full path.
+  Whether it is set is the useful diagnostic; the text is not.
+
+### Changed
+
+- **"Always use English" now takes effect where you set it.** Nothing injected into the page carries
+  a translation attribute — every string is baked in when the element is built — so flipping the
+  switch changed the flag and nothing else, and it simply looked broken. The settings dialog now
+  rebuilds itself in the new language.
+- **A settings write is retried like every other message to the worker,** and *Restore Defaults* goes
+  through the worker's serialised queue instead of writing straight to storage, where a patch still
+  in flight could land afterwards and resurrect the value just reset.
+
+- **The popup's tab bar is translated.** *Controls* and *Help & Bugs* were wired for translation but
+  every one of the twelve non-English catalogues still held the English string, so the tab bar read
+  English in every language. Long translations now ellipsise rather than widening the popup.
+
 ### Fixed
+
+- **Failed Nexus responses are no longer scanned and logged twice.** Both the request helper and the
+  login check ran the same classifier over the same body — up to 200 KB lowercased and put through a
+  dozen regexes each time — and because building an error also records it, a logged-out collection
+  run wrote a duplicate entry for every failure.
+- **Typing in a settings field no longer writes on every keystroke.** Each keypress persisted the
+  value, reloaded the whole config and re-broadcast it to every content script, so typing `45000`
+  into a timeout stored 4, then 45, then 450, then 4500, then 45000. Writes are debounced and
+  flushed when the dialog closes, so closing mid-edit still keeps the value.
+- **A bug report is assembled once instead of up to eight times.** Fitting it inside GitHub's URL
+  limit retries at shrinking sizes, and every attempt re-read the settings and the whole error log
+  from storage and re-probed the user agent against a 500 ms timeout.
+- **The collection deck's activity log can be selected and copied.** A deck-wide `user-select: none`
+  covered the one thing a user needs to copy out of it — the error codes and file names they are
+  asked to paste into a bug report.
+- **The deck's glass highlight renders again.** A later rule of equal specificity was overriding the
+  two injected overlay layers' positioning, turning them into ordinary in-flow spans.
+- **The progress bar no longer repaints continuously.** Its shimmer animated `background-position`,
+  which repaints the whole bar every frame for as long as a collection is downloading — hours, in a
+  large run. It sweeps a composited overlay instead.
+- **Escape closes the mod-selection and revision dialogs**, which were the only two that ignored it,
+  and the settings dialog now announces itself as a dialog, takes focus when it opens and gives it
+  back when it closes.
+- **The alert dialog's OK button is translated**, the popup's tab bar has an accessible name in every
+  language, and the popup and onboarding pages declare the language they are actually rendered in.
+- **The collection deck's title is translated** in Italian, Japanese, Korean, Polish and Turkish,
+  where it had stayed *Collection Downloader*.
+- **Ad and Premium hiding no longer stalls on a busy page.** The flush was a reset-only debounce:
+  each batch of mutations pushed the timer back another 100ms. A page that keeps mutating — Nexus
+  with ad slots streaming in is exactly that — never let it fire, so nothing was hidden *and* the
+  pending-node queue grew for the life of the tab. The wait is now capped, and the queue is capped
+  too: past the point where one document sweep is cheaper than scanning each root, it stops
+  accumulating and sweeps once.
+- **The file-page button scan stops re-reading the whole page every second.** The 1 Hz poll marked
+  only the buttons that matched, so every *other* button on the page had its text read and normalised
+  again on every tick, for as long as the tab stayed on a file page. Every examined button is now
+  marked; buttons that have not rendered their text yet are deliberately left for the next pass.
+- **The Select Mods list is built in one pass.** Each row was created with its own `innerHTML`
+  assignment, had its text read back out of the DOM to build a search key, and carried its own click
+  closure — on a 500-mod collection that is 500 parses, 500 forced text reads and 500 closures, all
+  repeated on every sort. The list is now parsed once with a single delegated handler, and the two
+  lookups that scanned every mod for every selected row use an index.
+- **The collection init backoff actually retries.** The retry deadline was only consulted when
+  something else triggered a route change, so on a quiet page a collection that failed to load once
+  stayed broken until the user navigated. It now arms a real timer.
+- **The worker's storage write-queue releases finished keys.** Item lists are stored per job id, so
+  the map gained a permanent entry for every collection run the worker had ever seen.
+
+- **A collection queue can no longer roll itself backwards.** Job state was persisted by writing a
+  whole job object back, but callers held that object across several awaits — reading the item list,
+  verifying the transfer size, writing history. Anything that moved in between was silently reverted
+  to its stale value. An attach landing while a download finished could reset `index` and
+  `activeDownloadId`, so the queue re-downloaded an item it had already finished while the one
+  actually in flight was orphaned, and its completion event was dropped — leaving the run stuck at a
+  frozen count. Writes now happen against freshly read state and touch only the fields they name.
+- **Opening a collection in a second tab no longer hands it the run.** Attaching is passive — it
+  happens merely by opening the page — but it moved job ownership to whichever tab attached last, and
+  ownership decides which tab closing cancels the run. Closing a throwaway second tab killed a queue
+  the original tab was still driving. Ownership now transfers only when the owning tab is really
+  gone; pressing Start remains an explicit claim.
+- **Import downloaded mods merges instead of replacing.** The three history lists were overwritten
+  wholesale, so importing a second folder — or importing at all after a partial run — wiped every mod
+  already recorded, and the next run fetched them all again.
+- **The Cloudflare fallback only ever navigates to a real mod page.** It could send the tab to a
+  `Core/Libs` widget fragment or an `/api/files/` endpoint, where `isModPage()` is false, every
+  interceptor switches off, and the user is left on a bare HTML fragment with no download control.
+- **A native fallback whose click never lands no longer goes silent.** The watchdog was cancelled
+  before the click was attempted; if the button had gone away in the meantime the handler returned
+  without re-arming it, so nothing was left watching and the extension never spoke again.
 
 - **A mod you have to download by hand is no longer blocked from being downloaded by hand.** The
   click interceptor is capture-phase and calls `stopImmediatePropagation`, so it matched any link
@@ -90,11 +179,21 @@ they are simply not listed.
   file the package does not contain, which is what would have caught it.
 - `sectionQuickControls` and `sectionHelpBugs` — 26 shipped strings across 13 locales that no code
   reads. `check-locales.mjs` had been warning about both; it now reports zero warnings.
+- 63 lines of popup CSS for four classes that no longer appear in any markup, a hover rule for a
+  glass layer that is never added to a modal, and `clearActivity`, which was exported and never
+  called.
 
 ### Added
 
 - `tools/background-units-test.cjs`, covering the download conflict action, the rate-limit backoff
-  ladder and the download-target validator. It runs as part of `tools/build-zip.mjs`.
+  ladder, the download-target validator, the job-state read-modify-write and the storage write-queue.
+  It runs as part of `tools/build-zip.mjs`.
+- `tools/check-locales.mjs` now compares which placeholders a translation uses, not how many. Counting
+  alone let a translation swap `$1` for `$2`, or drop one while adding another, and still pass — the
+  user would see the wrong value, or a literal `$1`, with the build green.
+- `tools/build-zip.mjs` now fails the build if `shared.js` and `background.js` `DEFAULTS` drift. The
+  worker validates every settings patch against its own copy and rejects unknown keys, so a mismatch
+  would silently stop a setting from saving.
 
 
 ## [2.5.2] — 2026-08-28

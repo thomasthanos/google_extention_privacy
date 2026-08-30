@@ -83,6 +83,14 @@
     NXTK.applyI18nTo(document);
   }
 
+  function syncDocumentLanguage(forceEnglish) {
+    try {
+      const ui = forceEnglish ? 'en' : (chrome.i18n.getUILanguage?.() || '');
+      if (ui) document.documentElement.lang = ui;
+    } catch (_) {
+    }
+  }
+
   function showSupportStatus(message, type = 'info') {
     const status = document.getElementById('supportStatus');
     if (!status) return;
@@ -186,6 +194,9 @@
     const cfg = await getSettings();
     NXTK.setForceEnglish(cfg.ForceEnglish);
     applyI18n();
+    /* The page is rendered in the catalogue language but the document still declared
+       lang="en", so screen readers and hyphenation used the wrong language rules. */
+    syncDocumentLanguage(cfg.ForceEnglish);
 
     const tabList = document.querySelector('.popup-tabs');
     const tabIds = ['tabControls', 'tabHelp'];

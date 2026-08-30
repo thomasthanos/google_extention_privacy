@@ -231,7 +231,7 @@
     "message": "오류 대화상자 닫기"
   },
   "deckTitle": {
-    "message": "Collection Downloader"
+    "message": "컬렉션 다운로더"
   },
   "deckReadyQueue": {
     "message": "대기열 준비됨"
@@ -1154,11 +1154,14 @@
     "message": "백그라운드 다운로드 요청에 Nexus가 확인 페이지로 응답하면, 실패시키는 대신 파일 페이지를 열어 확인을 완료할 수 있게 합니다. 탭이 가끔 저절로 이동하는 이유입니다."
   },
   "tabControls": {
-    "message": "Controls",
+    "message": "제어",
     "description": "Tab bar button for the quick controls panel."
   },
   "tabHelp": {
-    "message": "Help & Bugs",
+    "message": "도움말 및 버그",
     "description": "Tab bar button for the help and bug report panel."
+  },
+  "popupSectionsAria": {
+    "message": "섹션"
   }
 }

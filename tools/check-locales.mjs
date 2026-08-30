@@ -28,6 +28,13 @@ function positionalCount(entry) {
   const hits = [...String(entry.message || '').matchAll(/\$([1-9])(?!\$)/g)].map((m) => +m[1]);
   return hits.length ? Math.max(...hits) : 0;
 }
+/* The identity of every placeholder in a message: positional ones as $1..$9, named ones as $name$
+   lowercased. Sorted and de-duplicated so two catalogues can be compared directly. */
+function placeholderSignature(entry) {
+  const positional = [...String(entry?.message || '').matchAll(/\$([1-9])(?!\$)/g)].map((m) => `$${m[1]}`);
+  const named = [...placeholderNames(entry || {})].map((name) => `$${name}$`);
+  return [...new Set([...positional, ...named])].sort();
+}
 
 const locales = readdirSync(localesDir).filter((d) => existsSync(join(localesDir, d, 'messages.json')));
 if (!locales.includes(MASTER)) {
@@ -74,10 +81,19 @@ for (const locale of locales) {
     for (const name of placeholderNames(entry)) {
       if (!declared.has(name)) errors.push(`${locale}: "${key}" uses $${name}$ with no placeholders entry`);
     }
-    const mine = Math.max(positionalCount(entry), placeholderNames(entry).size);
-    const theirs = Math.max(positionalCount(master[key]), placeholderNames(master[key]).size);
-    if (mine !== theirs) {
-      errors.push(`${locale}: "${key}" takes ${mine} substitution(s), ${MASTER} takes ${theirs}`);
+    /* Compare which placeholders are used, not how many. Counting alone let a translation swap $1 for
+       $2, or drop $1 while adding $2, and still pass — the user would then see the wrong value, or a
+       literal "$1", with the build green. Order may differ between languages; the set may not. */
+    const mine = placeholderSignature(entry);
+    const theirs = placeholderSignature(master[key]);
+    const missing = theirs.filter((name) => !mine.includes(name));
+    const extra = mine.filter((name) => !theirs.includes(name));
+    if (missing.length || extra.length) {
+      const detail = [
+        missing.length ? `missing ${missing.join(', ')}` : '',
+        extra.length ? `unexpected ${extra.join(', ')}` : ''
+      ].filter(Boolean).join('; ');
+      errors.push(`${locale}: "${key}" placeholders differ from ${MASTER} — ${detail}`);
     }
     if (/<[a-z][\s\S]*>/i.test(entry.message)) {
       errors.push(`${locale}: "${key}" contains HTML markup`);

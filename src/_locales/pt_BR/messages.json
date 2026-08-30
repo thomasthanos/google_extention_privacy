@@ -1230,11 +1230,14 @@
     "message": "Quando o Nexus responde a um pedido de download em segundo plano com uma página de verificação, abre a página do arquivo para você concluir a checagem, em vez de falhar. É por isso que a aba às vezes navega sozinha."
   },
   "tabControls": {
-    "message": "Controls",
+    "message": "Controles",
     "description": "Tab bar button for the quick controls panel."
   },
   "tabHelp": {
-    "message": "Help & Bugs",
+    "message": "Ajuda e erros",
     "description": "Tab bar button for the help and bug report panel."
+  },
+  "popupSectionsAria": {
+    "message": "Seções"
   }
 }
