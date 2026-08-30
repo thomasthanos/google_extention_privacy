@@ -47,6 +47,12 @@ const backgroundUnits = spawnSync(process.execPath, [join(root, 'tools', 'backgr
 });
 if (backgroundUnits.status !== 0) fail('background-units-test.cjs did not pass — package not built.');
 
+const wabbajack = spawnSync(process.execPath, [join(root, 'tools', 'wabbajack-test.cjs')], {
+  cwd: root,
+  stdio: 'inherit'
+});
+if (wabbajack.status !== 0) fail('wabbajack-test.cjs did not pass — package not built.');
+
 function walk(absolute, prefix, allowedExt) {
   const found = [];
   for (const name of readdirSync(absolute).sort()) {
