@@ -1502,5 +1502,29 @@
   "popupSectionsAria": {
     "message": "Sections",
     "description": "Accessible name for the popup tab bar."
+  },
+  "setWabbajackImportLabel": {
+    "message": "Wabbajack modlist import (beta)",
+    "description": "Label for the beta Wabbajack modlist import toggle."
+  },
+  "setWabbajackImportDesc": {
+    "message": "Adds a button to this dialog that reads a .wabbajack file and queues the Nexus files it lists. Files hosted outside Nexus, and games this build does not recognise, are reported instead of downloaded.",
+    "description": "Description for the beta Wabbajack modlist import toggle."
+  },
+  "btnImportWabbajack": {
+    "message": "Import Wabbajack modlist",
+    "description": "Button that opens the .wabbajack file picker."
+  },
+  "wjImportSummary": {
+    "message": "$1 of $2 files queued from $3.",
+    "description": "Result after importing a modlist. $1 queued, $2 total, $3 modlist name."
+  },
+  "wjImportSkipped": {
+    "message": "$1 left out — hosted outside Nexus, or an unrecognised game.",
+    "description": "How many archives in the modlist were not queued. $1 is a count."
+  },
+  "wjImportFailed": {
+    "message": "Could not read this modlist: $1",
+    "description": "Shown when a .wabbajack file cannot be read. $1 is the reason."
   }
 }

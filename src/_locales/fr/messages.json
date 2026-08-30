@@ -1239,5 +1239,23 @@
   },
   "popupSectionsAria": {
     "message": "Sections"
+  },
+  "setWabbajackImportLabel": {
+    "message": "Import de liste Wabbajack (bêta)"
+  },
+  "setWabbajackImportDesc": {
+    "message": "Ajoute à cette fenêtre un bouton qui lit un fichier .wabbajack et met en file d'attente les fichiers Nexus qu'il répertorie. Les fichiers hébergés hors de Nexus, et les jeux que cette version ne reconnaît pas, sont signalés au lieu d'être téléchargés."
+  },
+  "btnImportWabbajack": {
+    "message": "Importer une liste Wabbajack"
+  },
+  "wjImportSummary": {
+    "message": "$1 fichiers sur $2 mis en file d'attente depuis $3."
+  },
+  "wjImportSkipped": {
+    "message": "$1 écartés — hébergés hors de Nexus, ou jeu non reconnu."
+  },
+  "wjImportFailed": {
+    "message": "Impossible de lire cette liste : $1"
   }
 }

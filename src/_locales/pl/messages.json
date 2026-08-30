@@ -1391,5 +1391,23 @@
   },
   "popupSectionsAria": {
     "message": "Sekcje"
+  },
+  "setWabbajackImportLabel": {
+    "message": "Import listy Wabbajack (beta)"
+  },
+  "setWabbajackImportDesc": {
+    "message": "Dodaje do tego okna przycisk, który odczytuje plik .wabbajack i kolejkuje wymienione w nim pliki z Nexusa. Pliki hostowane poza Nexusem oraz gry nierozpoznane przez tę wersję są zgłaszane zamiast pobierane."
+  },
+  "btnImportWabbajack": {
+    "message": "Importuj listę Wabbajack"
+  },
+  "wjImportSummary": {
+    "message": "Zakolejkowano $1 z $2 plików z $3."
+  },
+  "wjImportSkipped": {
+    "message": "Pominięto $1 — hostowane poza Nexusem lub nierozpoznana gra."
+  },
+  "wjImportFailed": {
+    "message": "Nie udało się odczytać tej listy: $1"
   }
 }

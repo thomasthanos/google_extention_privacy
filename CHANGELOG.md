@@ -188,6 +188,14 @@ they are simply not listed.
 - `tools/background-units-test.cjs`, covering the download conflict action, the rate-limit backoff
   ladder, the download-target validator, the job-state read-modify-write and the storage write-queue.
   It runs as part of `tools/build-zip.mjs`.
+- **Wabbajack modlist import, behind a beta switch that is off by default.** Turning on
+  *Wabbajack modlist import (beta)* in the page settings adds an **Import Wabbajack modlist** button
+  to that dialog. It reads the `modlist` manifest out of a `.wabbajack` file and builds a download
+  queue from the Nexus files it names — the same queue a collection uses, so pacing, rate-limit
+  backoff, download history, resume and both the Vortex and browser paths all apply unchanged.
+  Archives hosted outside Nexus, and games this build's registry does not recognise, are counted and
+  reported rather than silently dropped: the mod page URL needs the Nexus domain, and that cannot be
+  guessed from the Wabbajack game name.
 - `tools/check-locales.mjs` now compares which placeholders a translation uses, not how many. Counting
   alone let a translation swap `$1` for `$2`, or drop one while adding another, and still pass — the
   user would see the wrong value, or a literal `$1`, with the build green.

@@ -1163,5 +1163,23 @@
   },
   "popupSectionsAria": {
     "message": "セクション"
+  },
+  "setWabbajackImportLabel": {
+    "message": "Wabbajack モッドリスト読み込み（ベータ）"
+  },
+  "setWabbajackImportDesc": {
+    "message": "このダイアログに .wabbajack ファイルを読み込み、含まれる Nexus のファイルをキューに入れるボタンを追加します。Nexus 以外でホストされているファイルや、このバージョンが認識できないゲームは、ダウンロードせずに報告します。"
+  },
+  "btnImportWabbajack": {
+    "message": "Wabbajack モッドリストを読み込む"
+  },
+  "wjImportSummary": {
+    "message": "$3 から $2 件中 $1 件をキューに追加しました。"
+  },
+  "wjImportSkipped": {
+    "message": "$1 件を除外しました — Nexus 以外のホスト、または未対応のゲームです。"
+  },
+  "wjImportFailed": {
+    "message": "このモッドリストを読み込めませんでした: $1"
   }
 }

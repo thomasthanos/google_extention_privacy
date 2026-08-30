@@ -1391,5 +1391,23 @@
   },
   "popupSectionsAria": {
     "message": "Разделы"
+  },
+  "setWabbajackImportLabel": {
+    "message": "Импорт списка Wabbajack (бета)"
+  },
+  "setWabbajackImportDesc": {
+    "message": "Добавляет в это окно кнопку, которая читает файл .wabbajack и ставит в очередь перечисленные в нём файлы с Nexus. Файлы, размещённые вне Nexus, и игры, неизвестные этой версии, отмечаются, а не загружаются."
+  },
+  "btnImportWabbajack": {
+    "message": "Импортировать список Wabbajack"
+  },
+  "wjImportSummary": {
+    "message": "В очередь добавлено $1 из $2 файлов из $3."
+  },
+  "wjImportSkipped": {
+    "message": "Пропущено $1 — вне Nexus или неизвестная игра."
+  },
+  "wjImportFailed": {
+    "message": "Не удалось прочитать этот список: $1"
   }
 }

@@ -1239,5 +1239,23 @@
   },
   "popupSectionsAria": {
     "message": "Sezioni"
+  },
+  "setWabbajackImportLabel": {
+    "message": "Importazione modlist Wabbajack (beta)"
+  },
+  "setWabbajackImportDesc": {
+    "message": "Aggiunge a questa finestra un pulsante che legge un file .wabbajack e accoda i file Nexus elencati. I file ospitati fuori da Nexus, e i giochi che questa versione non riconosce, vengono segnalati anziché scaricati."
+  },
+  "btnImportWabbajack": {
+    "message": "Importa modlist Wabbajack"
+  },
+  "wjImportSummary": {
+    "message": "$1 di $2 file accodati da $3."
+  },
+  "wjImportSkipped": {
+    "message": "$1 esclusi — ospitati fuori da Nexus o gioco non riconosciuto."
+  },
+  "wjImportFailed": {
+    "message": "Impossibile leggere questa modlist: $1"
   }
 }

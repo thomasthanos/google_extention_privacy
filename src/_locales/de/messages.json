@@ -1239,5 +1239,23 @@
   },
   "popupSectionsAria": {
     "message": "Bereiche"
+  },
+  "setWabbajackImportLabel": {
+    "message": "Wabbajack-Modlisten-Import (Beta)"
+  },
+  "setWabbajackImportDesc": {
+    "message": "Fügt diesem Dialog eine Schaltfläche hinzu, die eine .wabbajack-Datei liest und die darin aufgeführten Nexus-Dateien einreiht. Dateien außerhalb von Nexus und Spiele, die diese Version nicht kennt, werden gemeldet statt heruntergeladen."
+  },
+  "btnImportWabbajack": {
+    "message": "Wabbajack-Modliste importieren"
+  },
+  "wjImportSummary": {
+    "message": "$1 von $2 Dateien aus $3 eingereiht."
+  },
+  "wjImportSkipped": {
+    "message": "$1 ausgelassen — außerhalb von Nexus gehostet oder unbekanntes Spiel."
+  },
+  "wjImportFailed": {
+    "message": "Diese Modliste konnte nicht gelesen werden: $1"
   }
 }

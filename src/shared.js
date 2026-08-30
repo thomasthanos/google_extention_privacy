@@ -26,7 +26,8 @@
     NDC_pauseBetweenDownload: 5,
     NDC_downloadSpeed: 3.2,
     ForceEnglish: false,
-    NDC_downloadMethod: 0  
+    NDC_downloadMethod: 0,
+    WabbajackImport: false  
   };
 
   function escapeHtml(value) {

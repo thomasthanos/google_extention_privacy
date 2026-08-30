@@ -1239,5 +1239,23 @@
   },
   "popupSectionsAria": {
     "message": "Ενότητες"
+  },
+  "setWabbajackImportLabel": {
+    "message": "Εισαγωγή λίστας Wabbajack (beta)"
+  },
+  "setWabbajackImportDesc": {
+    "message": "Προσθέτει σε αυτόν τον διάλογο ένα κουμπί που διαβάζει ένα αρχείο .wabbajack και βάζει στην ουρά τα αρχεία Nexus που περιέχει. Αρχεία εκτός Nexus, και παιχνίδια που δεν αναγνωρίζει αυτή η έκδοση, αναφέρονται αντί να κατέβουν."
+  },
+  "btnImportWabbajack": {
+    "message": "Εισαγωγή λίστας Wabbajack"
+  },
+  "wjImportSummary": {
+    "message": "$1 από $2 αρχεία στην ουρά από το $3."
+  },
+  "wjImportSkipped": {
+    "message": "$1 παραλείφθηκαν — εκτός Nexus ή άγνωστο παιχνίδι."
+  },
+  "wjImportFailed": {
+    "message": "Δεν ήταν δυνατή η ανάγνωση της λίστας: $1"
   }
 }

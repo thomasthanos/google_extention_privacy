@@ -1163,5 +1163,23 @@
   },
   "popupSectionsAria": {
     "message": "分区"
+  },
+  "setWabbajackImportLabel": {
+    "message": "Wabbajack 模组列表导入（测试版）"
+  },
+  "setWabbajackImportDesc": {
+    "message": "在此对话框中添加一个按钮，用于读取 .wabbajack 文件并将其中的 Nexus 文件加入队列。托管在 Nexus 之外的文件，以及此版本无法识别的游戏，将被报告而不会下载。"
+  },
+  "btnImportWabbajack": {
+    "message": "导入 Wabbajack 模组列表"
+  },
+  "wjImportSummary": {
+    "message": "已从 $3 将 $2 个文件中的 $1 个加入队列。"
+  },
+  "wjImportSkipped": {
+    "message": "已排除 $1 个 — 托管在 Nexus 之外，或游戏无法识别。"
+  },
+  "wjImportFailed": {
+    "message": "无法读取此模组列表：$1"
   }
 }

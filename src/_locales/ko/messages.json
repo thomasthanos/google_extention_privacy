@@ -1163,5 +1163,23 @@
   },
   "popupSectionsAria": {
     "message": "섹션"
+  },
+  "setWabbajackImportLabel": {
+    "message": "Wabbajack 모드리스트 가져오기 (베타)"
+  },
+  "setWabbajackImportDesc": {
+    "message": "이 대화 상자에 .wabbajack 파일을 읽어 목록의 Nexus 파일을 대기열에 넣는 버튼을 추가합니다. Nexus 외부에 호스팅된 파일과 이 버전이 인식하지 못하는 게임은 내려받지 않고 보고합니다."
+  },
+  "btnImportWabbajack": {
+    "message": "Wabbajack 모드리스트 가져오기"
+  },
+  "wjImportSummary": {
+    "message": "$3에서 $2개 중 $1개를 대기열에 추가했습니다."
+  },
+  "wjImportSkipped": {
+    "message": "$1개 제외됨 — Nexus 외부 호스팅이거나 인식할 수 없는 게임입니다."
+  },
+  "wjImportFailed": {
+    "message": "이 모드리스트를 읽을 수 없습니다: $1"
   }
 }

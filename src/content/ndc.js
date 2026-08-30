@@ -236,6 +236,29 @@ window.NexusExt = window.NexusExt || {};
       NXTK.setForceEnglish(next.ForceEnglish);
     }
 
+    /* Seeds the queue from a list the caller already has, instead of fetching a collection. Used by
+       the Wabbajack import: the modlist names every file, and there is no collection to fetch. Sets
+       up exactly the same state init() does, so pacing, history, resume and both download paths
+       behave identically from here on. */
+    async initFromMods(mods) {
+      const settings = await NexusExt.Storage.getSettings();
+      this.pauseBetweenDownload = settings.NDC_pauseBetweenDownload;
+      this.downloadSpeed = settings.NDC_downloadSpeed;
+      this.downloadMethod = settings.NDC_downloadMethod;
+      this.requestTimeout = settings.RequestTimeout || Errors.DEFAULT_TIMEOUT_MS;
+      this.showAlertsOnError = settings.ShowAlertsOnError !== false;
+      this.downloadFolder = settings.DownloadFolder ?? '';
+
+      this.watchSettings();
+
+      const sorted = [...mods].sort((a, b) => nameCollator.compare(a.file.mod.name, b.file.mod.name));
+      /* Nothing here is optional: a modlist is the whole list or nothing. */
+      this.mods = { all: sorted, mandatory: sorted, optional: [] };
+      this.external = true;
+      this.initialized = true;
+      return true;
+    }
+
     async fetchMods(collectionId = this.collectionId, revision = this.revision) {
       const response = await Errors.request('https://api-router.nexusmods.com/graphql', {
         headers: { 'content-type': 'application/json' },

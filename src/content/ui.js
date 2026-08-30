@@ -756,6 +756,12 @@ window.NexusExt = window.NexusExt || {};
     { key: 'ShowAlertsOnError', label: () => NXTK.t('setShowAlertsOnErrorLabel', null, 'Show error popups'), type: 'bool', desc: () => NXTK.t('setShowAlertsOnErrorDesc', null, 'Show a clear message when Nexus does not return a usable download link.') },
     { key: 'HidePremiumUpsells', label: () => NXTK.t('setHidePremiumUpsellsLabel', null, 'Hide ads and Premium panels'), type: 'bool', desc: () => NXTK.t('setHidePremiumUpsellsDesc', null, 'Hide Nexus advertising slots, empty ad containers, Premium banners and upgrade panels while browsing. It also sets the Nexus ad-timer cookie so queued downloads do not wait through the countdown before each link.') },
     { key: 'HandleArchivedFiles', label: () => NXTK.t('setHandleArchivedFilesLabel', null, 'Archived file buttons'), type: 'bool', desc: () => NXTK.t('setHandleArchivedFilesDesc', null, 'Add Vortex and browser download buttons to archived file entries when Nexus hides them.') },
+    {
+      key: 'WabbajackImport',
+      label: () => NXTK.t('setWabbajackImportLabel', null, 'Wabbajack modlist import (beta)'),
+      type: 'bool',
+      desc: () => NXTK.t('setWabbajackImportDesc', null, 'Adds a button to this dialog that reads a .wabbajack file and queues the Nexus files it lists. Files hosted outside Nexus, and games this build does not recognise, are reported instead of downloaded.')
+    },
     { key: 'CloudflareFallback', label: () => NXTK.t('setCloudflareFallbackLabel', null, 'Cloudflare fallback'), type: 'bool', desc: () => NXTK.t('setCloudflareFallbackDesc', null, 'When Nexus answers a background download request with a browser verification page, open the file page so you can complete the check, instead of failing. This is why the tab sometimes navigates on its own.') },
     {
       key: 'ForceEnglish',
@@ -874,6 +880,7 @@ window.NexusExt = window.NexusExt || {};
         </div>
       </div>
       <div class="nxtk-modal-footer">
+        <button class="nxtk-btn nxtk-btn-secondary" id="nxtk-wj-import" ${cfg.WabbajackImport ? '' : 'hidden'}>${L('btnImportWabbajack', 'Import Wabbajack modlist')}</button>
         <button class="nxtk-btn nxtk-btn-secondary" data-reset>${L('setRestoreDefaults', 'Restore Defaults & Refresh')}</button>
         <button class="nxtk-btn nxtk-btn-primary" data-close>${L('btnDone', 'Done')}</button>
       </div>
@@ -899,6 +906,11 @@ window.NexusExt = window.NexusExt || {};
       cfg[key] = value;
       NexusExt.Storage.patchSetting(key, value);
       if (NexusExt.NNW) NexusExt.NNW.updateConfig(cfg);
+
+      if (key === 'WabbajackImport') {
+        const importButton = modal.querySelector('#nxtk-wj-import');
+        if (importButton) importButton.hidden = !value;
+      }
 
       if (key === 'ForceEnglish') {
         /* Nothing injected into the page carries data-i18n — every string is baked in at build time
@@ -957,6 +969,7 @@ window.NexusExt = window.NexusExt || {};
     });
     modal.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', close));
     modal.querySelectorAll('[data-report-issue]').forEach(b => b.addEventListener('click', () => copyReportAndOpenIssue(b)));
+    modal.querySelector('#nxtk-wj-import')?.addEventListener('click', () => importWabbajackModlist(close));
 
     const advancedToggle = modal.querySelector('#nxtk-advanced-toggle');
     const advancedBody = modal.querySelector('#nxtk-advanced-body');
@@ -1438,6 +1451,78 @@ window.NexusExt = window.NexusExt || {};
       existing.remove();
       syncDropdownPageLock();
     }
+  }
+
+  /* A Wabbajack modlist has no collection page to hang off, so its deck is mounted wherever the user
+     happens to be. main.js only tears a deck down while it is on a collection route, so this one
+     survives until the user opens a real collection — at which point that collection's deck should
+     take over anyway. */
+  const WABBAJACK_UNSAFE_ID = /[^A-Za-z0-9._-]+/g;
+
+  function wabbajackCollectionId(list) {
+    /* Doubles as the history key, so it has to satisfy the worker's isSafeId check. The wj- prefix
+       keeps it from ever colliding with a real collection slug. */
+    const base = String(list?.name || '').replace(WABBAJACK_UNSAFE_ID, '-').replace(/^-+|-+$/g, '');
+    return `wj-${base || 'modlist'}`.slice(0, 128);
+  }
+
+  async function mountWabbajackDeck(list, mods) {
+    const existing = document.getElementById('nxtk-control-deck');
+    if (existing) {
+      disposeControlDeck(existing);
+      existing.remove();
+    }
+
+    const ndc = new NexusExt.NDC(mods[0].file.mod.game.domainName, wabbajackCollectionId(list));
+    await ndc.initFromMods(mods);
+
+    const deck = createControlDeck(ndc);
+    /* There is no collection here, so there are no revisions to diff against. */
+    deck.querySelector('#nxtk-update-collection')?.remove();
+
+    const host = document.getElementById('mainContent') || document.body;
+    host.insertBefore(deck, host.firstChild);
+    deck.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    return ndc;
+  }
+
+  async function importWabbajackModlist(closeDialog) {
+    const Wabbajack = NexusExt.Wabbajack;
+    if (!Wabbajack) return;
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.wabbajack';
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      let list;
+      try {
+        list = await Wabbajack.readModlist(file);
+      } catch (cause) {
+        const reason = String(cause?.message || cause);
+        await nxtkAlert(NXTK.t('wjImportFailed', [reason], `Could not read this modlist: ${reason}`));
+        return;
+      }
+
+      const mods = Wabbajack.toCollectionMods(list);
+      const title = list.name || file.name;
+      const lines = [
+        NXTK.t('wjImportSummary', [String(mods.length), String(list.total), title],
+          `${mods.length} of ${list.total} files queued from ${title}.`)
+      ];
+      if (list.skipped.length) {
+        lines.push(NXTK.t('wjImportSkipped', [String(list.skipped.length)],
+          `${list.skipped.length} left out — hosted outside Nexus, or an unrecognised game.`));
+      }
+      await nxtkAlert(lines.join('\n'));
+      if (!mods.length) return;
+
+      closeDialog?.();
+      await mountWabbajackDeck(list, mods);
+    }, { once: true });
+    input.click();
   }
 
   function createControlDeck(ndc) {

@@ -1239,5 +1239,23 @@
   },
   "popupSectionsAria": {
     "message": "Bölümler"
+  },
+  "setWabbajackImportLabel": {
+    "message": "Wabbajack mod listesi içe aktarma (beta)"
+  },
+  "setWabbajackImportDesc": {
+    "message": "Bu pencereye, bir .wabbajack dosyasını okuyup içindeki Nexus dosyalarını kuyruğa ekleyen bir düğme ekler. Nexus dışında barındırılan dosyalar ve bu sürümün tanımadığı oyunlar indirilmek yerine bildirilir."
+  },
+  "btnImportWabbajack": {
+    "message": "Wabbajack mod listesi içe aktar"
+  },
+  "wjImportSummary": {
+    "message": "$3 listesinden $2 dosyanın $1 tanesi kuyruğa alındı."
+  },
+  "wjImportSkipped": {
+    "message": "$1 tanesi dışarıda bırakıldı — Nexus dışı veya tanınmayan oyun."
+  },
+  "wjImportFailed": {
+    "message": "Bu mod listesi okunamadı: $1"
   }
 }
