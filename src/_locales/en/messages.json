@@ -1544,7 +1544,11 @@
     "description": "Explanation in the Wabbajack import info dialog."
   },
   "dlgWabbajackNote": {
-    "message": "Files hosted outside Nexus, and games this version does not recognise, cannot be fetched. They are counted and named in the summary so you can get them yourself.",
+    "message": "Files hosted outside Nexus, and games this version does not recognise, cannot be fetched. Every one of them is listed by name in the activity log so you can get them yourself.",
     "description": "Caveat in the Wabbajack import info dialog about files it cannot fetch."
+  },
+  "wjSkippedHeading": {
+    "message": "Not queued from this modlist:",
+    "description": "Heading above the list of modlist archives that could not be queued."
   }
 }

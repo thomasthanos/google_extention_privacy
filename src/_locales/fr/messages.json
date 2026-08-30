@@ -1271,6 +1271,9 @@
     "message": "Choisis le fichier .wabbajack téléchargé depuis Wabbajack. L'extension lit la liste qu'il contient et met en file d'attente les fichiers hébergés sur Nexus, avec le même rythme, le même historique et la même méthode de téléchargement qu'une collection."
   },
   "dlgWabbajackNote": {
-    "message": "Les fichiers hébergés hors de Nexus, et les jeux que cette version ne reconnaît pas, ne peuvent pas être récupérés. Ils sont comptés et nommés dans le résumé pour que tu puisses les obtenir toi-même."
+    "message": "Les fichiers hébergés hors de Nexus, et les jeux que cette version ne reconnaît pas, ne peuvent pas être récupérés. Chacun est listé par son nom dans le journal d'activité pour que tu puisses l'obtenir toi-même."
+  },
+  "wjSkippedHeading": {
+    "message": "Non mis en file d'attente depuis cette liste :"
   }
 }

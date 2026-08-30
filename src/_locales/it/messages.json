@@ -1271,6 +1271,9 @@
     "message": "Scegli il file .wabbajack scaricato da Wabbajack. L'estensione legge la lista al suo interno e accoda i file ospitati su Nexus, con lo stesso ritmo, cronologia e metodo di download di una collezione."
   },
   "dlgWabbajackNote": {
-    "message": "I file ospitati fuori da Nexus, e i giochi che questa versione non riconosce, non possono essere scaricati. Vengono contati e indicati nel riepilogo così puoi procurarteli da solo."
+    "message": "I file ospitati fuori da Nexus, e i giochi che questa versione non riconosce, non possono essere scaricati. Ognuno viene elencato per nome nel registro attività così puoi procurarteli da solo."
+  },
+  "wjSkippedHeading": {
+    "message": "Non accodati da questa modlist:"
   }
 }

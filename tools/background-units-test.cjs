@@ -50,6 +50,7 @@ const source = `${fs.readFileSync('src/background.js', 'utf8')}\n;globalThis.__N
 vm.runInContext(source, context, { filename: 'src/background.js' });
 
 const { retryAfterMilliseconds, conflictActionFor, __NXTK: NXTK } = context;
+const { responseLooksChallenged, responseLooksSuspended } = context;
 const { mutateNdcJob, readNdcJob, saveNdcJob, storageSetLocal, enqueueStorageTask,
   __NDC_JOBS_KEY: NDC_JOBS_KEY, __writeQueues: writeQueues } = context;
 
@@ -73,6 +74,22 @@ assert.equal(conflictActionFor('Some Mod.zip'), 'uniquify', 'unfoldered download
 assert.equal(NXTK.validateDownloadTarget('nxm://skyrim/mods/1/files/2?key=k&expires=1&user_id=3').ok, true);
 assert.equal(NXTK.validateDownloadTarget('nxm://skyrim/mods/1/files/2').ok, false, 'unsigned nxm links are rejected');
 assert.equal(NXTK.validateDownloadTarget('https://evil.example/x.zip', { method: 1 }).ok, false, 'off-host downloads are rejected');
+
+/* A Cloudflare interstitial arrives as an ordinary 200 or 403 carrying a challenge page, so without
+   these the worker fell through to a generic request failure and burned two attempts on every
+   remaining file instead of stopping once. */
+assert.equal(responseLooksChallenged({}, '<title>Just a moment...</title>'), true);
+assert.equal(responseLooksChallenged({}, '<div id="cf-browser-verification">'), true);
+assert.equal(responseLooksChallenged({}, '<script src="/cdn-cgi/challenge-platform/x.js">'), true);
+assert.equal(responseLooksChallenged({ cfMitigated: 'challenge' }, ''), true,
+  'the Cf-Mitigated header alone is enough');
+assert.equal(responseLooksChallenged({}, '<html><body>Skyrim Special Edition</body></html>'), false,
+  'an ordinary mod page is not a challenge');
+assert.equal(responseLooksChallenged({}, ''), false);
+
+assert.equal(responseLooksSuspended('Your account has been temporarily suspended'), true);
+assert.equal(responseLooksSuspended('too many requests from your account'), true);
+assert.equal(responseLooksSuspended('<html>a normal page</html>'), false);
 
 /* A collection job advances from two directions at once: the download-terminal handler and an
    attach/status call from a tab. saveNdcJob wrote back a whole snapshot read several awaits earlier,

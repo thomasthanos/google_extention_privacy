@@ -1271,6 +1271,9 @@
     "message": "Elige el archivo .wabbajack que descargaste de Wabbajack. La extensión lee la lista que contiene y pone en cola los archivos alojados en Nexus, con el mismo ritmo, historial y método de descarga que usa una colección."
   },
   "dlgWabbajackNote": {
-    "message": "Los archivos alojados fuera de Nexus, y los juegos que esta versión no reconoce, no se pueden obtener. Se cuentan y se nombran en el resumen para que puedas conseguirlos por tu cuenta."
+    "message": "Los archivos alojados fuera de Nexus, y los juegos que esta versión no reconoce, no se pueden obtener. Todos aparecen por nombre en el registro de actividad para que puedas conseguirlos por tu cuenta."
+  },
+  "wjSkippedHeading": {
+    "message": "No se pusieron en cola de esta lista:"
   }
 }

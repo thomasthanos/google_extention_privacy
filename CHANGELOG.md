@@ -78,6 +78,13 @@ they are simply not listed.
 - **The worker's storage write-queue releases finished keys.** Item lists are stored per job id, so
   the map gained a permanent entry for every collection run the worker had ever seen.
 
+- **A Cloudflare challenge no longer fails an entire queue one file at a time.** The worker only
+  recognised HTTP 429, so an interstitial — which arrives as an ordinary 200 or 403 carrying a
+  challenge page — fell through to a generic request failure. The queue then spent two attempts on
+  every remaining file, failing each in turn, when the right answer is to stop once and let the user
+  clear the check. Account suspension had the same blind spot. Both are now recognised, by marker and
+  by the `Cf-Mitigated` header, and stop the run with the reason. This affects collections as much as
+  imported modlists.
 - **A collection queue can no longer roll itself backwards.** Job state was persisted by writing a
   whole job object back, but callers held that object across several awaits — reading the item list,
   verifying the transfer size, writing history. Anything that moved in between was silently reverted

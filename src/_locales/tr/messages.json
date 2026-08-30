@@ -1271,6 +1271,9 @@
     "message": "Wabbajack'ten indirdiğin .wabbajack dosyasını seç. Uzantı içindeki listeyi okur ve Nexus'ta barındırılan dosyaları kuyruğa alır; hız ayarı, geçmiş ve indirme yöntemi bir koleksiyondakiyle aynıdır."
   },
   "dlgWabbajackNote": {
-    "message": "Nexus dışında barındırılan dosyalar ve bu sürümün tanımadığı oyunlar alınamaz. Kendin edinebilmen için özet bölümünde sayılır ve adlarıyla belirtilir."
+    "message": "Nexus dışında barındırılan dosyalar ve bu sürümün tanımadığı oyunlar alınamaz. Her biri etkinlik günlüğünde adıyla listelenir, böylece kendin edinebilirsin."
+  },
+  "wjSkippedHeading": {
+    "message": "Bu mod listesinden kuyruğa alınmayanlar:"
   }
 }

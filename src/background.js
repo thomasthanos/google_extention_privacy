@@ -772,6 +772,24 @@ function responseLooksLoggedOut(response, text) {
   return /(?:auth\/sign_in|name=["']login|sign in to nexus mods)/i.test(String(text || '').slice(0, 200000));
 }
 
+/* A Cloudflare interstitial comes back as a normal 200 or 403 carrying a challenge page, so without
+   these checks it fell through to the generic page_request_failed / generate_failed branches. The
+   queue then burned two attempts on every remaining file, failing the whole run one item at a time,
+   when the right answer is to stop and let the user clear the check once. The content-script path
+   already classifies this (errors.js classifyContent); the worker had no equivalent. */
+const CLOUDFLARE_MARKERS = /just a moment|cf-browser-verification|challenge-platform|cf_chl_|attention required!/i;
+const SUSPENDED_MARKERS = /temporarily suspended|too many requests from your account/i;
+
+function responseLooksChallenged(response, text) {
+  const mitigated = String(response?.cfMitigated || '').trim().toLowerCase();
+  if (mitigated === 'challenge') return true;
+  return CLOUDFLARE_MARKERS.test(String(text || '').slice(0, 200000));
+}
+
+function responseLooksSuspended(text) {
+  return SUSPENDED_MARKERS.test(String(text || '').slice(0, 200000));
+}
+
 async function fetchNdcResponse(url, options, timeoutMs) {
   const controller = typeof AbortController === 'function' ? new AbortController() : null;
   const timeout = Math.min(Math.max(Number(timeoutMs) || 30000, 5000), 120000);
@@ -784,7 +802,8 @@ async function fetchNdcResponse(url, options, timeoutMs) {
       status: response.status || 0,
       text,
       url: response.url || url,
-      retryAfter: response.headers?.get?.('Retry-After') || ''
+      retryAfter: response.headers?.get?.('Retry-After') || '',
+      cfMitigated: response.headers?.get?.('Cf-Mitigated') || ''
     };
   } catch (cause) {
     return { ok: false, status: 0, text: '', url, error: String(cause?.message || cause) };
@@ -864,6 +883,8 @@ async function resolveNdcBrowserUrl(item, timeoutMs) {
     credentials: 'include'
   }, timeoutMs);
   if (responseLooksLoggedOut(page, page.text)) return { ok: false, code: 'requires_login' };
+  if (responseLooksChallenged(page, page.text)) return { ok: false, code: 'cloudflare' };
+  if (responseLooksSuspended(page.text)) return { ok: false, code: 'account_suspended' };
   if (!page.ok) return ndcResolveFailure(page.status === 429 ? 'rate_limited' : 'page_request_failed', page);
 
   const generated = await fetchNdcResponse(
@@ -880,6 +901,8 @@ async function resolveNdcBrowserUrl(item, timeoutMs) {
     timeoutMs
   );
   if (responseLooksLoggedOut(generated, generated.text)) return { ok: false, code: 'requires_login' };
+  if (responseLooksChallenged(generated, generated.text)) return { ok: false, code: 'cloudflare' };
+  if (responseLooksSuspended(generated.text)) return { ok: false, code: 'account_suspended' };
   if (!generated.ok) {
     return ndcResolveFailure(generated.status === 429 ? 'rate_limited' : 'generate_failed', generated);
   }
@@ -931,6 +954,7 @@ async function finishNdcJob(job) {
 }
 
 const NDC_RESOLVE_RETRY_DELAY_MS = 1500;
+const BLOCKING_RESOLVE_CODES = new Set(['requires_login', 'cloudflare', 'account_suspended']);
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -981,12 +1005,15 @@ async function advanceNdcJob(jobId) {
         });
         return null;
       }
-      if (resolved.code === 'requires_login') {
-        job.status = 'requires_login';
+      /* These three mean "nothing else in this queue will work until you act", so the run stops with
+         the reason rather than grinding through every remaining file to fail each one twice. */
+      if (BLOCKING_RESOLVE_CODES.has(resolved.code)) {
+        job.status = resolved.code === 'requires_login' ? 'requires_login' : 'error';
+        job.lastError = resolved.code;
         job.failed.push({ fileId: item.fileId, code: resolved.code });
         clearNdcJobAlarm(job.id);
         await saveNdcJob(job);
-        notifyNdcJob(job, 'NXT_NDC_DONE', { outcome: 'requires_login', itemName: item.name });
+        notifyNdcJob(job, 'NXT_NDC_DONE', { outcome: resolved.code, itemName: item.name });
         dropNdcJobItems(job.id);
         return null;
       }

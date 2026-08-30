@@ -1271,6 +1271,9 @@
     "message": "Wähle die .wabbajack-Datei, die du von Wabbajack heruntergeladen hast. Die Erweiterung liest die enthaltene Liste und reiht die auf Nexus gehosteten Dateien ein — mit demselben Tempo, Verlauf und Download-Verfahren wie bei einer Kollektion."
   },
   "dlgWabbajackNote": {
-    "message": "Dateien außerhalb von Nexus und Spiele, die diese Version nicht kennt, können nicht geholt werden. Sie werden in der Zusammenfassung gezählt und benannt, damit du sie selbst besorgen kannst."
+    "message": "Dateien außerhalb von Nexus und Spiele, die diese Version nicht kennt, können nicht geholt werden. Jede einzelne wird im Aktivitätsprotokoll namentlich aufgeführt, damit du sie selbst besorgen kannst."
+  },
+  "wjSkippedHeading": {
+    "message": "Nicht aus dieser Modliste eingereiht:"
   }
 }

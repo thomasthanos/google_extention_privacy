@@ -1471,6 +1471,17 @@ window.NexusExt = window.NexusExt || {};
     return `wj-${base || 'modlist'}`.slice(0, 128);
   }
 
+  /* wabbajack.js records a reason for every archive it could not queue. Reporting only the count left
+     the user unable to tell WHICH files to fetch by hand — and the info dialog promises they are named
+     — so the full list goes into the deck's activity log, which is scrollable and copyable. */
+  function logSkippedArchives(ndc, skipped) {
+    if (!skipped?.length) return;
+    ndc.ui?.logText?.(NXTK.t('wjSkippedHeading', null, 'Not queued from this modlist:'), 'info');
+    for (const entry of skipped) {
+      ndc.ui?.logText?.(`· ${entry.name} — ${entry.reason}`, 'info');
+    }
+  }
+
   async function mountWabbajackDeck(list, mods) {
     const existing = document.getElementById('nxtk-control-deck');
     if (existing) {
@@ -1488,12 +1499,18 @@ window.NexusExt = window.NexusExt || {};
     const host = document.getElementById('mainContent') || document.body;
     host.insertBefore(deck, host.firstChild);
     deck.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    logSkippedArchives(ndc, list.skipped);
     return ndc;
   }
 
   async function importWabbajackModlist(closeDialog) {
     const Wabbajack = NexusExt.Wabbajack;
     if (!Wabbajack) return;
+
+    /* Reading a large modlist inflates and parses megabytes of JSON, which is long enough for the
+       button to look dead and be clicked again, opening a second picker. */
+    const triggers = Array.from(document.querySelectorAll('#nxtk-wj-import, #nxtk-wj-deck-import'));
+    const setBusy = (busy) => triggers.forEach((button) => { button.disabled = busy; });
 
     const input = document.createElement('input');
     input.type = 'file';
@@ -1502,30 +1519,34 @@ window.NexusExt = window.NexusExt || {};
       const file = input.files?.[0];
       if (!file) return;
 
-      let list;
+      setBusy(true);
       try {
-        list = await Wabbajack.readModlist(file);
+        /* Everything from here on is guarded, not just the parse: mounting the deck reads settings
+           and builds a queue, and a throw inside this async listener would otherwise be an unhandled
+           rejection that closes the picker and shows the user nothing at all. */
+        const list = await Wabbajack.readModlist(file);
+        const mods = Wabbajack.toCollectionMods(list);
+        const title = list.name || file.name;
+
+        const lines = [
+          NXTK.t('wjImportSummary', [String(mods.length), String(list.total), title],
+            `${mods.length} of ${list.total} files queued from ${title}.`)
+        ];
+        if (list.skipped.length) {
+          lines.push(NXTK.t('wjImportSkipped', [String(list.skipped.length)],
+            `${list.skipped.length} left out — hosted outside Nexus, or an unrecognised game.`));
+        }
+        await nxtkAlert(lines.join('\n'));
+        if (!mods.length) return;
+
+        closeDialog?.();
+        await mountWabbajackDeck(list, mods);
       } catch (cause) {
         const reason = String(cause?.message || cause);
         await nxtkAlert(NXTK.t('wjImportFailed', [reason], `Could not read this modlist: ${reason}`));
-        return;
+      } finally {
+        setBusy(false);
       }
-
-      const mods = Wabbajack.toCollectionMods(list);
-      const title = list.name || file.name;
-      const lines = [
-        NXTK.t('wjImportSummary', [String(mods.length), String(list.total), title],
-          `${mods.length} of ${list.total} files queued from ${title}.`)
-      ];
-      if (list.skipped.length) {
-        lines.push(NXTK.t('wjImportSkipped', [String(list.skipped.length)],
-          `${list.skipped.length} left out — hosted outside Nexus, or an unrecognised game.`));
-      }
-      await nxtkAlert(lines.join('\n'));
-      if (!mods.length) return;
-
-      closeDialog?.();
-      await mountWabbajackDeck(list, mods);
     }, { once: true });
     input.click();
   }
