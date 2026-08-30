@@ -1409,5 +1409,20 @@
   },
   "wjImportFailed": {
     "message": "Nie udało się odczytać tej listy: $1"
+  },
+  "tipWabbajackInfo": {
+    "message": "O imporcie Wabbajack"
+  },
+  "dlgWabbajackTitle": {
+    "message": "Import listy Wabbajack"
+  },
+  "dlgWabbajackLead": {
+    "message": "Zakolejkuj każdy plik z Nexusa, którego wymaga lista."
+  },
+  "dlgWabbajackHelp": {
+    "message": "Wybierz plik .wabbajack pobrany z Wabbajacka. Rozszerzenie odczyta zawartą w nim listę i zakolejkuje pliki z Nexusa, używając tego samego tempa, historii i metody pobierania co kolekcja."
+  },
+  "dlgWabbajackNote": {
+    "message": "Plików hostowanych poza Nexusem oraz gier nierozpoznanych przez tę wersję nie da się pobrać. Są zliczane i wymienione w podsumowaniu, żebyś mógł zdobyć je samodzielnie."
   }
 }

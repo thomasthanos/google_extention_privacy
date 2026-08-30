@@ -1257,5 +1257,20 @@
   },
   "wjImportFailed": {
     "message": "Não foi possível ler esta modlist: $1"
+  },
+  "tipWabbajackInfo": {
+    "message": "Sobre a importação do Wabbajack"
+  },
+  "dlgWabbajackTitle": {
+    "message": "Importar modlist do Wabbajack"
+  },
+  "dlgWabbajackLead": {
+    "message": "Enfileire todos os arquivos do Nexus que uma modlist precisa."
+  },
+  "dlgWabbajackHelp": {
+    "message": "Escolha o arquivo .wabbajack que você baixou do Wabbajack. A extensão lê a lista contida nele e enfileira os arquivos hospedados no Nexus, com o mesmo ritmo, histórico e método de download de uma coleção."
+  },
+  "dlgWabbajackNote": {
+    "message": "Arquivos hospedados fora do Nexus, e jogos que esta versão não reconhece, não podem ser obtidos. Eles são contados e nomeados no resumo para que você possa buscá-los por conta própria."
   }
 }

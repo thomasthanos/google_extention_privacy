@@ -1181,5 +1181,20 @@
   },
   "wjImportFailed": {
     "message": "このモッドリストを読み込めませんでした: $1"
+  },
+  "tipWabbajackInfo": {
+    "message": "Wabbajack 読み込みについて"
+  },
+  "dlgWabbajackTitle": {
+    "message": "Wabbajack モッドリスト読み込み"
+  },
+  "dlgWabbajackLead": {
+    "message": "モッドリストが必要とする Nexus のファイルをすべてキューに入れます。"
+  },
+  "dlgWabbajackHelp": {
+    "message": "Wabbajack からダウンロードした .wabbajack ファイルを選んでください。拡張機能はその中のリストを読み取り、Nexus にあるファイルをキューに追加します。ペース配分、履歴、ダウンロード方法はコレクションと同じです。"
+  },
+  "dlgWabbajackNote": {
+    "message": "Nexus 以外でホストされているファイルや、このバージョンが認識できないゲームは取得できません。概要で件数と名前が示されるので、ご自身で入手してください。"
   }
 }

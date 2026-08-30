@@ -1181,5 +1181,20 @@
   },
   "wjImportFailed": {
     "message": "无法读取此模组列表：$1"
+  },
+  "tipWabbajackInfo": {
+    "message": "关于 Wabbajack 导入"
+  },
+  "dlgWabbajackTitle": {
+    "message": "Wabbajack 模组列表导入"
+  },
+  "dlgWabbajackLead": {
+    "message": "将模组列表所需的所有 Nexus 文件加入队列。"
+  },
+  "dlgWabbajackHelp": {
+    "message": "选择你从 Wabbajack 下载的 .wabbajack 文件。扩展会读取其中的列表，并将托管在 Nexus 上的文件加入队列，使用与合集相同的节奏、历史记录和下载方式。"
+  },
+  "dlgWabbajackNote": {
+    "message": "托管在 Nexus 之外的文件，以及此版本无法识别的游戏，无法获取。它们会在摘要中计数并列出名称，方便你自行下载。"
   }
 }

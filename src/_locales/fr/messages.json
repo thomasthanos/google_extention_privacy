@@ -1257,5 +1257,20 @@
   },
   "wjImportFailed": {
     "message": "Impossible de lire cette liste : $1"
+  },
+  "tipWabbajackInfo": {
+    "message": "À propos de l'import Wabbajack"
+  },
+  "dlgWabbajackTitle": {
+    "message": "Import de liste Wabbajack"
+  },
+  "dlgWabbajackLead": {
+    "message": "Mettre en file d'attente tous les fichiers Nexus d'une liste."
+  },
+  "dlgWabbajackHelp": {
+    "message": "Choisis le fichier .wabbajack téléchargé depuis Wabbajack. L'extension lit la liste qu'il contient et met en file d'attente les fichiers hébergés sur Nexus, avec le même rythme, le même historique et la même méthode de téléchargement qu'une collection."
+  },
+  "dlgWabbajackNote": {
+    "message": "Les fichiers hébergés hors de Nexus, et les jeux que cette version ne reconnaît pas, ne peuvent pas être récupérés. Ils sont comptés et nommés dans le résumé pour que tu puisses les obtenir toi-même."
   }
 }

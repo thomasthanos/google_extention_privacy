@@ -1526,5 +1526,25 @@
   "wjImportFailed": {
     "message": "Could not read this modlist: $1",
     "description": "Shown when a .wabbajack file cannot be read. $1 is the reason."
+  },
+  "tipWabbajackInfo": {
+    "message": "About Wabbajack import",
+    "description": "Tooltip on the info button beside the Wabbajack import button."
+  },
+  "dlgWabbajackTitle": {
+    "message": "Wabbajack Modlist Import",
+    "description": "Title of the Wabbajack import info dialog."
+  },
+  "dlgWabbajackLead": {
+    "message": "Queue every Nexus file a modlist needs.",
+    "description": "One-line summary in the Wabbajack import info dialog."
+  },
+  "dlgWabbajackHelp": {
+    "message": "Pick the .wabbajack file you downloaded from Wabbajack. The extension reads the list inside it and queues the Nexus-hosted files, using the same pacing, history and download method a collection uses.",
+    "description": "Explanation in the Wabbajack import info dialog."
+  },
+  "dlgWabbajackNote": {
+    "message": "Files hosted outside Nexus, and games this version does not recognise, cannot be fetched. They are counted and named in the summary so you can get them yourself.",
+    "description": "Caveat in the Wabbajack import info dialog about files it cannot fetch."
   }
 }

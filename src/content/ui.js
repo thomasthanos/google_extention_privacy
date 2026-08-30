@@ -427,6 +427,7 @@ window.NexusExt = window.NexusExt || {};
     'nxtk-vortex-check-modal',
     'nxtk-history-modal',
     'nxtk-import-info-modal',
+    'nxtk-wj-info-modal',
     'nxtk-select-modal',
     'nxtk-update-modal'
   ];
@@ -910,7 +911,7 @@ window.NexusExt = window.NexusExt || {};
       if (key === 'WabbajackImport') {
         /* Two entry points: this dialog, reachable from any Nexus page, and the collection deck's
            Actions row when one is open. Both follow the switch immediately rather than on reload. */
-        for (const id of ['#nxtk-wj-import', '#nxtk-wj-deck-import']) {
+        for (const id of ['#nxtk-wj-import', '#nxtk-wj-deck-import', '#nxtk-wj-info']) {
           const button = id === '#nxtk-wj-import' ? modal.querySelector(id) : document.querySelector(id);
           if (button) button.hidden = !value;
         }
@@ -1529,6 +1530,67 @@ window.NexusExt = window.NexusExt || {};
     input.click();
   }
 
+  function showWabbajackInfoModal() {
+    closeModal('nxtk-wj-info-modal');
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'nxtk-modal-backdrop';
+    backdrop.id = 'nxtk-wj-info-modal';
+
+    const previouslyFocused = document.activeElement;
+
+    const modal = document.createElement('div');
+    modal.className = 'nxtk-modal nxtk-modal-sm nxtk-import-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', NXTK.t('dlgWabbajackTitle', null, 'Wabbajack Modlist Import'));
+    modal.innerHTML = `
+      <div class="nxtk-modal-header">
+        <div class="nxtk-modal-title">${L('dlgWabbajackTitle', 'Wabbajack Modlist Import')}</div>
+        <button class="nxtk-modal-close" data-close aria-label="${L('ariaClose', 'Close')}">&times;</button>
+      </div>
+      <div class="nxtk-import-guide">
+        <div class="nxtk-import-hero">
+          <span class="nxtk-import-hero-icon">${svgIcon('importIcon')}</span>
+          <div class="nxtk-import-hero-copy">
+            <div class="nxtk-history-lead">${L('dlgWabbajackLead', 'Queue every Nexus file a modlist needs.')}</div>
+            <div class="nxtk-history-text">${L('dlgWabbajackHelp', 'Pick the .wabbajack file you downloaded from Wabbajack. The extension reads the list inside it and queues the Nexus-hosted files, using the same pacing, history and download method a collection uses.')}</div>
+          </div>
+        </div>
+        <div class="nxtk-import-path-card">
+          <div class="nxtk-import-path-label">${L('setWabbajackImportLabel', 'Wabbajack modlist import (beta)')}</div>
+          <div class="nxtk-history-text">${L('dlgWabbajackNote', 'Files hosted outside Nexus, and games this version does not recognise, cannot be fetched. They are counted and named in the summary so you can get them yourself.')}</div>
+        </div>
+      </div>
+      <div class="nxtk-modal-footer">
+        <button type="button" class="nxtk-btn nxtk-btn-primary" data-close>${L('btnGotIt', 'Got it')}</button>
+      </div>
+    `;
+    prepareToolkitSurface(modal);
+
+    const onKeyDown = (e) => {
+      if (!document.contains(backdrop)) {
+        document.removeEventListener('keydown', onKeyDown);
+        return;
+      }
+      if (e.key === 'Escape') close();
+    };
+    const close = () => {
+      document.removeEventListener('keydown', onKeyDown);
+      backdrop.remove();
+      if (previouslyFocused?.isConnected) previouslyFocused.focus?.({ preventScroll: true });
+    };
+    modal.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', close));
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) close();
+    });
+    document.addEventListener('keydown', onKeyDown);
+
+    backdrop.appendChild(modal);
+    document.body.appendChild(backdrop);
+    modal.querySelector('[data-close]')?.focus?.({ preventScroll: true });
+  }
+
   function createControlDeck(ndc) {
     const deck = document.createElement('div');
     deck.className = 'nxtk-deck';
@@ -1595,6 +1657,7 @@ window.NexusExt = window.NexusExt || {};
             <button class="nxtk-btn nxtk-btn-secondary" id="nxtk-import-mods">${L('deckImportMods', 'Import downloaded mods')}</button>
             <button class="nxtk-btn nxtk-btn-ghost nxtk-btn-icon" id="nxtk-import-info" title="${L('tipImportInfo', 'Info about importing')}">${svgIcon('info')}</button>
             <button class="nxtk-btn nxtk-btn-secondary" id="nxtk-wj-deck-import" ${ndc.wabbajackImport ? '' : 'hidden'}>${L('btnImportWabbajack', 'Import Wabbajack modlist')}</button>
+            <button class="nxtk-btn nxtk-btn-ghost nxtk-btn-icon" id="nxtk-wj-info" ${ndc.wabbajackImport ? '' : 'hidden'} title="${L('tipWabbajackInfo', 'About Wabbajack import')}" aria-label="${L('tipWabbajackInfo', 'About Wabbajack import')}">${svgIcon('info')}</button>
           </div>
           <div class="nxtk-btn-row">
             <div class="nxtk-btn-split nxtk-grow">
@@ -1750,6 +1813,7 @@ window.NexusExt = window.NexusExt || {};
     });
 
     $('#nxtk-wj-deck-import')?.addEventListener('click', () => importWabbajackModlist());
+    $('#nxtk-wj-info')?.addEventListener('click', () => showWabbajackInfoModal());
 
     const menu = $('#nxtk-dl-menu');
     const menuController = bindDropdownToggle($('#nxtk-menu-toggle'), menu, { portal: true });
