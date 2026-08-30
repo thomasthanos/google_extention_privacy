@@ -772,6 +772,35 @@ window.NexusExt = window.NexusExt || {};
     }
   }
 
+  /* Files the extension has proven it cannot resolve on its own — manual-download-only, off-site,
+     archived or otherwise not available through GenerateDownloadUrl. The click interceptor is
+     capture-phase and calls stopImmediatePropagation, so before this existed a failed resolution left
+     the user with a dead button: Nexus's own handler never ran, and every further click was swallowed
+     the same way. The error's own recovery text says "open the file page and download manually",
+     which was impossible. Once a file is in here, its controls are handed back to Nexus untouched. */
+  const nativePassthroughFiles = new Set();
+
+  function allowNativeDownload(fileId) {
+    const key = String(fileId || '');
+    if (key) nativePassthroughFiles.add(key);
+  }
+
+  function shouldPassThroughToNative(fileId) {
+    return nativePassthroughFiles.has(String(fileId || ''));
+  }
+
+  /* Codes that mean "Nexus will not give this to the extension", as opposed to a transient failure
+     worth retrying. Only these hand control back — a timeout or a rate limit still belongs to us. */
+  const NATIVE_HANDOFF_CODES = new Set(['no_download_url', 'no_nmm_link', 'unsafe_download_url']);
+
+  function releaseToNativeControl(button, fileId, error) {
+    if (!NATIVE_HANDOFF_CODES.has(error?.code)) return false;
+    allowNativeDownload(fileId);
+    restoreButtonState(button);
+    Logger.info('Handing this file back to the native Nexus controls; the extension cannot resolve it.');
+    return true;
+  }
+
   function isDifferentPage(href) {
     try {
       return new URL(href, location.href).href !== location.href;
@@ -917,7 +946,12 @@ window.NexusExt = window.NexusExt || {};
     if (error) {
       error = Errors.normalize(error);
       if (error.code === 'cloudflare') {
-        if (attemptId !== downloadAttemptSequence) return false;
+        if (attemptId !== downloadAttemptSequence) {
+          /* Superseded by a newer attempt. Returning silently used to leave the button frozen on
+             "Please Wait..." with the native control still suppressed. */
+          restoreButtonState(button);
+          return false;
+        }
         if (activateCloudflareFallback({ button, fileId, isNMM, href })) return false;
       }
       const shouldOpenFilePage = openFilePageOnNoUrl && !isNMM && href
@@ -935,6 +969,7 @@ window.NexusExt = window.NexusExt || {};
         return false;
       }
       handleError(button, error, { onRetry: () => runDownload(options) });
+      releaseToNativeControl(button, fileId, error);
       return false;
     }
 
@@ -949,9 +984,9 @@ window.NexusExt = window.NexusExt || {};
       return false;
     }
     if (!finalUrl) {
-      handleError(button, Errors.create(isNMM ? 'no_nmm_link' : 'no_download_url'), {
-        onRetry: () => runDownload(options)
-      });
+      const missing = Errors.create(isNMM ? 'no_nmm_link' : 'no_download_url');
+      handleError(button, missing, { onRetry: () => runDownload(options) });
+      releaseToNativeControl(button, fileId, missing);
       return false;
     }
 
@@ -962,6 +997,7 @@ window.NexusExt = window.NexusExt || {};
         technicalMessage: `rejected: ${verdict.detail} | method=${isNMM ? 'vortex' : 'browser'}`
       });
       handleError(button, unsafe);
+      releaseToNativeControl(button, fileId, unsafe);
       return false;
     }
     if (isNMM) {
@@ -1065,7 +1101,7 @@ window.NexusExt = window.NexusExt || {};
               }
             }
 
-            if (modalHref) {
+            if (modalHref && !shouldPassThroughToNative(extractFileId(modalHref))) {
               event.preventDefault();
               event.stopImmediatePropagation();
               handleDownload(modalButton, extractFileId(modalHref), isNMMModal, modalHref)
@@ -1079,6 +1115,11 @@ window.NexusExt = window.NexusExt || {};
         }
       }
 
+      /* A modified or non-primary click is the user asking the browser for something specific —
+         open in a new tab, save as, paste-and-go. Swallowing those was never intended, and it also
+         leaves no way to reach the native control at all. */
+      if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+
       const element = event.target.closest('a,button');
       if (!element) return;
       if (element.closest(IGNORE_ANCESTORS)) return;
@@ -1087,6 +1128,7 @@ window.NexusExt = window.NexusExt || {};
       if (!isDownloadHref(linkHref)) return;
       const fileId = extractFileId(linkHref);
       if (!fileId) return;
+      if (shouldPassThroughToNative(fileId)) return;
       const hasRequirements = linkHref.includes('ModRequirementsPopUp') || linkHref.includes('tab=requirements');
       const isNMM = linkHref.includes('nmm=1') || linkHref.includes('&nmm') || element.closest('#action-nmm') !== null;
       if (hasRequirements && !cfg.SkipRequirements) return;
@@ -1187,15 +1229,23 @@ window.NexusExt = window.NexusExt || {};
   }
 
   async function handleSlowDownloadClick(button, event) {
+    const params = new URLSearchParams(location.search);
+    const fileId = params.get('file_id');
+    /* Guard before cancelling the event. This used to preventDefault and stopImmediatePropagation as
+       its first two statements and only then check for a file id, so on any page where the check
+       failed the native Slow download button became a dead control: no download, no error, nothing. */
+    if (!fileId || shouldPassThroughToNative(fileId)) return;
+
     event.preventDefault();
     event.stopImmediatePropagation();
 
-    const params = new URLSearchParams(location.search);
-    const fileId = params.get('file_id');
-    if (!fileId) return;
+    return runDownload({ button, fileId, isNMM: wantsVortexHandoff(params), href: location.href });
+  }
 
-    const isNMM = params.has('nmm') || params.get('nmm') === '1';
-    return runDownload({ button, fileId, isNMM, href: location.href });
+  /* `params.has('nmm')` was used for this, which is also true for `?nmm=0` — a URL explicitly asking
+     for a browser download was routed down the Vortex path, where a manual-only file dead-ends. */
+  function wantsVortexHandoff(params) {
+    return params.get('nmm') === '1';
   }
 
   function isFilePage() {
@@ -1286,7 +1336,7 @@ window.NexusExt = window.NexusExt || {};
     const autoStartKey = location.origin + location.pathname + location.search;
     if (lastAutoStartHref === autoStartKey) return;
     lastAutoStartHref = autoStartKey;
-    const isNMM = params.has('nmm') || params.get('nmm') === '1';
+    const isNMM = wantsVortexHandoff(params);
     Logger.debug('Auto-start: fileId', fileId, 'isNMM', isNMM);
     await new Promise(r => setTimeout(r, 200));
     Logger.info(`Auto ${isNMM ? 'NMM' : 'manual'}: starting download`);

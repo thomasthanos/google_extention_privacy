@@ -5,9 +5,6 @@
   "appDesc": {
     "message": "Semplifica i download da Nexus Mods, gestisce le code di download delle collection e mantiene una cronologia locale dei file completati."
   },
-  "sectionQuickControls": {
-    "message": "Controlli rapidi"
-  },
   "toggleAutoStart": {
     "message": "Avvia i download automaticamente"
   },
@@ -1239,9 +1236,5 @@
   "tabHelp": {
     "message": "Help & Bugs",
     "description": "Tab bar button for the help and bug report panel."
-  },
-  "sectionHelpBugs": {
-    "message": "Help & Bugs",
-    "description": "Section heading above help and bug report items."
   }
 }

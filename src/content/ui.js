@@ -185,6 +185,7 @@ window.NexusExt = window.NexusExt || {};
   }
 
   let dropdownInteractionBlockerBound = false;
+  let overlayScrollLockAttached = false;
 
   const openDropdownMenuSet = new Set();
   const dropdownTriggers = new WeakMap();
@@ -387,6 +388,7 @@ window.NexusExt = window.NexusExt || {};
   }
 
   function syncDropdownSurfaces() {
+    syncOverlayScrollLock();
     document.querySelectorAll('.nxtk-deck, .nxtk-modal').forEach((surface) => {
       const active = getOpenDropdownMenus().some((menu) => (
         !dropdownPortals.has(menu) && getDropdownSurface(menu) === surface
@@ -439,16 +441,8 @@ window.NexusExt = window.NexusExt || {};
     if (dropdownInteractionBlockerBound) return;
     dropdownInteractionBlockerBound = true;
 
-    const blockScrollBehindDropdown = (event) => {
-      const openMenus = getOpenDropdownMenus();
-      if (!openMenus.length || isDropdownUiTarget(event.target, openMenus)) return;
-      event.preventDefault();
-      event.stopPropagation();
-    };
-
-    document.addEventListener('wheel', blockScrollBehindDropdown, { capture: true, passive: false });
-    document.addEventListener('touchmove', blockScrollBehindDropdown, { capture: true, passive: false });
-
+    /* pointerdown does not gate scrolling, so it stays bound for the life of the page. Only the
+       scroll-cancelling listeners are attached on demand — see syncOverlayScrollLock. */
     document.addEventListener('pointerdown', (event) => {
       const openMenus = getOpenDropdownMenus();
       if (!openMenus.length || isDropdownUiTarget(event.target, openMenus)) return;
@@ -503,21 +497,66 @@ window.NexusExt = window.NexusExt || {};
         event.stopImmediatePropagation();
       }
     }, true);
-
-    document.addEventListener('wheel', (event) => {
-      const backdrop = getTopModalBackdrop();
-      if (!backdrop) return;
-
-      const modal = backdrop.querySelector('.nxtk-modal');
-      if (!modal) return;
-
-      if (!modal.contains(event.target) || !canScrollModalTarget(event.target, modal, event.deltaY)) {
-        event.preventDefault();
-      }
-      event.stopPropagation();
-    }, { capture: true, passive: false });
   }
   ensureModalInteractionGuard();
+
+  /* Cancelling a scroll needs `passive: false`, which forces the browser to block on JS before every
+     wheel and touchmove frame. These listeners used to be bound for the whole life of every page the
+     content script matches — the entire site, not just pages with extension UI — so every scroll frame
+     paid for a handler that almost always early-returned after a document-wide querySelectorAll.
+     They are now attached only while an extension overlay is actually open, and removed again after.
+     The handler below merges what used to be two separate capture listeners on `document`; since
+     stopPropagation does not stop other listeners on the same node, both bodies always ran, so running
+     them in sequence here is equivalent. */
+  function applyDropdownScrollBlock(event) {
+    const openMenus = getOpenDropdownMenus();
+    if (!openMenus.length || isDropdownUiTarget(event.target, openMenus)) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function onOverlayWheel(event) {
+    applyDropdownScrollBlock(event);
+
+    const backdrop = getTopModalBackdrop();
+    if (!backdrop) return;
+    const modal = backdrop.querySelector('.nxtk-modal');
+    if (!modal) return;
+    if (!modal.contains(event.target) || !canScrollModalTarget(event.target, modal, event.deltaY)) {
+      event.preventDefault();
+    }
+    event.stopPropagation();
+  }
+
+  function onOverlayTouchMove(event) {
+    applyDropdownScrollBlock(event);
+  }
+
+  function syncOverlayScrollLock() {
+    /* getOpenDropdownMenus() rather than the raw Set: the Set can still hold menus that have been
+       disconnected, and reading through the getter prunes them, so the lock is not held open by a
+       menu that is already gone. */
+    const needed = getOpenDropdownMenus().length > 0 || !!document.querySelector('.nxtk-modal-backdrop');
+    if (needed === overlayScrollLockAttached) return;
+    overlayScrollLockAttached = needed;
+    if (needed) {
+      document.addEventListener('wheel', onOverlayWheel, { capture: true, passive: false });
+      document.addEventListener('touchmove', onOverlayTouchMove, { capture: true, passive: false });
+      return;
+    }
+    document.removeEventListener('wheel', onOverlayWheel, true);
+    document.removeEventListener('touchmove', onOverlayTouchMove, true);
+  }
+
+  /* Every modal appends its backdrop directly to document.body and removes it there, across nine
+     separate builders. Watching body's direct children — childList only, no subtree — catches all of
+     them without threading a hook through each one, and body's own child list changes rarely. */
+  function watchOverlayPresence() {
+    if (!document.body) return;
+    new MutationObserver(syncOverlayScrollLock)
+      .observe(document.body, { childList: true });
+  }
+  watchOverlayPresence();
 
   function bindDropdownToggle(button, menu, { portal = false } = {}) {
     if (!button || !menu) return null;

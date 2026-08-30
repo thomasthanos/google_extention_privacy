@@ -108,11 +108,7 @@ window.NexusExt = window.NexusExt || {};
       };
     }
 
-    stopBackgroundQueue({ ownedOnly = false } = {}) {
-      if (ownedOnly && !this.backgroundJobId) {
-        this.settleBrowserQueue?.('stopped');
-        return;
-      }
+    stopBackgroundQueue() {
       Promise.resolve(NexusExt.Storage.sendDownloadCommand('NDC_QUEUE_STOP', this.queueTarget()))
         .then((reply) => {
           if (!reply?.ok) this.settleBrowserQueue?.('stopped');
@@ -138,7 +134,11 @@ window.NexusExt = window.NexusExt || {};
         this.onSettingsChanged = null;
       }
       this.releaseRunClaim();
-      this.stopBackgroundQueue({ ownedOnly: true });
+      /* Detach, do not stop. dispose() runs from teardownActiveCollection() on every SPA route change
+         away from the collection page, so stopping here meant that clicking a mod title mid-run
+         cancelled the in-flight download and dropped the rest of the queue. The job is built to
+         outlive this: reconcileNdcJobs() re-drives it and NDC_QUEUE_ATTACH re-adopts it, which is why
+         a full page reload already survived. Only the explicit Stop button should halt a run. */
       this.settleBrowserQueue?.('stopped');
       for (const controller of [this.downloadController, this.lifecycleController]) {
         try {
@@ -484,10 +484,15 @@ window.NexusExt = window.NexusExt || {};
           const waitSeconds = this.noteRateLimited(result.rateLimit?.retryAfterSeconds);
           this.ui.logText(TS('logBackingOff', [formatDuration(waitSeconds)],
             `Nexus Mods is rate limiting requests. Backing off ${formatDuration(waitSeconds)}.`), 'info');
+          /* Only spend the wait when there is an attempt left to spend it on. This used to sit out a
+             multi-minute backoff on the final attempt and then fail the mod regardless. noteRateLimited
+             has already published the deadline, so runCollection's own waitOutRateLimit() before the
+             next mod still honours it — the run backs off either way, it just no longer stalls for
+             minutes to no purpose. */
+          if (attempt >= attempts) return result;
           await this.waitOutRateLimit();
           if (this.isStopped()) return result;
-          if (attempt < attempts) continue;
-          return result;
+          continue;
         }
 
         if (attempt >= attempts || !error.retryable || Errors.isBlocking(error)) return result;
@@ -499,10 +504,19 @@ window.NexusExt = window.NexusExt || {};
       return result;
     }
 
+    /* Every link the deck offers the user must carry the run's own download method. mod.file.url is
+       a bare `?tab=files&file_id=N`, and opening that during a Vortex run lands on a page the content
+       script auto-starts as a BROWSER download — so the file drops into the browser's download folder
+       instead of being handed to Vortex, and never gets imported. */
+    fileLinkFor(mod) {
+      const url = mod.file.url;
+      return this.downloadMethod === DOWNLOAD_METHOD_VORTEX ? `${url}&nmm=1` : url;
+    }
+
     handOffDownload(mod, downloadUrl, prefix) {
       const sizeStr = convertSize(mod.file.size);
       const fileName = escapeHtml(mod.file.name);
-      const fileUrl = escapeHtml(mod.file.url);
+      const fileUrl = escapeHtml(this.fileLinkFor(mod));
       const meta = `<span style="opacity:0.6;font-size:11px">(${sizeStr})</span>`;
       const link = `<a href="${fileUrl}" target="_blank" rel="noopener noreferrer">${fileName}</a>`;
 
@@ -521,7 +535,7 @@ window.NexusExt = window.NexusExt || {};
       return true;
     }
 
-    async retryMod(mod) {
+    async retryMod(mod, { type = null, onSucceeded = null } = {}) {
       if (this.isStopped()) {
         this.ui?.logText(T('logRetryIgnored', 'Retry ignored: this collection run was stopped.'), 'info');
         return;
@@ -531,15 +545,26 @@ window.NexusExt = window.NexusExt || {};
       if (this.isStopped()) return;
 
       if (result.downloadUrl) {
-        if (this.handOffDownload(mod, result.downloadUrl, 'Retry:')) NXTK.bumpTotalDownloads?.();
+        if (this.handOffDownload(mod, result.downloadUrl, 'Retry:')) {
+          NXTK.bumpTotalDownloads?.();
+          /* The main loop records history immediately after a successful hand-off. Without the same
+             call here a retried file stays absent from history, so the next run over this collection
+             hands it to Vortex a second time — one duplicate per file the user ever retried. */
+          if (type !== null) {
+            try {
+              await this.recordHistoryEntry(type, mod.fileId);
+            } catch (_) { }
+          }
+          onSucceeded?.();
+        }
         return;
       }
 
       const error = this.resolveLinkError(result);
-      const link = `<a href="${escapeHtml(mod.file.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(mod.file.name)}</a>`;
+      const link = `<a href="${escapeHtml(this.fileLinkFor(mod))}" target="_blank" rel="noopener noreferrer">${escapeHtml(mod.file.name)}</a>`;
       this.ui.log(`${TS('logRetryFailed', [escapeHtml(Errors.toLogMessage(error))], `Retry failed: ${escapeHtml(Errors.toLogMessage(error))}`)} ${link}`, 'error');
       if (this.showAlertsOnError && error.retryable) {
-        NexusExt.UI.showError(error, { title: NXTK.t('dlgDownloadIssue', null, 'Download issue'), onRetry: () => this.retryMod(mod) });
+        NexusExt.UI.showError(error, { title: NXTK.t('dlgDownloadIssue', null, 'Download issue'), onRetry: () => this.retryMod(mod, { type, onSucceeded }) });
       }
     }
 
@@ -931,7 +956,8 @@ window.NexusExt = window.NexusExt || {};
         for (const [index, mod] of mods.entries()) {
         const modNumber = `${String(index + 1).padStart(String(mods.length).length, '0')}/${mods.length}`;
         const fileName = escapeHtml(mod.file.name);
-        const fileUrl = escapeHtml(mod.file.url);
+        const fileUrl = escapeHtml(this.fileLinkFor(mod));
+        let handedOff = false;
 
         if (this.isStopped()) {
           outcome = 'stopped';
@@ -987,7 +1013,13 @@ window.NexusExt = window.NexusExt || {};
             if (this.showAlertsOnError && downloadError.retryable) {
               NexusExt.UI.showError(downloadError, {
                 title: T('dlgDownloadIssue', 'Download issue'),
-                onRetry: () => this.retryMod(mod)
+                onRetry: () => this.retryMod(mod, {
+                  type,
+                  onSucceeded: () => {
+                    const failedIndex = failedDownload.findIndex((entry) => entry.mod === mod);
+                    if (failedIndex !== -1) failedDownload.splice(failedIndex, 1);
+                  }
+                })
               });
             }
           }
@@ -1000,6 +1032,7 @@ window.NexusExt = window.NexusExt || {};
         } else {
           this.ui.incrementProgress();
           NXTK.bumpTotalDownloads?.();
+          handedOff = true;
 
           if (history) {
             history = await this.recordHistoryEntry(type, mod.fileId);
@@ -1011,7 +1044,11 @@ window.NexusExt = window.NexusExt || {};
           break;
         }
 
-        if (index < mods.length - 1) {
+        /* The pause exists to space out real Vortex transfers, so it is only owed after a file was
+           actually handed over. It used to run for every mod, meaning a failed link resolution still
+           cost a full size-based sleep — on a big archive that is minutes of waiting for a download
+           that never started. */
+        if (handedOff && index < mods.length - 1) {
           const computePause = () => {
             if (this.pauseBetweenDownload === 0) return 0;
             const { speed } = this.resolveDownloadSpeed();
@@ -1091,7 +1128,7 @@ window.NexusExt = window.NexusExt || {};
           `Failed to download ${failedDownload.length} mods:`), 'info');
         for (const { mod, error } of failedDownload) {
           this.ui.log(
-            `${escapeHtml(error.code)} · <a href="${escapeHtml(mod.file.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(mod.file.name)}</a>`,
+            `${escapeHtml(error.code)} · <a href="${escapeHtml(this.fileLinkFor(mod))}" target="_blank" rel="noopener noreferrer">${escapeHtml(mod.file.name)}</a>`,
             'info'
           );
         }

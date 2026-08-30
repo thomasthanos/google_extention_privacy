@@ -41,6 +41,12 @@ const vortexPreflight = spawnSync(process.execPath, [join(root, 'tools', 'vortex
 });
 if (vortexPreflight.status !== 0) fail('vortex-preflight-test.cjs did not pass — package not built.');
 
+const backgroundUnits = spawnSync(process.execPath, [join(root, 'tools', 'background-units-test.cjs')], {
+  cwd: root,
+  stdio: 'inherit'
+});
+if (backgroundUnits.status !== 0) fail('background-units-test.cjs did not pass — package not built.');
+
 function walk(absolute, prefix, allowedExt) {
   const found = [];
   for (const name of readdirSync(absolute).sort()) {
@@ -115,6 +121,32 @@ function assertReferencesArePackaged(source, label) {
 }
 
 assertReferencesArePackaged(manifest, 'Chrome');
+
+/* The manifest check above only covers files the manifest itself names, so a stray tag inside a
+   packaged HTML page shipped unnoticed in 2.5.2 (`<script src="/__l5e/lovable.js">` left behind by a
+   web builder). Every local src/href in packaged HTML must resolve to a packaged file. */
+const HTML_REFERENCE = /<(?:script|link|img)\b[^>]*?\b(?:src|href)\s*=\s*["']([^"']+)["']/gi;
+const EXTERNAL_REFERENCE = /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i;
+
+function assertHtmlReferencesArePackaged() {
+  const problems = [];
+  for (const name of entryNames.filter((n) => n.endsWith('.html'))) {
+    const source = readFileSync(join(pkg, name), 'utf8');
+    const baseDir = name.includes('/') ? name.slice(0, name.lastIndexOf('/')) : '';
+    for (const [, reference] of source.matchAll(HTML_REFERENCE)) {
+      if (EXTERNAL_REFERENCE.test(reference)) continue;
+      if (reference.startsWith('/')) {
+        problems.push(`${name}: "${reference}" is an absolute path — nothing resolves it inside the package`);
+        continue;
+      }
+      const target = relative(pkg, join(pkg, baseDir, reference.split(/[?#]/)[0])).replace(/\\/g, '/');
+      if (!packaged.has(target)) problems.push(`${name}: "${reference}" resolves to ${target}, which is not packaged`);
+    }
+  }
+  if (problems.length) fail(`packaged HTML references files the package does not include:\n  ${problems.join('\n  ')}`);
+}
+
+assertHtmlReferencesArePackaged();
 
 const GECKO_ID = 'nexus-mods-bypass@thomasthanos.github.io';
 

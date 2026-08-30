@@ -5,9 +5,6 @@
   "appDesc": {
     "message": "Nexus Mods 다운로드를 간편하게 하고, 컬렉션 다운로드 대기열을 관리하며, 완료된 파일의 기록을 로컬에 보관합니다."
   },
-  "sectionQuickControls": {
-    "message": "빠른 설정"
-  },
   "toggleAutoStart": {
     "message": "다운로드 자동 시작"
   },
@@ -1163,9 +1160,5 @@
   "tabHelp": {
     "message": "Help & Bugs",
     "description": "Tab bar button for the help and bug report panel."
-  },
-  "sectionHelpBugs": {
-    "message": "Help & Bugs",
-    "description": "Section heading above help and bug report items."
   }
 }

@@ -5,9 +5,6 @@
   "appDesc": {
     "message": "Nexus Mods のダウンロードを簡単にし、コレクションのダウンロードキューを管理し、完了したファイルの履歴をローカルに保存します。"
   },
-  "sectionQuickControls": {
-    "message": "クイック設定"
-  },
   "toggleAutoStart": {
     "message": "ダウンロードを自動的に開始"
   },
@@ -1163,9 +1160,5 @@
   "tabHelp": {
     "message": "Help & Bugs",
     "description": "Tab bar button for the help and bug report panel."
-  },
-  "sectionHelpBugs": {
-    "message": "Help & Bugs",
-    "description": "Section heading above help and bug report items."
   }
 }

@@ -9,6 +9,94 @@ they are simply not listed.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A mod you have to download by hand is no longer blocked from being downloaded by hand.** The
+  click interceptor is capture-phase and calls `stopImmediatePropagation`, so it matched any link
+  carrying `file_id=` — including Nexus's own **Manual download** and **Slow download** buttons — and
+  replaced it with the extension's own resolution. When that resolution could not succeed, which is
+  exactly the case for a manual-only, off-site or gated file, Nexus's handler had already been
+  cancelled: the button was left reading red *Error* and every further click was swallowed the same
+  way. The extension's own advice for that error is *"Open the file page and download manually"*,
+  which was impossible to follow. A file the extension has failed to resolve is now handed back to
+  the native Nexus controls for the rest of the page, and a modified or middle click is never
+  intercepted at all.
+- **A failed mod in a Vortex collection run no longer downloads into the browser instead.** The links
+  the deck offers for failed mods were bare `?tab=files&file_id=N` with no `&nmm=1`, so opening one
+  during a Vortex run auto-started it as a *browser* download — into the `NexusMods` subfolder, which
+  Vortex does not watch. The file downloaded and was never imported. Deck links now carry the run's
+  own download method.
+- **`?nmm=0` no longer counts as a Vortex download.** The check was `params.has('nmm')`, which is
+  true for any value, so a URL explicitly asking for a browser download was routed down the Vortex
+  path — where a manual-only file dead-ends.
+- **The Slow download button is no longer a dead control when it has nothing to work with.** Its
+  handler cancelled the event as its first two statements and only then checked for a file id, so on
+  any page where that check failed the click did nothing at all: no download, no error, no log.
+- **A superseded download attempt no longer freezes the button.** Losing a race against a newer
+  attempt returned silently, leaving the control stuck on *Please Wait…* with the native button still
+  suppressed.
+
+- **Scrolling any Nexus page no longer waits on the extension.** The modal and dropdown scroll guards
+  were bound for the whole life of every page the content script matches — the entire site, not just
+  pages with extension UI — and they used `passive: false`, which forces the browser to block on
+  JavaScript before every wheel and touchmove frame. Each one then ran a document-wide
+  `querySelectorAll` only to find no overlay and return. Both listeners are now attached on demand,
+  while an overlay is actually open, and removed again after.
+- **Browser downloads no longer overwrite each other.** The download folder defaults to `NexusMods`,
+  and any path containing a `/` was written with `conflictAction: 'overwrite'` — so on a default
+  install two mods that ship the same archive name silently clobbered each other on disk while the
+  queue reported both complete. Every download now uniquifies.
+- **Rate-limit backoff actually escalates.** Nexus often answers a 429 with no `Retry-After` header,
+  which reached the backoff calculation as `''` — and `Number('')` is `0`, which is finite and not
+  negative, so the header branch swallowed every call and returned the 30-second floor. The
+  exponential ladder behind it had been unreachable; a hard rate limit was retried every 30 seconds
+  indefinitely instead of backing off toward the ten-minute cap.
+- **Reading a mod description mid-run no longer cancels the collection.** Teardown ran on every
+  in-page navigation away from the collection page and stopped the background job, cancelling the
+  in-flight archive and dropping the rest of the queue. Clicking a mod title was enough. Teardown now
+  only detaches the watcher — the job already survives a full page reload the same way, through the
+  worker's reconcile pass and the reattach on return. Only the Stop button halts a run.
+- **Retrying a failed mod no longer queues it twice.** A successful retry handed the file to Vortex
+  but never recorded it in the download history, so the run still reported it as failed and the next
+  run over that collection handed the same file to Vortex again — one duplicate for every file ever
+  retried.
+- **A stalled collection recovers on its own.** A job left in `running` with no active download had
+  nothing to drive it: the deck's own status poll kept the worker awake, so the startup reconcile
+  never re-ran, and the poll itself only read state. The queue reported *running* forever while
+  nothing downloaded. The poll now nudges a stalled job the way reattaching already did.
+- **The bug-report result is visible again.** The popup's status line lived inside the *Controls*
+  panel, but **Report a bug** is on *Help & Bugs*, and switching tabs hides the inactive panel
+  outright — so every message from the report flow, including *the full copy is on your clipboard*,
+  was written into a hidden element. It now sits outside both panels.
+- **The Vortex/Browser choice is reachable by keyboard.** Its radio inputs were `display: none`,
+  which removes them from the tab order and from the accessibility tree, leaving the collection
+  deck's central choice mouse-only. They are visually hidden instead, and the surrounding card shows
+  a focus ring.
+- **A failed mod no longer costs a full transfer-length pause.** The pacing delay is sized from the
+  file's size to space out real Vortex transfers, but it ran after every mod — so a mod whose link
+  never resolved still cost minutes of waiting for a download that never started.
+- **Backing off on the final attempt no longer wastes the wait.** A rate-limited last attempt sat out
+  the whole backoff and then failed the mod regardless. The deadline is shared, so the run still
+  paces itself before the next mod; it just no longer stalls to no purpose.
+- **A second tab can no longer shorten a long cooldown.** The shared rate-limit deadline was
+  overwritten rather than extended, so a tab that hit a short limit could wipe out a longer one
+  another tab was already serving.
+
+### Removed
+
+- A stray `<script src="/__l5e/lovable.js">` left behind by a web builder was committed in the
+  onboarding page and shipped inside both 2.5.2 store packages, where it resolves to nothing and
+  404s on every install. `tools/build-zip.mjs` now fails the build when packaged HTML references a
+  file the package does not contain, which is what would have caught it.
+- `sectionQuickControls` and `sectionHelpBugs` — 26 shipped strings across 13 locales that no code
+  reads. `check-locales.mjs` had been warning about both; it now reports zero warnings.
+
+### Added
+
+- `tools/background-units-test.cjs`, covering the download conflict action, the rate-limit backoff
+  ladder and the download-target validator. It runs as part of `tools/build-zip.mjs`.
+
+
 ## [2.5.2] — 2026-08-28
 
 ### Changed

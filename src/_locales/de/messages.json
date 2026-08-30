@@ -5,9 +5,6 @@
   "appDesc": {
     "message": "Vereinfacht Nexus-Mods-Downloads, verwaltet Download-Warteschlangen für Kollektionen und speichert einen lokalen Verlauf."
   },
-  "sectionQuickControls": {
-    "message": "Schnelleinstellungen"
-  },
   "toggleAutoStart": {
     "message": "Downloads automatisch starten"
   },
@@ -1239,9 +1236,5 @@
   "tabHelp": {
     "message": "Help & Bugs",
     "description": "Tab bar button for the help and bug report panel."
-  },
-  "sectionHelpBugs": {
-    "message": "Help & Bugs",
-    "description": "Section heading above help and bug report items."
   }
 }

@@ -181,7 +181,13 @@ window.NexusExt = window.NexusExt || {};
   }
 
   async function saveRateLimit(state) {
-    return storageSet(NDC_RATE_LIMIT_KEY, { until: Number(state?.until) || 0 });
+    const until = Number(state?.until) || 0;
+    /* Take the max, the way the worker's publishSharedRateLimit already does. Overwriting let a second
+       tab that hit a short 30s limit wipe out a long cooldown a first tab was already serving, and
+       both tabs then hammered Nexus again immediately. */
+    const current = Number((await getRateLimit())?.until) || 0;
+    if (until <= current) return true;
+    return storageSet(NDC_RATE_LIMIT_KEY, { until });
   }
 
   window.NexusExt.Storage = {

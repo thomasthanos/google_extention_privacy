@@ -19,7 +19,10 @@ Do not include Nexus credentials, cookies, tokens, or private URLs.
 
 1. Fork the repository and create a focused branch.
 2. Make the smallest change that solves the problem.
-3. Load `src/` as an unpacked extension and exercise the affected flow.
+3. Load `src/` as an unpacked extension and exercise the affected flow. In Firefox, load the built
+   `dist/nexus.mods.bypass-<version>-firefox.zip` instead — `src/manifest.json` declares a
+   `background.service_worker`, which Firefox does not accept; the Firefox manifest is generated
+   by `tools/build-zip.mjs`.
 4. Run the locale validator when strings change:
 
    ```bash

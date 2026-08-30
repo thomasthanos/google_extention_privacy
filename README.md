@@ -74,7 +74,8 @@ can pick up where it stopped instead of starting over.
 ### <img src=".github/assets/icon-globe.svg" width="20" align="middle"> Languages
 
 English, Greek, German, Spanish, French, Italian, Japanese, Korean, Polish, Portuguese (BR),
-Russian, Turkish, Simplified Chinese — 319 strings each. There is also an **Always use English**
+Russian, Turkish, Simplified Chinese — 325 strings each (a few more or fewer where a language's
+plural rules need extra forms). There is also an **Always use English**
 switch for when your browser language and your Nexus language disagree.
 
 <img src=".github/assets/divider.svg" width="100%" alt="">
@@ -135,7 +136,7 @@ Reachable from the popup → **Page settings**. Changes save instantly.
 |---|---|
 | `storage` | Your settings and the local download history. |
 | `downloads` | Browser download mode — starting files and putting them in your chosen subfolder. |
-| `downloads.ui` | Chrome and Edge only — Firefox has no such API, and the Firefox package does not ask for it. Being removed anyway: the "hide the download button" setting is gone as of 2.4.3 and the permission is held only to put the button back for profiles that still have it hidden. Dropped in 2.5.0. |
+| `downloads.ui` | Chrome and Edge only — Firefox has no such API, and the Firefox package does not ask for it. Being removed anyway: the "hide the download button" setting is gone as of 2.4.3 and the permission is held only to put the button back for profiles that still have it hidden, which the extension does once at startup. |
 | `alarms` | Pacing the background queue between mods. |
 | `https://www.nexusmods.com/*` | The only site this extension touches. |
 

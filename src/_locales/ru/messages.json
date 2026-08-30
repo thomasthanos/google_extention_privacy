@@ -5,9 +5,6 @@
   "appDesc": {
     "message": "Упрощает загрузки с Nexus Mods, управляет очередями загрузки коллекций и хранит локальную историю."
   },
-  "sectionQuickControls": {
-    "message": "Быстрые настройки"
-  },
   "toggleAutoStart": {
     "message": "Автоматически начинать загрузки"
   },
@@ -1391,9 +1388,5 @@
   "tabHelp": {
     "message": "Help & Bugs",
     "description": "Tab bar button for the help and bug report panel."
-  },
-  "sectionHelpBugs": {
-    "message": "Help & Bugs",
-    "description": "Section heading above help and bug report items."
   }
 }

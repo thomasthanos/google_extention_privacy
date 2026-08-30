@@ -5,9 +5,6 @@
   "appDesc": {
     "message": "Nexus Mods indirmelerini kolaylaştırır, koleksiyon indirme kuyruklarını yönetir ve tamamlanan dosyaların yerel geçmişini tutar."
   },
-  "sectionQuickControls": {
-    "message": "Hızlı ayarlar"
-  },
   "toggleAutoStart": {
     "message": "İndirmeleri otomatik başlat"
   },
@@ -1239,9 +1236,5 @@
   "tabHelp": {
     "message": "Help & Bugs",
     "description": "Tab bar button for the help and bug report panel."
-  },
-  "sectionHelpBugs": {
-    "message": "Help & Bugs",
-    "description": "Section heading above help and bug report items."
   }
 }

@@ -5,9 +5,6 @@
   "appDesc": {
     "message": "Απλοποιεί τις λήψεις από το Nexus Mods, διαχειρίζεται ουρές λήψης collections και κρατά τοπικό ιστορικό."
   },
-  "sectionQuickControls": {
-    "message": "Γρήγορες ρυθμίσεις"
-  },
   "toggleAutoStart": {
     "message": "Αυτόματη έναρξη λήψεων"
   },
@@ -1239,9 +1236,5 @@
   "tabHelp": {
     "message": "Help & Bugs",
     "description": "Tab bar button for the help and bug report panel."
-  },
-  "sectionHelpBugs": {
-    "message": "Help & Bugs",
-    "description": "Section heading above help and bug report items."
   }
 }

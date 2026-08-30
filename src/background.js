@@ -397,8 +397,12 @@ function buildDownloadPath(folder, rawName) {
   return dir ? `${dir}/${name}` : name;
 }
 
-function conflictActionFor(filename) {
-  return String(filename).includes('/') ? 'overwrite' : 'uniquify';
+function conflictActionFor(_filename) {
+  /* Always uniquify. This used to return 'overwrite' for any path containing '/', and
+     buildDownloadPath prepends DownloadFolder — which defaults to 'NexusMods' — so on a default
+     install every browser download overwrote. Two mods shipping the same archive name silently
+     clobbered each other on disk while the queue reported both complete. */
+  return 'uniquify';
 }
 
 const DOWNLOAD_EXTENSIONS = new Set([
@@ -733,10 +737,16 @@ async function fetchNdcResponse(url, options, timeoutMs) {
 const MIN_NDC_ALARM_DELAY_MS = 30000;
 
 function retryAfterMilliseconds(raw, strike = 1) {
-  const seconds = Number(raw);
-  if (Number.isFinite(seconds) && seconds >= 0) return Math.max(MIN_NDC_ALARM_DELAY_MS, seconds * 1000);
-  const asDate = Date.parse(String(raw || ''));
-  if (!Number.isNaN(asDate)) return Math.max(MIN_NDC_ALARM_DELAY_MS, asDate - Date.now());
+  /* An absent Retry-After arrives here as '' — and Number('') is 0, which is finite and >= 0.
+     Reading it as "retry immediately" pinned every backoff to the 30s floor and made the
+     exponential ladder below unreachable, so a hard rate limit was retried forever at 30s. */
+  const header = String(raw ?? '').trim();
+  if (header) {
+    const seconds = Number(header);
+    if (Number.isFinite(seconds) && seconds >= 0) return Math.max(MIN_NDC_ALARM_DELAY_MS, seconds * 1000);
+    const asDate = Date.parse(header);
+    if (!Number.isNaN(asDate)) return Math.max(MIN_NDC_ALARM_DELAY_MS, asDate - Date.now());
+  }
   return Math.min(30000 * Math.pow(2, Math.max(0, strike - 1)), 10 * 60 * 1000);
 }
 
@@ -1246,6 +1256,15 @@ const NDC_QUEUE_HANDLERS = {
   async NDC_QUEUE_STATUS(payload) {
     const job = await resolveNdcJob(payload);
     if (!job) return null;
+    /* A 'running' job with no active download and no pending alarm has nothing driving it: the deck's
+       7s poll keeps the worker warm, so reconcileNdcJobs() never re-runs, and the poll itself only
+       read. The queue then reported 'running' forever while nothing downloaded. NDC_QUEUE_ATTACH
+       already carries this nudge; the poll needs it too so a stall self-heals within one tick. */
+    if (job.status === 'running'
+      && job.activeDownloadId === null
+      && (Number(job.waitingUntil) || 0) <= Date.now()) {
+      processNdcJob(job.id).catch((cause) => recordBackgroundError('status nudge', cause));
+    }
     return {
       jobId: job.id,
       status: job.status,
