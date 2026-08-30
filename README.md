@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src=".github/assets/banner-nexus.svg" alt="NexusMods Bypass">
+<img src=".github/assets/banner-nexus.svg?v=2.6.0" alt="NexusMods Bypass">
 
 [![Manifest V3](.github/assets/badge-manifest.svg)](src/manifest.json)
 [![13 languages](.github/assets/badge-lang-13.svg)](src/_locales)
@@ -12,7 +12,7 @@
 [![Privacy](.github/assets/btn-privacy.svg)](PRIVACY.md)
 [![Troubleshooting](.github/assets/btn-troubleshooting.svg)](#-troubleshooting)
 
-<img src=".github/assets/spec-nexus.svg" alt="At a glance">
+<img src=".github/assets/spec-nexus.svg?v=2.6.0" alt="At a glance">
 
 <br>
 <a href="https://chromewebstore.google.com/detail/nexusmods-bypass/chfghiknjhpcncpcjopglefnckckdlpj"><img src=".github/assets/btn-chrome.svg" alt="Chrome"></a>
