@@ -12,7 +12,7 @@
 [![Privacy](.github/assets/btn-privacy.svg)](PRIVACY.md)
 [![Troubleshooting](.github/assets/btn-troubleshooting.svg)](#-troubleshooting)
 
-<img src=".github/assets/spec-nexus-v2.svg" alt="At a glance">
+<img src=".github/assets/spec-nexus-v2.svg?v=2.6.0-final" alt="At a glance">
 
 <br>
 <a href="https://chromewebstore.google.com/detail/nexusmods-bypass/chfghiknjhpcncpcjopglefnckckdlpj"><img src=".github/assets/btn-chrome.svg" alt="Chrome"></a>
