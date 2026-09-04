@@ -1,3 +1,19 @@
+/*
+ * Download-flow component for NexusMods Bypass.
+ *
+ * Based on Nexus No Wait ++ by Torkelicious and upstream contributors:
+ * https://github.com/torkelicious/nexus-no-wait-pp
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * Modifications Copyright (C) 2026 Thomas Thanos.
+ * Copyright in the upstream portions remains with its respective holders.
+ *
+ * This file is distributed under the GNU General Public License, version 3
+ * or (at your option) any later version. See ../LICENSE-GPL-3.0-or-later.txt.
+ * This notice and license apply to this file; see the repository LICENSE for
+ * the terms that cover the rest of NexusMods Bypass.
+ */
+
 window.NexusExt = window.NexusExt || {};
 
 (function () {

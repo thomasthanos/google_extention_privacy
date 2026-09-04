@@ -10,6 +10,7 @@ const pkg = join(root, 'src');
 
 const ALLOWLIST = [
   { path: 'manifest.json' },
+  { path: 'LICENSE-GPL-3.0-or-later.txt' },
   { path: 'background.js' },
   { path: 'shared.js' },
   { path: 'content', ext: ['.js', '.css'] },

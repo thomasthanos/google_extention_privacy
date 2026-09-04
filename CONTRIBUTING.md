@@ -1,6 +1,9 @@
 # Contributing to NexusMods Bypass
 
-Bug reports and focused pull requests are welcome. Before contributing, read the source-available [licence](LICENSE); contributions are licensed to the project owner under its terms.
+Bug reports and focused pull requests are welcome. Before contributing, read the source-available
+[licence](LICENSE). Contributions are licensed to the project owner under its terms, except for
+changes made specifically to `src/content/nnw.js`, which must be submitted under
+[GPL-3.0-or-later](src/LICENSE-GPL-3.0-or-later.txt).
 
 ## Reporting a bug
 

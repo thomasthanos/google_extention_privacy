@@ -1,8 +1,15 @@
-Copyright (c) 2026 Thomas Thanos. All rights reserved.
+Copyright (c) 2026 Thomas Thanos.
+All rights reserved except where this licence identifies separately licensed material.
 
-This repository contains the source code for the browser extensions NexusMods Bypass,
-An1me.to Tracker, An1me.to Speed Control, and Auto Liker for Tinder & Boo (each, the
+This repository contains the source code for the NexusMods Bypass browser extension (the
 "Software").
+
+This licence does not apply to src/content/nnw.js. That file is based on Nexus No Wait ++
+by Torkelicious and is distributed under the GNU General Public License, version 3 or (at
+your option) any later version (GPL-3.0-or-later). Its licence text is included at
+src/LICENSE-GPL-3.0-or-later.txt, and its attribution is documented in
+THIRD-PARTY-NOTICES.md. For the purposes of this licence, "Software" excludes
+src/content/nnw.js.
 
 The Software is source-available, NOT open source. The source is published so that anyone
 can read and audit exactly what the extensions do. Publishing it does not place it in the
@@ -46,10 +53,8 @@ public domain and does not grant permission to reuse it.
 
 3. NAME, ICONS, AND STORE ASSETS
 
-   The name "NexusMods Bypass", the extension icons in src/icons/, and
-   every file in nexus.mods.bypass/internal/store-assets/ are excluded from all permissions
-   above. The same applies to the names and artwork of the other extensions in this
-   repository.
+   The name "NexusMods Bypass", the extension icons in src/icons/, and every file in
+   internal/store-assets/ are excluded from all permissions above.
 
    Nothing in this licence grants any right to use them. A fork that section 1(c) permits
    to exist for review is not permitted to carry the name, icons, or branding.
@@ -63,12 +68,15 @@ public domain and does not grant permission to reuse it.
    copyright holder adopts. You confirm that the contribution is your own work and that
    you are entitled to grant this.
 
+   This section does not apply to contributions made specifically to src/content/nnw.js.
+   Contributions to that file must be provided under GPL-3.0-or-later.
+
 
 5. THIRD-PARTY MATERIAL
 
-   The Software embeds icon artwork from third parties, which is covered by its own
-   licences and not by this one. See THIRD-PARTY-NOTICES.md. Nothing here claims ownership
-   of that material.
+   The repository contains separately licensed source code and embeds icon artwork from
+   third parties. See THIRD-PARTY-NOTICES.md. Nothing here claims ownership of third-party
+   material.
 
 
 6. NO WARRANTY
@@ -83,9 +91,8 @@ public domain and does not grant permission to reuse it.
 
 7. NOT AFFILIATED
 
-   NexusMods Bypass is not affiliated with, endorsed by, or connected to Nexus Mods. The
-   other extensions are likewise unaffiliated with the sites they operate on. All product
-   names and trademarks belong to their respective owners.
+   NexusMods Bypass is not affiliated with, endorsed by, or connected to Nexus Mods. All
+   product names and trademarks belong to their respective owners.
 
 
 8. PERMISSION REQUESTS

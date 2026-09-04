@@ -215,10 +215,18 @@ Turning on **Verbose extension logs** first gives a much more useful report.
 
 ## <img src=".github/assets/icon-license.svg" width="22" align="middle"> Licence
 
-Source-available, all rights reserved. The name *NexusMods Bypass*, the icons in `src/icons/`, and
-everything in `internal/` are explicitly excluded from all permissions — a review fork may not
-carry the branding.
+Most of the extension is source-available and all rights reserved under the repository
+[licence](LICENSE). The name *NexusMods Bypass*, the icons in `src/icons/`, and everything in
+`internal/` are explicitly excluded from all permissions — a review fork may not carry the
+branding.
 
-[![Read the licence](.github/assets/btn-licence-read.svg)](LICENSE)
+`src/content/nnw.js` is the only source file licensed separately under
+[GPL-3.0-or-later](src/LICENSE-GPL-3.0-or-later.txt). It is based on
+[Nexus No Wait ++](https://github.com/torkelicious/nexus-no-wait-pp) by Torkelicious and upstream
+contributors and is distributed as part of this extension with attribution to that project. All
+other original extension code remains under the repository licence. See the
+[third-party notices](THIRD-PARTY-NOTICES.md) for details.
+
+[![Read the main licence](.github/assets/btn-licence-read.svg)](LICENSE)
 
 **Not affiliated with, endorsed by, or connected to Nexus Mods.**
