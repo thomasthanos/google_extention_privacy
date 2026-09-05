@@ -115,6 +115,22 @@ window.NexusExt = window.NexusExt || {};
     }
 
     if (domain && gameIdCache.has(domain)) return gameIdCache.get(domain);
+
+    /* 
+     * pages such as the hidden file page do not render #section or data-game-id element at all, 
+     * this will scan the embedded script content, or later on the game domain slug
+     * backported from nnw++.
+    */
+    for (const script of document.querySelectorAll('script')) {
+      const text = script.textContent || '';
+      const m = text.match(/game[_-]?id["']?\s*[:=]\s*["']?(\d+)/i);
+      if (m) {
+        if (domain) gameIdCache.set(domain, m[1]);
+        return m[1];
+      }
+    }
+
+    if (domain) return domain;
     return '';
   }
 
@@ -391,7 +407,7 @@ window.NexusExt = window.NexusExt || {};
       .trim();
   }
 
-  function findJsonDownloadUrl(value, source = 'json') {
+  function findJsonDownloadUrl(value, source = 'json', isNMM = false) {
     if (!value || typeof value !== 'object') return null;
 
     const directKeys = ['url', 'downloadUrl', 'vortexDownloadUrl', 'nmmDownloadUrl'];
@@ -405,10 +421,10 @@ window.NexusExt = window.NexusExt || {};
       const nested = value[key];
       if (!nested) continue;
       if (typeof nested === 'string') {
-        const extracted = parseDownloadURLFromResponse(nested);
+        const extracted = parseDownloadURLFromResponse(nested, isNMM);
         if (extracted) return { ...extracted, source: `${source}-${key}-${extracted.source}` };
       } else {
-        const extracted = findJsonDownloadUrl(nested, `${source}-${key}`);
+        const extracted = findJsonDownloadUrl(nested, `${source}-${key}`, isNMM);
         if (extracted) return extracted;
       }
     }
@@ -436,10 +452,42 @@ window.NexusExt = window.NexusExt || {};
     return parseNxmDownloadLink(url) === decodeDownloadUrlValue(url);
   }
 
-  function extractDownloadUrlFrom(inputText) {
+  /*
+   * pages sometimes have download info as a main-file="{...}" or other similar things embedded
+   * Ported from scrapeDeepDownloadLink in nnw++
+   */
+  const EMBEDDED_FILE_ATTR_PATTERN = /(?:main-file|file)=(["'])(.*?)\1/gi;
+
+  function findEmbeddedAttrDownloadUrl(inputText, isNMM) {
+    EMBEDDED_FILE_ATTR_PATTERN.lastIndex = 0;
+    let m;
+    while ((m = EMBEDDED_FILE_ATTR_PATTERN.exec(inputText)) !== null) {
+      const raw = m[2]
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&')
+        .replace(/&#34;/g, '"');
+      if (!raw.includes('downloadUrl') && !raw.includes('vortexDownloadUrl')) continue;
+      try {
+        const fd = JSON.parse(raw);
+        const url = isNMM ? (fd.vortexDownloadUrl || fd.downloadUrl) : fd.downloadUrl;
+        if (typeof url === 'string' && url.trim()) {
+          return { url: decodeDownloadUrlValue(url), source: 'embedded-file-attr' };
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  // last resort fallback to grab *any* CDN link in the page text
+  function findBareCdnDownloadUrl(inputText) {
+    const match = inputText.match(/https?:\/\/[a-zA-Z0-9-]+\.nexus-cdn\.com[^"'<>\s]+/i);
+    return match ? { url: decodeDownloadUrlValue(match[0]), source: 'bare-cdn-url' } : null;
+  }
+
+  function extractDownloadUrlFrom(inputText, isNMM = false) {
     try {
       const json = JSON.parse(inputText);
-      const jsonResult = findJsonDownloadUrl(json);
+      const jsonResult = findJsonDownloadUrl(json, 'json', isNMM);
       if (jsonResult) return jsonResult;
     } catch (_) {}
 
@@ -452,16 +500,25 @@ window.NexusExt = window.NexusExt || {};
     if (dataDownloadUrlMatch) return { url: decodeDownloadUrlValue(dataDownloadUrlMatch[1]), source: 'data-download-url' };
     const constDownloadUrlMatch = inputText.match(/const\s+downloadUrl\s*=\s*["']([^"']+)["']/i);
     if (constDownloadUrlMatch) return { url: decodeDownloadUrlValue(constDownloadUrlMatch[1]), source: 'const-downloadUrl' };
+
+    const embeddedAttr = findEmbeddedAttrDownloadUrl(inputText, isNMM);
+    if (embeddedAttr) return embeddedAttr;
+
+    if (!isNMM) {
+      const bareCdn = findBareCdnDownloadUrl(inputText);
+      if (bareCdn) return bareCdn;
+    }
+
     return null;
   }
 
-  function parseDownloadURLFromResponse(text) {
+  function parseDownloadURLFromResponse(text, isNMM = false) {
     if (!text) return null;
     const raw = String(text);
-    const fromRaw = extractDownloadUrlFrom(raw);
+    const fromRaw = extractDownloadUrlFrom(raw, isNMM);
     if (fromRaw) return fromRaw;
     const decoded = decodeDownloadUrlValue(raw);
-    return decoded && decoded !== raw ? extractDownloadUrlFrom(decoded) : null;
+    return decoded && decoded !== raw ? extractDownloadUrlFrom(decoded, isNMM) : null;
   }
 
   async function getDownloadUrl({
@@ -550,7 +607,7 @@ window.NexusExt = window.NexusExt || {};
       const nxmUrl = parseNxmDownloadLink(response.text);
       if (nxmUrl) return { url: nxmUrl, text: response.text, error: null };
 
-      const extracted = parseDownloadURLFromResponse(response.text);
+      const extracted = parseDownloadURLFromResponse(response.text, nmm);
       if (extracted?.url) return { url: extracted.url, text: response.text, error: null };
       return { url: null, text: response.text, error: null };
     };
@@ -573,7 +630,7 @@ window.NexusExt = window.NexusExt || {};
       const fromBodyNxm = parseNxmDownloadLink(response.text);
       if (fromBodyNxm) return { url: fromBodyNxm };
 
-      const extracted = parseDownloadURLFromResponse(response.text);
+      const extracted = parseDownloadURLFromResponse(response.text, isNMM);
       if (extracted?.url) {
         const nxmUrl = parseNxmDownloadLink(extracted.url);
         if (isNMM && nxmUrl) return { url: nxmUrl };
@@ -609,7 +666,7 @@ window.NexusExt = window.NexusExt || {};
         const link = parseNxmDownloadLink(firstResponse.finalUrl) || parseNxmDownloadLink(firstResponse.text);
         if (link) return { url: link };
 
-        const extracted = parseDownloadURLFromResponse(firstResponse.text);
+        const extracted = parseDownloadURLFromResponse(firstResponse.text, true);
         if (extracted?.url) {
           const nxmUrl = parseNxmDownloadLink(extracted.url);
           if (nxmUrl) return { url: nxmUrl };
@@ -660,7 +717,7 @@ window.NexusExt = window.NexusExt || {};
         resolvedGameId = pageGameId;
         rememberGameId(pageGameId, filePageUrl);
       }
-      const extracted = parseDownloadURLFromResponse(pageResponse.text);
+      const extracted = parseDownloadURLFromResponse(pageResponse.text, isNMM);
       if (extracted) {
         Logger.info('Manual download URL found from file page:', extracted.source);
         return { url: extracted.url };
