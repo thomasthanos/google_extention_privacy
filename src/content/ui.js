@@ -519,6 +519,7 @@ window.NexusExt = window.NexusExt || {};
     applyDropdownScrollBlock(event);
   }
 
+  // Install blocking scroll handlers only while extension overlays are open.
   function syncOverlayScrollLock() {
     const needed = getOpenDropdownMenus().length > 0 || !!document.querySelector('.nxtk-modal-backdrop');
     if (needed === overlayScrollLockAttached) return;
@@ -910,6 +911,7 @@ window.NexusExt = window.NexusExt || {};
     const SETTING_INPUT_DEBOUNCE_MS = 400;
     const pendingInputWrites = new Map();
 
+    // Flush pending edits before removing the settings dialog.
     const flushPendingInputWrites = () => {
       for (const [target, timer] of pendingInputWrites) {
         clearTimeout(timer);

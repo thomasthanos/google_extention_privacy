@@ -131,6 +131,7 @@
   }
 
   let routeChangeTimer = null;
+  // Serialize SPA route updates so navigation cannot race deck setup.
   let routeChangeChain = Promise.resolve();
   function handleRouteChange() {
     clearTimeout(routeChangeTimer);

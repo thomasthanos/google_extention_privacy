@@ -98,6 +98,7 @@
     }
   }
 
+  // Remove credentials and query secrets before diagnostics are shared.
   function sanitizeDiagnosticText(value, maxLength = 1500) {
     let text = String(value ?? '');
     if (!text) return text;

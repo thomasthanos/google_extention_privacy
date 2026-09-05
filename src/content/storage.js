@@ -115,6 +115,7 @@ window.NexusExt = window.NexusExt || {};
     });
   }
 
+  // Retry transport failures only; logical failures must surface immediately.
   async function mutateWithRetry(type, payload) {
     for (let attempt = 0; attempt <= MUTATION_RETRY_DELAYS.length; attempt += 1) {
       const reply = await sendMutation(type, payload);
@@ -135,6 +136,7 @@ window.NexusExt = window.NexusExt || {};
   }
 
   const MAX_LOCAL_HISTORY_IDS = 10000;
+  // Serialize fallback history writes to prevent lost updates.
   let localHistoryChain = Promise.resolve();
 
   function localHistoryMutate(gameId, collectionId, mutate) {

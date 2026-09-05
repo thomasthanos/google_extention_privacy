@@ -188,6 +188,7 @@ const ID_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
 const MAX_HISTORY_IDS = 10000;
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
+// Serialize storage writes per key to prevent lost updates.
 const writeQueues = new Map();
 
 function enqueueStorageTask(storageKey, task) {
@@ -406,6 +407,7 @@ function capFileName(name) {
   return name.slice(0, MAX_DOWNLOAD_NAME_CHARS - ext.length) + ext;
 }
 
+// Sanitize both user-controlled path segments before downloading.
 function buildDownloadPath(folder, rawName) {
   const name = capFileName(sanitizePathSegment(rawName)) || 'nexus-download';
   const dir = sanitizePathSegment(folder, { allowDots: false });
@@ -1578,6 +1580,7 @@ function isTrustedSender(sender) {
   return TRUSTED_SENDER_URL.test(sender.url);
 }
 
+// Reject untrusted senders before any privileged action.
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!isTrustedSender(sender)) return false;
 
@@ -1662,4 +1665,3 @@ chrome.runtime.onInstalled.addListener((details) => {
     });
   });
 });
-

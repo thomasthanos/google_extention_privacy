@@ -167,6 +167,7 @@ window.NexusExt = window.NexusExt || {};
     }
   }
 
+  // Limit inspection of untrusted responses to keep classification bounded.
   const MAX_CLASSIFY_CHARS = 200000;
 
   function classifyContent(text, { status = null, context = '', extra = '' } = {}) {

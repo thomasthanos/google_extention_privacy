@@ -48,6 +48,7 @@ window.NexusExt = window.NexusExt || {};
     let size = tail.getUint32(eocd + 12, true);
     let offset = tail.getUint32(eocd + 16, true);
 
+    // Read ZIP64 metadata only when legacy fields are saturated.
     if (offset === U32_MAX || size === U32_MAX || entries === U16_MAX) {
       const tailStart = file.size - tailBytes;
       let locator = -1;
@@ -139,6 +140,7 @@ window.NexusExt = window.NexusExt || {};
   async function readZipEntry(file, wantedName) {
     const entry = await findCentralEntry(file, wantedName);
     if (!entry) return null;
+    // Reject oversized manifests before allocating decompressed data.
     if (entry.uncompressedSize > MAX_MODLIST_BYTES) {
       throw new WabbajackError('entry-too-large', 'The modlist inside this file is implausibly large.');
     }

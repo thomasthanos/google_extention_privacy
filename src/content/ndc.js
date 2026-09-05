@@ -143,6 +143,7 @@ window.NexusExt = window.NexusExt || {};
       this.downloadController = null;
     }
 
+    // Renew the worker claim to prevent duplicate collection runs across tabs.
     async acquireRunClaim() {
       const reply = await NexusExt.Storage.sendDownloadCommand('NDC_RUN_CLAIM', {
         gameId: this.gameId,
@@ -750,6 +751,7 @@ window.NexusExt = window.NexusExt || {};
           }
         };
 
+        // Bind progress only after the event is matched to this job.
         const onQueueEvent = (message) => {
           if (!/^NXT_NDC_/.test(String(message?.type || ''))) return false;
           if (this.backgroundJobId) {

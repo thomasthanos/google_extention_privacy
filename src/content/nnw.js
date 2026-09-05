@@ -700,6 +700,7 @@ window.NexusExt = window.NexusExt || {};
     return attemptFetch(1);
   }
 
+  // Bound recursive URL resolution and reject invalid Vortex links.
   async function normalizeDownloadUrl(url, isNMM, depth = 0) {
     if (!url) return null;
     const decodedUrl = decodeDownloadUrlValue(url);
@@ -803,6 +804,7 @@ window.NexusExt = window.NexusExt || {};
 
   const NATIVE_HANDOFF_CODES = new Set(['no_download_url', 'no_nmm_link', 'unsafe_download_url', 'mod_unavailable']);
 
+  // Release unresolved files to Nexus instead of trapping the click.
   function releaseToNativeControl(button, fileId, error) {
     if (!NATIVE_HANDOFF_CODES.has(error?.code)) return false;
     allowNativeDownload(fileId);
