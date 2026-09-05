@@ -331,7 +331,10 @@ window.NexusExt = window.NexusExt || {};
 
       let downloadUrl = '';
       if (this.downloadMethod === DOWNLOAD_METHOD_VORTEX) {
-        const extracted = NexusExt.NNW?.parseDownloadURLFromResponse?.(text);
+        const extracted = NexusExt.NNW?.parseDownloadURLFromResponse?.(text, {
+          mode: 'vortex',
+          fileId: mod.fileId || mod.file.fileId
+        });
         downloadUrl = NexusExt.NNW?.parseNxmDownloadLink?.(extracted?.url)
           || NexusExt.NNW?.parseNxmDownloadLink?.(text)
           || '';
@@ -374,7 +377,10 @@ window.NexusExt = window.NexusExt || {};
         if (!generatedResponse.ok) {
           return { downloadUrl: '', text: generatedResponse.text, rateLimit: generatedResponse.rateLimit, error: generatedResponse.error };
         }
-        const extracted = NexusExt.NNW?.parseDownloadURLFromResponse?.(generatedResponse.text);
+        const extracted = NexusExt.NNW?.parseDownloadURLFromResponse?.(generatedResponse.text, {
+          mode: 'browser',
+          fileId: mod.fileId || mod.file.fileId
+        });
         if (extracted?.url) {
           downloadUrl = extracted.url;
         }

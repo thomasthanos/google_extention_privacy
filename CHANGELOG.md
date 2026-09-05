@@ -34,6 +34,8 @@ they are simply not listed.
 
 ### Fixed
 
+- **Legacy and hidden file pages resolve their intended download more reliably.** The fallback now
+  reads embedded Nexus metadata, keeps browser and Vortex links separate, and rejects ambiguous URLs.
 - **Wabbajack archives are validated before their manifest is trusted.** Imports now enforce actual
   decompression limits, CRC and size checks, safe ZIP64 bounds, single-disk and unencrypted entries;
   multi-game lists also keep separate history for identical file IDs from different games.

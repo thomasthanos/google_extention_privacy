@@ -74,69 +74,88 @@ window.NexusExt = window.NexusExt || {};
   }
 
   const gameIdCache = new Map();
+  const NUMERIC_GAME_ID_PATTERN = /^\d{1,12}$/;
+  const GAME_PAGE_PATTERN = /^\/([a-z0-9][a-z0-9-]{0,63})\/mods\/\d+(?:\/|$)/i;
+
+  function normalizeGameId(value) {
+    const id = String(value ?? '').trim();
+    return NUMERIC_GAME_ID_PATTERN.test(id) && Number(id) > 0 ? id : '';
+  }
 
   function getGameDomainFromUrl(url = location.href) {
     try {
-      const pathname = new URL(url, location.href).pathname;
-      return pathname.split('/').filter(Boolean)[0] || '';
+      const parsed = new URL(url, location.href);
+      const host = parsed.hostname.toLowerCase().replace(/\.$/, '');
+      if (host !== 'nexusmods.com' && !host.endsWith('.nexusmods.com')) return '';
+      return parsed.pathname.match(GAME_PAGE_PATTERN)?.[1]?.toLowerCase() || '';
     } catch (_) {
       return '';
     }
   }
 
-  function extractGameIdFromText(text) {
-    if (!text) return '';
-    const inputText = String(text);
+  function collectGameIdsFromText(text) {
+    const ids = new Set();
+    if (!text) return ids;
+    const inputText = String(text).slice(0, 2 * 1024 * 1024);
     const patterns = [
-      /data-game-id=["'](\d+)["']/i,
-      /["']game[_-]?id["']\s*:\s*["']?(\d+)["']?/i,
-      /gameId["']?\s*[:=]\s*["']?(\d+)["']?/i
+      /data-game-id=["'](\d{1,12})["']/gi,
+      /["']game[_-]?id["']\s*:\s*["']?(\d{1,12})["']?/gi,
+      /\bgameId["']?\s*[:=]\s*["']?(\d{1,12})["']?/gi
     ];
     for (const pattern of patterns) {
-      const match = inputText.match(pattern);
-      if (match) return match[1];
+      for (const match of inputText.matchAll(pattern)) {
+        const id = normalizeGameId(match[1]);
+        if (id) ids.add(id);
+      }
     }
-    return '';
+    return ids;
+  }
+
+  function extractGameIdFromText(text) {
+    const ids = collectGameIdsFromText(text);
+    return ids.size === 1 ? ids.values().next().value : '';
   }
 
   function getGameId(url = location.href) {
-    const domain = getGameDomainFromUrl(url);
-    const nodes = [
-      document.getElementById('section'),
-      ...Array.from(document.querySelectorAll('[data-game-id]'))
-    ].filter(Boolean);
-
-    for (const node of nodes) {
-      const value = node.dataset?.gameId;
-      if (value) {
-        if (domain) gameIdCache.set(domain, value);
-        return value;
-      }
+    const requestedDomain = getGameDomainFromUrl(url);
+    const documentDomain = getGameDomainFromUrl(location.href);
+    const domain = requestedDomain || documentDomain;
+    if (requestedDomain && requestedDomain !== documentDomain) {
+      return gameIdCache.get(requestedDomain) || '';
     }
+
+    const sectionId = normalizeGameId(document.getElementById('section')?.dataset?.gameId);
+    if (sectionId) {
+      if (domain) gameIdCache.set(domain, sectionId);
+      return sectionId;
+    }
+    const nodeIds = new Set(Array.from(document.querySelectorAll('[data-game-id]'))
+      .map((node) => normalizeGameId(node.dataset?.gameId))
+      .filter(Boolean));
+    if (nodeIds.size === 1) {
+      const nodeId = nodeIds.values().next().value;
+      if (domain) gameIdCache.set(domain, nodeId);
+      return nodeId;
+    }
+    if (nodeIds.size > 1) return '';
 
     if (domain && gameIdCache.has(domain)) return gameIdCache.get(domain);
 
-    /* 
-     * pages such as the hidden file page do not render #section or data-game-id element at all, 
-     * this will scan the embedded script content, or later on the game domain slug
-     * backported from nnw++.
-    */
-    for (const script of document.querySelectorAll('script')) {
-      const text = script.textContent || '';
-      const m = text.match(/game[_-]?id["']?\s*[:=]\s*["']?(\d+)/i);
-      if (m) {
-        if (domain) gameIdCache.set(domain, m[1]);
-        return m[1];
-      }
+    // Legacy pages may expose the numeric ID only in inline state.
+    const scriptIds = new Set();
+    for (const script of Array.from(document.querySelectorAll('script')).slice(0, 128)) {
+      for (const id of collectGameIdsFromText(script.textContent || '')) scriptIds.add(id);
+      if (scriptIds.size > 1) return '';
     }
-
-    if (domain) return domain;
-    return '';
+    const scriptId = scriptIds.values().next().value || '';
+    if (scriptId && domain) gameIdCache.set(domain, scriptId);
+    return scriptId;
   }
 
   function rememberGameId(gameId, url = location.href) {
     const domain = getGameDomainFromUrl(url);
-    if (domain && gameId) gameIdCache.set(domain, String(gameId));
+    const id = normalizeGameId(gameId);
+    if (domain && id) gameIdCache.set(domain, id);
   }
 
   const MOD_PAGE_PATTERN = /\/mods\/\d+$/;
@@ -407,118 +426,226 @@ window.NexusExt = window.NexusExt || {};
       .trim();
   }
 
-  function findJsonDownloadUrl(value, source = 'json', isNMM = false) {
-    if (!value || typeof value !== 'object') return null;
+  const MAX_DOWNLOAD_RESPONSE_CHARS = 2 * 1024 * 1024;
+  const MAX_JSON_DEPTH = 8;
+  const MAX_JSON_NODES = 256;
+  const NXM_RAW_PATTERN = /nxm:(?:\\?\/){2}[^\s"'<>]+/gi;
+  const EMBEDDED_FILE_ATTR_PATTERN = /(?:^|[\s<])(?:main-file|file)\s*=\s*(["'])([\s\S]*?)\1/gi;
+  const BARE_CDN_PATTERN = /https?:\/\/[a-z0-9-]+\.nexus-cdn\.com[^\s"'<>]*/gi;
 
-    const directKeys = ['url', 'downloadUrl', 'vortexDownloadUrl', 'nmmDownloadUrl'];
-    for (const key of directKeys) {
-      if (typeof value[key] === 'string' && value[key].trim()) {
-        return { url: decodeDownloadUrlValue(value[key]), source: `${source}-${key}` };
-      }
-    }
-
-    for (const key of ['data', 'html', 'links', 'downloadLinks']) {
-      const nested = value[key];
-      if (!nested) continue;
-      if (typeof nested === 'string') {
-        const extracted = parseDownloadURLFromResponse(nested, isNMM);
-        if (extracted) return { ...extracted, source: `${source}-${key}-${extracted.source}` };
-      } else {
-        const extracted = findJsonDownloadUrl(nested, `${source}-${key}`, isNMM);
-        if (extracted) return extracted;
-      }
-    }
-
-    return null;
+  function parserContext(options) {
+    const input = options && typeof options === 'object' ? options : {};
+    return {
+      isNMM: typeof options === 'boolean' ? options : input.mode === 'vortex' || input.isNMM === true,
+      fileId: normalizeGameId(input.fileId),
+      allowBareCdn: input.allowBareCdn !== false
+    };
   }
 
-  const NXM_RAW_PATTERN = /nxm:(?:\\?\/){2}[^\s"'<>]+/i;
+  function trimUrlPunctuation(value) {
+    return decodeDownloadUrlValue(value).replace(/[)\]},;]+$/g, '').trim();
+  }
 
   function parseNxmDownloadLink(text) {
     if (!text) return null;
-    const match = String(text).match(NXM_RAW_PATTERN);
-    if (!match) return null;
-
-    const url = decodeDownloadUrlValue(match[0]);
-    const queryIndex = url.indexOf('?');
-    if (queryIndex === -1) return null;
-
-    const params = new URLSearchParams(url.slice(queryIndex + 1));
-    if (!params.get('key') || !params.get('expires') || !params.get('user_id')) return null;
-    return url;
+    const inputText = decodeDownloadUrlValue(String(text).slice(0, MAX_DOWNLOAD_RESPONSE_CHARS));
+    NXM_RAW_PATTERN.lastIndex = 0;
+    let match;
+    while ((match = NXM_RAW_PATTERN.exec(inputText)) !== null) {
+      const url = trimUrlPunctuation(match[0]);
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'nxm:' || parsed.username || parsed.password || parsed.hash) continue;
+        if (!/^[a-z0-9][a-z0-9-]{0,63}$/i.test(parsed.hostname)) continue;
+        if (!/^\/mods\/\d{1,12}\/files\/\d{1,12}\/?$/i.test(parsed.pathname)) continue;
+        const key = parsed.searchParams.get('key') || '';
+        const expires = parsed.searchParams.get('expires') || '';
+        const userId = parsed.searchParams.get('user_id') || '';
+        if (!key || key.length > 512 || !/^\d+$/.test(expires) || !/^\d+$/.test(userId)) continue;
+        return url;
+      } catch (_) {}
+    }
+    return null;
   }
 
   function isValidNxmUrl(url) {
     return parseNxmDownloadLink(url) === decodeDownloadUrlValue(url);
   }
 
-  /*
-   * pages sometimes have download info as a main-file="{...}" or other similar things embedded
-   * Ported from scrapeDeepDownloadLink in nnw++
-   */
-  const EMBEDDED_FILE_ATTR_PATTERN = /(?:main-file|file)=(["'])(.*?)\1/gi;
+  function normalizeResponseCandidate(value, context) {
+    const candidate = trimUrlPunctuation(value);
+    if (!candidate || candidate.length > 2048) return '';
 
-  function findEmbeddedAttrDownloadUrl(inputText, isNMM) {
-    EMBEDDED_FILE_ATTR_PATTERN.lastIndex = 0;
-    let m;
-    while ((m = EMBEDDED_FILE_ATTR_PATTERN.exec(inputText)) !== null) {
-      const raw = m[2]
-        .replace(/&quot;/g, '"')
-        .replace(/&amp;/g, '&')
-        .replace(/&#34;/g, '"');
-      if (!raw.includes('downloadUrl') && !raw.includes('vortexDownloadUrl')) continue;
-      try {
-        const fd = JSON.parse(raw);
-        const url = isNMM ? (fd.vortexDownloadUrl || fd.downloadUrl) : fd.downloadUrl;
-        if (typeof url === 'string' && url.trim()) {
-          return { url: decodeDownloadUrlValue(url), source: 'embedded-file-attr' };
-        }
-      } catch (_) {}
+    if (/^nxm:/i.test(candidate)) return context.isNMM ? (parseNxmDownloadLink(candidate) || '') : '';
+
+    try {
+      const parsed = new URL(candidate, location.href);
+      const host = parsed.hostname.toLowerCase().replace(/\.$/, '');
+      const isNexus = host === 'nexusmods.com' || host.endsWith('.nexusmods.com');
+      const isCdn = host === 'nexus-cdn.com' || host.endsWith('.nexus-cdn.com');
+      if (parsed.protocol !== 'https:' || parsed.username || parsed.password || (!isNexus && !isCdn)) return '';
+      if (context.isNMM) {
+        const isResolver = isNexus && (
+          /\/api\/files\/\d+/i.test(parsed.pathname)
+          || parsed.searchParams.has('file_id')
+          || /\/Core\/Libs\/Common\/Managers\/Downloads$/i.test(parsed.pathname)
+        );
+        return isResolver ? parsed.href : '';
+      }
+      const verdict = NXTK.validateDownloadTarget(parsed.href, { method: 1 });
+      return verdict?.ok ? (verdict.url || parsed.href) : '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function objectFileId(value) {
+    if (!value || typeof value !== 'object') return '';
+    for (const key of ['fileId', 'file_id', 'id']) {
+      const id = normalizeGameId(value[key]);
+      if (id) return id;
+    }
+    return '';
+  }
+
+  function findJsonDownloadUrl(value, source, context, state, depth = 0) {
+    if (!value || typeof value !== 'object' || depth > MAX_JSON_DEPTH) return null;
+    if (state.nodes++ >= MAX_JSON_NODES || state.seen.has(value)) return null;
+    state.seen.add(value);
+
+    if (Array.isArray(value)) {
+      const entries = context.fileId
+        ? [...value].sort((a, b) => Number(objectFileId(b) === context.fileId) - Number(objectFileId(a) === context.fileId))
+        : value;
+      for (const entry of entries) {
+        const extracted = findJsonDownloadUrl(entry, source, context, state, depth + 1);
+        if (extracted) return extracted;
+      }
+      return null;
+    }
+
+    const candidateFileId = objectFileId(value);
+    if (!context.fileId || !candidateFileId || candidateFileId === context.fileId) {
+      const directKeys = context.isNMM
+        ? ['vortexDownloadUrl', 'nmmDownloadUrl', 'url', 'downloadUrl']
+        : ['downloadUrl', 'url'];
+      for (const key of directKeys) {
+        if (typeof value[key] !== 'string') continue;
+        const url = normalizeResponseCandidate(value[key], context);
+        if (url) return { url, source: `${source}-${key}` };
+      }
+    }
+
+    for (const key of ['data', 'html', 'links', 'downloadLinks']) {
+      const nested = value[key];
+      if (!nested) continue;
+      const extracted = typeof nested === 'string'
+        ? parseDownloadResponse(nested, context, state, depth + 1)
+        : findJsonDownloadUrl(nested, `${source}-${key}`, context, state, depth + 1);
+      if (extracted) {
+        return typeof nested === 'string'
+          ? { ...extracted, source: `${source}-${key}-${extracted.source}` }
+          : extracted;
+      }
     }
     return null;
   }
 
-  // last resort fallback to grab *any* CDN link in the page text
-  function findBareCdnDownloadUrl(inputText) {
-    const match = inputText.match(/https?:\/\/[a-zA-Z0-9-]+\.nexus-cdn\.com[^"'<>\s]+/i);
-    return match ? { url: decodeDownloadUrlValue(match[0]), source: 'bare-cdn-url' } : null;
+  function findEmbeddedAttrDownloadUrl(inputText, context, state, depth) {
+    EMBEDDED_FILE_ATTR_PATTERN.lastIndex = 0;
+    const exact = [];
+    const unscoped = [];
+    let match;
+    while ((match = EMBEDDED_FILE_ATTR_PATTERN.exec(inputText)) !== null) {
+      try {
+        const metadata = JSON.parse(decodeDownloadUrlValue(match[2]));
+        const fileId = objectFileId(metadata);
+        if (context.fileId && fileId && fileId !== context.fileId) continue;
+        const extracted = findJsonDownloadUrl(metadata, 'embedded', context, state, depth + 1);
+        if (!extracted) continue;
+        const result = { url: extracted.url, source: 'embedded-file-attr' };
+        (context.fileId && fileId === context.fileId ? exact : unscoped).push(result);
+      } catch (_) {}
+    }
+    if (exact.length) return exact[0];
+    const urls = new Set(unscoped.map((entry) => entry.url));
+    return urls.size === 1 ? unscoped[0] : null;
   }
 
-  function extractDownloadUrlFrom(inputText, isNMM = false) {
+  function findPatternDownloadUrl(inputText, context) {
+    const patterns = [
+      { source: 'dl_link-value', pattern: /id=["']dl_link["'][^>]*value=["']([^"']+)["']/gi },
+      { source: 'data-download-url', pattern: /data-download-url=["']([^"']+)["']/gi },
+      { source: 'const-downloadUrl', pattern: /const\s+downloadUrl\s*=\s*["']([^"']+)["']/gi }
+    ];
+    for (const { source, pattern } of patterns) {
+      let match;
+      while ((match = pattern.exec(inputText)) !== null) {
+        const url = normalizeResponseCandidate(match[1], context);
+        if (url) return { url, source };
+      }
+    }
+    return null;
+  }
+
+  function findBareCdnDownloadUrl(inputText, context) {
+    if (context.isNMM || !context.allowBareCdn) return null;
+    BARE_CDN_PATTERN.lastIndex = 0;
+    const urls = new Map();
+    let match;
+    while ((match = BARE_CDN_PATTERN.exec(inputText)) !== null) {
+      const url = normalizeResponseCandidate(match[0], context);
+      if (!url) continue;
+      try {
+        const parsed = new URL(url);
+        if (!parsed.searchParams.has('expires')
+          || (!parsed.searchParams.has('key') && !parsed.searchParams.has('md5') && !parsed.searchParams.has('user_id'))) continue;
+      } catch (_) {
+        continue;
+      }
+      const nearby = inputText.slice(Math.max(0, match.index - 512), match.index + match[0].length + 512);
+      urls.set(url, context.fileId && nearby.includes(context.fileId));
+      if (urls.size > 8) return null;
+    }
+    const contextual = [...urls].filter(([, matchesFile]) => matchesFile);
+    if (contextual.length === 1) return { url: contextual[0][0], source: 'bare-cdn-url' };
+    if (contextual.length > 1 || urls.size !== 1) return null;
+    return { url: urls.keys().next().value, source: 'bare-cdn-url' };
+  }
+
+  function extractDownloadUrlFrom(inputText, context, state, depth) {
     try {
       const json = JSON.parse(inputText);
-      const jsonResult = findJsonDownloadUrl(json, 'json', isNMM);
+      const jsonResult = findJsonDownloadUrl(json, 'json', context, state, depth);
       if (jsonResult) return jsonResult;
     } catch (_) {}
 
-    const nxmUrl = parseNxmDownloadLink(inputText);
-    if (nxmUrl) return { url: nxmUrl, source: 'nxm-url' };
+    const embedded = findEmbeddedAttrDownloadUrl(inputText, context, state, depth);
+    if (embedded) return embedded;
 
-    const match = inputText.match(/id=["']dl_link["'][^>]*value=["']([^"']+)["']/i);
-    if (match) return { url: decodeDownloadUrlValue(match[1]), source: 'dl_link-value' };
-    const dataDownloadUrlMatch = inputText.match(/data-download-url=["']([^"']+)["']/i);
-    if (dataDownloadUrlMatch) return { url: decodeDownloadUrlValue(dataDownloadUrlMatch[1]), source: 'data-download-url' };
-    const constDownloadUrlMatch = inputText.match(/const\s+downloadUrl\s*=\s*["']([^"']+)["']/i);
-    if (constDownloadUrlMatch) return { url: decodeDownloadUrlValue(constDownloadUrlMatch[1]), source: 'const-downloadUrl' };
+    const patterned = findPatternDownloadUrl(inputText, context);
+    if (patterned) return patterned;
 
-    const embeddedAttr = findEmbeddedAttrDownloadUrl(inputText, isNMM);
-    if (embeddedAttr) return embeddedAttr;
-
-    if (!isNMM) {
-      const bareCdn = findBareCdnDownloadUrl(inputText);
-      if (bareCdn) return bareCdn;
+    if (context.isNMM) {
+      const nxmUrl = parseNxmDownloadLink(inputText);
+      if (nxmUrl) return { url: nxmUrl, source: 'nxm-url' };
     }
-
-    return null;
+    return findBareCdnDownloadUrl(inputText, context);
   }
 
-  function parseDownloadURLFromResponse(text, isNMM = false) {
-    if (!text) return null;
-    const raw = String(text);
-    const fromRaw = extractDownloadUrlFrom(raw, isNMM);
+  function parseDownloadResponse(text, context, state, depth) {
+    if (!text || depth > MAX_JSON_DEPTH) return null;
+    const raw = String(text).slice(0, MAX_DOWNLOAD_RESPONSE_CHARS);
+    const fromRaw = extractDownloadUrlFrom(raw, context, state, depth);
     if (fromRaw) return fromRaw;
     const decoded = decodeDownloadUrlValue(raw);
-    return decoded && decoded !== raw ? extractDownloadUrlFrom(decoded, isNMM) : null;
+    return decoded && decoded !== raw
+      ? extractDownloadUrlFrom(decoded, context, state, depth + 1)
+      : null;
+  }
+
+  function parseDownloadURLFromResponse(text, options = false) {
+    return parseDownloadResponse(text, parserContext(options), { nodes: 0, seen: new WeakSet() }, 0);
   }
 
   async function getDownloadUrl({
@@ -535,7 +662,8 @@ window.NexusExt = window.NexusExt || {};
     if (!fileId && !href) return { url: null, error: Errors.create('missing_file') };
 
     const filePageUrl = href || `${location.origin}${location.pathname}?tab=files&file_id=${encodeURIComponent(fileId)}`;
-    let resolvedGameId = gameId || getGameId(filePageUrl);
+    let resolvedGameId = normalizeGameId(gameId) || getGameId(filePageUrl);
+    const gameDomain = getGameDomainFromUrl(filePageUrl) || getGameDomainFromUrl(location.href);
     refreshAdTimerCookie();
     const endpoint = new URL('/Core/Libs/Common/Managers/Downloads?GenerateDownloadUrl', filePageUrl).href;
     const headers = {
@@ -585,7 +713,7 @@ window.NexusExt = window.NexusExt || {};
     const fetchGeneratedDownloadUrl = async (nmm = false) => {
       if (!fileId) return { url: null, text: '', error: Errors.create('missing_file') };
 
-      const body = `fid=${encodeURIComponent(fileId)}&game_id=${encodeURIComponent(resolvedGameId || '')}${nmm ? '&nmm=1' : ''}`;
+      const body = `fid=${encodeURIComponent(fileId)}&game_id=${encodeURIComponent(resolvedGameId || gameDomain)}${nmm ? '&nmm=1' : ''}`;
       const response = await Errors.request(endpoint, {
         method: 'POST',
         credentials: 'include',
@@ -604,10 +732,15 @@ window.NexusExt = window.NexusExt || {};
         rememberGameId(responseGameId, filePageUrl);
       }
 
-      const nxmUrl = parseNxmDownloadLink(response.text);
-      if (nxmUrl) return { url: nxmUrl, text: response.text, error: null };
+      if (nmm) {
+        const nxmUrl = parseNxmDownloadLink(response.text);
+        if (nxmUrl) return { url: nxmUrl, text: response.text, error: null };
+      }
 
-      const extracted = parseDownloadURLFromResponse(response.text, nmm);
+      const extracted = parseDownloadURLFromResponse(response.text, {
+        mode: nmm ? 'vortex' : 'browser',
+        fileId
+      });
       if (extracted?.url) return { url: extracted.url, text: response.text, error: null };
       return { url: null, text: response.text, error: null };
     };
@@ -621,16 +754,23 @@ window.NexusExt = window.NexusExt || {};
       const response = await fetchText(apiUrl, { context: 'Resolving Nexus API download link' });
       if (!response.ok) return { url: null, error: response.error };
 
-      const fromFinalUrl = parseNxmDownloadLink(response.finalUrl);
-      if (fromFinalUrl) return { url: fromFinalUrl };
+      if (isNMM) {
+        const fromFinalUrl = parseNxmDownloadLink(response.finalUrl);
+        if (fromFinalUrl) return { url: fromFinalUrl };
+      }
       if (!isNMM && response.finalUrl && response.finalUrl !== apiUrl && !response.finalUrl.includes('/api/files/')) {
         return { url: response.finalUrl };
       }
 
-      const fromBodyNxm = parseNxmDownloadLink(response.text);
-      if (fromBodyNxm) return { url: fromBodyNxm };
+      if (isNMM) {
+        const fromBodyNxm = parseNxmDownloadLink(response.text);
+        if (fromBodyNxm) return { url: fromBodyNxm };
+      }
 
-      const extracted = parseDownloadURLFromResponse(response.text, isNMM);
+      const extracted = parseDownloadURLFromResponse(response.text, {
+        mode: isNMM ? 'vortex' : 'browser',
+        fileId
+      });
       if (extracted?.url) {
         const nxmUrl = parseNxmDownloadLink(extracted.url);
         if (isNMM && nxmUrl) return { url: nxmUrl };
@@ -666,7 +806,7 @@ window.NexusExt = window.NexusExt || {};
         const link = parseNxmDownloadLink(firstResponse.finalUrl) || parseNxmDownloadLink(firstResponse.text);
         if (link) return { url: link };
 
-        const extracted = parseDownloadURLFromResponse(firstResponse.text, true);
+        const extracted = parseDownloadURLFromResponse(firstResponse.text, { mode: 'vortex', fileId });
         if (extracted?.url) {
           const nxmUrl = parseNxmDownloadLink(extracted.url);
           if (nxmUrl) return { url: nxmUrl };
@@ -705,6 +845,14 @@ window.NexusExt = window.NexusExt || {};
       return { url: null, error: generated?.error || latestError || Errors.create('no_nmm_link') };
     }
 
+    if (isNMM) {
+      const generated = await fetchGeneratedDownloadUrl(true);
+      const generatedNxm = parseNxmDownloadLink(generated?.url);
+      return generatedNxm
+        ? { url: generatedNxm }
+        : { url: null, error: generated?.error || Errors.create('no_nmm_link') };
+    }
+
     const fetchFilePageFallback = async () => {
       const pageResponse = await fetchText(filePageUrl, {
         ajax: false,
@@ -717,7 +865,10 @@ window.NexusExt = window.NexusExt || {};
         resolvedGameId = pageGameId;
         rememberGameId(pageGameId, filePageUrl);
       }
-      const extracted = parseDownloadURLFromResponse(pageResponse.text, isNMM);
+      const extracted = parseDownloadURLFromResponse(pageResponse.text, {
+        mode: isNMM ? 'vortex' : 'browser',
+        fileId
+      });
       if (extracted) {
         Logger.info('Manual download URL found from file page:', extracted.source);
         return { url: extracted.url };
