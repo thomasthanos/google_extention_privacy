@@ -427,8 +427,8 @@ window.NexusExt = window.NexusExt || {};
   }
 
   const MAX_DOWNLOAD_RESPONSE_CHARS = 2 * 1024 * 1024;
-  const MAX_JSON_DEPTH = 8;
-  const MAX_JSON_NODES = 256;
+  const MAX_JSON_DEPTH = 12;
+  const MAX_JSON_NODES = 1000;
   const NXM_RAW_PATTERN = /nxm:(?:\\?\/){2}[^\s"'<>]+/gi;
   const EMBEDDED_FILE_ATTR_PATTERN = /(?:^|[\s<])(?:main-file|file)\s*=\s*(["'])([\s\S]*?)\1/gi;
   const BARE_CDN_PATTERN = /https?:\/\/[a-z0-9-]+\.nexus-cdn\.com[^\s"'<>]*/gi;

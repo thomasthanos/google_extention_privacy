@@ -844,10 +844,17 @@ const pendingTerminalDownloads = new Map();
 const MAX_PENDING_TERMINALS = 200;
 
 function rememberEarlyTerminal(downloadId, state, error) {
-  pendingTerminalDownloads.set(downloadId, { state, error });
+  pendingTerminalDownloads.set(downloadId, { state, error, at: Date.now() });
   while (pendingTerminalDownloads.size > MAX_PENDING_TERMINALS) {
     const oldest = pendingTerminalDownloads.keys().next().value;
     pendingTerminalDownloads.delete(oldest);
+  }
+}
+
+function cleanPendingTerminals() {
+  const cutoff = Date.now() - 3600000; // 1 hour
+  for (const [id, entry] of pendingTerminalDownloads) {
+    if (entry.at && entry.at < cutoff) pendingTerminalDownloads.delete(id);
   }
 }
 
@@ -1461,6 +1468,11 @@ const NDC_QUEUE_HANDLERS = {
 if (chrome.alarms?.onAlarm) {
   chrome.alarms.onAlarm.addListener((alarm) => {
     const name = String(alarm?.name || '');
+    if (name === 'nxtk-reconcile') {
+      reconcileNdcJobs().catch(() => {});
+      cleanPendingTerminals();
+      return;
+    }
     if (!name.startsWith(NDC_ALARM_PREFIX)) return;
     processNdcJob(name.slice(NDC_ALARM_PREFIX.length))
       .catch((cause) => recordBackgroundError('rate-limit alarm', cause));
@@ -1567,6 +1579,10 @@ async function pruneOrphanedNdcItems() {
   try {
     chrome.storage.local.remove(stale, () => void getRuntimeError());
   } catch (_) { }
+}
+
+if (chrome.alarms?.create) {
+  chrome.alarms.create('nxtk-reconcile', { periodInMinutes: 5 });
 }
 
 migrateNdcJobItems()
