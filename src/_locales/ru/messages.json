@@ -161,6 +161,12 @@
   "errModerationHoldFix": {
     "message": "Дождитесь одобрения файла со стороны Nexus Mods."
   },
+  "errModUnavailableMsg": {
+    "message": "Этот мод был скрыт или удалён автором."
+  },
+  "errModUnavailableFix": {
+    "message": "Мод больше не доступен на Nexus Mods. Поищите альтернативу или свяжитесь с автором мода."
+  },
   "errServerErrorMsg": {
     "message": "На стороне сервера Nexus Mods возникла проблема."
   },

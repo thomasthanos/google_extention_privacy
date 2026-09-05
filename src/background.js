@@ -195,8 +195,7 @@ function enqueueStorageTask(storageKey, task) {
   const next = previous.then(task, task);
   const settled = next.then(() => undefined, () => undefined);
   writeQueues.set(storageKey, settled);
-  /* Release the key once this is the tail of its chain. Item lists are keyed per job id, so without
-     this the map kept a permanent entry for every collection run the worker had ever seen. */
+
   settled.then(() => {
     if (writeQueues.get(storageKey) === settled) writeQueues.delete(storageKey);
   });
@@ -301,9 +300,7 @@ const STORAGE_HANDLERS = {
   },
 
   async SETTINGS_RESET() {
-    /* Restore Defaults used to be written straight to storage from the content script, outside this
-       queue, so a patch still in flight could land afterwards and resurrect the value the user had
-       just reset. */
+
     return enqueueStorageTask(NXTK.SETTINGS_KEY, async () => {
       const next = { ...NXTK.DEFAULTS };
       await storageSetLocal(NXTK.SETTINGS_KEY, next);
@@ -416,10 +413,7 @@ function buildDownloadPath(folder, rawName) {
 }
 
 function conflictActionFor(_filename) {
-  /* Always uniquify. This used to return 'overwrite' for any path containing '/', and
-     buildDownloadPath prepends DownloadFolder — which defaults to 'NexusMods' — so on a default
-     install every browser download overwrote. Two mods shipping the same archive name silently
-     clobbered each other on disk while the queue reported both complete. */
+
   return 'uniquify';
 }
 
@@ -631,11 +625,6 @@ async function saveNdcJob(job) {
   return job;
 }
 
-/* Read-modify-write inside the NDC_JOBS_KEY critical section. saveNdcJob writes back a whole job
-   object that the caller may have read several awaits earlier, so every field the caller did not
-   intend to touch is silently rolled back to its stale value. The mutator here runs against the
-   freshly stored job, so only what it changes is written. enqueueStorageTask already serialises on
-   this key, so no new locking is needed. */
 async function mutateNdcJob(jobId, mutate) {
   let updated = null;
   await enqueueStorageTask(NDC_JOBS_KEY, async () => {
@@ -683,10 +672,6 @@ function tabExists(tabId) {
   });
 }
 
-/* Ownership decides which tab closing cancels the run (stopNdcJobsForTab). Handing it to whichever
-   tab attached last meant that opening the same collection in a second tab silently moved the run
-   onto that tab, and closing it — the throwaway one the user never meant to run anything — killed a
-   queue the original tab was still showing. Only adopt an orphan. */
 async function claimNdcJobOwnership(job, tabId) {
   if (job.tabId === tabId) return job;
   if (await tabExists(job.tabId)) return job;
@@ -772,11 +757,6 @@ function responseLooksLoggedOut(response, text) {
   return /(?:auth\/sign_in|name=["']login|sign in to nexus mods)/i.test(String(text || '').slice(0, 200000));
 }
 
-/* A Cloudflare interstitial comes back as a normal 200 or 403 carrying a challenge page, so without
-   these checks it fell through to the generic page_request_failed / generate_failed branches. The
-   queue then burned two attempts on every remaining file, failing the whole run one item at a time,
-   when the right answer is to stop and let the user clear the check once. The content-script path
-   already classifies this (errors.js classifyContent); the worker had no equivalent. */
 const CLOUDFLARE_MARKERS = /just a moment|cf-browser-verification|challenge-platform|cf_chl_|attention required!/i;
 const SUSPENDED_MARKERS = /temporarily suspended|too many requests from your account/i;
 
@@ -788,6 +768,12 @@ function responseLooksChallenged(response, text) {
 
 function responseLooksSuspended(text) {
   return SUSPENDED_MARKERS.test(String(text || '').slice(0, 200000));
+}
+
+const UNAVAILABLE_MARKERS = /this mod has been set to hidden|the author has hidden this mod|this mod has been removed|this file has been removed/i;
+
+function responseLooksUnavailable(text) {
+  return UNAVAILABLE_MARKERS.test(String(text || '').slice(0, 200000));
 }
 
 async function fetchNdcResponse(url, options, timeoutMs) {
@@ -815,9 +801,7 @@ async function fetchNdcResponse(url, options, timeoutMs) {
 const MIN_NDC_ALARM_DELAY_MS = 30000;
 
 function retryAfterMilliseconds(raw, strike = 1) {
-  /* An absent Retry-After arrives here as '' — and Number('') is 0, which is finite and >= 0.
-     Reading it as "retry immediately" pinned every backoff to the 30s floor and made the
-     exponential ladder below unreachable, so a hard rate limit was retried forever at 30s. */
+
   const header = String(raw ?? '').trim();
   if (header) {
     const seconds = Number(header);
@@ -885,6 +869,7 @@ async function resolveNdcBrowserUrl(item, timeoutMs) {
   if (responseLooksLoggedOut(page, page.text)) return { ok: false, code: 'requires_login' };
   if (responseLooksChallenged(page, page.text)) return { ok: false, code: 'cloudflare' };
   if (responseLooksSuspended(page.text)) return { ok: false, code: 'account_suspended' };
+  if (responseLooksUnavailable(page.text)) return { ok: false, code: 'mod_unavailable' };
   if (!page.ok) return ndcResolveFailure(page.status === 429 ? 'rate_limited' : 'page_request_failed', page);
 
   const generated = await fetchNdcResponse(
@@ -1005,8 +990,7 @@ async function advanceNdcJob(jobId) {
         });
         return null;
       }
-      /* These three mean "nothing else in this queue will work until you act", so the run stops with
-         the reason rather than grinding through every remaining file to fail each one twice. */
+
       if (BLOCKING_RESOLVE_CODES.has(resolved.code)) {
         job.status = resolved.code === 'requires_login' ? 'requires_login' : 'error';
         job.lastError = resolved.code;
@@ -1163,9 +1147,6 @@ async function applyNdcDownloadTerminal(job, downloadId, state, error) {
     }
   }
 
-  /* Each branch mutates the stored job rather than writing this snapshot back. The snapshot was read
-     before readNdcJobItems, verifyTransferSize and the history write, so anything that moved in the
-     meantime — an attach, a pause, the next item starting — would otherwise be rolled back. */
   if (effectiveState === 'complete') {
     if (job.type) {
       await STORAGE_HANDLERS.NDC_HISTORY_ADD({
@@ -1296,8 +1277,7 @@ const NDC_QUEUE_HANDLERS = {
       && existing.type === type
       && (type !== null || existing.scopeKey === scopeKey);
     if (isReconnect) {
-      /* Pressing Start in this tab is an explicit claim, so ownership may move here — but write only
-         tabId, never the whole snapshot, which could roll back index/activeDownloadId. */
+
       existing = (await mutateNdcJob(existing.id, (current) => { current.tabId = tabId; })) || existing;
       if (existing.status === 'running') {
         processNdcJob(existing.id).catch((cause) => recordBackgroundError('resume adopted job', cause));
@@ -1354,10 +1334,7 @@ const NDC_QUEUE_HANDLERS = {
   async NDC_QUEUE_STATUS(payload) {
     const job = await resolveNdcJob(payload);
     if (!job) return null;
-    /* A 'running' job with no active download and no pending alarm has nothing driving it: the deck's
-       7s poll keeps the worker warm, so reconcileNdcJobs() never re-runs, and the poll itself only
-       read. The queue then reported 'running' forever while nothing downloaded. NDC_QUEUE_ATTACH
-       already carries this nudge; the poll needs it too so a stall self-heals within one tick. */
+
     if (job.status === 'running'
       && job.activeDownloadId === null
       && (Number(job.waitingUntil) || 0) <= Date.now()) {
@@ -1385,8 +1362,6 @@ const NDC_QUEUE_HANDLERS = {
     const found = await findActiveNdcJobForCollection(gameId, collectionId);
     if (!found) return null;
 
-    /* Attaching is passive — it happens just by opening the collection page. Taking ownership here
-       meant a second tab silently became the one whose closing cancels the run. */
     const job = await claimNdcJobOwnership(found, tabId);
 
     if (job.status === 'running' && job.activeDownloadId === null) {
@@ -1687,3 +1662,4 @@ chrome.runtime.onInstalled.addListener((details) => {
     });
   });
 });
+

@@ -261,10 +261,6 @@ window.NexusExt = window.NexusExt || {};
     closeTabTimer = null;
   }
 
-  /* The fallback hands control back to Nexus's own download button. If that button never appears
-     — a still-challenged page, a layout the selectors do not know, a disabled control — every
-     entry point short-circuits on isNativeFallbackActive() and the extension goes quiet with
-     nothing on screen. This gives that state a deadline and a visible ending. */
   function cancelFallbackWatchdog() {
     fallbackWatchdogDeadline = 0;
     if (fallbackWatchdogTimer === null) return;
@@ -669,6 +665,11 @@ window.NexusExt = window.NexusExt || {};
         Logger.info('Manual download URL found from file page:', extracted.source);
         return { url: extracted.url };
       }
+      const unavailable = Errors.classifyContent(pageResponse.text, { context: 'Reading manual download page' });
+      if (unavailable?.code === 'mod_unavailable') {
+        Logger.info('Mod page indicates the mod is hidden or removed.');
+        return { url: null, error: unavailable };
+      }
       return { url: null, error: Errors.create('no_download_url', { context: 'Reading manual download page' }) };
     };
 
@@ -789,12 +790,6 @@ window.NexusExt = window.NexusExt || {};
     }
   }
 
-  /* Files the extension has proven it cannot resolve on its own — manual-download-only, off-site,
-     archived or otherwise not available through GenerateDownloadUrl. The click interceptor is
-     capture-phase and calls stopImmediatePropagation, so before this existed a failed resolution left
-     the user with a dead button: Nexus's own handler never ran, and every further click was swallowed
-     the same way. The error's own recovery text says "open the file page and download manually",
-     which was impossible. Once a file is in here, its controls are handed back to Nexus untouched. */
   const nativePassthroughFiles = new Set();
 
   function allowNativeDownload(fileId) {
@@ -806,9 +801,7 @@ window.NexusExt = window.NexusExt || {};
     return nativePassthroughFiles.has(String(fileId || ''));
   }
 
-  /* Codes that mean "Nexus will not give this to the extension", as opposed to a transient failure
-     worth retrying. Only these hand control back — a timeout or a rate limit still belongs to us. */
-  const NATIVE_HANDOFF_CODES = new Set(['no_download_url', 'no_nmm_link', 'unsafe_download_url']);
+  const NATIVE_HANDOFF_CODES = new Set(['no_download_url', 'no_nmm_link', 'unsafe_download_url', 'mod_unavailable']);
 
   function releaseToNativeControl(button, fileId, error) {
     if (!NATIVE_HANDOFF_CODES.has(error?.code)) return false;
@@ -869,9 +862,7 @@ window.NexusExt = window.NexusExt || {};
   }
 
   function activateCloudflareFallback({ button = null, fileId, isNMM, href } = {}) {
-    /* Returning false hands the caller back to the normal error path, which reports the Cloudflare
-       block instead of navigating the tab. That navigation is the surprising part of this feature,
-       so it is the part that has to be switchable. */
+
     if (cfg.CloudflareFallback === false) {
       Logger.info('Cloudflare fallback is turned off; reporting the block instead of opening the page.');
       return false;
@@ -885,10 +876,6 @@ window.NexusExt = window.NexusExt || {};
       return false;
     }
 
-    /* getModPagePath returns '' for anything that is not /<game>/mods/<id>, which keeps the tab off
-       Core/Libs widget fragments and /api/files endpoints. Landing on one of those is worse than
-       failing: isModPage() is false there, so every interceptor switches off and the user is left on
-       a bare HTML fragment with no download control at all. */
     if (!NXTK.isSafeNexusPageUrl(target.href) || target.hostname !== location.hostname
       || !getModPagePath(target.href)) return false;
 
@@ -969,8 +956,7 @@ window.NexusExt = window.NexusExt || {};
       error = Errors.normalize(error);
       if (error.code === 'cloudflare') {
         if (attemptId !== downloadAttemptSequence) {
-          /* Superseded by a newer attempt. Returning silently used to leave the button frozen on
-             "Please Wait..." with the native control still suppressed. */
+
           restoreButtonState(button);
           return false;
         }
@@ -1138,9 +1124,6 @@ window.NexusExt = window.NexusExt || {};
         }
       }
 
-      /* A modified or non-primary click is the user asking the browser for something specific —
-         open in a new tab, save as, paste-and-go. Swallowing those was never intended, and it also
-         leaves no way to reach the native control at all. */
       if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
 
       const element = event.target.closest('a,button');
@@ -1194,10 +1177,7 @@ window.NexusExt = window.NexusExt || {};
   }
 
   function findSlowDownloadButtons(root, { includeBound = false } = {}) {
-    /* Mark every button that has been examined, not only the ones that matched. The poll below re-runs
-       this once a second for as long as a file page stays open, and marking only matches meant every
-       other button on the page had its textContent read and normalised again on every single tick.
-       Buttons with no text yet are deliberately left unmarked so a late render is still picked up. */
+
     const selector = includeBound ? 'button' : 'button:not([data-nxtk-slow-seen])';
     const buttons = Array.from(root.querySelectorAll(selector));
     return buttons.filter((button) => {
@@ -1247,8 +1227,7 @@ window.NexusExt = window.NexusExt || {};
     Logger.info('Starting the native Nexus download after the Cloudflare fallback.');
     Promise.resolve().then(() => {
       if (!isNativeFallbackActive() || !button.isConnected) {
-        /* The click never happened. The watchdog was already cancelled above, so returning silently
-           here left the fallback armed-but-unwatched and the extension went quiet for good. */
+
         nativeFallbackAutoStarted = false;
         setStoredCloudflareAutoStartPending(true);
         armFallbackWatchdog();
@@ -1266,9 +1245,7 @@ window.NexusExt = window.NexusExt || {};
   async function handleSlowDownloadClick(button, event) {
     const params = new URLSearchParams(location.search);
     const fileId = params.get('file_id');
-    /* Guard before cancelling the event. This used to preventDefault and stopImmediatePropagation as
-       its first two statements and only then check for a file id, so on any page where the check
-       failed the native Slow download button became a dead control: no download, no error, nothing. */
+
     if (!fileId || shouldPassThroughToNative(fileId)) return;
 
     event.preventDefault();
@@ -1277,8 +1254,6 @@ window.NexusExt = window.NexusExt || {};
     return runDownload({ button, fileId, isNMM: wantsVortexHandoff(params), href: location.href });
   }
 
-  /* `params.has('nmm')` was used for this, which is also true for `?nmm=0` — a URL explicitly asking
-     for a browser download was routed down the Vortex path, where a manual-only file dead-ends. */
   function wantsVortexHandoff(params) {
     return params.get('nmm') === '1';
   }
@@ -1545,10 +1520,6 @@ window.NexusExt = window.NexusExt || {};
   let pendingUpsellSince = 0;
   let pendingUpsellNeedsFullScan = false;
 
-  /* The flush used to be a reset-only debounce: every batch of mutations pushed the timer back another
-     100ms. A page that keeps mutating — Nexus with ad slots streaming in is exactly that — never let
-     it fire, so nothing was ever hidden and pendingUpsellRoots grew without bound for the life of the
-     tab. The queue is now capped, and the total wait is capped too, so a busy page still gets swept. */
   function scheduleUpsellFlush() {
     const now = Date.now();
     if (!pendingUpsellSince) pendingUpsellSince = now;
@@ -1591,8 +1562,7 @@ window.NexusExt = window.NexusExt || {};
         for (const node of mutation.addedNodes) {
           if (node.nodeType !== 1) continue;
           if (node.closest && node.closest("[id^=\"nxtk-\"], .nxtk-deck")) continue;
-          /* Past this many roots a single document sweep is cheaper than scanning each one, so stop
-             accumulating rather than letting the array grow. */
+
           if (pendingUpsellRoots.length >= UPSELL_FULL_RESCAN_THRESHOLD) pendingUpsellNeedsFullScan = true;
           else pendingUpsellRoots.push(node);
           queued = true;
@@ -1604,15 +1574,6 @@ window.NexusExt = window.NexusExt || {};
     premiumObserver.observe(document.body, { childList: true, subtree: true });
   }
 
-  /* Nexus gates a generated download link behind an ad timer it tracks in a first-party "ab" cookie
-     shaped `<group>|<unix seconds>`. Writing a near-future timestamp satisfies the check, which is
-     what lets a queued run resolve links without sitting through the wait on every file.
-
-     Two differences from the userscript this came from: it rewrote the cookie before every single
-     request, which on a several-hundred-mod queue is hundreds of pointless writes, so this refreshes
-     only when the value is close to lapsing; and it rides the existing "Hide ads and Premium panels"
-     switch, so turning that off turns this off too. The cookie is first-party, expires by itself in
-     five minutes, and is never read back. */
   const AD_TIMER_WINDOW_MS = 5 * 60 * 1000;
   const AD_TIMER_REFRESH_MS = 60 * 1000;
   let adTimerWrittenAt = 0;
@@ -1687,14 +1648,6 @@ window.NexusExt = window.NexusExt || {};
 
   const ARCHIVED_DOWNLOADS_CLASS = 'accordion-downloads';
 
-  /* Nexus renders each archived file as a header followed by its own downloads box. This used to
-     match the two collections by array index, which assumed they stay the same length and in the
-     same order; one stray box and every file after it silently received another file's buttons.
-
-     There is deliberately no index fallback. A fixture with one header missing its box showed the
-     fallback handing that header the *next* file's box — the exact defect, reintroduced by the
-     escape hatch meant to be safe. When neither relationship finds a box, the file gets no buttons,
-     which is recoverable; wrong buttons hand you a different mod version and look correct. */
   function findArchivedDownloadBox(header) {
     if (!header) return null;
 
@@ -1730,9 +1683,7 @@ window.NexusExt = window.NexusExt || {};
         }
         const hasArchiveBtn = footer.querySelector('[data-nxtk-archive]');
         if (!hasArchiveBtn) {
-          /* Built by the same helper as the archived download links, so it carries Nexus's own
-             button classes. On its own an nxtk- class styles nothing — this extension ships no
-             rule for it — and the link rendered as bare underlined text among real buttons. */
+
           const btn = buildArchivedDownloadLink(
             url + '&category=archived',
             NXTK.t('btnFileArchive', null, 'File archive')
@@ -1751,9 +1702,7 @@ window.NexusExt = window.NexusExt || {};
       const fileId = String(header?.dataset?.id ?? '');
       const box = findArchivedDownloadBox(header);
       if (!ARCHIVED_FILE_ID_PATTERN.test(fileId) || !box || box.dataset.nxtkDone) continue;
-      /* Pairing a header with a box that another header already took would put file A's buttons on
-         file B — you press download on one version and receive a different one. Dropping the
-         buttons is the safe failure. */
+
       if (claimed.has(box)) {
         Logger.warn('Archived files: two headers resolved to the same download box; skipping', fileId);
         continue;
@@ -1865,8 +1814,6 @@ window.NexusExt = window.NexusExt || {};
     scheduleDomEnhancements();
   }
 
-  /* True while this page is one the extension can act on. main.js uses it to decide how often to
-     poll for navigations — most of nexusmods.com (forums, profiles, search, news) is neither. */
   function isActionablePage() {
     return isModPage() || isNativeFallbackActive();
   }
@@ -1884,3 +1831,4 @@ window.NexusExt = window.NexusExt || {};
     refreshAdTimerCookie
   };
 })();
+

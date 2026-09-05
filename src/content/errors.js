@@ -66,6 +66,11 @@ window.NexusExt = window.NexusExt || {};
       recovery: 'Wait for Nexus Mods to approve the file before downloading.',
       retryable: false
     },
+    mod_unavailable: {
+      userMessage: 'This mod has been hidden or removed by its author.',
+      recovery: 'The mod is no longer available on Nexus Mods. Check for an alternative or contact the mod author.',
+      retryable: false
+    },
     server_error: {
       userMessage: 'Nexus Mods is having a server-side problem.',
       recovery: 'Wait a moment and retry.',
@@ -197,6 +202,15 @@ window.NexusExt = window.NexusExt || {};
         return create('requires_login', detail(`login signal: ${weakReasons.join(', ')}`));
       }
     }
+    const modUnavailable = content.includes('this mod has been set to hidden')
+      || content.includes('the author has hidden this mod')
+      || content.includes('this mod has been removed')
+      || content.includes('this file has been removed')
+      || /\bmod\b[^.]{0,40}\bno longer available\b/.test(content)
+      || /\bthis mod\b[^.]{0,60}\b(?:hidden|archived|taken down)\b/.test(content);
+    if (modUnavailable) {
+      return create('mod_unavailable', detail('hidden/removed mod page markup'));
+    }
     const cloudflareChallenge = content.includes('just a moment')
       || content.includes('cf-chl-interstitial')
       || /id=["']challenge-form["']/i.test(content)
@@ -215,9 +229,6 @@ window.NexusExt = window.NexusExt || {};
   }
 
   function fromResponse({ status = 0, text = '', context = '', extra = '', classified = false } = {}) {
-    /* classifyContent lowercases and runs a dozen regexes over up to 200 KB. Callers that have
-       already run it on this exact body pass classified:true — re-running is guaranteed to return
-       null there, because a truthy result would have short-circuited before reaching here. */
     const contentError = classified ? null : classifyContent(text, { status, context, extra });
     if (contentError) return contentError;
     const detail = (reason) => ({ status, context, technicalMessage: [reason, extra].filter(Boolean).join(' | ') });
@@ -417,11 +428,6 @@ window.NexusExt = window.NexusExt || {};
       } catch (_) {
       }
     };
-    /* Callback form on purpose. Firefox's chrome.* namespace returns undefined rather than a
-       promise, so testing the return value opened GitHub twice there: the background created one
-       tab and the fallback created another. The callback also makes the background's own reply
-       visible — as a promise, {ok:false} resolves, so a tabs.create that failed left the button
-       doing nothing at all. */
     try {
       if (!chrome.runtime?.id) {
         fallback();

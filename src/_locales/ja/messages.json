@@ -161,6 +161,12 @@
   "errModerationHoldFix": {
     "message": "Nexus Mods がファイルを承認するまでお待ちください。"
   },
+  "errModUnavailableMsg": {
+    "message": "このModは作者によって非公開または削除されました。"
+  },
+  "errModUnavailableFix": {
+    "message": "このModはNexus Modsで利用できなくなりました。代替を探すか、Mod作者に問い合わせてください。"
+  },
   "errServerErrorMsg": {
     "message": "Nexus Mods 側でサーバーの問題が発生しています。"
   },

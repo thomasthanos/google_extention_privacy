@@ -183,6 +183,14 @@
     "message": "Wait for Nexus Mods to approve the file before downloading.",
     "description": "Recovery advice for errModerationHoldMsg."
   },
+  "errModUnavailableMsg": {
+    "message": "This mod has been hidden or removed by its author.",
+    "description": "Error message: mod hidden or removed by author."
+  },
+  "errModUnavailableFix": {
+    "message": "The mod is no longer available on Nexus Mods. Check for an alternative or contact the mod author.",
+    "description": "Recovery advice for errModUnavailableMsg."
+  },
   "errServerErrorMsg": {
     "message": "Nexus Mods is having a server-side problem.",
     "description": "Error message: HTTP 5xx."
