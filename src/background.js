@@ -253,7 +253,16 @@ function isSafeId(value) {
 
 function isValidFileId(value) {
   if (typeof value === 'number') return Number.isInteger(value) && value > 0 && value < 1e12;
-  return typeof value === 'string' && /^\d{1,12}$/.test(value);
+  if (typeof value !== 'string' || !/^\d{1,12}$/.test(value)) return false;
+  const number = Number(value);
+  return Number.isSafeInteger(number) && number > 0 && number < 1e12;
+}
+
+function isValidHistoryId(value) {
+  if (isValidFileId(value)) return true;
+  if (typeof value !== 'string') return false;
+  const parts = value.split(':');
+  return parts.length === 2 && parts.every(isValidFileId);
 }
 
 function historyBranch(history, gameId, collectionId) {
@@ -318,7 +327,7 @@ const STORAGE_HANDLERS = {
   async NDC_HISTORY_ADD(payload) {
     const { type, fileId } = payload || {};
     if (!HISTORY_TYPES.has(type)) throw new Error('invalid-history-type');
-    if (!isValidFileId(fileId)) throw new Error('invalid-file-id');
+    if (!isValidHistoryId(fileId)) throw new Error('invalid-file-id');
     return mutateHistory(payload, (collection) => {
       const list = readHistoryList(collection, type);
       if (list.length >= MAX_HISTORY_IDS) throw new Error('history-too-large');
@@ -341,7 +350,7 @@ const STORAGE_HANDLERS = {
     for (const type of HISTORY_TYPES) {
       const raw = Array.isArray(lists[type]) ? lists[type] : [];
       if (raw.length > MAX_HISTORY_IDS) throw new Error('history-too-large');
-      cleaned[type] = [...new Set(raw.filter(isValidFileId))];
+      cleaned[type] = [...new Set(raw.filter(isValidHistoryId))];
     }
     return mutateHistory(payload, (collection) => {
       for (const type of HISTORY_TYPES) collection[type] = cleaned[type];
@@ -496,7 +505,7 @@ function makeNdcJobId() {
 }
 
 function ndcScopeKey(type, items) {
-  const ids = items.map((item) => String(item.fileId)).sort();
+  const ids = items.map((item) => `${item.gameId}:${item.fileId}`).sort();
   const text = `${type ?? 'null'}|${ids.join(',')}`;
   let hash = 5381;
   for (let index = 0; index < text.length; index += 1) {
@@ -507,12 +516,14 @@ function ndcScopeKey(type, items) {
 
 function sanitizeNdcJobItem(raw) {
   const fileId = raw?.fileId;
+  const historyId = raw?.historyId ?? fileId;
   const gameId = String(raw?.gameId ?? '').trim();
   const name = String(raw?.name || '').trim().slice(0, 300);
   const pageUrl = String(raw?.pageUrl || '').trim();
   const rawSize = Number(raw?.sizeKb);
   const sizeKb = Number.isFinite(rawSize) && rawSize > 0 && rawSize < 1e9 ? Math.round(rawSize) : 0;
-  if (!isValidFileId(fileId) || !/^\d{1,12}$/.test(gameId) || !name || !pageUrl) return null;
+  if (!isValidFileId(fileId) || !isValidHistoryId(historyId)
+    || !/^\d{1,12}$/.test(gameId) || !name || !pageUrl) return null;
 
   try {
     const parsed = new URL(pageUrl);
@@ -523,7 +534,7 @@ function sanitizeNdcJobItem(raw) {
     return null;
   }
 
-  return { fileId, gameId, name, pageUrl, sizeKb };
+  return { fileId, historyId, gameId, name, pageUrl, sizeKb };
 }
 
 const SHORT_TRANSFER_RATIO = 0.5;
@@ -1155,7 +1166,7 @@ async function applyNdcDownloadTerminal(job, downloadId, state, error) {
         gameId: job.gameId,
         collectionId: job.collectionId,
         type: job.type,
-        fileId: item.fileId
+        fileId: item.historyId ?? item.fileId
       });
     }
     await STORAGE_HANDLERS.TOTAL_DOWNLOADS_INCREMENT();

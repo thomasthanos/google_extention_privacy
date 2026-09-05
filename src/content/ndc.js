@@ -41,6 +41,7 @@ window.NexusExt = window.NexusExt || {};
   const escapeHtml = NXTK.escapeHtml;
   const T = (key, fallback) => NXTK.t(key, null, fallback);
   const TS = (key, subs, fallback) => NXTK.t(key, subs.map(String), fallback);
+  const historyEntryId = (mod) => mod.historyId || mod.fileId || mod.file?.fileId;
 
   const DEFAULT_DOWNLOAD_SPEED = 3.2;
   const MAX_PAUSE_SECONDS = 10 * 60;
@@ -558,7 +559,7 @@ window.NexusExt = window.NexusExt || {};
           NXTK.bumpTotalDownloads?.();
           if (type !== null) {
             try {
-              await this.recordHistoryEntry(type, mod.fileId);
+              await this.recordHistoryEntry(type, historyEntryId(mod));
             } catch (_) { }
           }
           onSucceeded?.();
@@ -591,7 +592,7 @@ window.NexusExt = window.NexusExt || {};
       const pending = [];
 
       for (const mod of mods) {
-        if (alreadyDownloaded.has(mod.fileId)) {
+        if (alreadyDownloaded.has(historyEntryId(mod))) {
           this.ui.log(
             `${T('logAlreadyDownloaded', 'Already downloaded')} <a href="${escapeHtml(mod.file.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(mod.file.name)}</a>`
           );
@@ -600,6 +601,7 @@ window.NexusExt = window.NexusExt || {};
         }
         pending.push({
           fileId: mod.fileId || mod.file.fileId,
+          historyId: historyEntryId(mod),
           gameId: mod.file.mod.game.id,
           name: mod.file.name,
           pageUrl: mod.file.url,
@@ -972,7 +974,7 @@ window.NexusExt = window.NexusExt || {};
           break;
         }
 
-        if (history?.[this.gameId]?.[this.collectionId]?.[type]?.includes(mod.fileId)) {
+        if (history?.[this.gameId]?.[this.collectionId]?.[type]?.includes(historyEntryId(mod))) {
           this.ui.log(`[${modNumber}] ${T('logAlreadyDownloaded', 'Already downloaded')} <a href="${fileUrl}" target="_blank" rel="noopener noreferrer">${fileName}</a>`);
           this.ui.incrementProgress();
           continue;
@@ -1042,7 +1044,7 @@ window.NexusExt = window.NexusExt || {};
           handedOff = true;
 
           if (history) {
-            history = await this.recordHistoryEntry(type, mod.fileId);
+            history = await this.recordHistoryEntry(type, historyEntryId(mod));
           }
         }
 

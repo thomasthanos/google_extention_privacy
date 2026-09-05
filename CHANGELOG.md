@@ -17,6 +17,9 @@ they are simply not listed.
 
 ### Changed
 
+- **Wabbajack import now uses a dedicated importer and ZIP reader.** The game registry is aligned with
+  current Wabbajack game names, including newer Nexus mappings and Terraria, while the saved beta
+  setting and existing interface stay compatible.
 - **"Always use English" now takes effect where you set it.** Nothing injected into the page carries
   a translation attribute — every string is baked in when the element is built — so flipping the
   switch changed the flag and nothing else, and it simply looked broken. The settings dialog now
@@ -31,6 +34,9 @@ they are simply not listed.
 
 ### Fixed
 
+- **Wabbajack archives are validated before their manifest is trusted.** Imports now enforce actual
+  decompression limits, CRC and size checks, safe ZIP64 bounds, single-disk and unencrypted entries;
+  multi-game lists also keep separate history for identical file IDs from different games.
 - **Failed Nexus responses are no longer scanned and logged twice.** Both the request helper and the
   login check ran the same classifier over the same body — up to 200 KB lowercased and put through a
   dozen regexes each time — and because building an error also records it, a logged-out collection

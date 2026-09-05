@@ -46,7 +46,8 @@
         "content/errors.js",
         "content/auth.js",
         "content/nnw.js",
-        "content/wabbajack.js",
+        "content/zip-reader.js",
+        "content/wabbajack-importer.js",
         "content/ndc.js",
         "content/ui.js",
         "content/main.js"

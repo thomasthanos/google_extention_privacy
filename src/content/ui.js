@@ -1456,8 +1456,8 @@ window.NexusExt = window.NexusExt || {};
   }
 
   async function importWabbajackModlist(closeDialog) {
-    const Wabbajack = NexusExt.Wabbajack;
-    if (!Wabbajack) return;
+    const importer = NexusExt.WabbajackImporter;
+    if (!importer) return;
 
     const triggers = Array.from(document.querySelectorAll('#nxtk-wj-import, #nxtk-wj-deck-import'));
     const setBusy = (busy) => triggers.forEach((button) => { button.disabled = busy; });
@@ -1471,8 +1471,8 @@ window.NexusExt = window.NexusExt || {};
 
       setBusy(true);
       try {
-        const list = await Wabbajack.readModlist(file);
-        const mods = Wabbajack.toCollectionMods(list);
+        const list = await importer.importFile(file);
+        const mods = importer.toQueueMods(list);
         const title = list.name || file.name;
 
         const lines = [
@@ -1750,9 +1750,9 @@ window.NexusExt = window.NexusExt || {};
           gameId: ndc.gameId,
           collectionId: ndc.collectionId,
           lists: {
-            all: merge('all', downloaded.map(m => m.fileId)),
-            mandatory: merge('mandatory', downloaded.filter(m => !m.optional).map(m => m.fileId)),
-            optional: merge('optional', downloaded.filter(m => m.optional).map(m => m.fileId))
+            all: merge('all', downloaded.map(m => m.historyId || m.fileId)),
+            mandatory: merge('mandatory', downloaded.filter(m => !m.optional).map(m => m.historyId || m.fileId)),
+            optional: merge('optional', downloaded.filter(m => m.optional).map(m => m.historyId || m.fileId))
           }
         });
         const summary = [
@@ -2075,7 +2075,8 @@ window.NexusExt = window.NexusExt || {};
     const listEl = $('#nxtk-mod-list');
     const countBadge = $('#nxtk-sel-count');
     let lastChecked = null;
-    const modsByFileId = new Map(ndc.mods.all.map((mod) => [String(mod.file.fileId), mod]));
+    const modEntryId = (mod) => String(mod.historyId || mod.file.fileId);
+    const modsByEntryId = new Map(ndc.mods.all.map((mod) => [modEntryId(mod), mod]));
 
     function updateCount() {
       const c = listEl.querySelectorAll('.nxtk-mod-item.nxtk-selected').length;
@@ -2092,7 +2093,7 @@ window.NexusExt = window.NexusExt || {};
           : NXTK.t('tagMandatory', null, 'Mandatory');
         const search = `#${i + 1} ${modName} ${fileName} ${size} ${tag}`
           .replace(/\s+/g, ' ').trim().toLowerCase();
-        return `<div class="nxtk-mod-item" data-file-id="${escapeHtml(mod.file.fileId)}" data-search="${escapeHtml(search)}">`
+        return `<div class="nxtk-mod-item" data-file-id="${escapeHtml(modEntryId(mod))}" data-nexus-file-id="${escapeHtml(mod.file.fileId)}" data-search="${escapeHtml(search)}">`
           + `<span class="nxtk-ml-idx">#${i + 1}</span>`
           + `<span class="nxtk-ml-name">${escapeHtml(modName)}</span>`
           + `<span class="nxtk-ml-file">${escapeHtml(fileName)}</span>`
@@ -2142,7 +2143,7 @@ window.NexusExt = window.NexusExt || {};
     $('#nxtk-export-sel').addEventListener('click', () => {
       const selected = [];
       listEl.querySelectorAll('.nxtk-mod-item.nxtk-selected').forEach(el => {
-        const mod = modsByFileId.get(el.dataset.fileId);
+        const mod = modsByEntryId.get(el.dataset.fileId);
         if (mod) selected.push(mod);
       });
       if (!selected.length) { nxtkAlert(NXTK.t('alertPickOneToExport', null, 'Select at least one mod to export.')); return; }
@@ -2150,7 +2151,7 @@ window.NexusExt = window.NexusExt || {};
         schema: SELECTION_SCHEMA_VERSION,
         gameId: ndc.gameId,
         collectionId: ndc.collectionId,
-        fileIds: selected.map((mod) => mod.file.fileId),
+        fileIds: selected.map((mod) => mod.historyId || mod.file.fileId),
       };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -2188,7 +2189,7 @@ window.NexusExt = window.NexusExt || {};
           const wanted = new Set(fileIds.map((id) => String(id)));
           let matched = 0;
           Array.from(listEl.children).forEach((child) => {
-            if (!wanted.has(child.dataset.fileId)) return;
+            if (!wanted.has(child.dataset.fileId) && !wanted.has(child.dataset.nexusFileId)) return;
             child.classList.add('nxtk-selected');
             matched += 1;
           });
@@ -2217,7 +2218,7 @@ window.NexusExt = window.NexusExt || {};
       input.addEventListener('change', () => {
         const fileNames = Array.from(input.files, (file) => file.name);
         const { matched } = matchModsToFileNames(ndc.mods.all, fileNames);
-        const downloadedIds = new Set(matched.map((mod) => String(mod.file.fileId)));
+        const downloadedIds = new Set(matched.map(modEntryId));
         listEl.querySelectorAll('.nxtk-mod-item').forEach(el => {
           if (!downloadedIds.has(el.dataset.fileId)) el.classList.add('nxtk-selected');
         });
@@ -2268,7 +2269,7 @@ window.NexusExt = window.NexusExt || {};
     $('#nxtk-dl-selected').addEventListener('click', () => {
       const selected = [];
       listEl.querySelectorAll('.nxtk-mod-item.nxtk-selected').forEach(el => {
-        const mod = modsByFileId.get(el.dataset.fileId);
+        const mod = modsByEntryId.get(el.dataset.fileId);
         if (mod) selected.push(mod);
       });
       if (!selected.length) { nxtkAlert(NXTK.t('alertPickOneMod', null, 'Select at least one mod.')); return; }
@@ -2300,9 +2301,15 @@ window.NexusExt = window.NexusExt || {};
   const MAX_SELECTION_FILE_BYTES = 512 * 1024;
   const MAX_SELECTION_IDS = 10000;
 
-  function toFileId(value) {
+  function toSelectionId(value) {
     if (typeof value === 'number' && Number.isInteger(value) && value > 0 && value < 1e12) return value;
-    if (typeof value === 'string' && /^\d{1,12}$/.test(value.trim())) return value.trim();
+    if (typeof value !== 'string') return null;
+    const text = value.trim();
+    const parts = text.split(':');
+    if ((parts.length === 1 || parts.length === 2)
+      && parts.every((part) => /^\d{1,12}$/.test(part) && Number(part) > 0 && Number(part) < 1e12)) {
+      return text;
+    }
     return null;
   }
 
@@ -2336,7 +2343,7 @@ window.NexusExt = window.NexusExt || {};
     const seen = new Set();
     const fileIds = [];
     for (const candidate of candidates) {
-      const id = toFileId(candidate);
+      const id = toSelectionId(candidate);
       if (id === null) continue;
       const key = String(id);
       if (seen.has(key)) continue;
