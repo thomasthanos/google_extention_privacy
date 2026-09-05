@@ -635,6 +635,15 @@ async function saveNdcJob(job) {
     jobs[job.id] = job;
     await storageSetLocal(NDC_JOBS_KEY, jobs);
   });
+  
+  try {
+    if (job.status === 'running' && chrome.alarms?.create) {
+      chrome.alarms.create('nxtk-reconcile', { delayInMinutes: 5 });
+    } else if (job.status !== 'running') {
+      reconcileNdcJobs().catch(() => {});
+    }
+  } catch (_) { }
+
   return job;
 }
 
@@ -1507,9 +1516,11 @@ function searchDownload(downloadId) {
 async function reconcileNdcJobs() {
   if (!hasDownloadsApi()) return;
   const jobs = await readNdcJobs();
+  let runningCount = 0;
 
   for (const job of Object.values(jobs)) {
     if (job.status !== 'running') continue;
+    runningCount++;
 
     if (Number.isInteger(job.activeDownloadId)) {
       const record = await searchDownload(job.activeDownloadId);
@@ -1533,6 +1544,14 @@ async function reconcileNdcJobs() {
 
     await processNdcJob(job.id);
   }
+
+  try {
+    if (runningCount === 0 && chrome.alarms?.clear) {
+      chrome.alarms.clear('nxtk-reconcile');
+    } else if (runningCount > 0 && chrome.alarms?.create) {
+      chrome.alarms.create('nxtk-reconcile', { delayInMinutes: 5 });
+    }
+  } catch (_) { }
 }
 
 async function migrateNdcJobItems() {
@@ -1581,9 +1600,7 @@ async function pruneOrphanedNdcItems() {
   } catch (_) { }
 }
 
-if (chrome.alarms?.create) {
-  chrome.alarms.create('nxtk-reconcile', { periodInMinutes: 5 });
-}
+
 
 migrateNdcJobItems()
   .then(() => reconcileNdcJobs())
