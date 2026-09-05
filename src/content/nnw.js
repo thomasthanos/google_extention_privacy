@@ -466,7 +466,7 @@ window.NexusExt = window.NexusExt || {};
         .replace(/&quot;/g, '"')
         .replace(/&amp;/g, '&')
         .replace(/&#34;/g, '"');
-      if (!raw.includes('downloadUrl')) continue;
+      if (!raw.includes('downloadUrl') && !raw.includes('vortexDownloadUrl')) continue;
       try {
         const fd = JSON.parse(raw);
         const url = isNMM ? (fd.vortexDownloadUrl || fd.downloadUrl) : fd.downloadUrl;
