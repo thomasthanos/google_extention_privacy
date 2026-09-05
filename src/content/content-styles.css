@@ -171,8 +171,6 @@
   transition: opacity 0.3s var(--nxtk-ease);
   mix-blend-mode: screen;
 }
-/* decorateGlass only ever decorates .nxtk-deck and .nxtk-settings-fab, so a .nxtk-modal variant of
-   this selector could never match. */
 .nxtk-deck:hover > .nxtk-glass-sheen,
 .nxtk-settings-fab:hover > .nxtk-glass-sheen { opacity: 1; }
 
@@ -238,9 +236,6 @@
 .nxtk-deck input,
 .nxtk-deck textarea,
 .nxtk-deck select,
-/* The activity log is the one thing in the deck a user needs to copy out of — it carries the error
-   codes and file names they are asked to paste into a bug report — and the deck-wide user-select:none
-   made that impossible. */
 .nxtk-log-container,
 .nxtk-log-container * {
   user-select: text;
@@ -272,9 +267,6 @@
   pointer-events: none;
   z-index: 0;
 }
-/* The two injected glass layers are direct children of the deck, and this rule has the same
-   specificity as `.nxtk-glass-sheen` / `.nxtk-glass-specular` but comes later, so it was winning and
-   turning both overlays into in-flow relative spans — the specular and sheen never rendered. */
 .nxtk-deck > *:not(.nxtk-glass-specular):not(.nxtk-glass-sheen) { position: relative; z-index: 3; }
 
 .nxtk-deck-header {
@@ -422,10 +414,6 @@
   mix-blend-mode: screen; opacity:.45; pointer-events:none;
 }
 .nxtk-radio-label > * { position: relative; z-index: 1; }
-/* Visually hidden rather than display:none. `display:none` drops the input out of the tab order and
-   out of the accessibility tree, which made the deck's core Vortex-vs-Browser choice reachable only
-   by mouse and invisible to a screen reader. This keeps it focusable and announced, and the wrapping
-   label carries the focus ring. */
 .nxtk-radio-label input {
   position: absolute;
   width: 1px; height: 1px;
@@ -734,9 +722,6 @@
   transition: width .4s var(--nxtk-ease);
   overflow: hidden;
 }
-/* The shimmer used to animate background-position, which repaints the whole bar on every frame for
-   as long as a collection is downloading — hours in a large run. Sweeping an overlay with a transform
-   is handled by the compositor, so the bar itself is painted once. */
 .nxtk-progress-fill::after {
   content: "";
   position: absolute;
@@ -1017,7 +1002,6 @@
 .nxtk-settings-version-name {
   letter-spacing: 0.02em;
 }
-/* same stamp as the popup header, so the two surfaces label themselves alike */
 .nxtk-settings-version-tag {
   padding: 1px 8px;
   border-radius: var(--nxtk-radius-pill);
@@ -1250,11 +1234,6 @@
   transform: translateX(18px);
 }
 
-/* Settings dialog: two content columns on desktop, one column on narrow or zoomed
-   windows. Density lives in three custom properties, so the compact desktop scale is
-   one override block instead of a rule per element. The columns stretch to the same
-   height and the help/version footnote is pushed to the foot of the side column, which
-   is what keeps both columns ending level without stretching the cards themselves. */
 #nxtk-settings-modal {
   --nxtk-set-gap: 12px;
   --nxtk-set-pad: 14px;
@@ -1279,9 +1258,6 @@
   gap: var(--nxtk-set-gap);
   min-width: 0;
 }
-/* However much the two columns differ — fonts and translations both move it — the
-   side cards soak it up as a little extra breathing room around their own rows, so
-   it never shows up as a gap between the cards or a hole under them. */
 #nxtk-settings-modal .nxtk-settings-col-side > .nxtk-settings-section {
   flex: 1 1 auto;
   display: flex;
@@ -1301,10 +1277,6 @@
   padding: var(--nxtk-set-row-pad) 0;
 }
 
-/* Advanced is a full-width strip rather than a card — a card holding a single pill
-   spent a whole block of space on nothing, and expanding it inside a column emptied
-   out the bottom of the other one. Its rows lay out side by side, so the open panel
-   is a short band instead of a tall stack. */
 #nxtk-settings-modal .nxtk-settings-advanced {
   display: flex;
   flex-direction: column;
@@ -1312,8 +1284,6 @@
   gap: 8px;
   margin: 0;
 }
-/* The body is the drawer: a single grid row that animates from 0fr to 1fr, which
-   gives a real height transition without measuring anything in script. */
 #nxtk-settings-modal .nxtk-settings-advanced-body {
   align-self: stretch;
   display: grid;
@@ -1328,7 +1298,6 @@
   grid-template-rows: 1fr;
   opacity: 1;
 }
-/* the display above outranks the UA's [hidden] rule, so restore it explicitly */
 #nxtk-settings-modal .nxtk-settings-advanced-body[hidden] {
   display: none;
 }
@@ -1346,16 +1315,12 @@
   border-radius: var(--nxtk-radius-md);
   background: var(--nxtk-glass-tint-soft);
 }
-/* clipping is only needed while the drawer grows; once open the panel must let the
-   info tooltips out again */
 #nxtk-settings-modal .nxtk-settings-advanced-body.nxtk-settled .nxtk-settings-advanced-panel {
   overflow: visible;
 }
 #nxtk-settings-modal .nxtk-settings-advanced-panel .nxtk-setting-row {
   border-top: none;
 }
-/* the short numeric settings sit centred in their share of the band, so the three
-   items read as one row instead of drifting to the column edges */
 #nxtk-settings-modal .nxtk-settings-advanced-panel .nxtk-setting-row-field .nxtk-setting-label {
   justify-content: center;
   gap: 12px;
@@ -1364,8 +1329,6 @@
   margin-left: 0;
 }
 
-/* The Advanced row was a pill with an empty half-metre of space beside it, so the
-   help line moved in next to it: one closing bar, no extra height. */
 #nxtk-settings-modal .nxtk-settings-advanced-bar {
   display: flex;
   align-items: center;
@@ -1390,10 +1353,6 @@
   }
   #nxtk-settings-modal .nxtk-modal-scroll {
     display: grid;
-    /* 1.3/0.7 is where the two columns come out near the same natural height:
-       a wider Download Flow wraps its descriptions less, a narrower side column
-       wraps its own a little more. space-between absorbs whatever is left over,
-       which is what other locales will differ by. */
     grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
     margin: 0 -5px;
     padding: 0 5px 3px;
@@ -1906,10 +1865,6 @@
   }
 }
 
-/* Sits above .nxtk-settings-fab, which is fixed at bottom 28px and is ~46px tall, and is on every
-   page. Their z-indexes cannot be reordered — the ladder is 999997 dropdown portal, 999998 FAB,
-   999999 modal backdrop, and this toast has to stay under a modal — so the two are kept apart by
-   position instead. Move the FAB and this has to move with it, or the FAB covers Keep open. */
 .nxtk-close-toast {
   position: fixed;
   right: 28px;

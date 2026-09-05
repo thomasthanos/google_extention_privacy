@@ -95,11 +95,6 @@ window.NexusExt = window.NexusExt || {};
     if (!response) return null;
     if (response.error?.code === 'requires_login') return response.error;
     if (isLoginUrl(response.finalUrl)) return createLoginError(context);
-    /* Errors.request already ran classifyContent over this exact body and surfaced anything it found
-       on response.error. Running it again scanned the same 200 KB a second time and, because
-       Errors.create records every error it builds, wrote a duplicate entry into the error log — so a
-       logged-out collection run reported each failure twice. Every Errors.request result carries an
-       `error` key, so its presence is the signal that the work is already done. */
     if ('error' in response) return null;
     const contentError = Errors.classifyContent(response.text, {
       status: response.status || null,

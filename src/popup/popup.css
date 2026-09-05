@@ -155,7 +155,6 @@ html, body {
   margin-bottom: 10px;
 }
 
-/* ── Tab bar ─────────────────────────────────── */
 .popup-tabs {
   position: relative;
   display: grid;
@@ -206,8 +205,6 @@ html, body {
   cursor: pointer;
   transition: color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
   white-space: nowrap;
-  /* Flex items default to min-width:auto, so a long translation would push the tab bar wider than
-     the popup rather than shrinking. Ellipsise instead. */
   min-width: 0;
 }
 
@@ -232,7 +229,6 @@ html, body {
   color: var(--nxtk-text-bright);
 }
 
-/* ── Tab panels ──────────────────────────────── */
 .popup-tab-panel[hidden] { display: none; }
 
 .popup-tab-panel {
@@ -672,7 +668,6 @@ html, body {
   box-shadow: 0 0 8px rgba(77, 219, 120, 0.45);
 }
 
-/* ── Donate grid (replaces Ko-fi primary) ─── */
 .support-donate-grid {
   display: flex;
   flex-direction: column;
@@ -728,7 +723,6 @@ html, body {
   filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
 }
 
-/* GitHub — dark */
 .support-donate-icon--github {
   background: linear-gradient(145deg, #3a3a4a, #24292e);
   box-shadow:
@@ -736,7 +730,6 @@ html, body {
     0 4px 10px rgba(0,0,0,0.35);
 }
 
-/* PayPal — blue */
 .support-donate-icon--paypal {
   background: linear-gradient(145deg, #009cde, #003087);
   box-shadow:
@@ -744,7 +737,6 @@ html, body {
     0 4px 10px rgba(0, 112, 200, 0.40);
 }
 
-/* Revolut — slate-purple */
 .support-donate-icon--revolut {
   background: linear-gradient(145deg, #7c3fe4, #191c2e);
   box-shadow:

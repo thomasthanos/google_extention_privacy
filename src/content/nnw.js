@@ -1831,4 +1831,3 @@ window.NexusExt = window.NexusExt || {};
     refreshAdTimerCookie
   };
 })();
-

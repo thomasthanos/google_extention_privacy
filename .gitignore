@@ -1,12 +1,9 @@
-# Build artifacts
 *.zip
 dist/
 
-# Wrangler
 .wrangler
 node_modules/
 
-# Secrets — never commit
 .env*
 .dev.vars*
 nexus.mods.bypass/.claude/settings.local.json
@@ -14,9 +11,7 @@ nexus.mods.bypass/.claude/settings.local.json
 /internal/promo
 /LeadManagerUI
 
-# Reference userscripts to port from — not part of the package
 you need to add this (gitgnore this folder)/
 nexusmods
 
-# Development & internal tools
 tools/

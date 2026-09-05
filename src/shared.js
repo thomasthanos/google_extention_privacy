@@ -27,7 +27,7 @@
     NDC_downloadSpeed: 3.2,
     ForceEnglish: false,
     NDC_downloadMethod: 0,
-    WabbajackImport: false  
+    WabbajackImport: false
   };
 
   function escapeHtml(value) {
@@ -284,7 +284,7 @@
     [/\bOPR\/([\d.]+)/, 'Opera'],
     [/\bVivaldi\/([\d.]+)/, 'Vivaldi'],
     [/\bFirefox\/([\d.]+)/, 'Firefox'],
-    [/\bChrome\/([\d.]+)/, 'Chrome'],            
+    [/\bChrome\/([\d.]+)/, 'Chrome'],
     [/\bVersion\/([\d.]+).*\bSafari\//, 'Safari']
   ];
 
@@ -400,8 +400,6 @@
     for (const [key, value] of Object.entries(cfg)) {
       let line = `${key}: ${sanitizeDiagnosticText(value, 120)}`;
       if (key === 'DownloadFolder') {
-        /* Typed by the user, and this report is pasted into a public GitHub issue, so it can carry a
-           real name or a full path. Whether it is set is the diagnostic value; the text is not. */
         const folder = String(value ?? '');
         line = `${key}: ${folder ? `(set, ${folder.length} characters)` : '(empty — saves straight to Downloads)'}`;
       }
@@ -486,10 +484,6 @@
     return lines;
   }
 
-  /* Fitting a report inside GitHub's URL limit can take up to eight rebuilds. Each one re-read the
-     settings and the whole error log from storage and re-probed the user agent — a probe that races a
-     500ms timeout every time. None of it changes between attempts, so it is gathered once per report
-     and released again afterwards. */
   let reportCache = null;
 
   async function cachedSettings() {

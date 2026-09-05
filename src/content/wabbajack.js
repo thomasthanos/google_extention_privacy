@@ -3,11 +3,6 @@ window.NexusExt = window.NexusExt || {};
 (function () {
   'use strict';
 
-  /* A .wabbajack file is a ZIP whose "modlist" entry is a JSON manifest of every archive the list
-     needs. The userscript this is ported from pulled zip.js off a CDN, which a Manifest V3 extension
-     cannot do — remote code is blocked outright. Reading the one small entry we care about out of a
-     ZIP is a couple of hundred lines, and the repo already contains the mirror image of this logic in
-     tools/build-zip.mjs, so it carries no dependency and nothing to keep patched. */
 
   const SIG_EOCD = 0x06054b50;
   const SIG_EOCD64_LOCATOR = 0x07064b50;
@@ -20,8 +15,6 @@ window.NexusExt = window.NexusExt || {};
   const U32_MAX = 0xffffffff;
   const U16_MAX = 0xffff;
 
-  /* The manifest is JSON and stays well under this even for very large lists; the cap is here so a
-     malformed or hostile archive cannot claim a multi-gigabyte entry and exhaust the tab. */
   const MAX_MODLIST_BYTES = 64 * 1024 * 1024;
 
   class WabbajackError extends Error {
@@ -39,8 +32,6 @@ window.NexusExt = window.NexusExt || {};
   }
 
   function findEocdOffset(view) {
-    /* The end-of-central-directory record sits at the very end unless the archive carries a comment,
-       so scan backwards for its signature rather than assuming a fixed offset. */
     for (let offset = view.byteLength - EOCD_MIN_BYTES; offset >= 0; offset -= 1) {
       if (view.getUint32(offset, true) === SIG_EOCD) return offset;
     }
@@ -57,8 +48,6 @@ window.NexusExt = window.NexusExt || {};
     let size = tail.getUint32(eocd + 12, true);
     let offset = tail.getUint32(eocd + 16, true);
 
-    /* Real modlists routinely exceed 4 GB, at which point the 32-bit fields above are saturated and
-       the true values live in a ZIP64 record found through its own locator. */
     if (offset === U32_MAX || size === U32_MAX || entries === U16_MAX) {
       const tailStart = file.size - tailBytes;
       let locator = -1;
@@ -81,8 +70,6 @@ window.NexusExt = window.NexusExt || {};
   }
 
   function readZip64Extra(view, start, length, needs) {
-    /* Each saturated 32-bit field is replaced, in order, by a 64-bit value inside the 0x0001 extra
-       field — so which values are present depends on which fields were saturated. */
     let at = start;
     const end = start + length;
     while (at + 4 <= end) {
@@ -159,8 +146,6 @@ window.NexusExt = window.NexusExt || {};
       throw new WabbajackError('unsupported-compression', `Unsupported ZIP compression method ${entry.method}.`);
     }
 
-    /* The central directory records the name and extra-field lengths the *local* header uses, and the
-       two are allowed to differ, so the data offset has to come from the local header itself. */
     const local = await readSlice(file, entry.localOffset, entry.localOffset + 30);
     if (local.byteLength < 30 || local.getUint32(0, true) !== SIG_LOCAL) {
       throw new WabbajackError('bad-entry', 'The modlist entry has no valid local header.');
@@ -174,16 +159,6 @@ window.NexusExt = window.NexusExt || {};
     return entry.method === 0 ? bytes : inflateRaw(bytes);
   }
 
-  /* Wabbajack's own game registry, keyed by the GameName the manifest carries:
-     https://github.com/wabbajack-tools/wabbajack/blob/main/Wabbajack.DTOs/Game/GameRegistry.cs
-     It is only a fast path — anything missing is resolved from the mod page at download time, so a
-     list for a game added after this snapshot still works. Entries Nexus does not host are null. */
-  /* Wabbajack's own game registry, keyed by the GameName its manifest carries:
-     https://github.com/wabbajack-tools/wabbajack/blob/main/Wabbajack.DTOs/Game/GameRegistry.cs
-     Both halves are needed: the numeric id goes to the download endpoint, and the domain builds the
-     mod page URL the queue validates. The domain cannot be guessed from the Wabbajack name —
-     FalloutNewVegas lives at /newvegas — so a game missing here is reported rather than guessed at.
-     Entries Nexus does not host are null. */
   const GAMES = Object.freeze({
     Morrowind: { domain: 'morrowind', id: 100 },
     Oblivion: { domain: 'oblivion', id: 101 },
@@ -233,7 +208,6 @@ window.NexusExt = window.NexusExt || {};
     const state = archive?.State;
     if (!state || typeof state !== 'object') return false;
     if (NEXUS_STATE_TYPES.test(String(state.$type || ''))) return true;
-    /* Older manifests spell the discriminator differently; the field shape is the reliable signal. */
     return state.GameName !== undefined && state.ModID !== undefined && state.FileID !== undefined;
   }
 
@@ -242,9 +216,6 @@ window.NexusExt = window.NexusExt || {};
     return Number.isInteger(number) && number > 0 ? number : null;
   }
 
-  /* Every archive is accounted for: usable ones become items, the rest are named with a reason so the
-     user can see what a list needs that the extension cannot fetch, instead of silently getting a
-     shorter queue than the modlist. */
   function collectNexusArchives(modlist) {
     const archives = Array.isArray(modlist?.Archives) ? modlist.Archives : [];
     const items = [];
@@ -266,8 +237,6 @@ window.NexusExt = window.NexusExt || {};
         continue;
       }
 
-      /* The domain cannot be derived from the Wabbajack name, so an unrecognised game is reported
-         rather than guessed — a wrong domain would just 404 for every file of that game. */
       const game = GAMES[gameName];
       if (!game) {
         skip(name, `unknown-game:${gameName}`);
@@ -290,9 +259,6 @@ window.NexusExt = window.NexusExt || {};
     return { items, skipped };
   }
 
-  /* The exact shape the collection GraphQL query produces, so a modlist can be handed to the existing
-     queue untouched — which means its pacing, rate-limit backoff, download history, resume and both
-     the Vortex and browser paths all apply with no queue changes at all. */
   function toCollectionMods(list) {
     const items = Array.isArray(list?.items) ? list.items : [];
     return items.map((item) => ({
