@@ -131,6 +131,7 @@
   }
 
   let routeChangeTimer = null;
+  // Serialize SPA route updates so navigation cannot race deck setup.
   let routeChangeChain = Promise.resolve();
   function handleRouteChange() {
     clearTimeout(routeChangeTimer);
@@ -192,9 +193,6 @@
       initAttempts += 1;
       const retryDelay = Math.min(INIT_RETRY_BASE_MS * Math.pow(2, initAttempts - 1), INIT_RETRY_MAX_MS);
       initRetryAt = Date.now() + retryDelay;
-      /* Arm an actual timer. The backoff deadline is only consulted from handleRouteChange, which
-         fires on a URL change or on DOM churn — so on a quiet page nothing ever came back to check
-         it and a collection that failed to load once stayed broken until the user navigated. */
       clearTimeout(initRetryTimer);
       initRetryTimer = setTimeout(() => {
         initRetryTimer = null;
@@ -260,9 +258,6 @@
       if (mutations.every(isExtensionOwnedMutation)) return;
       syncNavigation();
       handleRouteChange();
-      /* An SPA navigation always rewrites the page, so this — not the poll — is what actually
-         notices one. Re-rate here so arriving on a mod page speeds the backstop up immediately
-         instead of on the next idle tick. */
       syncPollRate();
     });
 
@@ -279,10 +274,6 @@
     syncObserverRoot();
     handleRouteChange();
 
-    /* Nexus routes with pushState from the page's own world, which a content script in an isolated
-       world cannot observe — hence the poll. It only has to be quick on pages the extension acts
-       on; on the rest of the site (forums, profiles, search, news) a slower beat is enough, and
-       this content script runs on all of them for the whole time a tab is open. */
     let pollTimer = null;
     let pollInterval = 0;
 

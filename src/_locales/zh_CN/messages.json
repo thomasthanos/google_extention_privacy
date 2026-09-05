@@ -161,6 +161,12 @@
   "errModerationHoldFix": {
     "message": "请等待 Nexus Mods 审核通过后再下载。"
   },
+  "errModUnavailableMsg": {
+    "message": "此Mod已被作者隐藏或删除。"
+  },
+  "errModUnavailableFix": {
+    "message": "该Mod在Nexus Mods上已不可用。请寻找替代方案或联系Mod作者。"
+  },
   "errServerErrorMsg": {
     "message": "Nexus Mods 服务器端出现问题。"
   },

@@ -14,7 +14,6 @@
   --accent-soft: rgba(217, 143, 64, 0.14);
   --radius: 14px;
   --radius-sm: 10px;
-  /* global scale — tuned per screen size below */
   --s: 0.82;
 }
 
@@ -52,7 +51,6 @@ body::before {
   padding: calc(46px * var(--s)) calc(20px * var(--s)) calc(38px * var(--s));
 }
 
-/* ---------- svg icons ---------- */
 .ico {
   width: 1em;
   height: 1em;
@@ -64,7 +62,6 @@ body::before {
   flex: 0 0 auto;
 }
 
-/* ---------- hero ---------- */
 .hero { text-align: center; margin-bottom: calc(34px * var(--s)); }
 
 .hero-icon {
@@ -117,7 +114,6 @@ body::before {
 
 .badge .ico { color: var(--accent-hover); width: 1.15em; height: 1.15em; }
 
-/* ---------- panels ---------- */
 .steps,
 .card {
   position: relative;
@@ -210,7 +206,6 @@ body::before {
 
 .steps p { color: var(--text-muted); font-size: calc(13px * var(--s)); }
 
-/* ---------- cards ---------- */
 .cards {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -237,7 +232,6 @@ body::before {
 .card h3 { font-size: calc(14px * var(--s)); color: var(--text-bright); margin-bottom: 4px; letter-spacing: -0.2px; }
 .card p { font-size: calc(12.5px * var(--s)); color: var(--text-muted); }
 
-/* ---------- actions ---------- */
 .actions {
   display: flex;
   gap: calc(10px * var(--s));
@@ -287,7 +281,6 @@ body::before {
   margin: 0 auto;
 }
 
-/* ---------- motion ---------- */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
@@ -301,14 +294,9 @@ body::before {
 .actions { animation-delay: 0.18s; }
 .disclaimer { animation-delay: 0.24s; }
 
-/* ---------- responsive scale ---------- */
-/* 720p and smaller laptops */
 @media (min-width: 1000px) { :root { --s: 0.8; } }
-/* 1080p */
 @media (min-width: 1600px) { :root { --s: 0.85; } }
-/* 2K / 1440p */
 @media (min-width: 2000px) { :root { --s: 1; } }
-/* 4K */
 @media (min-width: 3000px) { :root { --s: 1.35; } }
 
 @media (max-width: 640px) {

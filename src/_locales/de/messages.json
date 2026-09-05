@@ -161,6 +161,12 @@
   "errModerationHoldFix": {
     "message": "Warten Sie, bis Nexus Mods die Datei freigibt."
   },
+  "errModUnavailableMsg": {
+    "message": "Diese Mod wurde vom Autor versteckt oder entfernt."
+  },
+  "errModUnavailableFix": {
+    "message": "Die Mod ist nicht mehr auf Nexus Mods verfügbar. Suchen Sie nach einer Alternative oder kontaktieren Sie den Mod-Autor."
+  },
   "errServerErrorMsg": {
     "message": "Bei Nexus Mods liegt ein serverseitiges Problem vor."
   },

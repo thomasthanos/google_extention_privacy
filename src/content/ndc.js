@@ -134,11 +134,6 @@ window.NexusExt = window.NexusExt || {};
         this.onSettingsChanged = null;
       }
       this.releaseRunClaim();
-      /* Detach, do not stop. dispose() runs from teardownActiveCollection() on every SPA route change
-         away from the collection page, so stopping here meant that clicking a mod title mid-run
-         cancelled the in-flight download and dropped the rest of the queue. The job is built to
-         outlive this: reconcileNdcJobs() re-drives it and NDC_QUEUE_ATTACH re-adopts it, which is why
-         a full page reload already survived. Only the explicit Stop button should halt a run. */
       this.settleBrowserQueue?.('stopped');
       for (const controller of [this.downloadController, this.lifecycleController]) {
         try {
@@ -148,6 +143,7 @@ window.NexusExt = window.NexusExt || {};
       this.downloadController = null;
     }
 
+    // Renew the worker claim to prevent duplicate collection runs across tabs.
     async acquireRunClaim() {
       const reply = await NexusExt.Storage.sendDownloadCommand('NDC_RUN_CLAIM', {
         gameId: this.gameId,
@@ -238,10 +234,6 @@ window.NexusExt = window.NexusExt || {};
       NXTK.setForceEnglish(next.ForceEnglish);
     }
 
-    /* Seeds the queue from a list the caller already has, instead of fetching a collection. Used by
-       the Wabbajack import: the modlist names every file, and there is no collection to fetch. Sets
-       up exactly the same state init() does, so pacing, history, resume and both download paths
-       behave identically from here on. */
     async initFromMods(mods) {
       const settings = await NexusExt.Storage.getSettings();
       this.pauseBetweenDownload = settings.NDC_pauseBetweenDownload;
@@ -255,7 +247,6 @@ window.NexusExt = window.NexusExt || {};
       this.watchSettings();
 
       const sorted = [...mods].sort((a, b) => nameCollator.compare(a.file.mod.name, b.file.mod.name));
-      /* Nothing here is optional: a modlist is the whole list or nothing. */
       this.mods = { all: sorted, mandatory: sorted, optional: [] };
       this.external = true;
       this.initialized = true;
@@ -361,7 +352,6 @@ window.NexusExt = window.NexusExt || {};
           }
         }
       } else {
-        // Same ad-timer refresh the single-file path uses; see NNW.refreshAdTimerCookie.
         NexusExt.NNW?.refreshAdTimerCookie?.();
         const generatedResponse = await Errors.request(
           'https://www.nexusmods.com/Core/Libs/Common/Managers/Downloads?GenerateDownloadUrl',
@@ -512,11 +502,6 @@ window.NexusExt = window.NexusExt || {};
           const waitSeconds = this.noteRateLimited(result.rateLimit?.retryAfterSeconds);
           this.ui.logText(TS('logBackingOff', [formatDuration(waitSeconds)],
             `Nexus Mods is rate limiting requests. Backing off ${formatDuration(waitSeconds)}.`), 'info');
-          /* Only spend the wait when there is an attempt left to spend it on. This used to sit out a
-             multi-minute backoff on the final attempt and then fail the mod regardless. noteRateLimited
-             has already published the deadline, so runCollection's own waitOutRateLimit() before the
-             next mod still honours it — the run backs off either way, it just no longer stalls for
-             minutes to no purpose. */
           if (attempt >= attempts) return result;
           await this.waitOutRateLimit();
           if (this.isStopped()) return result;
@@ -532,10 +517,6 @@ window.NexusExt = window.NexusExt || {};
       return result;
     }
 
-    /* Every link the deck offers the user must carry the run's own download method. mod.file.url is
-       a bare `?tab=files&file_id=N`, and opening that during a Vortex run lands on a page the content
-       script auto-starts as a BROWSER download — so the file drops into the browser's download folder
-       instead of being handed to Vortex, and never gets imported. */
     fileLinkFor(mod) {
       const url = mod.file.url;
       return this.downloadMethod === DOWNLOAD_METHOD_VORTEX ? `${url}&nmm=1` : url;
@@ -575,9 +556,6 @@ window.NexusExt = window.NexusExt || {};
       if (result.downloadUrl) {
         if (this.handOffDownload(mod, result.downloadUrl, 'Retry:')) {
           NXTK.bumpTotalDownloads?.();
-          /* The main loop records history immediately after a successful hand-off. Without the same
-             call here a retried file stays absent from history, so the next run over this collection
-             hands it to Vortex a second time — one duplicate per file the user ever retried. */
           if (type !== null) {
             try {
               await this.recordHistoryEntry(type, mod.fileId);
@@ -773,6 +751,7 @@ window.NexusExt = window.NexusExt || {};
           }
         };
 
+        // Bind progress only after the event is matched to this job.
         const onQueueEvent = (message) => {
           if (!/^NXT_NDC_/.test(String(message?.type || ''))) return false;
           if (this.backgroundJobId) {
@@ -1072,10 +1051,6 @@ window.NexusExt = window.NexusExt || {};
           break;
         }
 
-        /* The pause exists to space out real Vortex transfers, so it is only owed after a file was
-           actually handed over. It used to run for every mod, meaning a failed link resolution still
-           cost a full size-based sleep — on a big archive that is minutes of waiting for a download
-           that never started. */
         if (handedOff && index < mods.length - 1) {
           const computePause = () => {
             if (this.pauseBetweenDownload === 0) return 0;

@@ -161,6 +161,12 @@
   "errModerationHoldFix": {
     "message": "Περιμένετε να εγκρίνει το Nexus Mods το αρχείο πριν το κατεβάσετε."
   },
+  "errModUnavailableMsg": {
+    "message": "Αυτό το mod έχει κρυφτεί ή αφαιρεθεί από τον δημιουργό του."
+  },
+  "errModUnavailableFix": {
+    "message": "Το mod δεν είναι πλέον διαθέσιμο στο Nexus Mods. Αναζητήστε εναλλακτικό ή επικοινωνήστε με τον δημιουργό."
+  },
   "errServerErrorMsg": {
     "message": "Το Nexus Mods αντιμετωπίζει πρόβλημα στον διακομιστή."
   },

@@ -161,6 +161,12 @@
   "errModerationHoldFix": {
     "message": "다운로드하기 전에 Nexus Mods의 승인을 기다리세요."
   },
+  "errModUnavailableMsg": {
+    "message": "이 모드는 작성자에 의해 숨겨지거나 삭제되었습니다."
+  },
+  "errModUnavailableFix": {
+    "message": "이 모드는 더 이상 Nexus Mods에서 사용할 수 없습니다. 대안을 찾거나 모드 작성자에게 문의하세요."
+  },
   "errServerErrorMsg": {
     "message": "Nexus Mods에 서버 측 문제가 발생했습니다."
   },

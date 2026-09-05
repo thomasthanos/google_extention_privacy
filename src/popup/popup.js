@@ -194,8 +194,6 @@
     const cfg = await getSettings();
     NXTK.setForceEnglish(cfg.ForceEnglish);
     applyI18n();
-    /* The page is rendered in the catalogue language but the document still declared
-       lang="en", so screen readers and hyphenation used the wrong language rules. */
     syncDocumentLanguage(cfg.ForceEnglish);
 
     const tabList = document.querySelector('.popup-tabs');

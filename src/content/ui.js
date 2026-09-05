@@ -109,10 +109,6 @@ window.NexusExt = window.NexusExt || {};
       const label = button.querySelector('[data-report-label]') || button;
       const originalText = label.textContent;
       button.disabled = true;
-      /* The third case is truncated *and* not on the clipboard, so the maintainer will only ever
-         see the short report. popupReportNoCopy is the popup's wording for the same outcome and
-         is already translated in all 13 locales; dlgReportOpeningPrefilled would claim the report
-         went through. */
       label.textContent = complete
         ? NXTK.t('dlgReportOpeningFull', null, 'GitHub opens with the full report…')
         : copied
@@ -442,8 +438,6 @@ window.NexusExt = window.NexusExt || {};
     if (dropdownInteractionBlockerBound) return;
     dropdownInteractionBlockerBound = true;
 
-    /* pointerdown does not gate scrolling, so it stays bound for the life of the page. Only the
-       scroll-cancelling listeners are attached on demand — see syncOverlayScrollLock. */
     document.addEventListener('pointerdown', (event) => {
       const openMenus = getOpenDropdownMenus();
       if (!openMenus.length || isDropdownUiTarget(event.target, openMenus)) return;
@@ -501,14 +495,6 @@ window.NexusExt = window.NexusExt || {};
   }
   ensureModalInteractionGuard();
 
-  /* Cancelling a scroll needs `passive: false`, which forces the browser to block on JS before every
-     wheel and touchmove frame. These listeners used to be bound for the whole life of every page the
-     content script matches — the entire site, not just pages with extension UI — so every scroll frame
-     paid for a handler that almost always early-returned after a document-wide querySelectorAll.
-     They are now attached only while an extension overlay is actually open, and removed again after.
-     The handler below merges what used to be two separate capture listeners on `document`; since
-     stopPropagation does not stop other listeners on the same node, both bodies always ran, so running
-     them in sequence here is equivalent. */
   function applyDropdownScrollBlock(event) {
     const openMenus = getOpenDropdownMenus();
     if (!openMenus.length || isDropdownUiTarget(event.target, openMenus)) return;
@@ -533,10 +519,8 @@ window.NexusExt = window.NexusExt || {};
     applyDropdownScrollBlock(event);
   }
 
+  // Install blocking scroll handlers only while extension overlays are open.
   function syncOverlayScrollLock() {
-    /* getOpenDropdownMenus() rather than the raw Set: the Set can still hold menus that have been
-       disconnected, and reading through the getter prunes them, so the lock is not held open by a
-       menu that is already gone. */
     const needed = getOpenDropdownMenus().length > 0 || !!document.querySelector('.nxtk-modal-backdrop');
     if (needed === overlayScrollLockAttached) return;
     overlayScrollLockAttached = needed;
@@ -549,9 +533,6 @@ window.NexusExt = window.NexusExt || {};
     document.removeEventListener('touchmove', onOverlayTouchMove, true);
   }
 
-  /* Every modal appends its backdrop directly to document.body and removes it there, across nine
-     separate builders. Watching body's direct children — childList only, no subtree — catches all of
-     them without threading a hook through each one, and body's own child list changes rarely. */
   function watchOverlayPresence() {
     if (!document.body) return;
     new MutationObserver(syncOverlayScrollLock)
@@ -810,8 +791,6 @@ window.NexusExt = window.NexusExt || {};
 
     const modal = document.createElement('div');
     modal.className = 'nxtk-modal nxtk-modal-sm';
-    /* Every other dialog in here announces itself; this one did not, so a screen reader read it as
-       plain page content and keyboard focus stayed behind it on the page underneath. */
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-label', NXTK.t('setTitle', null, 'Download Helper Settings'));
@@ -909,8 +888,6 @@ window.NexusExt = window.NexusExt || {};
       if (NexusExt.NNW) NexusExt.NNW.updateConfig(cfg);
 
       if (key === 'WabbajackImport') {
-        /* Two entry points: this dialog, reachable from any Nexus page, and the collection deck's
-           Actions row when one is open. Both follow the switch immediately rather than on reload. */
         for (const id of ['#nxtk-wj-import', '#nxtk-wj-deck-import', '#nxtk-wj-info']) {
           const button = id === '#nxtk-wj-import' ? modal.querySelector(id) : document.querySelector(id);
           if (button) button.hidden = !value;
@@ -918,10 +895,6 @@ window.NexusExt = window.NexusExt || {};
       }
 
       if (key === 'ForceEnglish') {
-        /* Nothing injected into the page carries data-i18n — every string is baked in at build time
-           by L()/T() — so flipping the flag alone changed nothing the user could see and the switch
-           looked broken. Rebuild this dialog so the change is visible where it was made; the deck
-           picks the new language up the next time it is built. */
         NXTK.setForceEnglish(value);
         close();
         showSettingsModal().catch(() => undefined);
@@ -935,13 +908,10 @@ window.NexusExt = window.NexusExt || {};
       }
       if (e.key === 'Escape') close();
     };
-    /* Typed fields settle before they are written. `input` fires per keystroke, and update() writes to
-       storage, reloads the whole config and re-broadcasts it to every content script — so typing
-       "45000" into a timeout persisted 4, then 45, then 450, then 4500, then 45000, each a full round
-       trip. Anything still pending is flushed on close, so closing mid-edit does not drop the value. */
     const SETTING_INPUT_DEBOUNCE_MS = 400;
     const pendingInputWrites = new Map();
 
+    // Flush pending edits before removing the settings dialog.
     const flushPendingInputWrites = () => {
       for (const [target, timer] of pendingInputWrites) {
         clearTimeout(timer);
@@ -985,14 +955,12 @@ window.NexusExt = window.NexusExt || {};
       advancedToggle.classList.toggle('nxtk-expanded', open);
       if (open) {
         advancedBody.hidden = false;
-        void advancedBody.offsetHeight; // flush the collapsed state so the transition has a start value
+        void advancedBody.offsetHeight;
         advancedBody.classList.add('nxtk-open');
-        // the panel clips itself while it grows; let tooltips escape once it has settled
         advancedCloseTimer = setTimeout(() => advancedBody.classList.add('nxtk-settled'), 280);
         return;
       }
       advancedBody.classList.remove('nxtk-open', 'nxtk-settled');
-      // hide it only once it has finished collapsing, so it stays out of the tab order
       advancedCloseTimer = setTimeout(() => { advancedBody.hidden = true; }, 280);
     };
     advancedToggle.addEventListener('click', () => setAdvanced(!advancedBody.classList.contains('nxtk-open')));
@@ -1105,10 +1073,6 @@ window.NexusExt = window.NexusExt || {};
         </div>
         <div class="nxtk-history-summary">
           <div class="nxtk-history-copy">
-            <!-- "marked as downloaded", not "you downloaded": in Vortex mode the entry
-                 records that a file was SENT to Vortex, which the browser cannot verify
-                 was received. Asserting it outright misled anyone whose Vortex was not
-                 running, since Skip then silently passed over files they never got. -->
             <div class="nxtk-history-lead">${escapeHtml(NXTK.t('dlgHistoryMarked', [String(downloadedCount), String(totalCount)], `${downloadedCount} of ${totalCount} mods are marked as downloaded.`))}</div>
             <div class="nxtk-history-text">${L('dlgHistoryHelp', 'Choose how you want this collection run to behave before anything starts. If files are missing, pick Re-download All.')}</div>
           </div>
@@ -1267,11 +1231,9 @@ window.NexusExt = window.NexusExt || {};
         <div class="nxtk-alert-body">
           <div class="nxtk-error-message">${escapeHtml(shown.message)}</div>
           <div class="nxtk-error-recovery">${escapeHtml(shown.recovery)}</div>
-          <!-- The code is a stable identifier and never translated; only its label is. -->
           <div class="nxtk-error-code">${escapeHtml(NXTK.t('dlgErrorId', null, 'Error ID'))}: ${escapeHtml(normalized.code)}</div>
         </div>
         <div class="nxtk-modal-footer nxtk-alert-footer nxtk-error-footer">
-          <!-- Distinct from btnReportBug: that key is the popup's longer wording. -->
           <button class="nxtk-btn nxtk-btn-secondary" type="button" data-report>${escapeHtml(NXTK.t('dlgReportBug', null, 'Report a bug'))}</button>
           ${requiresLogin
             ? `<button class="nxtk-btn nxtk-btn-primary" type="button" data-login>${escapeHtml(NXTK.t('btnSignIn', null, 'Sign in to Nexus Mods'))}</button>`
@@ -1458,22 +1420,13 @@ window.NexusExt = window.NexusExt || {};
     }
   }
 
-  /* A Wabbajack modlist has no collection page to hang off, so its deck is mounted wherever the user
-     happens to be. main.js only tears a deck down while it is on a collection route, so this one
-     survives until the user opens a real collection — at which point that collection's deck should
-     take over anyway. */
   const WABBAJACK_UNSAFE_ID = /[^A-Za-z0-9._-]+/g;
 
   function wabbajackCollectionId(list) {
-    /* Doubles as the history key, so it has to satisfy the worker's isSafeId check. The wj- prefix
-       keeps it from ever colliding with a real collection slug. */
     const base = String(list?.name || '').replace(WABBAJACK_UNSAFE_ID, '-').replace(/^-+|-+$/g, '');
     return `wj-${base || 'modlist'}`.slice(0, 128);
   }
 
-  /* wabbajack.js records a reason for every archive it could not queue. Reporting only the count left
-     the user unable to tell WHICH files to fetch by hand — and the info dialog promises they are named
-     — so the full list goes into the deck's activity log, which is scrollable and copyable. */
   function logSkippedArchives(ndc, skipped) {
     if (!skipped?.length) return;
     ndc.ui?.logText?.(NXTK.t('wjSkippedHeading', null, 'Not queued from this modlist:'), 'info');
@@ -1493,7 +1446,6 @@ window.NexusExt = window.NexusExt || {};
     await ndc.initFromMods(mods);
 
     const deck = createControlDeck(ndc);
-    /* There is no collection here, so there are no revisions to diff against. */
     deck.querySelector('#nxtk-update-collection')?.remove();
 
     const host = document.getElementById('mainContent') || document.body;
@@ -1507,8 +1459,6 @@ window.NexusExt = window.NexusExt || {};
     const Wabbajack = NexusExt.Wabbajack;
     if (!Wabbajack) return;
 
-    /* Reading a large modlist inflates and parses megabytes of JSON, which is long enough for the
-       button to look dead and be clicked again, opening a second picker. */
     const triggers = Array.from(document.querySelectorAll('#nxtk-wj-import, #nxtk-wj-deck-import'));
     const setBusy = (busy) => triggers.forEach((button) => { button.disabled = busy; });
 
@@ -1521,9 +1471,6 @@ window.NexusExt = window.NexusExt || {};
 
       setBusy(true);
       try {
-        /* Everything from here on is guarded, not just the parse: mounting the deck reads settings
-           and builds a queue, and a throw inside this async listener would otherwise be an unhandled
-           rejection that closes the picker and shows the user nothing at all. */
         const list = await Wabbajack.readModlist(file);
         const mods = Wabbajack.toCollectionMods(list);
         const title = list.name || file.name;
@@ -1671,7 +1618,6 @@ window.NexusExt = window.NexusExt || {};
           </div>
         </div>
 
-        <!-- Main Buttons -->
         <div class="nxtk-panel" id="nxtk-buttons-area">
           <div class="nxtk-panel-label">${L('deckActions', 'Actions')}</div>
           <div class="nxtk-btn-row nxtk-btn-row-utility">
@@ -1719,7 +1665,6 @@ window.NexusExt = window.NexusExt || {};
         </div>
       </div>
 
-      <!-- Progress Area (hidden until download starts) -->
       <div class="nxtk-progress-area" id="nxtk-progress-area">
         <div class="nxtk-progress-head">
           <div class="nxtk-panel-label">${L('deckProgress', 'Download Progress')}</div>
@@ -1730,8 +1675,6 @@ window.NexusExt = window.NexusExt || {};
                aria-label="${L('ariaProgress', 'Collection download progress')}"
                aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="">
             <div class="nxtk-progress-fill" id="nxtk-progress-fill"></div>
-            <!-- Decorative: the accessible value lives on the progressbar above, and
-                 the state changes are announced through the live region below. -->
             <div class="nxtk-progress-labels" aria-hidden="true">
               <span class="nxtk-progress-pct" id="nxtk-pct">0%</span>
               <span class="nxtk-progress-status" id="nxtk-status-text">${L('statusDownloading', 'Downloading...')}</span>
@@ -1743,12 +1686,9 @@ window.NexusExt = window.NexusExt || {};
             <button class="nxtk-btn nxtk-btn-icon" id="nxtk-stop" title="${L('tipStop', 'Stop')}" aria-label="${L('ariaStop', 'Stop download')}">${svgIcon('stop')}</button>
           </div>
         </div>
-        <!-- Transitions only (started/paused/finished), never per-percent: a live
-             region on the percentage itself would talk over everything else. -->
         <div class="nxtk-sr-only" id="nxtk-progress-announce" role="status" aria-live="polite"></div>
       </div>
 
-      <!-- Log Console (collapsible) -->
       <div class="nxtk-log-wrap">
         <div class="nxtk-log-header">
           <button class="nxtk-log-toggle" id="nxtk-log-toggle">${svgIcon('chevronRight')} ${L('deckLogs', 'Logs')}</button>
@@ -1800,9 +1740,6 @@ window.NexusExt = window.NexusExt || {};
       input.addEventListener('change', async () => {
         const fileNames = Array.from(input.files, (file) => file.name);
         const { matched: downloaded, unmatchedCount } = matchModsToFileNames(ndc.mods.all, fileNames);
-        /* Merge, do not replace. setCollectionHistory overwrites the three lists wholesale, so
-           importing a second folder — or importing at all after a partial run — used to wipe every
-           mod already recorded as downloaded, and the next run re-fetched all of them. */
         const history = await NexusExt.Storage.getHistory();
         const existing = history?.[ndc.gameId]?.[ndc.collectionId] || {};
         const merge = (type, ids) => [...new Set([
@@ -2138,8 +2075,6 @@ window.NexusExt = window.NexusExt || {};
     const listEl = $('#nxtk-mod-list');
     const countBadge = $('#nxtk-sel-count');
     let lastChecked = null;
-    /* Indexed once. Export and Download-selected each did a full linear scan of every mod for every
-       selected row, so selecting most of a large collection cost O(selected x total). */
     const modsByFileId = new Map(ndc.mods.all.map((mod) => [String(mod.file.fileId), mod]));
 
     function updateCount() {
@@ -2147,10 +2082,6 @@ window.NexusExt = window.NexusExt || {};
       countBadge.textContent = NXTK.tPlural('selSelectedCount', c, `${c} mods selected`);
     }
 
-    /* Built as one string and parsed once. Each row used to get its own innerHTML assignment, its own
-       textContent read back out of the DOM to build the search key, and its own click closure — on a
-       500-mod collection that is 500 parses, 500 forced text reads and 500 closures, repeated every
-       time the list is sorted or filtered. The click handler is delegated to the container instead. */
     function renderList(mods) {
       const rows = mods.map((mod, i) => {
         const modName = mod.file.mod.name;
@@ -2350,7 +2281,6 @@ window.NexusExt = window.NexusExt || {};
 
     modal.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => closeModal('nxtk-select-modal')));
     backdrop.addEventListener('click', e => { if (e.target === backdrop) closeModal('nxtk-select-modal'); });
-    /* Every other dialog closes on Escape; these two were the exceptions. */
     const onSelectKeyDown = (event) => {
       if (!document.contains(backdrop)) {
         document.removeEventListener('keydown', onSelectKeyDown);
@@ -2660,11 +2590,6 @@ window.NexusExt = window.NexusExt || {};
     document.body.appendChild(backdrop);
   }
 
-  /* Announces the tab close that follows a Vortex handoff, and lets the user stop it. The page
-     cannot tell whether Vortex actually received the nxm: link, so the close is the one moment
-     where a failed handoff is still recoverable — it must not happen silently. Returns a disposer;
-     calling it dismisses the toast WITHOUT running onCancel, so an internal cancellation is not
-     mistaken for the user pressing the button. */
   function showCloseCountdown({ ms = 3000, onDone = null, onCancel = null } = {}) {
     const total = Math.max(1000, Number(ms) || 3000);
     let remaining = Math.ceil(total / 1000);
@@ -2679,9 +2604,6 @@ window.NexusExt = window.NexusExt || {};
     const copy = document.createElement('div');
     copy.className = 'nxtk-close-toast-copy';
 
-    /* The live region is the title, which is written once. The countdown beside it is rewritten
-       every second, so it is hidden from assistive tech — announcing the whole toast on each tick
-       is noise, and the Keep open button already carries the action. */
     const title = document.createElement('strong');
     title.setAttribute('role', 'status');
     title.setAttribute('aria-live', 'polite');
